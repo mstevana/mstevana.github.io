@@ -93,7 +93,8 @@
     padding:14px;
     min-height:0;
   }
-  .search-wrap{ position:relative; margin-bottom:14px; }
+  .search-row{ display:flex; align-items:stretch; gap:8px; margin-bottom:14px; }
+  .search-wrap{ position:relative; flex:1 1 auto; min-width:0; }
   .search-input{
     width:100%;
     box-sizing:border-box;
@@ -215,7 +216,7 @@
   #map{ grid-area:map; min-width:0; min-height:0; }
   #drag-handle{ display:none; }
 
-  .reset-btn, .locate-btn-block{
+  .reset-btn{
     width:100%;
     margin-top:6px;
     padding:9px 10px;
@@ -226,11 +227,28 @@
     font-weight:500;
     cursor:pointer;
     letter-spacing:0.01em;
+    background:var(--ink); color:var(--parchment);
   }
-  .reset-btn{ background:var(--ink); color:var(--parchment); }
   .reset-btn:hover{ opacity:0.88; }
-  .locate-btn-block{ background:#2E86FF; color:#fff; }
-  .locate-btn-block:hover{ background:#2372DE; }
+  .locate-btn{
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    padding:0 12px;
+    border:none;
+    border-radius:8px;
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:12.5px;
+    font-weight:500;
+    cursor:pointer;
+    letter-spacing:0.01em;
+    white-space:nowrap;
+    background:#2E86FF; color:#fff;
+  }
+  .locate-btn:hover{ background:#2372DE; }
+  .locate-btn .icon{ font-size:14px; line-height:1; }
   .locate-status{
     font-size:11px;
     color:rgba(27,29,27,0.65);
@@ -1140,12 +1158,26 @@ function buildSearchBar(){
   return wrap;
 }
 
+function buildLocateButton(){
+  const btn = document.createElement('button');
+  btn.className = 'locate-btn';
+  btn.innerHTML = '<span class="icon">📍</span>Location';
+  btn.title = 'Show my location';
+  btn.setAttribute('aria-label', 'Show my location');
+  btn.addEventListener('click', locateMe);
+  return btn;
+}
+
 function renderSidebar(){
   // On mobile the <header> is moved into the sidebar; preserve it across re-renders.
   const movedHeader = (headerEl && headerEl.parentElement === sidebarEl) ? headerEl : null;
   sidebarEl.innerHTML = '';
   if (movedHeader) sidebarEl.appendChild(movedHeader);
-  sidebarEl.appendChild(buildSearchBar());
+  const searchRow = document.createElement('div');
+  searchRow.className = 'search-row';
+  searchRow.appendChild(buildSearchBar());
+  searchRow.appendChild(buildLocateButton());
+  sidebarEl.appendChild(searchRow);
 
   const anyOn = Object.values(catState).some(s => s.on);
   const q = filterQuery.trim().toLowerCase();
@@ -1217,12 +1249,6 @@ function renderSidebar(){
   resetBtn.textContent = activeLineId ? 'Show all routes' : 'Reset view';
   resetBtn.addEventListener('click', resetView);
   sidebarEl.appendChild(resetBtn);
-
-  const locBtn = document.createElement('button');
-  locBtn.className = 'locate-btn-block';
-  locBtn.textContent = '📍 Show my location';
-  locBtn.addEventListener('click', locateMe);
-  sidebarEl.appendChild(locBtn);
 
   const status = document.createElement('div');
   status.className = 'locate-status';
