@@ -337,6 +337,44 @@
   }
   .path-total b{ color:var(--ink); }
 
+  .path-code{
+    margin-top:10px;
+    padding:10px 10px 0;
+    border-top:1px solid var(--line);
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .path-total + .path-code{ border-top:none; margin-top:0; padding-top:0; } /* avoid a doubled rule */
+  .path-code-row{ display:flex; gap:6px; }
+  .path-code-input{
+    flex:1 1 auto;
+    min-width:0;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    letter-spacing:0.03em;
+    padding:7px 8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    background:#fff;
+    color:var(--ink);
+  }
+  .path-code-btn, .path-code-load-btn{
+    flex:0 0 auto;
+    padding:7px 12px;
+    border:none;
+    border-radius:6px;
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:12px;
+    font-weight:500;
+    cursor:pointer;
+    background:var(--ink);
+    color:var(--parchment);
+  }
+  .path-code-btn:hover, .path-code-load-btn:hover{ opacity:0.88; }
+  .path-code-load-btn{ background:transparent; color:var(--ink); border:1px solid var(--line); align-self:flex-start; }
+  .path-code-empty{ margin-top:6px; padding-top:0; border-top:none; }
+
   #map{ grid-area:map; min-width:0; min-height:0; }
 
   .mobile-tabs{ display:none; } /* shown only in the mobile media query below */
@@ -1274,12 +1312,87 @@ Object.entries(CATEGORIES).forEach(([catKey, cat]) => {
   if (cat.defaultOn) built.layer.addTo(map);
 });
 
+/* ============ PATH CODE (compact shareable/typeable path encoding) ============ */
+// Every addable location gets a stable position-based index, in the order pathLocById
+// was populated above. Codes only stay valid as long as that ordering never changes —
+// see CLAUDE.md for the append-only rule this depends on.
+const ALL_LOCATION_IDS = Object.keys(pathLocById);
+const locIndexById = new Map(ALL_LOCATION_IDS.map((id, i) => [id, i]));
+const PATH_CODE_VERSION = 0; // bump if the append-only rule in CLAUDE.md is ever broken
+
+const B32_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'; // Crockford's Base32
+const B32_LOOKUP = {};
+for (let i = 0; i < B32_ALPHABET.length; i++) B32_LOOKUP[B32_ALPHABET[i]] = i;
+B32_LOOKUP.O = 0; B32_LOOKUP.I = 1; B32_LOOKUP.L = 1; // typo-tolerant aliases
+
+function encodeB32(value, chars){
+  let s = '';
+  for (let i = chars - 1; i >= 0; i--) s += B32_ALPHABET[(value >> (i * 5)) & 31];
+  return s;
+}
+function decodeB32(str){
+  let value = 0;
+  for (const ch of str) {
+    const d = B32_LOOKUP[ch];
+    if (d === undefined) return null;
+    value = (value << 5) | d;
+  }
+  return value >>> 0;
+}
+function pathChecksum(version, indices){
+  return indices.reduce((sum, idx) => (sum + idx) % 32, version % 32);
+}
+
+function encodePathCode(ids){
+  const indices = ids.map(id => locIndexById.get(id));
+  if (indices.some(i => i === undefined)) return '';
+  let code = encodeB32(PATH_CODE_VERSION, 1) + encodeB32(pathChecksum(PATH_CODE_VERSION, indices), 1);
+  indices.forEach(idx => { code += encodeB32(idx, 2); });
+  return code;
+}
+
+// Returns { ok:true, ids } on success, or { ok:false, error } with a user-facing message.
+function decodePathCode(raw){
+  const clean = (raw || '').trim().toUpperCase().replace(/[^0-9A-Z]/g, '');
+  if (clean.length < 2 || (clean.length - 2) % 2 !== 0) {
+    return { ok:false, error:"That doesn't look like a valid path code." };
+  }
+  const version = decodeB32(clean[0]);
+  const checksum = decodeB32(clean[1]);
+  if (version === null || checksum === null) {
+    return { ok:false, error:"That doesn't look like a valid path code." };
+  }
+  if (version !== PATH_CODE_VERSION) {
+    return { ok:false, error:"That code is from a different version of the map and can't be loaded." };
+  }
+  const indices = [];
+  for (let i = 2; i < clean.length; i += 2) {
+    const idx = decodeB32(clean.slice(i, i + 2));
+    if (idx === null || idx >= ALL_LOCATION_IDS.length) {
+      return { ok:false, error:"That doesn't look like a valid path code." };
+    }
+    indices.push(idx);
+  }
+  if (pathChecksum(version, indices) !== checksum) {
+    return { ok:false, error:"That code doesn't check out — check for a typo." };
+  }
+  return { ok:true, ids: indices.map(i => ALL_LOCATION_IDS[i]) };
+}
+
+function syncPathToUrl(){
+  const url = new URL(window.location.href);
+  if (selectedPath.length) url.searchParams.set('path', encodePathCode(selectedPath));
+  else url.searchParams.delete('path');
+  history.replaceState(null, '', url.toString());
+}
+
 /* ============ PATH (selected locations) ============ */
 function addToPath(id){
   if (selectedPath.includes(id)) return false;
   selectedPath.push(id);
   renderPathColumn();
   updatePathLine();
+  syncPathToUrl();
   return true;
 }
 
@@ -1290,6 +1403,7 @@ function removeFromPath(id){
   selectedPath = selectedPath.filter(x => x !== id);
   renderPathColumn();
   updatePathLine();
+  syncPathToUrl();
 }
 
 // "Add to path" buttons live inside dynamically-opened Leaflet popups, so listen
@@ -1516,35 +1630,89 @@ function renderPathColumn(){
     note.className = 'empty-note';
     note.textContent = 'Add locations from a map popup ("+ Add to path") to plan a route between them.';
     pathColEl.appendChild(note);
-    return;
+  } else {
+    const list = document.createElement('div');
+    list.className = 'path-list';
+    selectedPath.forEach((id, i) => {
+      const loc = pathLocById[id];
+      if (!loc) return;
+      const row = document.createElement('div');
+      row.className = 'path-row';
+      row.dataset.id = id;
+      row.innerHTML = `<span class="path-drag-handle" title="Drag to reorder">⠿</span>
+        <span class="path-order">${i+1}</span>
+        <span class="path-dot" style="background:${loc.color}"></span>
+        <span class="path-name">${loc.name}</span>
+        <button type="button" class="path-trash-btn" title="Remove" aria-label="Remove from path">🗑</button>`;
+      row.querySelector('.path-name').addEventListener('click', () => {
+        ensureMapTabVisible();
+        map.setView([loc.lat, loc.lng], 12);
+        loc.marker.openPopup();
+      });
+      row.querySelector('.path-trash-btn').addEventListener('click', () => removeFromPath(id));
+      attachRowDrag(row, id, list);
+      list.appendChild(row);
+      if (i < selectedPath.length - 1) list.appendChild(buildLegEl(i));
+    });
+    pathColEl.appendChild(list);
+
+    if (selectedPath.length >= 2) pathColEl.appendChild(buildPathTotalEl());
   }
 
-  const list = document.createElement('div');
-  list.className = 'path-list';
-  selectedPath.forEach((id, i) => {
-    const loc = pathLocById[id];
-    if (!loc) return;
-    const row = document.createElement('div');
-    row.className = 'path-row';
-    row.dataset.id = id;
-    row.innerHTML = `<span class="path-drag-handle" title="Drag to reorder">⠿</span>
-      <span class="path-order">${i+1}</span>
-      <span class="path-dot" style="background:${loc.color}"></span>
-      <span class="path-name">${loc.name}</span>
-      <button type="button" class="path-trash-btn" title="Remove" aria-label="Remove from path">🗑</button>`;
-    row.querySelector('.path-name').addEventListener('click', () => {
-      ensureMapTabVisible();
-      map.setView([loc.lat, loc.lng], 12);
-      loc.marker.openPopup();
-    });
-    row.querySelector('.path-trash-btn').addEventListener('click', () => removeFromPath(id));
-    attachRowDrag(row, id, list);
-    list.appendChild(row);
-    if (i < selectedPath.length - 1) list.appendChild(buildLegEl(i));
-  });
-  pathColEl.appendChild(list);
+  pathColEl.appendChild(buildPathCodeEl());
+}
 
-  if (selectedPath.length >= 2) pathColEl.appendChild(buildPathTotalEl());
+// A short code that encodes the whole path (order included) — copyable to type into
+// another device, and mirrored into the URL's ?path= query param.
+function buildPathCodeEl(){
+  const wrap = document.createElement('div');
+  wrap.className = 'path-code' + (selectedPath.length ? '' : ' path-code-empty');
+
+  if (selectedPath.length) {
+    const code = encodePathCode(selectedPath);
+    const row = document.createElement('div');
+    row.className = 'path-code-row';
+    row.innerHTML = `<input type="text" class="path-code-input" id="pathCodeOutput" readonly value="${code}" aria-label="Path code">
+      <button type="button" class="path-code-btn" id="pathCodeCopyBtn">Copy</button>`;
+    row.querySelector('#pathCodeOutput').addEventListener('click', e => e.target.select());
+    row.querySelector('#pathCodeCopyBtn').addEventListener('click', e => copyPathCode(code, e.currentTarget));
+    wrap.appendChild(row);
+  }
+
+  const loadBtn = document.createElement('button');
+  loadBtn.type = 'button';
+  loadBtn.className = 'path-code-load-btn';
+  loadBtn.textContent = 'Load code…';
+  loadBtn.addEventListener('click', promptLoadPathCode);
+  wrap.appendChild(loadBtn);
+
+  return wrap;
+}
+
+function copyPathCode(code, btn){
+  const showCopied = () => {
+    const original = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(code).then(showCopied)
+      .catch(() => document.getElementById('pathCodeOutput').select());
+  } else {
+    document.getElementById('pathCodeOutput').select();
+  }
+}
+
+function promptLoadPathCode(){
+  const input = prompt('Paste a path code:');
+  if (input === null || !input.trim()) return;
+  const result = decodePathCode(input);
+  if (!result.ok) { alert(result.error); return; }
+  if (!result.ids.length) { alert('That code has no locations in it.'); return; }
+  selectedPath = result.ids;
+  renderPathColumn();
+  updatePathLine();
+  syncPathToUrl();
 }
 
 function formatKm(km){ return km.toFixed(km < 10 ? 1 : 0) + ' km'; }
@@ -1612,6 +1780,7 @@ function attachRowDrag(row, id, list){
       if (newIndex !== startIndex) {
         const [moved] = selectedPath.splice(startIndex, 1);
         selectedPath.splice(newIndex, 0, moved);
+        syncPathToUrl();
       }
       renderPathColumn();
       updatePathLine();
@@ -1821,9 +1990,18 @@ wireColumnToggle(document.getElementById('sidebarToggle'), 'sidebar-collapsed', 
 wireColumnToggle(document.getElementById('pathToggle'), 'path-collapsed', 'Collapse path', 'Expand path');
 
 /* ============ INIT ============ */
+// A ?path=<code> in the URL restores a shared/bookmarked path — invalid or stale codes
+// are ignored silently here (an explicit "Load code" action is the place for an alert).
+const initialPathCode = new URLSearchParams(window.location.search).get('path');
+if (initialPathCode) {
+  const result = decodePathCode(initialPathCode);
+  if (result.ok) selectedPath = result.ids;
+}
+
 applyResponsiveLayout(mq);
 renderSidebar();
 renderPathColumn();
+updatePathLine();
 fitAll();
 </script>
 
