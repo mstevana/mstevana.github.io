@@ -1514,14 +1514,29 @@ function attachRowDrag(row, id, list){
 }
 
 let pathLine = null;
+let pathRequestId = 0;
 const pathMarkersLayer = L.layerGroup().addTo(map);
 function updatePathLine(){
   if (pathLine) { map.removeLayer(pathLine); pathLine = null; }
   pathMarkersLayer.clearLayers();
   const locs = selectedPath.map(id => pathLocById[id]).filter(Boolean);
+  const requestId = ++pathRequestId; // lets a stale road-geometry fetch detect it's been superseded
+
   if (locs.length >= 2) {
+    // Draw a straight line immediately, then replace it with real road geometry once fetched.
     pathLine = L.polyline(locs.map(l => [l.lat, l.lng]),
-      { color:'#2E86FF', weight:4, opacity:0.85, dashArray:'8,6', lineJoin:'round' }).addTo(map);
+      { color:'#2E86FF', weight:4, opacity:0.6, dashArray:'8,6', lineJoin:'round' }).addTo(map);
+
+    fetchRoadGeometry({ stops: locs, closeLoop:false })
+      .then(coords => {
+        if (requestId !== pathRequestId || !pathLine) return; // path changed since this request started
+        pathLine.setLatLngs(coords);
+        pathLine.setStyle({ opacity:0.88, dashArray:null });
+      })
+      .catch(() => {
+        if (requestId !== pathRequestId || !pathLine) return;
+        pathLine.setStyle({ opacity:0.75 });
+      });
   }
   locs.forEach((l, i) => {
     L.marker([l.lat, l.lng], { icon: lineIcon('#2E86FF', 18, String(i+1), false), zIndexOffset: 900 })
