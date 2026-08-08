@@ -340,6 +340,7 @@
   #map{ grid-area:map; min-width:0; min-height:0; }
 
   .mobile-tabs{ display:none; } /* shown only in the mobile media query below */
+  #headerDragHandle{ display:none; } /* shown only in the mobile media query below */
   .mobile-tab{
     flex:1 1 0;
     display:flex;
@@ -457,12 +458,29 @@
   @media (max-width: 760px){
     body{
       grid-template-columns:1fr;
-      grid-template-rows:auto 1fr auto;
+      grid-template-rows:auto auto 1fr auto;
       grid-template-areas:
         "header"
+        "headerHandle"
         "content"
         "tabbar";
     }
+    header{ overflow-y:auto; min-height:0; }
+    #headerDragHandle{
+      display:flex;
+      grid-area:headerHandle;
+      align-items:center;
+      justify-content:center;
+      height:18px;
+      background:var(--panel);
+      border-bottom:1px solid var(--line);
+      cursor:grab;
+      touch-action:none;
+      user-select:none;
+    }
+    #headerDragHandle:active{ cursor:grabbing; }
+    #headerDragHandle .grip{ width:38px;height:4px;border-radius:2px;background:rgba(27,29,27,0.32); }
+
     /* Only one of these three occupies "content" at a time — tab switching just
        flips which one is display:none, so each gets the full remaining height. */
     #sidebarWrap, #pathWrap, #map{ grid-area:content; display:none; min-height:0; }
@@ -489,6 +507,8 @@
   <h1>Scotland's Scenic Map</h1>
   <div class="cat-toggles" id="catToggles"></div>
 </header>
+
+<div id="headerDragHandle"><div class="grip"></div></div>
 
 <div class="col-wrap" id="sidebarWrap">
   <div id="sidebar"></div>
@@ -1725,9 +1745,11 @@ function locateMe(){
 
 /* ============ RESPONSIVE LAYOUT ============ */
 const mq = window.matchMedia('(max-width: 760px)');
+const headerEl = document.querySelector('header');
 
 // Below 760px the app becomes a 3-tab layout (map / locations / selected path) instead
-// of side-by-side columns — no column collapsing or panel resizing applies there.
+// of side-by-side columns — no column collapsing applies there, and each tab fills the
+// full remaining height (the title/category-toggles header stays drag-resizable, though).
 const mobileTabsEl = document.getElementById('mobileTabs');
 let mobileTab = 'map';
 function setMobileTab(tab){
@@ -1748,16 +1770,42 @@ function updateMobileTabCount(){
   document.getElementById('mobileTabCount').textContent = selectedPath.length ? ` ${selectedPath.length}` : '';
 }
 
+// Drag-resize for the header (title + category toggles) on mobile — it can wrap to many
+// rows, so letting it shrink (it scrolls internally once smaller than its content) frees
+// up room for the active tab below.
+function clampHeaderHeight(h){ return Math.max(56, Math.min(h, window.innerHeight - 160)); }
+function setHeaderHeight(h){ headerEl.style.height = clampHeaderHeight(h) + 'px'; }
+
+const headerDragHandleEl = document.getElementById('headerDragHandle');
+let headerDragging=false, headerDragStartY=0, headerDragStartHeight=0;
+headerDragHandleEl.addEventListener('pointerdown', e => {
+  if (!mq.matches) return;
+  headerDragging=true; headerDragStartY=e.clientY; headerDragStartHeight=headerEl.getBoundingClientRect().height;
+  headerDragHandleEl.setPointerCapture(e.pointerId);
+});
+headerDragHandleEl.addEventListener('pointermove', e => {
+  if (!headerDragging) return;
+  setHeaderHeight(headerDragStartHeight + (e.clientY - headerDragStartY));
+  map.invalidateSize();
+});
+['pointerup','pointercancel'].forEach(evt => headerDragHandleEl.addEventListener(evt, () => { headerDragging=false; }));
+
 function applyResponsiveLayout(e){
   if (e.matches) {
     // Mobile doesn't support collapsed columns — tabs already isolate each panel.
     document.body.classList.remove('sidebar-collapsed', 'path-collapsed');
     setMobileTab(mobileTab);
+    if (headerEl.style.height) setHeaderHeight(parseFloat(headerEl.style.height)); // re-clamp for the new viewport
+  } else {
+    headerEl.style.height = '';
   }
   map.invalidateSize();
 }
 mq.addEventListener('change', applyResponsiveLayout);
-window.addEventListener('resize', () => map.invalidateSize());
+window.addEventListener('resize', () => {
+  if (mq.matches && headerEl.style.height) setHeaderHeight(parseFloat(headerEl.style.height));
+  map.invalidateSize();
+});
 
 /* ============ COLUMN COLLAPSE (desktop only) ============ */
 function wireColumnToggle(btn, cssClass, expandedLabel, collapsedLabel){
