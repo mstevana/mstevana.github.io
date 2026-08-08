@@ -314,6 +314,28 @@
     border-radius:5px;
   }
   .path-trash-btn:hover{ background:rgba(166,50,60,0.12); color:#A6323C; }
+  .path-leg{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    margin:-1px 0 6px 22px;
+    padding:0 0 0 6px;
+    border-left:1.5px dashed rgba(46,134,255,0.4);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    color:rgba(27,29,27,0.5);
+    min-height:16px;
+  }
+  .path-leg-icon{ color:#2E86FF; }
+  .path-total{
+    margin-top:8px;
+    padding:9px 10px;
+    border-top:1px solid var(--line);
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:12.5px;
+    color:rgba(27,29,27,0.75);
+  }
+  .path-total b{ color:var(--ink); }
 
   #map{ grid-area:map; min-width:0; min-height:0; }
   #drag-handle{ display:none; }
@@ -1235,15 +1257,20 @@ document.addEventListener('click', e => {
 });
 
 /* road-snap driving routes (only the 'routes' category, not railways) */
-async function fetchRoadGeometry(route){
-  const coordStr = route.stops.map(s => `${s.lng},${s.lat}`)
-    .concat(route.closeLoop ? [`${route.stops[0].lng},${route.stops[0].lat}`] : []).join(';');
+// Low-level OSRM call — returns the full route object (geometry + per-leg distance/duration).
+async function fetchRoadRoute(stops, closeLoop){
+  const coordStr = stops.map(s => `${s.lng},${s.lat}`)
+    .concat(closeLoop ? [`${stops[0].lng},${stops[0].lat}`] : []).join(';');
   const url = `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`;
   const res = await fetch(url);
   if (!res.ok) throw new Error('routing failed');
   const data = await res.json();
   if (!data.routes || !data.routes.length) throw new Error('no route');
-  return data.routes[0].geometry.coordinates.map(([lng,lat]) => [lat,lng]);
+  return data.routes[0];
+}
+async function fetchRoadGeometry(route){
+  const r = await fetchRoadRoute(route.stops, route.closeLoop);
+  return r.geometry.coordinates.map(([lng,lat]) => [lat,lng]);
 }
 const routeEntries = catState.routes.entries;
 Object.entries(routeEntries).forEach(([id, entry], i) => {
@@ -1465,8 +1492,42 @@ function renderPathColumn(){
     row.querySelector('.path-trash-btn').addEventListener('click', () => removeFromPath(id));
     attachRowDrag(row, id, list);
     list.appendChild(row);
+    if (i < selectedPath.length - 1) list.appendChild(buildLegEl(i));
   });
   pathColEl.appendChild(list);
+
+  if (selectedPath.length >= 2) pathColEl.appendChild(buildPathTotalEl());
+}
+
+function formatKm(km){ return km.toFixed(km < 10 ? 1 : 0) + ' km'; }
+function formatDriveHours(hours){
+  const totalMin = Math.round(hours * 60);
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  if (h === 0) return m + ' min';
+  return h + 'h' + (m ? ' ' + m + 'min' : '');
+}
+
+// The leg row shown between two path rows — km & driving time between that leg's endpoints.
+function buildLegEl(i){
+  const el = document.createElement('div');
+  el.className = 'path-leg';
+  if (pathLegsState === 'pending') el.textContent = 'Calculating…';
+  else if (pathLegsState === 'failed') el.textContent = 'Distance unavailable';
+  else if (pathLegsState === 'ready' && pathLegs[i]) {
+    el.innerHTML = `<span class="path-leg-icon">↓</span>${formatKm(pathLegs[i].km)} · ${formatDriveHours(pathLegs[i].hours)} drive`;
+  }
+  return el;
+}
+
+function buildPathTotalEl(){
+  const el = document.createElement('div');
+  el.className = 'path-total';
+  if (pathLegsState === 'pending') el.textContent = 'Calculating total…';
+  else if (pathLegsState === 'failed') el.textContent = 'Total distance unavailable';
+  else if (pathLegsState === 'ready' && pathTotals) {
+    el.innerHTML = `Total <b>${formatKm(pathTotals.km)}</b> · <b>${formatDriveHours(pathTotals.hours)}</b> driving`;
+  }
+  return el;
 }
 
 // Pointer-based drag reorder: the dragged row follows the pointer, other rows shift
@@ -1515,6 +1576,9 @@ function attachRowDrag(row, id, list){
 
 let pathLine = null;
 let pathRequestId = 0;
+let pathLegsState = 'idle'; // 'idle' | 'pending' | 'ready' | 'failed'
+let pathLegs = [];          // per-leg { km, hours }, valid when pathLegsState==='ready'
+let pathTotals = null;      // { km, hours }, valid when pathLegsState==='ready'
 const pathMarkersLayer = L.layerGroup().addTo(map);
 function updatePathLine(){
   if (pathLine) { map.removeLayer(pathLine); pathLine = null; }
@@ -1526,17 +1590,30 @@ function updatePathLine(){
     // Draw a straight line immediately, then replace it with real road geometry once fetched.
     pathLine = L.polyline(locs.map(l => [l.lat, l.lng]),
       { color:'#2E86FF', weight:4, opacity:0.6, dashArray:'8,6', lineJoin:'round' }).addTo(map);
+    pathLegsState = 'pending';
+    renderPathColumn();
 
-    fetchRoadGeometry({ stops: locs, closeLoop:false })
-      .then(coords => {
+    fetchRoadRoute(locs, false)
+      .then(r => {
         if (requestId !== pathRequestId || !pathLine) return; // path changed since this request started
+        const coords = r.geometry.coordinates.map(([lng,lat]) => [lat,lng]);
         pathLine.setLatLngs(coords);
         pathLine.setStyle({ opacity:0.88, dashArray:null });
+        pathLegs = r.legs.map(leg => ({ km: leg.distance / 1000, hours: leg.duration / 3600 }));
+        pathTotals = { km: r.distance / 1000, hours: r.duration / 3600 };
+        pathLegsState = 'ready';
+        renderPathColumn();
       })
       .catch(() => {
         if (requestId !== pathRequestId || !pathLine) return;
         pathLine.setStyle({ opacity:0.75 });
+        pathLegsState = 'failed';
+        renderPathColumn();
       });
+  } else {
+    pathLegsState = 'idle';
+    pathLegs = [];
+    pathTotals = null;
   }
   locs.forEach((l, i) => {
     L.marker([l.lat, l.lng], { icon: lineIcon('#2E86FF', 18, String(i+1), false), zIndexOffset: 900 })
