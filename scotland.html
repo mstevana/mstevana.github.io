@@ -338,7 +338,30 @@
   .path-total b{ color:var(--ink); }
 
   #map{ grid-area:map; min-width:0; min-height:0; }
-  #drag-handle{ display:none; }
+
+  .mobile-tabs{ display:none; } /* shown only in the mobile media query below */
+  .mobile-tab{
+    flex:1 1 0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:2px;
+    padding:8px 4px 10px;
+    border:none;
+    background:transparent;
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:11px;
+    font-weight:500;
+    color:rgba(27,29,27,0.5);
+    cursor:pointer;
+  }
+  .mobile-tab.active{ color:var(--ink); }
+  .mobile-tab-icon{ font-size:18px; line-height:1; }
+  .mobile-tab-count{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:9.5px;
+    color:rgba(27,29,27,0.45);
+  }
 
   .reset-btn{
     width:100%;
@@ -434,34 +457,29 @@
   @media (max-width: 760px){
     body{
       grid-template-columns:1fr;
-      grid-template-rows:auto auto auto 1fr;
+      grid-template-rows:auto 1fr auto;
       grid-template-areas:
-        "sidebar"
-        "path"
-        "handle"
-        "map";
+        "header"
+        "content"
+        "tabbar";
     }
-    #sidebar header{
-      margin:-14px -14px 10px -14px;
-      padding:14px 14px 12px;
-    }
-    #sidebar{ border-right:none; border-bottom:1px solid var(--line); }
-    #pathCol{ border-right:none; border-bottom:1px solid var(--line); max-height:220px; }
-    .col-toggle{ flex-basis:26px; font-size:13px; }
-    #drag-handle{
+    /* Only one of these three occupies "content" at a time — tab switching just
+       flips which one is display:none, so each gets the full remaining height. */
+    #sidebarWrap, #pathWrap, #map{ grid-area:content; display:none; min-height:0; }
+    body[data-mobile-tab="sidebar"] #sidebarWrap{ display:flex; }
+    body[data-mobile-tab="path"] #pathWrap{ display:flex; }
+    body[data-mobile-tab="map"] #map{ display:block; }
+
+    #sidebar, #pathCol{ border:none; }
+    .col-toggle{ display:none; } /* no collapsing on mobile — tabs replace it */
+
+    .mobile-tabs{
+      grid-area:tabbar;
       display:flex;
-      grid-area:handle;
-      align-items:center;
-      justify-content:center;
-      height:22px;
+      border-top:1px solid var(--line);
       background:var(--panel);
-      border-bottom:1px solid var(--line);
-      cursor:grab;
-      touch-action:none;
-      user-select:none;
+      padding-bottom:env(safe-area-inset-bottom, 0);
     }
-    #drag-handle:active{ cursor:grabbing; }
-    #drag-handle .grip{ width:38px;height:4px;border-radius:2px;background:rgba(27,29,27,0.32); }
   }
 </style>
 </head>
@@ -482,9 +500,19 @@
   <button id="pathToggle" class="col-toggle" title="Collapse path" aria-label="Collapse path">‹</button>
 </div>
 
-<div id="drag-handle"><div class="grip"></div></div>
-
 <div id="map"></div>
+
+<nav class="mobile-tabs" id="mobileTabs">
+  <button type="button" class="mobile-tab active" data-tab="map">
+    <span class="mobile-tab-icon">🗺️</span>Map
+  </button>
+  <button type="button" class="mobile-tab" data-tab="sidebar">
+    <span class="mobile-tab-icon">📍</span>Locations
+  </button>
+  <button type="button" class="mobile-tab" data-tab="path">
+    <span class="mobile-tab-icon">🧭</span>Selected<span class="mobile-tab-count" id="mobileTabCount"></span>
+  </button>
+</nav>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -1366,10 +1394,7 @@ function buildLocateButton(){
 }
 
 function renderSidebar(){
-  // On mobile the <header> is moved into the sidebar; preserve it across re-renders.
-  const movedHeader = (headerEl && headerEl.parentElement === sidebarEl) ? headerEl : null;
   sidebarEl.innerHTML = '';
-  if (movedHeader) sidebarEl.appendChild(movedHeader);
   const searchRow = document.createElement('div');
   searchRow.className = 'search-row';
   searchRow.appendChild(buildSearchBar());
@@ -1420,6 +1445,7 @@ function renderSidebar(){
           <span class="poi-name">${poi.name}</span>
           ${poi.rating?`<span class="poi-rating">★ ${poi.rating}</span>`:''}`;
         row.addEventListener('click', () => {
+          ensureMapTabVisible();
           map.setView([poi.lat, poi.lng], 11);
           st.entries[id].marker.openPopup();
         });
@@ -1457,6 +1483,7 @@ function renderSidebar(){
 const pathColEl = document.getElementById('pathCol');
 
 function renderPathColumn(){
+  updateMobileTabCount();
   pathColEl.innerHTML = '';
 
   const title = document.createElement('div');
@@ -1486,6 +1513,7 @@ function renderPathColumn(){
       <span class="path-name">${loc.name}</span>
       <button type="button" class="path-trash-btn" title="Remove" aria-label="Remove from path">🗑</button>`;
     row.querySelector('.path-name').addEventListener('click', () => {
+      ensureMapTabVisible();
       map.setView([loc.lat, loc.lng], 12);
       loc.marker.openPopup();
     });
@@ -1632,6 +1660,7 @@ function selectLine(catKey, id){
   });
   const entry = st.entries[id];
   const bounds = entry.roaded ? entry.roadBounds : entry.route.stops.map(s => [s.lat, s.lng]);
+  ensureMapTabVisible();
   map.fitBounds(bounds, { padding:[60,60] });
   renderSidebar();
 }
@@ -1645,6 +1674,7 @@ function resetView(){
       Object.values(st.entries).forEach(e => { if(!map.hasLayer(e.group)) e.group.addTo(map); });
     }
   });
+  ensureMapTabVisible();
   fitAll();
   renderSidebar();
 }
@@ -1678,6 +1708,7 @@ function locateMe(){
       meMarker = L.marker([latitude,longitude], { icon:meIcon, zIndexOffset:1000 }).addTo(map);
       meMarker.bindPopup('<b>You are here</b>');
       if (accuracy) meCircle = L.circle([latitude,longitude], { radius:accuracy, color:'#2E86FF', weight:1, fillColor:'#2E86FF', fillOpacity:0.1 }).addTo(map);
+      ensureMapTabVisible();
       map.setView([latitude,longitude], Math.max(map.getZoom(), 9));
       statusEl.textContent = '';
     },
@@ -1693,44 +1724,42 @@ function locateMe(){
 }
 
 /* ============ RESPONSIVE LAYOUT ============ */
-const headerEl = document.querySelector('header');
-const dragHandleEl = document.getElementById('drag-handle');
 const mq = window.matchMedia('(max-width: 760px)');
 
-function clampSidebarHeight(h){ return Math.max(80, Math.min(h, window.innerHeight - 120)); }
-function setSidebarHeight(h){ sidebarEl.style.height = clampSidebarHeight(h) + 'px'; }
+// Below 760px the app becomes a 3-tab layout (map / locations / selected path) instead
+// of side-by-side columns — no column collapsing or panel resizing applies there.
+const mobileTabsEl = document.getElementById('mobileTabs');
+let mobileTab = 'map';
+function setMobileTab(tab){
+  mobileTab = tab;
+  document.body.dataset.mobileTab = tab;
+  mobileTabsEl.querySelectorAll('.mobile-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
+  if (tab === 'map') requestAnimationFrame(() => map.invalidateSize());
+}
+// Locations/path rows and the "reset view"-style actions pan or open a popup on the map,
+// which is only meaningful once the map tab is actually showing.
+function ensureMapTabVisible(){
+  if (mq.matches) setMobileTab('map');
+}
+mobileTabsEl.querySelectorAll('.mobile-tab').forEach(btn => {
+  btn.addEventListener('click', () => setMobileTab(btn.dataset.tab));
+});
+function updateMobileTabCount(){
+  document.getElementById('mobileTabCount').textContent = selectedPath.length ? ` ${selectedPath.length}` : '';
+}
 
 function applyResponsiveLayout(e){
   if (e.matches) {
-    if (headerEl.parentElement !== sidebarEl) sidebarEl.insertBefore(headerEl, sidebarEl.firstChild);
-    setSidebarHeight(sidebarEl.style.height ? parseFloat(sidebarEl.style.height) : window.innerHeight * 0.45);
-  } else {
-    if (headerEl.parentElement !== document.body) document.body.insertBefore(headerEl, document.body.firstElementChild);
-    sidebarEl.style.height = '';
+    // Mobile doesn't support collapsed columns — tabs already isolate each panel.
+    document.body.classList.remove('sidebar-collapsed', 'path-collapsed');
+    setMobileTab(mobileTab);
   }
   map.invalidateSize();
 }
 mq.addEventListener('change', applyResponsiveLayout);
+window.addEventListener('resize', () => map.invalidateSize());
 
-window.addEventListener('resize', () => {
-  if (mq.matches && sidebarEl.style.height) setSidebarHeight(parseFloat(sidebarEl.style.height));
-  map.invalidateSize();
-});
-
-let dragging=false, dragStartY=0, dragStartHeight=0;
-dragHandleEl.addEventListener('pointerdown', e => {
-  if (!mq.matches) return;
-  dragging=true; dragStartY=e.clientY; dragStartHeight=sidebarEl.getBoundingClientRect().height;
-  dragHandleEl.setPointerCapture(e.pointerId);
-});
-dragHandleEl.addEventListener('pointermove', e => {
-  if (!dragging) return;
-  setSidebarHeight(dragStartHeight + (e.clientY - dragStartY));
-  map.invalidateSize();
-});
-['pointerup','pointercancel'].forEach(evt => dragHandleEl.addEventListener(evt, () => { dragging=false; }));
-
-/* ============ COLUMN COLLAPSE ============ */
+/* ============ COLUMN COLLAPSE (desktop only) ============ */
 function wireColumnToggle(btn, cssClass, expandedLabel, collapsedLabel){
   btn.addEventListener('click', () => {
     const collapsed = document.body.classList.toggle(cssClass);
@@ -1744,8 +1773,6 @@ wireColumnToggle(document.getElementById('sidebarToggle'), 'sidebar-collapsed', 
 wireColumnToggle(document.getElementById('pathToggle'), 'path-collapsed', 'Collapse path', 'Expand path');
 
 /* ============ INIT ============ */
-// Apply responsive layout first — on mobile this moves the header into the sidebar,
-// so the first renderSidebar() call correctly preserves it.
 applyResponsiveLayout(mq);
 renderSidebar();
 renderPathColumn();
