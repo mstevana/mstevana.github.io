@@ -314,9 +314,55 @@
     border-radius:5px;
   }
   .path-trash-btn:hover{ background:rgba(166,50,60,0.12); color:#A6323C; }
+  .path-leg{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    margin:-1px 0 6px 22px;
+    padding:0 0 0 6px;
+    border-left:1.5px dashed rgba(46,134,255,0.4);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    color:rgba(27,29,27,0.5);
+    min-height:16px;
+  }
+  .path-leg-icon{ color:#2E86FF; }
+  .path-total{
+    margin-top:8px;
+    padding:9px 10px;
+    border-top:1px solid var(--line);
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:12.5px;
+    color:rgba(27,29,27,0.75);
+  }
+  .path-total b{ color:var(--ink); }
 
   #map{ grid-area:map; min-width:0; min-height:0; }
-  #drag-handle{ display:none; }
+
+  .mobile-tabs{ display:none; } /* shown only in the mobile media query below */
+  #headerDragHandle{ display:none; } /* shown only in the mobile media query below */
+  .mobile-tab{
+    flex:1 1 0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:2px;
+    padding:8px 4px 10px;
+    border:none;
+    background:transparent;
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:11px;
+    font-weight:500;
+    color:rgba(27,29,27,0.5);
+    cursor:pointer;
+  }
+  .mobile-tab.active{ color:var(--ink); }
+  .mobile-tab-icon{ font-size:18px; line-height:1; }
+  .mobile-tab-count{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:9.5px;
+    color:rgba(27,29,27,0.45);
+  }
 
   .reset-btn{
     width:100%;
@@ -412,34 +458,46 @@
   @media (max-width: 760px){
     body{
       grid-template-columns:1fr;
-      grid-template-rows:auto auto auto 1fr;
+      grid-template-rows:auto auto 1fr auto;
       grid-template-areas:
-        "sidebar"
-        "path"
-        "handle"
-        "map";
+        "header"
+        "headerHandle"
+        "content"
+        "tabbar";
     }
-    #sidebar header{
-      margin:-14px -14px 10px -14px;
-      padding:14px 14px 12px;
-    }
-    #sidebar{ border-right:none; border-bottom:1px solid var(--line); }
-    #pathCol{ border-right:none; border-bottom:1px solid var(--line); max-height:220px; }
-    .col-toggle{ flex-basis:26px; font-size:13px; }
-    #drag-handle{
+    header{ overflow-y:auto; min-height:0; }
+    #headerDragHandle{
       display:flex;
-      grid-area:handle;
+      grid-area:headerHandle;
       align-items:center;
       justify-content:center;
-      height:22px;
+      height:18px;
       background:var(--panel);
       border-bottom:1px solid var(--line);
       cursor:grab;
       touch-action:none;
       user-select:none;
     }
-    #drag-handle:active{ cursor:grabbing; }
-    #drag-handle .grip{ width:38px;height:4px;border-radius:2px;background:rgba(27,29,27,0.32); }
+    #headerDragHandle:active{ cursor:grabbing; }
+    #headerDragHandle .grip{ width:38px;height:4px;border-radius:2px;background:rgba(27,29,27,0.32); }
+
+    /* Only one of these three occupies "content" at a time — tab switching just
+       flips which one is display:none, so each gets the full remaining height. */
+    #sidebarWrap, #pathWrap, #map{ grid-area:content; display:none; min-height:0; }
+    body[data-mobile-tab="sidebar"] #sidebarWrap{ display:flex; }
+    body[data-mobile-tab="path"] #pathWrap{ display:flex; }
+    body[data-mobile-tab="map"] #map{ display:block; }
+
+    #sidebar, #pathCol{ border:none; }
+    .col-toggle{ display:none; } /* no collapsing on mobile — tabs replace it */
+
+    .mobile-tabs{
+      grid-area:tabbar;
+      display:flex;
+      border-top:1px solid var(--line);
+      background:var(--panel);
+      padding-bottom:env(safe-area-inset-bottom, 0);
+    }
   }
 </style>
 </head>
@@ -449,6 +507,8 @@
   <h1>Scotland's Scenic Map</h1>
   <div class="cat-toggles" id="catToggles"></div>
 </header>
+
+<div id="headerDragHandle"><div class="grip"></div></div>
 
 <div class="col-wrap" id="sidebarWrap">
   <div id="sidebar"></div>
@@ -460,9 +520,19 @@
   <button id="pathToggle" class="col-toggle" title="Collapse path" aria-label="Collapse path">‹</button>
 </div>
 
-<div id="drag-handle"><div class="grip"></div></div>
-
 <div id="map"></div>
+
+<nav class="mobile-tabs" id="mobileTabs">
+  <button type="button" class="mobile-tab active" data-tab="map">
+    <span class="mobile-tab-icon">🗺️</span>Map
+  </button>
+  <button type="button" class="mobile-tab" data-tab="sidebar">
+    <span class="mobile-tab-icon">📍</span>Locations
+  </button>
+  <button type="button" class="mobile-tab" data-tab="path">
+    <span class="mobile-tab-icon">🧭</span>Selected<span class="mobile-tab-count" id="mobileTabCount"></span>
+  </button>
+</nav>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -1235,15 +1305,20 @@ document.addEventListener('click', e => {
 });
 
 /* road-snap driving routes (only the 'routes' category, not railways) */
-async function fetchRoadGeometry(route){
-  const coordStr = route.stops.map(s => `${s.lng},${s.lat}`)
-    .concat(route.closeLoop ? [`${route.stops[0].lng},${route.stops[0].lat}`] : []).join(';');
+// Low-level OSRM call — returns the full route object (geometry + per-leg distance/duration).
+async function fetchRoadRoute(stops, closeLoop){
+  const coordStr = stops.map(s => `${s.lng},${s.lat}`)
+    .concat(closeLoop ? [`${stops[0].lng},${stops[0].lat}`] : []).join(';');
   const url = `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`;
   const res = await fetch(url);
   if (!res.ok) throw new Error('routing failed');
   const data = await res.json();
   if (!data.routes || !data.routes.length) throw new Error('no route');
-  return data.routes[0].geometry.coordinates.map(([lng,lat]) => [lat,lng]);
+  return data.routes[0];
+}
+async function fetchRoadGeometry(route){
+  const r = await fetchRoadRoute(route.stops, route.closeLoop);
+  return r.geometry.coordinates.map(([lng,lat]) => [lat,lng]);
 }
 const routeEntries = catState.routes.entries;
 Object.entries(routeEntries).forEach(([id, entry], i) => {
@@ -1339,10 +1414,7 @@ function buildLocateButton(){
 }
 
 function renderSidebar(){
-  // On mobile the <header> is moved into the sidebar; preserve it across re-renders.
-  const movedHeader = (headerEl && headerEl.parentElement === sidebarEl) ? headerEl : null;
   sidebarEl.innerHTML = '';
-  if (movedHeader) sidebarEl.appendChild(movedHeader);
   const searchRow = document.createElement('div');
   searchRow.className = 'search-row';
   searchRow.appendChild(buildSearchBar());
@@ -1393,6 +1465,7 @@ function renderSidebar(){
           <span class="poi-name">${poi.name}</span>
           ${poi.rating?`<span class="poi-rating">★ ${poi.rating}</span>`:''}`;
         row.addEventListener('click', () => {
+          ensureMapTabVisible();
           map.setView([poi.lat, poi.lng], 11);
           st.entries[id].marker.openPopup();
         });
@@ -1430,6 +1503,7 @@ function renderSidebar(){
 const pathColEl = document.getElementById('pathCol');
 
 function renderPathColumn(){
+  updateMobileTabCount();
   pathColEl.innerHTML = '';
 
   const title = document.createElement('div');
@@ -1459,14 +1533,49 @@ function renderPathColumn(){
       <span class="path-name">${loc.name}</span>
       <button type="button" class="path-trash-btn" title="Remove" aria-label="Remove from path">🗑</button>`;
     row.querySelector('.path-name').addEventListener('click', () => {
+      ensureMapTabVisible();
       map.setView([loc.lat, loc.lng], 12);
       loc.marker.openPopup();
     });
     row.querySelector('.path-trash-btn').addEventListener('click', () => removeFromPath(id));
     attachRowDrag(row, id, list);
     list.appendChild(row);
+    if (i < selectedPath.length - 1) list.appendChild(buildLegEl(i));
   });
   pathColEl.appendChild(list);
+
+  if (selectedPath.length >= 2) pathColEl.appendChild(buildPathTotalEl());
+}
+
+function formatKm(km){ return km.toFixed(km < 10 ? 1 : 0) + ' km'; }
+function formatDriveHours(hours){
+  const totalMin = Math.round(hours * 60);
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  if (h === 0) return m + ' min';
+  return h + 'h' + (m ? ' ' + m + 'min' : '');
+}
+
+// The leg row shown between two path rows — km & driving time between that leg's endpoints.
+function buildLegEl(i){
+  const el = document.createElement('div');
+  el.className = 'path-leg';
+  if (pathLegsState === 'pending') el.textContent = 'Calculating…';
+  else if (pathLegsState === 'failed') el.textContent = 'Distance unavailable';
+  else if (pathLegsState === 'ready' && pathLegs[i]) {
+    el.innerHTML = `<span class="path-leg-icon">↓</span>${formatKm(pathLegs[i].km)} · ${formatDriveHours(pathLegs[i].hours)} drive`;
+  }
+  return el;
+}
+
+function buildPathTotalEl(){
+  const el = document.createElement('div');
+  el.className = 'path-total';
+  if (pathLegsState === 'pending') el.textContent = 'Calculating total…';
+  else if (pathLegsState === 'failed') el.textContent = 'Total distance unavailable';
+  else if (pathLegsState === 'ready' && pathTotals) {
+    el.innerHTML = `Total <b>${formatKm(pathTotals.km)}</b> · <b>${formatDriveHours(pathTotals.hours)}</b> driving`;
+  }
+  return el;
 }
 
 // Pointer-based drag reorder: the dragged row follows the pointer, other rows shift
@@ -1515,6 +1624,9 @@ function attachRowDrag(row, id, list){
 
 let pathLine = null;
 let pathRequestId = 0;
+let pathLegsState = 'idle'; // 'idle' | 'pending' | 'ready' | 'failed'
+let pathLegs = [];          // per-leg { km, hours }, valid when pathLegsState==='ready'
+let pathTotals = null;      // { km, hours }, valid when pathLegsState==='ready'
 const pathMarkersLayer = L.layerGroup().addTo(map);
 function updatePathLine(){
   if (pathLine) { map.removeLayer(pathLine); pathLine = null; }
@@ -1526,17 +1638,30 @@ function updatePathLine(){
     // Draw a straight line immediately, then replace it with real road geometry once fetched.
     pathLine = L.polyline(locs.map(l => [l.lat, l.lng]),
       { color:'#2E86FF', weight:4, opacity:0.6, dashArray:'8,6', lineJoin:'round' }).addTo(map);
+    pathLegsState = 'pending';
+    renderPathColumn();
 
-    fetchRoadGeometry({ stops: locs, closeLoop:false })
-      .then(coords => {
+    fetchRoadRoute(locs, false)
+      .then(r => {
         if (requestId !== pathRequestId || !pathLine) return; // path changed since this request started
+        const coords = r.geometry.coordinates.map(([lng,lat]) => [lat,lng]);
         pathLine.setLatLngs(coords);
         pathLine.setStyle({ opacity:0.88, dashArray:null });
+        pathLegs = r.legs.map(leg => ({ km: leg.distance / 1000, hours: leg.duration / 3600 }));
+        pathTotals = { km: r.distance / 1000, hours: r.duration / 3600 };
+        pathLegsState = 'ready';
+        renderPathColumn();
       })
       .catch(() => {
         if (requestId !== pathRequestId || !pathLine) return;
         pathLine.setStyle({ opacity:0.75 });
+        pathLegsState = 'failed';
+        renderPathColumn();
       });
+  } else {
+    pathLegsState = 'idle';
+    pathLegs = [];
+    pathTotals = null;
   }
   locs.forEach((l, i) => {
     L.marker([l.lat, l.lng], { icon: lineIcon('#2E86FF', 18, String(i+1), false), zIndexOffset: 900 })
@@ -1555,6 +1680,7 @@ function selectLine(catKey, id){
   });
   const entry = st.entries[id];
   const bounds = entry.roaded ? entry.roadBounds : entry.route.stops.map(s => [s.lat, s.lng]);
+  ensureMapTabVisible();
   map.fitBounds(bounds, { padding:[60,60] });
   renderSidebar();
 }
@@ -1568,6 +1694,7 @@ function resetView(){
       Object.values(st.entries).forEach(e => { if(!map.hasLayer(e.group)) e.group.addTo(map); });
     }
   });
+  ensureMapTabVisible();
   fitAll();
   renderSidebar();
 }
@@ -1601,6 +1728,7 @@ function locateMe(){
       meMarker = L.marker([latitude,longitude], { icon:meIcon, zIndexOffset:1000 }).addTo(map);
       meMarker.bindPopup('<b>You are here</b>');
       if (accuracy) meCircle = L.circle([latitude,longitude], { radius:accuracy, color:'#2E86FF', weight:1, fillColor:'#2E86FF', fillOpacity:0.1 }).addTo(map);
+      ensureMapTabVisible();
       map.setView([latitude,longitude], Math.max(map.getZoom(), 9));
       statusEl.textContent = '';
     },
@@ -1616,44 +1744,70 @@ function locateMe(){
 }
 
 /* ============ RESPONSIVE LAYOUT ============ */
-const headerEl = document.querySelector('header');
-const dragHandleEl = document.getElementById('drag-handle');
 const mq = window.matchMedia('(max-width: 760px)');
+const headerEl = document.querySelector('header');
 
-function clampSidebarHeight(h){ return Math.max(80, Math.min(h, window.innerHeight - 120)); }
-function setSidebarHeight(h){ sidebarEl.style.height = clampSidebarHeight(h) + 'px'; }
+// Below 760px the app becomes a 3-tab layout (map / locations / selected path) instead
+// of side-by-side columns — no column collapsing applies there, and each tab fills the
+// full remaining height (the title/category-toggles header stays drag-resizable, though).
+const mobileTabsEl = document.getElementById('mobileTabs');
+let mobileTab = 'map';
+function setMobileTab(tab){
+  mobileTab = tab;
+  document.body.dataset.mobileTab = tab;
+  mobileTabsEl.querySelectorAll('.mobile-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
+  if (tab === 'map') requestAnimationFrame(() => map.invalidateSize());
+}
+// Locations/path rows and the "reset view"-style actions pan or open a popup on the map,
+// which is only meaningful once the map tab is actually showing.
+function ensureMapTabVisible(){
+  if (mq.matches) setMobileTab('map');
+}
+mobileTabsEl.querySelectorAll('.mobile-tab').forEach(btn => {
+  btn.addEventListener('click', () => setMobileTab(btn.dataset.tab));
+});
+function updateMobileTabCount(){
+  document.getElementById('mobileTabCount').textContent = selectedPath.length ? ` ${selectedPath.length}` : '';
+}
+
+// Drag-resize for the header (title + category toggles) on mobile — it can wrap to many
+// rows, so letting it shrink (it scrolls internally once smaller than its content) frees
+// up room for the active tab below.
+function clampHeaderHeight(h){ return Math.max(56, Math.min(h, window.innerHeight - 160)); }
+function setHeaderHeight(h){ headerEl.style.height = clampHeaderHeight(h) + 'px'; }
+
+const headerDragHandleEl = document.getElementById('headerDragHandle');
+let headerDragging=false, headerDragStartY=0, headerDragStartHeight=0;
+headerDragHandleEl.addEventListener('pointerdown', e => {
+  if (!mq.matches) return;
+  headerDragging=true; headerDragStartY=e.clientY; headerDragStartHeight=headerEl.getBoundingClientRect().height;
+  headerDragHandleEl.setPointerCapture(e.pointerId);
+});
+headerDragHandleEl.addEventListener('pointermove', e => {
+  if (!headerDragging) return;
+  setHeaderHeight(headerDragStartHeight + (e.clientY - headerDragStartY));
+  map.invalidateSize();
+});
+['pointerup','pointercancel'].forEach(evt => headerDragHandleEl.addEventListener(evt, () => { headerDragging=false; }));
 
 function applyResponsiveLayout(e){
   if (e.matches) {
-    if (headerEl.parentElement !== sidebarEl) sidebarEl.insertBefore(headerEl, sidebarEl.firstChild);
-    setSidebarHeight(sidebarEl.style.height ? parseFloat(sidebarEl.style.height) : window.innerHeight * 0.45);
+    // Mobile doesn't support collapsed columns — tabs already isolate each panel.
+    document.body.classList.remove('sidebar-collapsed', 'path-collapsed');
+    setMobileTab(mobileTab);
+    if (headerEl.style.height) setHeaderHeight(parseFloat(headerEl.style.height)); // re-clamp for the new viewport
   } else {
-    if (headerEl.parentElement !== document.body) document.body.insertBefore(headerEl, document.body.firstElementChild);
-    sidebarEl.style.height = '';
+    headerEl.style.height = '';
   }
   map.invalidateSize();
 }
 mq.addEventListener('change', applyResponsiveLayout);
-
 window.addEventListener('resize', () => {
-  if (mq.matches && sidebarEl.style.height) setSidebarHeight(parseFloat(sidebarEl.style.height));
+  if (mq.matches && headerEl.style.height) setHeaderHeight(parseFloat(headerEl.style.height));
   map.invalidateSize();
 });
 
-let dragging=false, dragStartY=0, dragStartHeight=0;
-dragHandleEl.addEventListener('pointerdown', e => {
-  if (!mq.matches) return;
-  dragging=true; dragStartY=e.clientY; dragStartHeight=sidebarEl.getBoundingClientRect().height;
-  dragHandleEl.setPointerCapture(e.pointerId);
-});
-dragHandleEl.addEventListener('pointermove', e => {
-  if (!dragging) return;
-  setSidebarHeight(dragStartHeight + (e.clientY - dragStartY));
-  map.invalidateSize();
-});
-['pointerup','pointercancel'].forEach(evt => dragHandleEl.addEventListener(evt, () => { dragging=false; }));
-
-/* ============ COLUMN COLLAPSE ============ */
+/* ============ COLUMN COLLAPSE (desktop only) ============ */
 function wireColumnToggle(btn, cssClass, expandedLabel, collapsedLabel){
   btn.addEventListener('click', () => {
     const collapsed = document.body.classList.toggle(cssClass);
@@ -1667,8 +1821,6 @@ wireColumnToggle(document.getElementById('sidebarToggle'), 'sidebar-collapsed', 
 wireColumnToggle(document.getElementById('pathToggle'), 'path-collapsed', 'Collapse path', 'Expand path');
 
 /* ============ INIT ============ */
-// Apply responsive layout first — on mobile this moves the header into the sidebar,
-// so the first renderSidebar() call correctly preserves it.
 applyResponsiveLayout(mq);
 renderSidebar();
 renderPathColumn();
