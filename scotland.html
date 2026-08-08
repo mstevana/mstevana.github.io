@@ -460,17 +460,17 @@
   }
   .leaflet-popup-content .gmaps-btn:hover{ opacity:0.88; }
   .leaflet-popup-content .gmaps-btn svg{ width:12px; height:12px; }
-  .leaflet-popup-content .add-path-btn{
+  .leaflet-popup-content .add-path-btn, .leaflet-popup-content .remove-path-btn{
     display:inline-flex; align-items:center; gap:5px;
     margin-top:8px; margin-left:6px; padding:5px 10px;
-    background:#2E86FF; color:#fff; border:none;
+    border:none;
     font-family:'IBM Plex Sans', sans-serif; font-size:11.5px; font-weight:500;
     border-radius:6px; letter-spacing:0.01em; cursor:pointer;
   }
+  .leaflet-popup-content .add-path-btn{ background:#2E86FF; color:#fff; }
   .leaflet-popup-content .add-path-btn:hover{ background:#2372DE; }
-  .leaflet-popup-content .add-path-btn.added{
-    background:rgba(27,29,27,0.1); color:rgba(27,29,27,0.55); cursor:default;
-  }
+  .leaflet-popup-content .remove-path-btn{ background:rgba(166,50,60,0.12); color:#A6323C; }
+  .leaflet-popup-content .remove-path-btn:hover{ background:rgba(166,50,60,0.22); }
   .leaflet-popup-tip{ background:var(--panel); }
   .pin-label{
     font-family:'IBM Plex Mono', monospace;
@@ -1256,12 +1256,14 @@ let filterQuery = '';
 const pathLocById = {};
 let selectedPath = [];      // ordered array of pathLocById keys
 
-// Markup for the "add to path" button shown in a location's popup. Regenerated on every
-// popup open (see bindPopup(() => ...) below) so it reflects the current selection state.
+// Markup for the "add to path" / "remove from path" button shown in a location's popup.
+// Regenerated on every popup open (see bindPopup(() => ...) below) so it reflects the
+// current selection state.
 function pathBtnHtml(id){
-  const already = selectedPath.includes(id);
-  return `<button type="button" class="add-path-btn${already?' added':''}" data-path-id="${id}"${already?' disabled':''}>`
-    + (already ? '✓ Added to path' : '+ Add to path') + '</button>';
+  if (selectedPath.includes(id)) {
+    return `<button type="button" class="remove-path-btn" data-path-id="${id}">− Remove from path</button>`;
+  }
+  return `<button type="button" class="add-path-btn" data-path-id="${id}">+ Add to path</button>`;
 }
 
 function buildLineCategory(catKey, cat){
@@ -1398,23 +1400,31 @@ function addToPath(id){
 
 function removeFromPath(id){
   const loc = pathLocById[id];
-  if (!loc) return;
-  if (!confirm(`Remove "${loc.name}" from your path?`)) return;
+  if (!loc) return false;
+  if (!confirm(`Remove "${loc.name}" from your path?`)) return false;
   selectedPath = selectedPath.filter(x => x !== id);
   renderPathColumn();
   updatePathLine();
   syncPathToUrl();
+  return true;
 }
 
-// "Add to path" buttons live inside dynamically-opened Leaflet popups, so listen
-// at the document level rather than binding to each button individually.
+// "Add/remove path" buttons live inside dynamically-opened Leaflet popups, so listen
+// at the document level rather than binding to each button individually. After the
+// state change, reopen the same marker's popup so its content (and layout) refreshes
+// to show the other action, instead of the popup going stale.
 document.addEventListener('click', e => {
-  const btn = e.target.closest('.add-path-btn');
-  if (!btn || btn.disabled) return;
-  if (addToPath(btn.dataset.pathId)) {
-    btn.textContent = '✓ Added to path';
-    btn.classList.add('added');
-    btn.disabled = true;
+  const addBtn = e.target.closest('.add-path-btn');
+  if (addBtn) {
+    const id = addBtn.dataset.pathId;
+    addToPath(id);
+    pathLocById[id].marker.openPopup();
+    return;
+  }
+  const removeBtn = e.target.closest('.remove-path-btn');
+  if (removeBtn) {
+    const id = removeBtn.dataset.pathId;
+    if (removeFromPath(id)) pathLocById[id].marker.openPopup();
   }
 });
 
@@ -1833,8 +1843,11 @@ function updatePathLine(){
     pathTotals = null;
   }
   locs.forEach((l, i) => {
-    L.marker([l.lat, l.lng], { icon: lineIcon('#2E86FF', 18, String(i+1), false), zIndexOffset: 900 })
-      .addTo(pathMarkersLayer);
+    const numberMarker = L.marker([l.lat, l.lng], { icon: lineIcon('#2E86FF', 18, String(i+1), false), zIndexOffset: 900 });
+    // The number pin sits on top of the location's own marker — clicking it opens that
+    // marker's normal popup (add/remove button included) rather than needing its own.
+    numberMarker.on('click', () => l.marker.openPopup());
+    numberMarker.addTo(pathMarkersLayer);
   });
 }
 
