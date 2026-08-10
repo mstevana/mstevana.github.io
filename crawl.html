@@ -582,11 +582,15 @@ function glowGrad(id,c){
     `<stop offset="100%" stop-color="${c}" stop-opacity="0"/></radialGradient>`;
 }
 function roughF(id,scale,freq,seed){
-  // low-frequency warp keeps silhouettes organic but SMOOTH: high-frequency
-  // displacement shuffles individual pixels and reads as jagged edges up close
+  // displace interior detail only: the displaced copy is clipped back to the
+  // original alpha and drawn OVER the untouched art, so the silhouette perimeter
+  // stays exactly as authored while gradients/details warp organically inside
   return `<filter id="${id}" x="-25%" y="-25%" width="150%" height="150%">`+
-    `<feTurbulence type="fractalNoise" baseFrequency="${(freq*0.28).toFixed(3)}" numOctaves="2" seed="${seed}" result="n"/>`+
-    `<feDisplacementMap in="SourceGraphic" in2="n" scale="${(scale*1.5).toFixed(1)}"/></filter>`;
+    `<feTurbulence type="fractalNoise" baseFrequency="${freq}" numOctaves="2" seed="${seed}" result="n"/>`+
+    `<feDisplacementMap in="SourceGraphic" in2="n" scale="${scale}" result="disp"/>`+
+    `<feComposite in="disp" in2="SourceGraphic" operator="in" result="inside"/>`+
+    `<feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="inside"/></feMerge>`+
+    `</filter>`;
 }
 function gEye(x,y,r,opts){ // glowing eye: soft halo + hot core (+ optional slit pupil)
   opts=opts||{};
