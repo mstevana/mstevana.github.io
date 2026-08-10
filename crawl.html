@@ -566,37 +566,404 @@ const UI_ICONS={
   holy:`<svg viewBox="0 0 32 32"><rect x="13" y="2" width="6" height="28" fill="currentColor"/><rect x="4" y="10" width="24" height="6" fill="currentColor"/></svg>`,
   fist:`<svg viewBox="0 0 64 64"><g fill="#4a4438"><path d="M20 24 Q20 16 28 16 L44 16 Q50 16 50 24 L50 40 Q50 50 40 50 L30 50 Q20 50 20 40 Z"/><path d="M14 28 L22 26 L22 38 L14 34 Z"/></g><path d="M28 16 L28 30 M35 16 L35 30 M42 16 L42 30" stroke="#2c2820" stroke-width="2.4"/></svg>`,
 };
-/* ---------- monster art (viewBox 0 0 64 64, feet at y=62) ---------- */
-function mWrap(inner){return `<svg xmlns="${SVGNS}" viewBox="0 0 64 64"><g stroke="#080706" stroke-width="1.8" stroke-linejoin="round">${inner}</g></svg>`;}
-const eyes=(x1,x2,y,c='#c93b2b',r=2)=>`<circle cx="${x1}" cy="${y}" r="${r}" fill="${c}" stroke="none"/><circle cx="${x2}" cy="${y}" r="${r}" fill="${c}" stroke="none"/>`;
+/* ---------- monster art: grim horror rework ----------
+   Each monster: volume-shaded gradient body drawn through a turbulence
+   displacement filter (organic rough hide/fur/bone), glowing eyes with soft
+   halos kept sharp on top, plus fangs/claws/wounds and a warm torch rim. */
+const RIM=`stroke="#c08a4a" stroke-opacity="0.22" stroke-width="0.9"`;
+function bodyGrad(id,lit,mid){
+  return `<radialGradient id="${id}" cx="50%" cy="36%" r="78%">`+
+    `<stop offset="0%" stop-color="${lit}"/><stop offset="52%" stop-color="${mid}"/>`+
+    `<stop offset="100%" stop-color="#060504"/></radialGradient>`;
+}
+function glowGrad(id,c){
+  return `<radialGradient id="${id}"><stop offset="0%" stop-color="${c}" stop-opacity="0.95"/>`+
+    `<stop offset="40%" stop-color="${c}" stop-opacity="0.4"/>`+
+    `<stop offset="100%" stop-color="${c}" stop-opacity="0"/></radialGradient>`;
+}
+function roughF(id,scale,freq,seed){
+  // displace interior detail only: the displaced copy is clipped back to the
+  // original alpha and drawn OVER the untouched art, so the silhouette perimeter
+  // stays exactly as authored while gradients/details warp organically inside
+  return `<filter id="${id}" x="-25%" y="-25%" width="150%" height="150%">`+
+    `<feTurbulence type="fractalNoise" baseFrequency="${freq}" numOctaves="2" seed="${seed}" result="n"/>`+
+    `<feDisplacementMap in="SourceGraphic" in2="n" scale="${scale}" result="disp"/>`+
+    `<feComposite in="disp" in2="SourceGraphic" operator="in" result="inside"/>`+
+    `<feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="inside"/></feMerge>`+
+    `</filter>`;
+}
+function gEye(x,y,r,opts){ // glowing eye: soft halo + hot core (+ optional slit pupil)
+  opts=opts||{};
+  let s=`<circle cx="${x}" cy="${y}" r="${(r*2.6).toFixed(1)}" fill="url(#eg)"/>`+
+        `<circle cx="${x}" cy="${y}" r="${r}" fill="url(#ec)"/>`;
+  if(opts.slit)s+=`<ellipse cx="${x}" cy="${y}" rx="${(r*0.26).toFixed(2)}" ry="${(r*0.92).toFixed(2)}" fill="#0a0603"/>`;
+  else if(opts.pupil)s+=`<circle cx="${x}" cy="${y}" r="${(r*0.36).toFixed(2)}" fill="#0a0603"/>`;
+  return s;
+}
+function fangsDown(x,y,w,n,h,c){c=c||'#d5cba8';let s='',st=w/n;
+  for(let i=0;i<n;i++){const fx=x+i*st;s+=`<path d="M${fx} ${y} L${(fx+st*0.5).toFixed(1)} ${y+h} L${fx+st} ${y} Z" fill="${c}"/>`;}
+  return s;}
+function fangsUp(x,y,w,n,h,c){c=c||'#d5cba8';let s='',st=w/n;
+  for(let i=0;i<n;i++){const fx=x+i*st;s+=`<path d="M${fx} ${y} L${(fx+st*0.5).toFixed(1)} ${y-h} L${fx+st} ${y} Z" fill="${c}"/>`;}
+  return s;}
+function clawsAt(x,y,angs,len,c){c=c||'#cfc4a2';
+  return angs.map(a=>{const r=a*Math.PI/180;
+    return `<path d="M${x} ${y} L${(x+Math.cos(r)*len).toFixed(1)} ${(y+Math.sin(r)*len).toFixed(1)}" stroke="${c}" stroke-width="1.3" stroke-linecap="round"/>`;}).join('');}
+function drip(x,y,l,c){return `<path d="M${x} ${y} q0.8 ${l*0.6} 0 ${l}" stroke="${c}" stroke-width="1.2" fill="none"/><circle cx="${x}" cy="${y+l}" r="1.1" fill="${c}"/>`;}
+// shared kobold body used by both kobold variants
+function koboldBody(){
+  return `<path d="M24 54 Q12 58 10 48" stroke="#4a2e1a" stroke-width="2.8" fill="none"/>`+
+  `<path d="M26 32 Q20 36 21 46 Q21 54 26 58 L38 58 Q43 52 42 44 Q41 35 37 32 Z" fill="url(#bg)" ${RIM}/>`+
+  `<path d="M24 31 L20 27 L25 29 Z M22 38 L17 35 L22 35 Z M21 45 L16 43 L21 42 Z" fill="#2c1c0c"/>`+
+  `<path d="M27 57 L26 62 L30 62 M37 57 L38 62 L42 62" stroke="#241408" stroke-width="2.4" fill="none"/>`+
+  `<path d="M26 24 Q24 14 33 13 Q41 13 43 20 Q47 21 49 25 Q45 28 40 27 Q38 31 31 30 Q26 29 26 24 Z" fill="url(#bg)" ${RIM}/>`+
+  `<path d="M28 14 Q26 8 30 6 L31 12 Z M38 14 Q40 8 37 5 L35 11 Z" fill="#bdb294"/>`+
+  `<path d="M27 44 L37 44 L36 52 L29 53 Z" fill="#1c130a"/>`+
+  `<path d="M29 41 Q30 46 29 50 M33 40 Q34 45 33 50" stroke="#170e06" stroke-width="1" fill="none" opacity="0.6"/>`;
+}
+function koboldSharp(){
+  return gEye(31,19,1.7,{slit:1})+gEye(40,21,1.4,{slit:1})+fangsDown(43,25,5,3,2.4);
+}
+// shared skeleton core used by both skeleton variants
+function skelCore(){
+  return `<path d="M22 24 Q18 40 20 56 L23 53 L26 57 L30 53 L34 57 L38 53 L41 57 L44 56 Q46 38 42 24 Z" fill="#100e0a" opacity="0.9"/>`+
+  `<path d="M25 17 Q25 7 32 7 Q39 7 39 17 Q39 22 36 24 L36 27 L28 27 L28 24 Q25 22 25 17 Z" fill="url(#bg)" ${RIM}/>`+
+  `<ellipse cx="28.6" cy="16" rx="2.5" ry="3" fill="#080606"/><ellipse cx="35.4" cy="16" rx="2.5" ry="3" fill="#080606"/>`+
+  `<path d="M32 19 L30.9 22 L33.1 22 Z" fill="#080606"/>`+
+  `<path d="M28.5 24.5 L28.5 27 M30.5 24.5 L30.5 27.2 M32.5 24.5 L32.5 27.2 M34.5 24.5 L34.5 27" stroke="#0c0a08" stroke-width="0.8"/>`+
+  `<path d="M32 27 L32 41" stroke="#a89e82" stroke-width="2" stroke-dasharray="2.2 1.4"/>`+
+  `<path d="M32 30 Q24 31 23 34 M32 33 Q25 34 24 37 M32 36 Q26 37 25 40 M32 30 Q40 31 41 34 M32 33 Q39 34 40 37 M32 36 Q38 37 39 40" stroke="#b3a98b" stroke-width="1.7" fill="none"/>`+
+  `<path d="M27 41 Q32 45 37 41 L36 45 L28 45 Z" fill="#a89e82"/>`+
+  `<path d="M29 45 L27 53 M27 54 L27 61 M35 45 L37 53 M37 54 L37 61" stroke="#b3a98b" stroke-width="2.3"/>`+
+  `<path d="M25 61 L29 61 M35 61 L40 61" stroke="#b3a98b" stroke-width="1.6"/>`;
+}
 const MONSTER_ART={
-  rat:()=>`<ellipse cx="32" cy="46" rx="20" ry="12" fill="#4a4038"/><circle cx="49" cy="38" r="9" fill="#544940"/><path d="M56 34 L62 28 L58 38 Z" fill="#6a5a50"/><path d="M12 46 Q2 42 4 34" fill="none" stroke="#6a5a50" stroke-width="3"/>${eyes(47,53,36)}<path d="M56 41 L61 40" stroke="#c9c1a8" stroke-width="1.6"/>`,
-  kobold:()=>`<path d="M24 30 L40 30 L42 56 L36 56 L36 62 L28 62 L28 56 L22 56 Z" fill="#6a4a30"/><circle cx="32" cy="22" r="10" fill="#7a5638"/><path d="M22 18 L16 8 L26 14 Z" fill="#7a5638"/><path d="M42 18 L48 8 L38 14 Z" fill="#7a5638"/><path d="M32 26 L36 30 L28 30 Z" fill="#5a3c24"/>${eyes(28,37,20,'#e0c040')}`,
-  koboldsl:()=>`<path d="M24 30 L40 30 L42 56 L36 56 L36 62 L28 62 L28 56 L22 56 Z" fill="#5c4a34"/><circle cx="32" cy="22" r="10" fill="#7a5638"/><path d="M22 18 L16 8 L26 14 Z" fill="#7a5638"/><path d="M42 18 L48 8 L38 14 Z" fill="#7a5638"/>${eyes(28,37,20,'#e0c040')}<path d="M44 36 Q54 28 50 20" fill="none" stroke="#8a7050" stroke-width="2.6"/><circle cx="50" cy="19" r="3.4" fill="#75787c"/>`,
-  goblin:()=>`<path d="M22 32 L42 32 L44 58 L36 58 L36 62 L28 62 L28 58 L20 58 Z" fill="#4a5a35"/><circle cx="32" cy="22" r="11" fill="#5a6a3f"/><path d="M20 20 L10 14 L22 26 Z" fill="#5a6a3f"/><path d="M44 20 L54 14 L42 26 Z" fill="#5a6a3f"/><path d="M26 30 L38 30" stroke="#38442a" stroke-width="2"/>${eyes(27,38,20,'#d8d048')}<path d="M28 26 L36 26" stroke="#2c3620" stroke-width="1.6"/>`,
-  skeleton:()=>`<circle cx="32" cy="16" r="9" fill="#c9c1a8"/><rect x="29" y="24" width="6" height="20" fill="#c9c1a8"/><path d="M20 28 L44 28 M22 34 L42 34 M24 40 L40 40" stroke="#c9c1a8" stroke-width="3"/><path d="M26 44 L24 62 M38 44 L40 62" stroke="#c9c1a8" stroke-width="4"/><path d="M20 28 L14 44 M44 28 L50 44" stroke="#c9c1a8" stroke-width="3.4"/>${eyes(28,36,15,'#1a1a1a',2.4)}<path d="M28 20 L36 20" stroke="#8a8270" stroke-width="1.6"/>`,
-  skelarcher:()=>`<circle cx="32" cy="16" r="9" fill="#bfb79e"/><rect x="29" y="24" width="6" height="20" fill="#bfb79e"/><path d="M20 28 L44 28 M22 34 L42 34" stroke="#bfb79e" stroke-width="3"/><path d="M26 44 L24 62 M38 44 L40 62" stroke="#bfb79e" stroke-width="4"/>${eyes(28,36,15,'#3a5a2a',2.4)}<path d="M48 10 Q58 30 48 50" fill="none" stroke="#6a5432" stroke-width="3"/><path d="M48 10 L48 50" stroke="#c9c1a8" stroke-width="1.2"/>`,
-  zombie:()=>`<path d="M22 30 L42 30 L44 62 L34 62 L34 48 L30 48 L30 62 L20 62 Z" fill="#5a6a52"/><circle cx="32" cy="20" r="11" fill="#6a7a5f"/><path d="M24 34 L20 44 M40 30 L52 36" stroke="#6a7a5f" stroke-width="5"/><path d="M26 30 L30 36 L34 30" fill="#4a5a44"/>${eyes(27,37,18,'#d8d8c8')}<path d="M27 25 L37 24" stroke="#3c4a36" stroke-width="2"/>`,
-  hobgoblin:()=>`<path d="M20 30 L44 30 L46 58 L36 58 L36 62 L28 62 L28 58 L18 58 Z" fill="#6a3a2a"/><rect x="22" y="30" width="20" height="10" fill="#75787c"/><circle cx="32" cy="20" r="11" fill="#8a5a3c"/><path d="M22 16 L16 10 L24 20 Z" fill="#8a5a3c"/><path d="M42 16 L48 10 L40 20 Z" fill="#8a5a3c"/>${eyes(27,38,18,'#e0b040')}<path d="M27 26 L37 26" stroke="#4a2c1c" stroke-width="2"/>`,
-  orc:()=>`<path d="M18 30 L46 30 L48 58 L37 58 L37 62 L27 62 L27 58 L16 58 Z" fill="#4a5238"/><circle cx="32" cy="19" r="12" fill="#5a6a44"/><path d="M26 26 L28 22 M38 26 L36 22" stroke="#c9c1a8" stroke-width="3"/>${eyes(27,38,16,'#c93b2b')}<path d="M24 30 L18 44 M40 30 L50 40" stroke="#5a6a44" stroke-width="6"/>`,
-  gobshaman:()=>`<path d="M20 28 L44 28 L46 62 L18 62 Z" fill="#3c3448"/><circle cx="32" cy="20" r="10" fill="#5a6a3f"/><path d="M20 28 L32 8 L44 28 Z" fill="#4a4058"/>${eyes(28,37,21,'#7fd17f')}<rect x="46" y="26" width="4" height="34" rx="2" fill="#6a5432"/><circle cx="48" cy="24" r="4" fill="#7fd17f"/>`,
-  spider:()=>`<ellipse cx="32" cy="42" rx="14" ry="11" fill="#2e2a26"/><circle cx="32" cy="26" r="8" fill="#3a342e"/><path d="M20 38 L6 28 M22 46 L6 44 M24 52 L10 60 M44 38 L58 28 M42 46 L58 44 M40 52 L54 60" fill="none" stroke="#2e2a26" stroke-width="3"/>${eyes(28,36,25,'#c93b2b',2)}${eyes(30,34,21,'#c93b2b',1.3)}<path d="M28 44 L36 44" stroke="#5a3a2a" stroke-width="1.6"/>`,
-  ghoul:()=>`<path d="M22 28 L42 28 L44 62 L34 62 L34 50 L30 50 L30 62 L20 62 Z" fill="#6a6a58"/><circle cx="32" cy="18" r="10" fill="#7a7a66"/><path d="M23 30 L14 40 L18 42 M41 30 L52 38 L48 42" fill="none" stroke="#7a7a66" stroke-width="5"/><path d="M27 24 L29 27 L31 24 L33 27 L35 24 L37 27" fill="none" stroke="#c9c1a8" stroke-width="1.6"/>${eyes(27,37,16,'#d8d048')}`,
-  gnoll:()=>`<path d="M20 32 L44 32 L46 58 L36 58 L36 62 L28 62 L28 58 L18 58 Z" fill="#6a5638"/><circle cx="32" cy="20" r="11" fill="#7a6440"/><path d="M24 12 L20 2 L28 8 Z" fill="#7a6440"/><path d="M40 12 L44 2 L36 8 Z" fill="#7a6440"/><path d="M28 26 Q32 31 36 26 L36 30 L28 30 Z" fill="#4a3820"/>${eyes(27,38,18,'#e0b040')}<path d="M26 14 L30 16 M38 14 L34 16" stroke="#4a3820" stroke-width="1.6"/>`,
-  bugbear:()=>`<path d="M16 30 L48 30 L50 58 L38 58 L38 62 L26 62 L26 58 L14 58 Z" fill="#5c4430"/><circle cx="32" cy="18" r="13" fill="#6c5238"/><circle cx="20" cy="10" r="4" fill="#6c5238"/><circle cx="44" cy="10" r="4" fill="#6c5238"/>${eyes(26,39,16,'#d8b040')}<path d="M26 24 L29 27 L32 24 L35 27 L38 24" fill="none" stroke="#c9c1a8" stroke-width="2"/>`,
-  ogre:()=>`<path d="M14 28 L50 28 L52 58 L39 58 L39 62 L25 62 L25 58 L12 58 Z" fill="#7a6a4a"/><circle cx="32" cy="16" r="13" fill="#8a7852"/><path d="M14 30 L6 48 M50 30 L58 48" stroke="#8a7852" stroke-width="8"/><path d="M26 24 L32 27 L38 24" fill="none" stroke="#5a4a30" stroke-width="2.4"/>${eyes(27,38,14,'#b03a2a')}<path d="M30 8 L32 4 M34 8 L36 4" stroke="#5a4a30" stroke-width="2"/>`,
-  wight:()=>`<path d="M20 26 L44 26 L48 62 L16 62 Z" fill="#3a3a44"/><circle cx="32" cy="17" r="10" fill="#8a8a92"/><path d="M20 30 L12 44 M44 30 L52 44" stroke="#3a3a44" stroke-width="5"/>${eyes(28,37,15,'#b8e0e8')}<path d="M28 22 L36 22" stroke="#5a5a62" stroke-width="1.6"/>`,
-  wightnec:()=>`<path d="M18 26 L46 26 L50 62 L14 62 Z" fill="#2e2438"/><circle cx="32" cy="16" r="10" fill="#7a7a84"/><path d="M18 26 L32 6 L46 26 Z" fill="#3a2c48"/>${eyes(28,37,16,'#b48ae0')}<rect x="48" y="24" width="4" height="36" rx="2" fill="#4a3a2a"/><circle cx="50" cy="22" r="4.5" fill="#b48ae0"/>`,
-  minotaur:()=>`<path d="M16 30 L48 30 L50 58 L38 58 L38 62 L26 62 L26 58 L14 58 Z" fill="#5c3a28"/><circle cx="32" cy="18" r="12" fill="#6c452e"/><path d="M20 14 Q8 12 10 2 L16 8 Q18 12 22 12 Z" fill="#c9c1a8"/><path d="M44 14 Q56 12 54 2 L48 8 Q46 12 42 12 Z" fill="#c9c1a8"/><ellipse cx="32" cy="24" rx="6" ry="4" fill="#4a2c1a"/>${eyes(27,38,15,'#c93b2b')}<circle cx="30" cy="24" r="1.2" fill="#1a120c" stroke="none"/><circle cx="34" cy="24" r="1.2" fill="#1a120c" stroke="none"/>`,
-  troll:()=>`<path d="M14 26 L50 26 L54 58 L40 58 L40 62 L24 62 L24 58 L10 58 Z" fill="#3e5240"/><circle cx="32" cy="15" r="12" fill="#4a6250"/><path d="M14 28 L4 50 M50 28 L60 50" stroke="#4a6250" stroke-width="7"/><path d="M26 20 L29 24 L32 20 L35 24 L38 20" fill="none" stroke="#c9c1a8" stroke-width="2"/>${eyes(27,38,13,'#d8d048')}<path d="M30 6 L32 2 M34 6 L36 2" stroke="#2e3e30" stroke-width="2"/>`,
-  ogremage:()=>`<path d="M16 26 L48 26 L52 62 L12 62 Z" fill="#2c3a4a"/><circle cx="32" cy="15" r="12" fill="#4a6a8a"/><path d="M24 8 L20 0 M40 8 L44 0" stroke="#c9c1a8" stroke-width="3"/>${eyes(27,38,13,'#8ad0e0')}<path d="M26 21 L32 24 L38 21" fill="none" stroke="#1c2a3a" stroke-width="2.2"/><circle cx="50" cy="30" r="5" fill="#8ad0e0"/>`,
-  dragon:()=>`<ellipse cx="30" cy="44" rx="18" ry="12" fill="#6a2a1e"/><path d="M44 36 Q54 28 52 18 Q58 24 60 34 L52 40 Z" fill="#7a3424"/><circle cx="48" cy="24" r="9" fill="#7a3424"/><path d="M44 16 L40 6 L48 12 Z" fill="#8a4030"/><path d="M54 16 L58 6 L50 12 Z" fill="#8a4030"/><path d="M12 40 Q2 34 4 24 L14 34 Z" fill="#7a3424"/><path d="M18 34 Q26 20 38 30" fill="none" stroke="#8a4030" stroke-width="5"/>${eyes(45,52,22,'#e0b040')}<path d="M54 28 L60 30" stroke="#e08a3a" stroke-width="2"/>`,
+  rat:()=>({o:{lit:'#7a6552',mid:'#3a2f26',eye:'#ff4526',rough:[3,0.5],seed:7},
+    body:`<path d="M12 53 Q0 52 3 40 Q4 35 8 34" fill="none" stroke="#6d5a4e" stroke-width="2.4" stroke-linecap="round"/>`+
+    `<path d="M4 44 L7 44 M3.4 40 L6.4 41" stroke="#40342a" stroke-width="0.8"/>`+
+    `<path d="M10 53 Q10 39 24 35 Q38 31 47 38 Q54 43 53 50 Q52 58 40 59 L17 59 Q10 58 10 53 Z" fill="url(#bg)" ${RIM}/>`+
+    `<ellipse cx="20" cy="49" rx="9" ry="8" fill="#241c15" opacity="0.75"/>`+
+    `<path d="M28 40 Q29 48 28 54 M34 38 Q35 47 34 54 M40 38 Q41 46 40 52" stroke="#191009" stroke-width="1.2" fill="none" opacity="0.7"/>`+
+    `<path d="M45 37 Q52 34 58 42 Q60 45 57 47 L48 50 Q43 48 43 42 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M46 35 Q44 28 50 29 Q53 30 51 35 Z" fill="#1e1610"/>`+
+    `<path d="M18 58 L16 62 M26 58 L25 62 M38 58 L38 62 M46 55 L48 61" stroke="#1e150e" stroke-width="2.2"/>`+
+    `<path d="M24 41 L30 44" stroke="#4c100c" stroke-width="2"/>`,
+    sharp:gEye(51,41,1.9,{pupil:1})+
+    `<path d="M55 46 L56 49.5 M57.5 45.5 L59 48.5" stroke="#cfc4a2" stroke-width="1.1"/>`+
+    `<path d="M56 44 L63 42 M56 45.5 L63 46.5" stroke="#7a705e" stroke-width="0.5" opacity="0.6"/>`+
+    drip(56,49.5,3.5,'#6a1210')}),
+  kobold:()=>({o:{lit:'#8a5c38',mid:'#462c1a',eye:'#ffb32a',rough:[2.2,0.4],seed:11},
+    body:koboldBody(),sharp:koboldSharp()}),
+  koboldsl:()=>({o:{lit:'#7a5a40',mid:'#3c2e20',eye:'#ffb32a',rough:[2.2,0.4],seed:12},
+    body:koboldBody()+`<path d="M42 38 Q50 34 52 26" stroke="#6a533c" stroke-width="2" fill="none"/>`,
+    sharp:koboldSharp()+`<path d="M52 26 Q57 20 54 14" stroke="#7a624a" stroke-width="1.6" fill="none"/>`+
+    `<circle cx="53.6" cy="13" r="2.6" fill="#75787c"/><circle cx="53" cy="12.4" r="0.9" fill="#9a9da2"/>`}),
+  goblin:()=>({o:{lit:'#5f7a42',mid:'#2c3c1e',eye:'#e8e04a',rough:[2.4,0.5],seed:5},
+    body:`<path d="M20 18 Q7 12 5 20 Q12 23 19 24 Z" fill="#354a22"/><path d="M10 16 L13 20 L9 19 Z" fill="#060504"/>`+
+    `<path d="M44 18 Q57 12 59 20 Q52 23 45 24 Z" fill="#354a22"/><path d="M54 16 L51 20 L55 19 Z" fill="#060504"/>`+
+    `<path d="M21 22 Q21 10 32 9 Q43 10 43 22 Q43 30 37 33 Q27 33 24 30 Q21 27 21 22 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M24 17.5 Q32 14.5 40 17.5 Q32 19 24 17.5 Z" fill="#131a0b"/>`+
+    `<path d="M24 27 Q32 34 40 26 Q36 31 32 31 Q27 31 24 27 Z" fill="#0a0505"/>`+
+    `<path d="M26 33 Q20 38 21 47 Q22 56 27 59 L38 59 Q42 54 41 46 Q40 37 37 33 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M27 38 Q28 44 27 50 M31 37 Q32 44 31 50 M35 37 Q36 43 35 49" stroke="#1a240e" stroke-width="1" fill="none" opacity="0.65"/>`+
+    `<path d="M27 48 L38 48 L37 55 L28 55 Z" fill="#171208"/>`+
+    `<path d="M25 36 Q16 42 15 52" stroke="#2e401e" stroke-width="3.4" fill="none"/>`+
+    `<path d="M39 36 Q47 40 48 47" stroke="#2e401e" stroke-width="3.4" fill="none"/>`+
+    `<path d="M28 58 L27 62 M36 58 L37 62" stroke="#223016" stroke-width="2.6"/>`,
+    sharp:gEye(27,21,2,{pupil:1})+gEye(38,21,2,{pupil:1})+
+    fangsDown(25.5,26.5,13,6,2.4)+fangsUp(27,30.5,10,4,2)+
+    clawsAt(15,52,[100,120,140],3.6)+
+    `<path d="M48 46 L57 39.5 L58 43 L50 50 Z" fill="#787d81"/><path d="M52 42 L55 44" stroke="#6b3a22" stroke-width="1.4" opacity="0.8"/>`}),
+  skeleton:()=>({o:{lit:'#cfc4a8',mid:'#6b6350',eye:'#9adfff',rough:[1.8,0.35],seed:9},
+    body:skelCore()+
+    `<path d="M27 30 L20 38 M20 38 L22 47" stroke="#b3a98b" stroke-width="2"/>`+
+    `<path d="M37 30 L43 38 M43 38 L42 48" stroke="#b3a98b" stroke-width="2"/>`+
+    `<path d="M42 48 L41 51 M42 48 L44 51" stroke="#b3a98b" stroke-width="1.1"/>`,
+    sharp:gEye(28.6,16,1.2)+gEye(35.4,16,1.2)+
+    `<path d="M22 46 L14 59 L11.6 56.5 L19.4 44.5 Z" fill="#6e6a5e"/>`+
+    `<path d="M15 55 L17 53 M13.5 57 L15 56" stroke="#6b3a22" stroke-width="1.2" opacity="0.85"/>`+
+    `<path d="M19 44 L23 48" stroke="#4a4436" stroke-width="1.6"/>`}),
+  skelarcher:()=>({o:{lit:'#c2b89c',mid:'#615a48',eye:'#7ce89a',rough:[1.8,0.35],seed:10},
+    body:skelCore()+
+    `<path d="M27 30 L21 36 M21 36 L27 33" stroke="#b3a98b" stroke-width="2"/>`+
+    `<path d="M37 30 L45 30" stroke="#b3a98b" stroke-width="2"/>`,
+    sharp:gEye(28.6,16,1.2)+gEye(35.4,16,1.2)+
+    `<path d="M46 12 Q58 30 46 48" stroke="#42311e" stroke-width="2.6" fill="none"/>`+
+    `<path d="M46 12 L46 48" stroke="#b8b096" stroke-width="0.8"/>`+
+    `<path d="M46 30 L28 30" stroke="#5c4728" stroke-width="1.4"/><path d="M28 30 L33 27.6 L33 32.4 Z" fill="#8f9296"/>`+
+    `<path d="M46 30 L49 28 M46 30 L49 32" stroke="#8a8270" stroke-width="0.9"/>`}),
+  zombie:()=>({o:{lit:'#7a8a68',mid:'#39422f',eye:'#cfd8c0',rough:[3.2,0.6],seed:13},
+    body:`<path d="M23 31 Q19 40 21 50 Q22 58 26 61 L40 61 Q43 56 42 47 Q41 36 38 32 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M23 38 Q28 36 30 42 Q28 47 23 46 Z" fill="#170b08"/>`+
+    `<path d="M24 39.5 Q27 39.5 29 41.5 M24 42.5 Q27 42.5 29 44.5" stroke="#a89e82" stroke-width="1.1" fill="none"/>`+
+    `<g transform="rotate(9 33 20)"><path d="M24 21 Q24 10 33 10 Q41 11 41 20 Q41 27 36 29 L29 29 Q24 26 24 21 Z" fill="url(#bg)" ${RIM}/></g>`+
+    `<path d="M29 28 Q30 34.5 34 34.5 Q37 33.5 37.5 29 Q33 31.5 29 28 Z" fill="#0d0706"/>`+
+    `<path d="M27 12 Q31 9 35 12 L33 15 Q30 14 27 12 Z" fill="#42100d"/>`+
+    `<path d="M24 33 Q14 36 10 44" stroke="#44503a" stroke-width="4.4" fill="none" stroke-linecap="round"/>`+
+    `<path d="M40 34 Q45 38 45 44" stroke="#44503a" stroke-width="4.4" fill="none" stroke-linecap="round"/>`+
+    `<circle cx="45" cy="45" r="2.2" fill="#42100d"/><path d="M45 45 L46.5 50" stroke="#b3a98b" stroke-width="1.4"/>`+
+    `<path d="M26 50 L40 50 L39 55 L36 53 L33 56.5 L30 53 L27 56 Z" fill="#191712"/>`+
+    `<path d="M28 56 L27 62 M37 56 L39 62" stroke="#39422f" stroke-width="3"/>`,
+    sharp:gEye(28,19,1.6)+gEye(37,21,1.4)+
+    `<path d="M30 26 L30 28 M32.5 26.5 L32.5 28.5" stroke="#b8b096" stroke-width="0.9"/>`+
+    clawsAt(10,44,[150,170,190,130],4)+
+    drip(33,34,4,'#3c0f0b')}),
+  hobgoblin:()=>({o:{lit:'#9a5c38',mid:'#48291a',eye:'#ff9422',rough:[2,0.4],seed:15},
+    body:`<path d="M18 32 L12 26 L20 28 Z M46 32 L52 26 L44 28 Z" fill="#33373b"/>`+
+    `<path d="M20 32 Q17 42 19 52 L24 59 L40 59 L45 52 Q47 42 44 32 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M21 33 L43 33 L44 44 Q32 48 20 44 Z" fill="#26292c"/>`+
+    `<path d="M21 33 L43 33" stroke="#5c6167" stroke-width="1.1"/>`+
+    `<circle cx="24" cy="36" r="0.8" fill="#55585c"/><circle cx="32" cy="37" r="0.8" fill="#55585c"/><circle cx="40" cy="36" r="0.8" fill="#55585c"/>`+
+    `<path d="M26 40 L31 43 M35 38 L39 42" stroke="#101214" stroke-width="0.9"/>`+
+    `<path d="M24 20 Q24 10 32 10 Q40 10 40 20 L40 24 Q36 28 28 28 Q24 26 24 20 Z" fill="url(#bg)" ${RIM}/>`+
+    `<ellipse cx="32" cy="22" rx="7" ry="5" fill="#8a5230" opacity="0.85"/>`+
+    `<path d="M23 16 Q24 7.5 32 7.5 Q40 7.5 41 16 Q36 12.5 32 12.5 Q28 12.5 23 16 Z" fill="#33373b"/>`+
+    `<path d="M23 16 Q28 12.5 32 12.5" stroke="#5c6167" stroke-width="0.8" fill="none"/>`+
+    `<path d="M24 16.5 L40 16.5 L40 20 L24 20 Z" fill="#000" opacity="0.5"/>`+
+    `<path d="M27 26.5 L26 22.5 L29.5 25.5 Z M37 26.5 L38 22.5 L34.5 25.5 Z" fill="#d5cba8"/>`+
+    `<path d="M29 24.5 L35 24.5" stroke="#170d07" stroke-width="1.4"/>`+
+    `<path d="M45 38 L51 31" stroke="#42311e" stroke-width="2.2"/>`+
+    `<path d="M27 58 L26 62 M37 58 L38 62" stroke="#201a12" stroke-width="3.4"/>`,
+    sharp:gEye(28,18.5,1.7)+gEye(36,18.5,1.7)+
+    `<circle cx="52.5" cy="29" r="4" fill="#3a3e42"/>`+
+    `<path d="M52.5 24 L52.5 21.6 M56.5 27 L58.6 25.6 M56.5 31.5 L58.6 32.6 M48.5 27 L46.4 25.6 M48.5 31.5 L46.4 32.6" stroke="#4c5054" stroke-width="1.6"/>`}),
+  orc:()=>({o:{lit:'#5c7040',mid:'#2a361c',eye:'#d63a20',rough:[2.6,0.5],seed:17},
+    body:`<path d="M15 30 Q13 24 20 25 L23 30 Z" fill="#33291e"/><path d="M17 26 L15 21" stroke="#33291e" stroke-width="1.6"/>`+
+    `<path d="M16 33 Q14 30 19 29 L45 29 Q50 30 48 33 Q50 44 46 53 L41 60 L23 60 L18 53 Q14 44 16 33 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M32 32 L32 46 M24 38 Q32 41 40 38" stroke="#16200c" stroke-width="1.3" opacity="0.8" fill="none"/>`+
+    `<path d="M22 34 L27 40 M25 33 L29 38" stroke="#170c07" stroke-width="1.1"/>`+
+    `<path d="M36 44 L40 49" stroke="#4c100c" stroke-width="1.4"/>`+
+    `<path d="M25 22 Q25 12 32 11 Q39 12 39 22 Q39 28 35 30 L29 30 Q25 27 25 22 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M31 11 Q30 5 34 4 Q33 8 33.5 11 Z" fill="#100e0a"/>`+
+    `<path d="M26 26 Q32 32 38 26 L38 29 Q32 34 26 29 Z" fill="#1e2a12"/>`+
+    `<path d="M17 34 Q11 42 13 51" stroke="#2c3c1a" stroke-width="5.6" fill="none" stroke-linecap="round"/>`+
+    `<path d="M47 34 Q53 40 52 47" stroke="#2c3c1a" stroke-width="5.6" fill="none" stroke-linecap="round"/>`+
+    `<path d="M25 59 L24 62 M39 59 L40 62" stroke="#1c140c" stroke-width="4"/>`,
+    sharp:gEye(28,19,1.5)+gEye(36,19,1.5)+
+    `<path d="M27.5 28 L25.5 21 L29.5 26 Z M36.5 28 L38.5 21 L34.5 26 Z" fill="#ddd5b6"/>`+
+    `<path d="M52 46 L62 42 L62 50 L53 51 Z" fill="#71777b"/>`+
+    `<path d="M62 42 L62 50" stroke="#6a1210" stroke-width="1.6"/><path d="M56 44 L58 46" stroke="#4c5054" stroke-width="1"/>`}),
+  gobshaman:()=>({o:{lit:'#4c4258',mid:'#221c30',eye:'#7fff6a',rough:[2.2,0.45],seed:19,
+      extra:glowGrad('og','#7fd15f')},
+    body:`<path d="M26 24 Q20 34 19 48 Q19 56 22 60 L28 57 L32 61 L36 57 L42 60 Q45 54 44 46 Q43 32 38 24 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M24 22 Q23 10 32 9 Q41 10 40 22 Q36 26 32 26 Q28 26 24 22 Z" fill="#191322"/>`+
+    `<ellipse cx="32" cy="19" rx="6" ry="6.5" fill="#050305"/>`+
+    `<path d="M27 29 Q32 32 37 29" stroke="#8a8270" stroke-width="1" fill="none"/>`+
+    `<path d="M29 30 L29 32 M32 31 L32 33.4 M35 30 L35 32" stroke="#b3a98b" stroke-width="1.1"/>`+
+    `<path d="M41 36 Q45 35 46.5 36.5" stroke="#354a22" stroke-width="2.4" fill="none"/>`,
+    sharp:gEye(29.5,19,1.3)+gEye(34.5,19,1.3)+
+    `<path d="M47 12 L46 58" stroke="#33230f" stroke-width="2.4"/>`+
+    `<circle cx="47" cy="10" r="4" fill="#b8ae90"/><circle cx="45.6" cy="9.4" r="0.9" fill="#0a0808"/><circle cx="48.4" cy="9.4" r="0.9" fill="#0a0808"/>`+
+    `<circle cx="47" cy="17.5" r="5.5" fill="url(#og)"/><circle cx="47" cy="17.5" r="1.9" fill="#c8ffb8"/>`+
+    `<path d="M13 19 l3.4 3.4 m0 -3.4 l-3.4 3.4" stroke="#7fd15f" stroke-width="1" opacity="0.75"/>`+
+    `<path d="M17 33 h4 m-2 -2 v4" stroke="#7fd15f" stroke-width="1" opacity="0.6"/>`+
+    `<circle cx="12" cy="42" r="1.2" fill="#7fd15f" opacity="0.6"/>`}),
+  spider:()=>({o:{lit:'#4c4340',mid:'#201b18',eye:'#ff2f1e',rough:[2.4,0.45],seed:21,
+      extra:glowGrad('og','#9fdc39')},
+    body:`<path d="M26 40 L13 29 L5 36 M24 44 L9 42 L3 49 M25 48 L13 52 L8 60 M29 51 L22 57 L20 62" stroke="#181310" stroke-width="3" fill="none"/>`+
+    `<path d="M26 40 L13 29 L5 36 M24 44 L9 42 L3 49 M25 48 L13 52 L8 60 M29 51 L22 57 L20 62" stroke="#4a3e34" stroke-width="1.3" fill="none"/>`+
+    `<path d="M40 40 L48 28 L45 20 M44 42 L55 36 L60 28 M45 48 L57 48 L62 42 M43 52 L52 58 L58 56" stroke="#181310" stroke-width="3" fill="none"/>`+
+    `<path d="M40 40 L48 28 L45 20 M44 42 L55 36 L60 28 M45 48 L57 48 L62 42 M43 52 L52 58 L58 56" stroke="#4a3e34" stroke-width="1.3" fill="none"/>`+
+    `<ellipse cx="24" cy="42" rx="15" ry="12" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M19 37 Q24 33 29 37 Q28 42 24 44.5 Q20 42 19 37 Z" fill="#7d7460" opacity="0.45"/>`+
+    `<circle cx="21.5" cy="38.5" r="1" fill="#14100d"/><circle cx="26.5" cy="38.5" r="1" fill="#14100d"/>`+
+    `<path d="M12 49 L9 52 M15 52 L13 55 M33 50 L35 54" stroke="#2c2620" stroke-width="0.9"/>`+
+    `<ellipse cx="42" cy="46" rx="9" ry="7.5" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M46 51 Q47.5 55 45.5 57.5 M50 50 Q52 54 50.5 56.5" stroke="#191310" stroke-width="2.2" fill="none"/>`,
+    sharp:gEye(44,44,1.6)+gEye(48,45.5,1.4)+
+    `<circle cx="41" cy="42.5" r="0.9" fill="#ff2f1e"/><circle cx="46" cy="41.5" r="0.9" fill="#ff2f1e"/><circle cx="51" cy="44" r="0.9" fill="#ff2f1e"/><circle cx="50.5" cy="48" r="0.8" fill="#ff2f1e"/>`+
+    `<path d="M45.5 57.5 L45 60 M50.5 56.5 L50.7 59" stroke="#a89e82" stroke-width="1.3"/>`+
+    drip(45,60,3,'#9fdc39')}),
+  ghoul:()=>({o:{lit:'#8a8a72',mid:'#3f4034',eye:'#e8e87a',rough:[2.8,0.5],seed:23},
+    body:`<path d="M24 30 Q17 38 19 48 Q20 57 26 60 L36 60 Q40 55 39 46 Q38 35 34 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<circle cx="24.5" cy="34" r="1" fill="#22231c"/><circle cx="22.5" cy="39" r="1" fill="#22231c"/><circle cx="21.5" cy="44" r="1" fill="#22231c"/>`+
+    `<path d="M25 38 Q28 37 30 40 M24 43 Q27 42 29 45 M24 48 Q27 47 29 50" stroke="#191a12" stroke-width="1.2" fill="none" opacity="0.8"/>`+
+    `<path d="M32 24 Q31 15 39 14 Q46 15 47 22 Q47 28 42 30 Q35 30 32 24 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M40 22 Q43 24 46 22" stroke="#2c2d24" stroke-width="1" fill="none"/>`+
+    `<path d="M38 27 Q43 31 47.5 26 Q44 30.5 38 27 Z" fill="#0b0504"/>`+
+    `<path d="M39 28 Q42 33 40 36.5" stroke="#4c100c" stroke-width="2" opacity="0.85" fill="none"/>`+
+    `<path d="M23 33 Q13 40 12 52" stroke="#545646" stroke-width="3.6" fill="none" stroke-linecap="round"/>`+
+    `<path d="M37 33 Q46 36 50 43" stroke="#545646" stroke-width="3.6" fill="none" stroke-linecap="round"/>`+
+    `<path d="M27 58 L25 62 M34 58 L36 62" stroke="#383a2e" stroke-width="2.8"/>`,
+    sharp:gEye(38,20,1.5)+gEye(44,21,1.5)+
+    fangsDown(39,27,7,4,2)+
+    clawsAt(12,52,[75,95,115,55],6)+clawsAt(50,43,[-10,10,30,-30],6)+
+    drip(41,36,3,'#4c100c')}),
+  gnoll:()=>({o:{lit:'#8a6a3c',mid:'#42301a',eye:'#ffb62a',rough:[3,0.55],seed:25},
+    body:`<path d="M24 12 L20 6 L27 9 L26 4 L31 8 L32 2 L36 8 L41 4 L39 10 L45 7 L41 13 Z" fill="#1f1406"/>`+
+    `<path d="M25 12 L22 4 L29 10 Z" fill="#33240f"/>`+
+    `<path d="M24 20 Q24 11 33 10 Q41 11 42 17 L49 20 Q51 23 48 26 L42 27 Q40 31 33 30 Q25 29 24 20 Z" fill="url(#bg)" ${RIM}/>`+
+    `<circle cx="49" cy="22" r="1.4" fill="#14100a"/>`+
+    `<path d="M41 24 Q45 27 49 24 L48 27.5 Q44 30.5 41 27.5 Z" fill="#0b0504"/>`+
+    `<path d="M25 30 Q20 38 21 48 Q22 57 27 60 L39 60 Q44 53 43 44 Q42 34 38 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<circle cx="27" cy="38" r="1.1" fill="#241708"/><circle cx="33" cy="42" r="1.1" fill="#241708"/><circle cx="28" cy="47" r="1.1" fill="#241708"/><circle cx="35" cy="52" r="1.1" fill="#241708"/><circle cx="38" cy="37" r="1.1" fill="#241708"/>`+
+    `<path d="M26 34 Q22 40 23 46" stroke="#33240f" stroke-width="3" fill="none"/>`+
+    `<path d="M40 34 L50 44" stroke="#33240f" stroke-width="3"/>`+
+    `<path d="M28 58 L26 62 M37 58 Q39 60 38 62" stroke="#2c1e0c" stroke-width="3"/>`,
+    sharp:gEye(29,17,1.8,{pupil:1})+gEye(37,17.5,1.7,{pupil:1})+
+    fangsDown(42,24.5,6,3,2.2)+fangsUp(43,27.2,5,2,2)+
+    `<path d="M48 42 L58 46" stroke="#42311e" stroke-width="2.2"/>`+
+    `<path d="M55 39 L63 43 L59 51 L52 47 Z" fill="#565a5e"/><path d="M63 43 L61 45" stroke="#2c2e30" stroke-width="1.2"/>`}),
+  bugbear:()=>({o:{lit:'#6f5238',mid:'#302218',eye:'#ffd24a',rough:[3.6,0.6],seed:27},
+    body:`<path d="M18 26 Q16 16 24 13 Q28 8 34 9 Q42 8 45 14 Q50 17 48 26 Q53 34 51 46 L47 59 L17 59 L13 46 Q11 34 18 26 Z" fill="url(#bg)" ${RIM}/>`+
+    `<circle cx="22" cy="11" r="2.6" fill="#4a3624"/><circle cx="43" cy="11" r="2.6" fill="#4a3624"/>`+
+    `<ellipse cx="32" cy="20" rx="10" ry="8" fill="#54402c" opacity="0.8"/>`+
+    `<path d="M26 25 Q32 29 38 25 L38 27.5 Q32 31.5 26 27.5 Z" fill="#0a0505"/>`+
+    `<path d="M18 34 L48 42" stroke="#170f08" stroke-width="3"/>`+
+    `<circle cx="33" cy="38.5" r="2.2" fill="#b3a98b"/><circle cx="32.2" cy="38" r="0.6" fill="#14100a"/><circle cx="34" cy="38" r="0.6" fill="#14100a"/>`+
+    `<path d="M14 40 Q10 46 12 52 M50 40 Q54 46 52 52" stroke="#3c2c1c" stroke-width="4.4" fill="none" stroke-linecap="round"/>`+
+    `<path d="M24 58 L23 62 M42 58 L43 62" stroke="#1f150c" stroke-width="4.2"/>`,
+    sharp:gEye(29,19,1.4)+gEye(35,19,1.4)+
+    `<path d="M26.5 27.5 L25.5 23.5 L28.5 26.5 Z M37.5 27.5 L38.5 23.5 L35.5 26.5 Z" fill="#d5cba8"/>`+
+    fangsDown(28,25.5,8,4,1.8)+
+    `<path d="M50 42 L59 26" stroke="#33230f" stroke-width="3.2"/>`+
+    `<path d="M56 30 L61 19 L64 22 L60 32 Z" fill="#3f3222"/>`+
+    `<path d="M58 27 L60.5 25.5 M59.5 23 L62 22" stroke="#55585c" stroke-width="1.4"/>`}),
+  ogre:()=>({o:{lit:'#8a7148',mid:'#40321e',eye:'#d88a2a',rough:[2.8,0.5],seed:29},
+    body:`<path d="M14 32 Q13 24 22 22 L26 16 Q28 12 33 12 Q38 12 39 17 L42 22 Q51 24 50 32 Q54 42 51 52 L46 60 L18 60 L13 52 Q10 42 14 32 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M27 20 Q27 12.5 33 12.5 Q39 13 39 20 Q39 25 33 26 Q28 25 27 20 Z" fill="url(#bg)" stroke="#100b06" stroke-width="1"/>`+
+    `<ellipse cx="33" cy="19" rx="5.5" ry="5" fill="#8a6a40" opacity="0.6"/>`+
+    `<ellipse cx="32" cy="45" rx="15" ry="12" fill="#57431f" opacity="0.3"/><circle cx="32" cy="47" r="1.4" fill="#241a0e"/>`+
+    `<circle cx="20" cy="34" r="1.1" fill="#57431f"/><circle cx="45" cy="38" r="1.1" fill="#57431f"/><circle cx="23" cy="52" r="1.1" fill="#57431f"/><circle cx="43" cy="30" r="1" fill="#57431f"/>`+
+    `<path d="M28 22.5 Q33 26.5 38 22.5 L38 24.5 Q33 28.5 28 24.5 Z" fill="#1f1509"/>`+
+    `<path d="M24 48 L40 48 L38 56 L26 56 Z" fill="#1f1910"/><path d="M27 49 L27 55 M31 49 L31 56 M35 49 L35 55" stroke="#0f0c07" stroke-width="0.8"/>`+
+    `<path d="M23 59 L22 62 M41 59 L42 62" stroke="#1f150c" stroke-width="5"/>`+
+    `<path d="M14 44 L7 30" stroke="#33230f" stroke-width="3.8"/>`,
+    sharp:gEye(29.5,18,1.4)+gEye(36,18,1.4)+
+    `<path d="M28.5 24 L27.5 20 L30.5 23 Z M37.5 24 L38.5 20 L35.5 23 Z" fill="#ddd5b6"/>`+
+    `<path d="M9 33 L2 19 L8 16.5 L13.5 30 Z" fill="#42341f"/><path d="M5 26 L9 24 M4 22 L8 20.5" stroke="#241a0e" stroke-width="1"/>`}),
+  wight:()=>({o:{lit:'#9aa2ac',mid:'#3a3f48',eye:'#86d8ff',rough:[2,0.4],seed:31,
+      extra:`<linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="55%" stop-color="#161920"/><stop offset="100%" stop-color="#161920" stop-opacity="0"/></linearGradient>`},
+    body:`<path d="M22 26 Q18 40 20 59 Q26 54 32 60 Q38 54 44 59 Q46 40 42 26 Z" fill="url(#fade)"/>`+
+    `<path d="M26 27 Q24 34 25 40 L39 40 Q40 34 38 27 Z" fill="url(#bg)" opacity="0.55"/>`+
+    `<path d="M26 20 Q26 10 33 10 Q40 11 40 19 Q40 26 34 28 Q28 27 26 20 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M27 21 Q29 22 30 21 M36 21 Q38 22 39 21" stroke="#20242b" stroke-width="1.2" fill="none"/>`+
+    `<path d="M30 24.5 L37 24.5" stroke="#0e1014" stroke-width="1"/>`+
+    `<path d="M31 24.5 L31 25.8 M33 24.5 L33 26 M35 24.5 L35 25.8" stroke="#b8c0c8" stroke-width="0.7"/>`+
+    `<path d="M26 12 Q23 20 25 27 M40 13 Q43 20 41 26" stroke="#1e2228" stroke-width="1.6" fill="none"/>`+
+    `<path d="M23 32 Q16 34 14 40" stroke="#68707c" stroke-width="2.6" fill="none" stroke-linecap="round"/>`+
+    `<ellipse cx="32" cy="58.5" rx="17" ry="3.6" fill="#aab4c2" opacity="0.1"/>`,
+    sharp:gEye(29.5,17,1.7)+gEye(36.5,17,1.7)+
+    clawsAt(14,40,[70,90,110,50],5.5,'#aeb6c0')+
+    `<path d="M45 33 L53 52 L50 54 L43 36 Z" fill="#56534c"/>`+
+    `<path d="M47 40 L49 42 M48.5 46 L50.5 47.5" stroke="#6b3a22" stroke-width="1.2" opacity="0.8"/>`}),
+  wightnec:()=>({o:{lit:'#6a5a80',mid:'#282036',eye:'#c08aff',rough:[2,0.4],seed:33,
+      extra:glowGrad('og','#a06ae0')+`<linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="55%" stop-color="#1c1628"/><stop offset="100%" stop-color="#1c1628" stop-opacity="0"/></linearGradient>`},
+    body:`<path d="M22 26 Q18 40 20 60 Q26 55 32 61 Q38 55 44 60 Q46 40 42 26 Z" fill="url(#fade)"/>`+
+    `<path d="M23 22 Q22 8 32 7 Q42 8 41 22 Q41 27 32 28 Q23 27 23 22 Z" fill="#1f1830"/>`+
+    `<ellipse cx="32" cy="19" rx="6.5" ry="7" fill="#040307"/>`+
+    `<path d="M30 30 L34 30 L35 52 L29 52 Z" fill="#151021"/>`+
+    `<path d="M31 33 h2 M31 37 l2 2 m0 -2 l-2 2 M31.4 43 h1.6 m-0.8 -0.8 v1.6" stroke="#8a6ab8" stroke-width="0.8" opacity="0.85"/>`+
+    `<path d="M41 34 Q45 33 47 34" stroke="#b8b0c8" stroke-width="1.8" fill="none"/>`,
+    sharp:gEye(29.5,19,1.4)+gEye(34.5,19,1.4)+
+    `<path d="M49 8 L48 58" stroke="#2a2114" stroke-width="2.4"/>`+
+    `<circle cx="49" cy="8" r="4.2" fill="#b8ae90"/>`+
+    `<path d="M46 5 Q44 2 46 1 M52 5 Q54 2 52 1" stroke="#b8ae90" stroke-width="1.4" fill="none"/>`+
+    `<circle cx="47.6" cy="7.4" r="0.9" fill="#a06ae0"/><circle cx="50.4" cy="7.4" r="0.9" fill="#a06ae0"/>`+
+    `<circle cx="49" cy="16" r="6" fill="url(#og)"/><circle cx="49" cy="16" r="2" fill="#e0ccff"/>`+
+    `<path d="M14 22 l3 0 m-1.5 -1.5 l0 3 M11 34 l3 3 m0 -3 l-3 3 M16 45 l2.6 0" stroke="#a06ae0" stroke-width="1" opacity="0.7"/>`}),
+  minotaur:()=>({o:{lit:'#7a4c30',mid:'#361e10',eye:'#ff3a1e',rough:[2.6,0.5],seed:35,
+      extra:`<linearGradient id="horn" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ddd3b4"/><stop offset="100%" stop-color="#7d7560"/></linearGradient>`},
+    body:`<path d="M14 36 Q14 30 22 32 Q26 34 32 34 Q38 34 42 32 Q50 30 50 36 Q52 46 49 54 L44 61 L20 61 L15 54 Q12 46 14 36 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M32 36 L32 50 M23 41 Q32 44 41 41" stroke="#1c0f06" stroke-width="1.4" opacity="0.85" fill="none"/>`+
+    `<path d="M16 48 Q24 52 32 52 Q40 52 48 48 L47 54 L17 54 Z" fill="#241207" opacity="0.7"/>`+
+    `<path d="M24 20 Q24 10 32 9 Q40 10 40 20 L40 24 Q40 32 32 33 Q24 32 24 24 Z" fill="url(#bg)" ${RIM}/>`+
+    `<ellipse cx="32" cy="28" rx="7" ry="5.5" fill="#4c2e18"/>`+
+    `<ellipse cx="29.5" cy="28.5" rx="1.5" ry="2" fill="#0d0603" transform="rotate(-15 29.5 28.5)"/>`+
+    `<ellipse cx="34.5" cy="28.5" rx="1.5" ry="2" fill="#0d0603" transform="rotate(15 34.5 28.5)"/>`+
+    `<path d="M24 60 L23 63 M40 60 L41 63" stroke="#1c0d04" stroke-width="4.6"/>`+
+    `<path d="M46 30 L58 50" stroke="#33230f" stroke-width="2.8"/>`,
+    sharp:`<path d="M23 14 Q10 12 8 2 Q17 5 22 9 Q24.5 11 24.5 14 Z" fill="url(#horn)" stroke="#141008" stroke-width="0.8"/>`+
+    `<path d="M41 14 Q54 12 56 2 Q47 5 42 9 Q39.5 11 39.5 14 Z" fill="url(#horn)" stroke="#141008" stroke-width="0.8"/>`+
+    gEye(28,17,1.8)+gEye(36,17,1.8)+
+    `<path d="M30 32.5 Q32 35 34 32.5" stroke="#8a8c90" stroke-width="1.4" fill="none"/>`+
+    `<path d="M27 24 Q26 21 28 20 M37 24 Q38 21 36 20" stroke="#c8ccd4" stroke-width="0.7" opacity="0.35" fill="none"/>`+
+    `<path d="M43 25 Q51 20 54 27 Q48 28 46 31 Z" fill="#565a5e"/><path d="M48 25 L51 27" stroke="#6a1210" stroke-width="1.3"/>`}),
+  troll:()=>({o:{lit:'#5c7050',mid:'#242e1d',eye:'#d8e04a',rough:[4,0.65],seed:37},
+    body:`<path d="M27 8 L24 3 L29 6 L30 1 L33 5 L37 2 L38 7 Z" fill="#131a0e"/>`+
+    `<path d="M26 14 Q26 6 33 6 Q40 7 40 14 Q40 20 33 21 Q26 20 26 14 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M32 13 Q29.5 19 33 22 Q35.5 19.5 34 14 Z" fill="#42543a"/>`+
+    `<path d="M28 17 Q33 20 38 16 L38 18.5 Q33 22.5 28 19.5 Z" fill="#0a0705"/>`+
+    `<path d="M27 21 Q20 26 20 36 Q19 46 24 52 L28 58 L38 58 Q43 50 42 40 Q42 27 37 21 Z" fill="url(#bg)" ${RIM}/>`+
+    `<circle cx="25" cy="30" r="1.2" fill="#39482f"/><circle cx="38" cy="34" r="1.2" fill="#39482f"/><circle cx="23" cy="42" r="1.2" fill="#39482f"/><circle cx="36" cy="47" r="1.1" fill="#39482f"/><circle cx="29" cy="26" r="1" fill="#39482f"/>`+
+    `<path d="M22 26 Q10 36 9 54" stroke="#39482f" stroke-width="3.8" fill="none" stroke-linecap="round"/>`+
+    `<path d="M40 26 Q52 36 52 52" stroke="#39482f" stroke-width="3.8" fill="none" stroke-linecap="round"/>`+
+    `<path d="M29 57 L27 62 M36 57 L38 62" stroke="#28331f" stroke-width="3.2"/>`,
+    sharp:gEye(29,13,1.4)+gEye(36,13,1.4)+
+    `<path d="M28.5 18 L27.5 13.5 L30.5 16.5 Z M37.5 17 L38.5 12.5 L35.5 15.5 Z" fill="#d5cba8"/>`+
+    clawsAt(9,54,[70,90,110,50],6)+clawsAt(52,52,[70,90,110,130],6)+
+    drip(33,21,4,'#7da53c')}),
+  ogremage:()=>({o:{lit:'#3c5a80',mid:'#1a2740',eye:'#a0e8ff',rough:[2.2,0.4],seed:39,
+      extra:glowGrad('og','#7ec8e8')+`<linearGradient id="horn" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ddd3b4"/><stop offset="100%" stop-color="#7d7560"/></linearGradient>`},
+    body:`<path d="M20 16 Q14 8 18 4 M44 16 Q50 8 46 4" stroke="#c8ccd4" stroke-width="0" fill="none"/>`+
+    `<path d="M22 20 Q16 22 14 18 Q18 14 21 12 Q19 8 23 6 Q25 10 26 12 Q29 8 32 8 Q35 8 38 12 Q39 10 41 6 Q45 8 43 12 Q46 14 50 18 Q48 22 42 20 Z" fill="#b8bec8" opacity="0.85"/>`+
+    `<path d="M25 20 Q25 10 32 10 Q39 10 39 20 Q39 27 32 29 Q25 27 25 20 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M26 17 L31 18.5 M38 17 L33 18.5" stroke="#0c1220" stroke-width="1.6"/>`+
+    `<path d="M28 25 Q32 28 36 25" stroke="#0c1220" stroke-width="1.4" fill="none"/>`+
+    `<path d="M20 30 Q17 40 19 50 L24 60 L40 60 L45 50 Q47 40 44 30 Z" fill="#1e222c"/>`+
+    `<path d="M22 32 Q32 36 42 32 M21 40 Q32 44 43 40" stroke="#8a7030" stroke-width="0.9" opacity="0.6" fill="none"/>`+
+    `<path d="M40 30 L24 52" stroke="#4c1620" stroke-width="3.4"/>`+
+    `<path d="M22 34 Q18 33 17 32" stroke="#31517a" stroke-width="2.6" fill="none"/>`+
+    `<path d="M26 59 L25 62 M39 59 L40 62" stroke="#161a22" stroke-width="4"/>`,
+    sharp:`<path d="M26 12 Q22 4 27 1 Q29 6 29 11 Z" fill="url(#horn)" stroke="#141008" stroke-width="0.7"/>`+
+    `<path d="M38 12 Q42 4 37 1 Q35 6 35 11 Z" fill="url(#horn)" stroke="#141008" stroke-width="0.7"/>`+
+    gEye(28,17.5,1.6)+gEye(36,17.5,1.6)+
+    `<path d="M29 26.5 L28.5 23.5 L31 26 Z M35 26.5 L35.5 23.5 L33 26 Z" fill="#ddd5b6"/>`+
+    `<circle cx="15" cy="30" r="6.5" fill="url(#og)"/><circle cx="15" cy="30" r="2.2" fill="#dff4ff"/>`+
+    `<circle cx="10" cy="25" r="0.8" fill="#c8e8f8" opacity="0.8"/><circle cx="20" cy="24" r="0.7" fill="#c8e8f8" opacity="0.7"/><circle cx="9" cy="35" r="0.7" fill="#c8e8f8" opacity="0.6"/>`+
+    `<path d="M49 12 L48 58" stroke="#2a2114" stroke-width="2.2"/>`+
+    `<path d="M49 12 Q55 6 53 1 Q48 5 48 12 Z" fill="#848a90"/>`}),
+  dragon:()=>({o:{lit:'#8a3020',mid:'#3c1108',eye:'#ffd23a',rough:[2.4,0.45],seed:41,
+      extra:glowGrad('og','#ff8c1e')+`<linearGradient id="wg" x1="0" y1="1" x2="0.6" y2="0"><stop offset="0%" stop-color="#7a3020"/><stop offset="100%" stop-color="#2a0c06"/></linearGradient>`},
+    body:`<path d="M22 34 Q8 26 4 8 Q14 16 18 14 Q20 20 24 20 Q24 28 26 32 Z" fill="url(#wg)" stroke="#c08a4a" stroke-opacity="0.3" stroke-width="1"/>`+
+    `<path d="M8 12 L22 32 M13 13 L24 28 M18 15 L25 24" stroke="#190805" stroke-width="1.1" opacity="0.9"/>`+
+    `<path d="M34 30 Q30 20 34 10 Q38 16 42 16 Q40 24 42 30 Z" fill="url(#wg)" stroke="#c08a4a" stroke-opacity="0.3" stroke-width="1"/>`+
+    `<path d="M35 12 L36 28 M38 15 L38.5 28" stroke="#190805" stroke-width="1.1" opacity="0.9"/>`+
+    `<path d="M18 52 Q6 56 8 46 Q9 42 14 42" stroke="#4c1a10" stroke-width="3.4" fill="none" stroke-linecap="round"/>`+
+    `<path d="M8 46 L4 43 L6 49 Z" fill="#4c1a10"/>`+
+    `<path d="M20 40 Q22 32 30 32 Q42 30 48 38 Q52 44 50 50 Q48 58 38 58 L24 58 Q18 52 20 40 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M24 48 Q32 51 42 49 M24 52 Q32 55 42 53" stroke="#a8663a" stroke-width="1.6" opacity="0.55" fill="none"/>`+
+    `<path d="M42 36 Q46 28 46 20 L52 22 Q52 30 48 38 Z" fill="url(#bg)"/>`+
+    `<path d="M44 32 L41.5 30.5 M45.5 27 L43 25.5 M46 22 L43.5 21" stroke="#2c0c06" stroke-width="1.3"/>`+
+    `<path d="M44 14 Q44 8 50 8 Q57 8 60 14 Q56 15 54 15 L58 19 Q54 22 48 20 Q44 19 44 14 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M48 20 Q52 24 58 22 L56 25.5 Q50 26.5 47 22 Z" fill="#260a05"/>`+
+    `<path d="M26 57 L25 61 M36 57 L37 61" stroke="#2c0e08" stroke-width="3"/>`,
+    sharp:`<path d="M47 9 Q45 4 48 2 Q50 6 50 9 Z M52 9 Q52 4 55 3 Q55 7 54 10 Z" fill="#b8a888"/>`+
+    gEye(52,13,1.6,{slit:1})+
+    `<circle cx="54" cy="21.5" r="4" fill="url(#og)"/>`+
+    fangsDown(49,19.5,8,4,1.8,'#e8dfc0')+fangsUp(50,24.5,7,3,1.7,'#e8dfc0')+
+    `<path d="M60 12 Q62 8 61 4 M62 14 Q65 12 65 9" stroke="#8a8a8a" stroke-width="0.9" opacity="0.35" fill="none"/>`+
+    `<circle cx="58" cy="26" r="0.8" fill="#ff8c1e" opacity="0.8"/><circle cx="61" cy="17" r="0.7" fill="#ffb84a" opacity="0.7"/><circle cx="44" cy="10" r="0.6" fill="#ff8c1e" opacity="0.6"/>`}),
 };
-function monsterSVG(key,boss){
-  const art=(MONSTER_ART[key]||MONSTER_ART.goblin)();
-  const crown=boss?`<path d="M22 6 L26 0 L30 5 L34 0 L38 5 L42 0 L44 8 L24 8 Z" fill="#c9a227" stroke="#080706" stroke-width="1.4"/>`:'';
-  const aura=boss?`<ellipse cx="32" cy="58" rx="24" ry="5" fill="#8c1f1f" opacity=".5"/>`:'';
-  return `<svg xmlns="${SVGNS}" viewBox="0 0 64 64">${aura}<g stroke="#080706" stroke-width="1.8" stroke-linejoin="round">${art}</g>${crown}</svg>`;
+// pose transforms pivoting at the feet (32,62): breathing, gait lean, rear-up, lunge
+function poseXf(pose){
+  const S=(sx,sy)=>`translate(32 62) scale(${sx} ${sy}) translate(-32 -62)`;
+  switch(pose){
+    case 'idle1': return S(1.025,0.972);
+    case 'walk0': return `rotate(-3.5 32 62) translate(0 -0.8)`;
+    case 'walk1': return `rotate(3.5 32 62) translate(0 -0.8)`;
+    case 'windup':return `rotate(-6 32 62) ${S(1.05,1.09)}`;
+    case 'strike':return `translate(0 1) ${S(1.17,1.1)}`;
+    default: return '';
+  }
+}
+function monsterSVG(key,boss,pose){
+  const a=(MONSTER_ART[key]||MONSTER_ART.goblin)();
+  const o=a.o;
+  const defs='<defs>'+bodyGrad('bg',o.lit,o.mid)+glowGrad('eg',o.eye)+
+    `<radialGradient id="ec"><stop offset="0%" stop-color="#fff8e8"/><stop offset="35%" stop-color="${o.eye}"/><stop offset="100%" stop-color="${o.eye}"/></radialGradient>`+
+    roughF('rf',o.rough?o.rough[0]:2.2,o.rough?o.rough[1]:0.45,o.seed||3)+
+    (boss?glowGrad('bossg','#c01a10'):'')+(o.extra||'')+'</defs>';
+  const ground=boss
+    ?`<ellipse cx="32" cy="60" rx="23" ry="5" fill="url(#bossg)" opacity="0.7"/><ellipse cx="32" cy="60.5" rx="16" ry="3.2" fill="#000" opacity="0.55"/>`
+    :`<ellipse cx="32" cy="60.5" rx="16" ry="3.2" fill="#000" opacity="0.55"/>`;
+  const crown=boss
+    ?`<path d="M24 7 L25.5 1 L28.5 5 L32 0 L35.5 5 L38.5 1 L40 7 L38 9 L26 9 Z" fill="#2c3034" stroke="#101314" stroke-width="1"/><circle cx="32" cy="5.5" r="1.5" fill="#d82a20"/>`
+    :'';
+  // windup frame flares an eye-colored aura as the warning
+  const flare=pose==='windup'?`<ellipse cx="32" cy="30" rx="26" ry="27" fill="url(#eg)" opacity="0.17"/>`:'';
+  const xf=poseXf(pose);
+  return `<svg xmlns="${SVGNS}" viewBox="0 0 64 64">${defs}${ground}<g${xf?` transform="${xf}"`:''}>${flare}<g filter="url(#rf)">${a.body}</g>${a.sharp||''}${crown}</g></svg>`;
 }
 const STAIRS_SVG=`<svg xmlns="${SVGNS}" viewBox="0 0 64 64"><g stroke="#080706" stroke-width="1.6"><rect x="8" y="8" width="48" height="48" fill="#12100c"/><path d="M8 8 L56 8 L56 20 L44 20 L44 32 L32 32 L32 44 L20 44 L20 56 L8 56 Z" fill="#3a352c"/><path d="M56 20 L44 20 L44 32 L32 32 L32 44 L20 44 L20 56 L56 56 Z" fill="#1e1b15"/></g></svg>`;
 /* ============================== ITEM REGISTRY & LOOT ============================== */
@@ -1167,6 +1534,75 @@ function shade(hex,f){ // lighten (f>0) or darken (f<0) a #rrggbb color
   const b=clamp(Math.round((n&255)*(1+f)),0,255);
   return `rgb(${r},${g},${b})`;
 }
+function shadeA(hex,f,a){ // shaded color with alpha
+  const n=parseInt(hex.slice(1),16);
+  const r=clamp(Math.round(((n>>16)&255)*(1+f)),0,255);
+  const g=clamp(Math.round(((n>>8)&255)*(1+f)),0,255);
+  const b=clamp(Math.round((n&255)*(1+f)),0,255);
+  return `rgba(${r},${g},${b},${a})`;
+}
+/* --- weathering generators: geometry is precomputed so the wrapped copies
+   drawn at x±128 are identical and the texture stays seamless --- */
+function genCrack(x0,y0,ang0,steps,w0){
+  const segs=[];let a=ang0,x=x0,y=y0;
+  for(let i=0;i<steps;i++){
+    a+=(Math.random()-0.5)*0.85;
+    const st=2.2+Math.random()*3;
+    const nx=x+Math.cos(a)*st,ny=y+Math.sin(a)*st;
+    const t=i/steps;
+    segs.push({x1:x,y1:y,x2:nx,y2:ny,w:Math.max(0.35,w0*(1-t*0.75)),al:0.7-t*0.3});
+    x=nx;y=ny;
+  }
+  return {segs,endX:x,endY:y};
+}
+function drawCrack(ctx,cr){
+  for(const s of cr.segs){
+    ctx.strokeStyle=`rgba(8,6,4,${s.al.toFixed(2)})`;ctx.lineWidth=s.w;
+    ctx.beginPath();ctx.moveTo(s.x1,s.y1);ctx.lineTo(s.x2,s.y2);ctx.stroke();
+    ctx.strokeStyle='rgba(255,238,205,0.055)';ctx.lineWidth=Math.max(0.3,s.w*0.8);
+    ctx.beginPath();ctx.moveTo(s.x1+0.7,s.y1+0.7);ctx.lineTo(s.x2+0.7,s.y2+0.7);ctx.stroke();
+  }
+}
+function genBlob(cx,cy,r,irr){
+  const n=7+rnd(4),pts=[];
+  for(let i=0;i<n;i++){
+    const a=i/n*Math.PI*2;
+    const rr=r*(1-irr/2+Math.random()*irr);
+    pts.push([cx+Math.cos(a)*rr,cy+Math.sin(a)*rr*0.8]);
+  }
+  return pts;
+}
+function pathBlob(ctx,pts){
+  ctx.beginPath();
+  pts.forEach(([px,py],i)=>i?ctx.lineTo(px,py):ctx.moveTo(px,py));
+  ctx.closePath();
+}
+function genMossClump(x,y,r,mossC){
+  const dots=[],n=Math.floor(r*r/2)+10;
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2,d=Math.pow(Math.random(),0.6)*r;
+    dots.push({x:x+Math.cos(a)*d,y:y+Math.sin(a)*d*0.85,r:0.7+Math.random()*1.7,
+      c:Math.random()<0.32?shadeA(mossC,0.4,0.55):shadeA(mossC,-0.3,0.55),
+      al:0.3+Math.random()*0.45});
+  }
+  // hanging tendrils below the clump
+  for(let k=0;k<2+rnd(3);k++){
+    let px=x+(Math.random()-0.5)*r,py=y+r*0.4,rr=1.3;
+    const L=4+rnd(9);
+    for(let s=0;s<L;s++){
+      dots.push({x:px,y:py,r:rr,c:shadeA(mossC,-0.25,0.5),al:0.3+Math.random()*0.25});
+      py+=1.5+Math.random();px+=(Math.random()-0.5)*1.1;rr*=0.93;
+    }
+  }
+  return dots;
+}
+function drawDots(ctx,dots){
+  for(const d of dots){
+    ctx.fillStyle=d.c;ctx.globalAlpha=d.al;
+    ctx.beginPath();ctx.arc(d.x,d.y,d.r,0,7);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
 // 6 aged wall variations: 0 uneven bricks, 1 chipped bricks, 2 broken stones,
 // 3 mossy, 4 cracked, 5 damp-stained
 // One shared brick skeleton for the whole level: identical course heights,
@@ -1216,13 +1652,15 @@ function baseWallCanvas(th,grid){
     wrapX(()=>ctx.fillRect(x,y,w,h));
   }
   ctx.globalAlpha=1;
-  if(th.moss){ // faint moss dust everywhere (shared, so it matches at joins)
+  if(th.moss){ // faint soft moss haze (shared, so it matches at joins)
     for(let i=0;i<6;i++){
-      ctx.fillStyle=th.moss;ctx.globalAlpha=0.07+Math.random()*0.1;
-      const x=rnd(128),y=rnd(128),r=3+rnd(8);
-      wrapX(()=>{ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();});
+      const x=rnd(128),y=rnd(128),r=4+rnd(8);
+      wrapX(()=>{
+        const g=ctx.createRadialGradient(x,y,0.5,x,y,r);
+        g.addColorStop(0,shadeA(th.moss,0,0.12));g.addColorStop(1,shadeA(th.moss,0,0));
+        ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+      });
     }
-    ctx.globalAlpha=1;
   }
   return cv;
 }
@@ -1231,61 +1669,102 @@ function wallCanvas(th,variant,grid,baseCv){
   const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
   ctx.drawImage(baseCv,0,0,128,128); // identical brick+grime base for every variant (drawn in logical space)
   // --- per-variant aging decoration on top of the shared base ---
-  if(variant===1){ // chipped corners bitten out of brick edges
-    for(let i=0;i<14;i++){
+  if(variant===1){ // chips spalled off brick edges: irregular bites with a lit lower lip
+    for(let i=0;i<12;i++){
       const p=pickBrickPoint(grid);
-      const cx=Math.random()<0.5?p.b.x0+2:p.b.x0+p.row.bw-12;
-      const cy=Math.random()<0.5?p.row.y+2:p.row.y+p.row.rh-9;
-      const w=8+rnd(6),h=6+rnd(5);
-      wrapX(()=>{ctx.fillStyle=shade(th.wall,-0.62);
-        ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+w,cy);ctx.lineTo(cx,cy+h);ctx.closePath();ctx.fill();});
-    }
-  }else if(variant===2){ // heavily worn: spalled bites and bleached brick centres
-    for(let i=0;i<10;i++){
-      const p=pickBrickPoint(grid),r=4+rnd(7);
-      wrapX(()=>{ctx.fillStyle=shade(th.wall,-0.55);ctx.globalAlpha=0.85;
-        ctx.beginPath();ctx.arc(p.x,p.y,r,0,7);ctx.fill();ctx.globalAlpha=1;});
-    }
-    for(let i=0;i<7;i++){
-      const p=pickBrickPoint(grid);
-      wrapX(()=>{ctx.fillStyle=shade(th.wall,0.18);ctx.globalAlpha=0.25;
-        ctx.beginPath();ctx.ellipse(p.x,p.y,6+rnd(8),4+rnd(6),0,0,7);ctx.fill();ctx.globalAlpha=1;});
-    }
-  }
-  if(variant===3&&th.moss){ // moss creeping up from below
-    for(let i=0;i<18;i++){
-      ctx.fillStyle=th.moss;ctx.globalAlpha=0.16+Math.random()*0.3;
-      const x=rnd(128),y=56+rnd(72),r=5+rnd(14),dl=8+rnd(16);
+      const onEdge=Math.random()<0.7;
+      const cx=onEdge?(Math.random()<0.5?p.b.x0+2+rnd(4):p.b.x0+p.row.bw-4-rnd(4)):p.x;
+      const cy=onEdge?(Math.random()<0.5?p.row.y+2+rnd(3):p.row.y+p.row.rh-3-rnd(3)):p.y;
+      const outer=genBlob(cx,cy,3.5+rnd(4),0.85);
+      const inner=genBlob(cx+0.5,cy-0.6,2+rnd(2),0.9);
       wrapX(()=>{
-        ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
-        ctx.fillRect(x-1,y,2,dl);
+        pathBlob(ctx,outer);ctx.fillStyle=shade(th.wall,-0.55);ctx.fill();
+        pathBlob(ctx,inner);ctx.fillStyle=shade(th.wall,-0.72);ctx.fill();
+        // light catches the concave lower lip of the chip
+        ctx.strokeStyle='rgba(235,215,175,0.12)';ctx.lineWidth=1;
+        ctx.beginPath();
+        const lower=outer.filter(([,py])=>py>cy);
+        lower.forEach(([px,py],k)=>k?ctx.lineTo(px,py):ctx.moveTo(px,py));
+        ctx.stroke();
       });
     }
-    ctx.globalAlpha=1;
+  }else if(variant===2){ // heavily worn: soft spalled hollows and bleached patches
+    for(let i=0;i<9;i++){
+      const p=pickBrickPoint(grid),r=3.5+rnd(5);
+      const pts=genBlob(p.x,p.y,r,0.7);
+      wrapX(()=>{
+        const g=ctx.createRadialGradient(p.x,p.y,r*0.15,p.x,p.y,r);
+        g.addColorStop(0,shadeA(th.wall,-0.62,0.85));g.addColorStop(1,shadeA(th.wall,-0.62,0));
+        pathBlob(ctx,pts);ctx.fillStyle=g;ctx.fill();
+      });
+    }
+    for(let i=0;i<7;i++){
+      const p=pickBrickPoint(grid),rx=5+rnd(8),ry=4+rnd(5);
+      wrapX(()=>{
+        const g=ctx.createRadialGradient(p.x,p.y,1,p.x,p.y,rx);
+        g.addColorStop(0,shadeA(th.wall,0.3,0.3));g.addColorStop(1,shadeA(th.wall,0.3,0));
+        ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(p.x,p.y,rx,ry,0,0,7);ctx.fill();
+      });
+    }
   }
-  if(variant===4){ // long branching cracks
+  if(variant===3&&th.moss){ // moss: organic clumps hugging the mortar lines, denser low down
+    const clumps=[];
+    for(let i=0;i<7;i++){
+      const row=grid[1+rnd(grid.length-1)];
+      clumps.push(genMossClump(rnd(128),Math.min(124,row.y+(Math.random()<0.6?0:row.rh)+(Math.random()-0.5)*3+20*Math.random()*Math.random()),3.5+rnd(6),th.moss));
+    }
+    for(let i=0;i<4;i++)clumps.push(genMossClump(rnd(128),100+rnd(26),5+rnd(7),th.moss));
+    for(const c of clumps)wrapX(()=>drawDots(ctx,c));
+  }
+  if(variant===4){ // cracks: meandering, tapered, branching, with a caught-light edge
     for(let c=0;c<2+rnd(2);c++){
-      let x=rnd(128),y=rnd(40);
-      const pts=[[x,y]];
-      for(let s=0;s<6+rnd(4);s++){x+=rnd(17)-8;y+=8+rnd(12);pts.push([x,y]);}
+      const main=genCrack(rnd(128),rnd(30),Math.PI/2+(Math.random()-0.5)*0.7,10+rnd(8),1.7);
+      const branches=[];
+      for(let b=0;b<1+rnd(2);b++){
+        const seg=main.segs[3+rnd(Math.max(1,main.segs.length-4))];
+        branches.push(genCrack(seg.x2,seg.y2,Math.random()<0.5?Math.PI*0.15:Math.PI*0.85,4+rnd(5),0.9));
+      }
       wrapX(()=>{
-        ctx.beginPath();pts.forEach(([px,py],p)=>p?ctx.lineTo(px,py):ctx.moveTo(px,py));
-        ctx.strokeStyle='rgba(0,0,0,0.65)';ctx.lineWidth=1.6;ctx.stroke();
-        ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=0.8;ctx.stroke();
+        drawCrack(ctx,main);
+        for(const b of branches)drawCrack(ctx,b);
       });
     }
   }
-  if(variant===5){ // damp stains and pale mineral streaks
-    for(let i=0;i<5;i++){
-      const x=rnd(128),y=rnd(128),rx=10+rnd(18),ry=8+rnd(14),rot=Math.random()*3;
+  if(variant===5){ // damp: layered soft stains bleeding drip tails, wavering mineral streaks
+    for(let i=0;i<4;i++){
+      const x=rnd(128),y=rnd(110),r=9+rnd(12);
+      const layers=[];
+      for(let l=0;l<3;l++)layers.push({ox:(Math.random()-0.5)*4,oy:(Math.random()-0.5)*4,rr:r*(1-l*0.26)});
+      const tails=[];
+      for(let t=0;t<1+rnd(2);t++){
+        const pts=[];let px=x+(Math.random()-0.5)*r,py=y+r*0.4;
+        const len=10+rnd(22);
+        for(let s=0;s<len;s+=3){px+=(Math.random()-0.5)*1.3;py+=3;pts.push([px,py]);}
+        tails.push({pts,w:0.9+Math.random()*1.3});
+      }
       wrapX(()=>{
-        ctx.fillStyle='rgba(0,0,0,0.22)';
-        ctx.beginPath();ctx.ellipse(x,y,rx,ry,rot,0,7);ctx.fill();
+        for(const l of layers){
+          const g=ctx.createRadialGradient(x+l.ox,y+l.oy,l.rr*0.15,x+l.ox,y+l.oy,l.rr);
+          g.addColorStop(0,'rgba(10,8,5,0.26)');g.addColorStop(1,'rgba(10,8,5,0)');
+          ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(x+l.ox,y+l.oy,l.rr,l.rr*0.82,0,0,7);ctx.fill();
+        }
+        for(const t of tails){
+          ctx.strokeStyle='rgba(10,8,5,0.17)';ctx.lineWidth=t.w;
+          ctx.beginPath();t.pts.forEach(([px,py],k)=>k?ctx.lineTo(px,py):ctx.moveTo(px,py));ctx.stroke();
+        }
       });
     }
-    for(let i=0;i<7;i++){
-      const x=rnd(128),y=rnd(30),w=1+rnd(2),h=40+rnd(80);
-      wrapX(()=>{ctx.fillStyle='rgba(220,215,190,0.08)';ctx.fillRect(x,y,w,h);});
+    for(let i=0;i<6;i++){
+      const x=rnd(128),y0=rnd(24),len=40+rnd(80);
+      const pts=[];let px=x;
+      for(let yy=0;yy<len;yy+=4){px+=(Math.random()-0.5)*0.9;pts.push([px,y0+yy]);}
+      const w=0.9+Math.random()*1.5;
+      wrapX(()=>{
+        const g=ctx.createLinearGradient(0,y0,0,y0+len);
+        g.addColorStop(0,'rgba(226,219,196,0.15)');g.addColorStop(1,'rgba(226,219,196,0)');
+        ctx.strokeStyle=g;ctx.lineWidth=w;
+        ctx.beginPath();pts.forEach(([qx,qy],k)=>k?ctx.lineTo(qx,qy):ctx.moveTo(qx,qy));ctx.stroke();
+      });
     }
   }
   // vertical ambient gradient is uniform in x, so it never breaks the horizontal wrap
@@ -1295,16 +1774,59 @@ function wallCanvas(th,variant,grid,baseCv){
   return cv;
 }
 function wallVariant(x,y){return (((x*73856093)^(y*19349663))>>>0)%6;}
-function svgToTexture(svg,cacheKey){
+function svgToTexture(svg,cacheKey,opt){
+  opt=opt||{};
   if(cacheKey&&R3.texCache[cacheKey])return R3.texCache[cacheKey];
-  const S=256; // raster SVG sprites at 2x for crisper edges when a monster is close
+  const S=opt.size||256;
+  // mipmaps kill distant-sprite shimmer; the dark transparent-edge fringe they
+  // introduce is invisible against the dark dungeon
+  const tex_opts=opt.mipmap?{}:{mipmap:false};
   const cv=document.createElement('canvas');cv.width=cv.height=S;
-  const tex=texFromCanvas(cv,{mipmap:false}); // linear, no mipmaps (avoids transparent-edge fringe)
+  const tex=texFromCanvas(cv,tex_opts);
   const img=new Image();
   img.onload=()=>{const ctx=cv.getContext('2d');ctx.clearRect(0,0,S,S);ctx.drawImage(img,0,0,S,S);tex.needsUpdate=true;};
   img.src='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg)));
   if(cacheKey)R3.texCache[cacheKey]=tex;
   return tex;
+}
+/* fx textures: glow orbs for spells, streaks for arrows and stones */
+function fxGlowTex(color){
+  const key='fxg_'+color;
+  if(R3.texCache[key])return R3.texCache[key];
+  const cv=document.createElement('canvas');cv.width=cv.height=64;
+  const ctx=cv.getContext('2d');
+  const g=ctx.createRadialGradient(32,32,2,32,32,30);
+  g.addColorStop(0,'#ffffff');g.addColorStop(0.28,color);g.addColorStop(1,color+'00');
+  ctx.fillStyle=g;ctx.fillRect(0,0,64,64);
+  const tex=texFromCanvas(cv,{mipmap:false});
+  R3.texCache[key]=tex;return tex;
+}
+function fxArrowTex(){
+  const key='fx_arrow';
+  if(R3.texCache[key])return R3.texCache[key];
+  const cv=document.createElement('canvas');cv.width=cv.height=64;
+  const ctx=cv.getContext('2d');
+  ctx.strokeStyle='rgba(150,130,100,0.4)';ctx.lineWidth=5;
+  ctx.beginPath();ctx.moveTo(6,38);ctx.lineTo(50,29);ctx.stroke();
+  ctx.strokeStyle='#3a2c1a';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(8,36);ctx.lineTo(52,28);ctx.stroke();
+  ctx.fillStyle='#9a9da2';
+  ctx.beginPath();ctx.moveTo(58,26);ctx.lineTo(49,25);ctx.lineTo(51,32);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#8a8270';ctx.lineWidth=1.6;
+  ctx.beginPath();ctx.moveTo(8,36);ctx.lineTo(13,31);ctx.moveTo(11,37);ctx.lineTo(16,32);ctx.stroke();
+  const tex=texFromCanvas(cv,{mipmap:false});
+  R3.texCache[key]=tex;return tex;
+}
+function fxStoneTex(){
+  const key='fx_stone';
+  if(R3.texCache[key])return R3.texCache[key];
+  const cv=document.createElement('canvas');cv.width=cv.height=64;
+  const ctx=cv.getContext('2d');
+  const g=ctx.createRadialGradient(30,30,3,32,32,20);
+  g.addColorStop(0,'#b0b3b8');g.addColorStop(0.5,'#6f7276');g.addColorStop(1,'#6f727600');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(32,32,18,0,7);ctx.fill();
+  const tex=texFromCanvas(cv,{mipmap:false});
+  R3.texCache[key]=tex;return tex;
 }
 function initRenderer(){
   const cv=document.getElementById('view3d');
@@ -1466,14 +1988,19 @@ function refreshItemSprite(L,i){
   R3.levelGroup.add(spr);R3.itemSprites[i]=spr;
 }
 function itemTexKey(it){return 'it_'+it.base+'_'+it.bonus+'_'+(it.tint||'')+'_'+(ITEM_DEFS[it.base].tint||'');}
+const MONSTER_POSES=['idle0','idle1','walk0','walk1','windup','strike'];
 function addMonsterSprite(m){
-  const svg=monsterSVG(MONSTERS[m.key].spr,m.boss);
-  const mat=new THREE.SpriteMaterial({map:svgToTexture(svg,'mon_'+m.key+(m.boss?'_b':'')),transparent:true});
+  const sprKey=MONSTERS[m.key].spr;
+  const frames={};
+  for(const p of MONSTER_POSES){
+    frames[p]=svgToTexture(monsterSVG(sprKey,m.boss,p),'mon_'+sprKey+(m.boss?'_b':'')+'_'+p,{size:384,mipmap:true});
+  }
+  const mat=new THREE.SpriteMaterial({map:frames.idle0,transparent:true});
   const spr=new THREE.Sprite(mat);
   const sc=m.boss?1.05:(['ogre','troll','minotaur','ogremage','dragon'].includes(m.key)?0.95:0.72);
   spr.scale.set(sc,sc,1);
   spr.position.set(m.x+0.5,sc/2+0.02,m.y+0.5);
-  spr.userData={kind:'monster',id:m.id};
+  spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0'};
   R3.levelGroup.add(spr);R3.monsterSprites[m.id]=spr;
   m._sc=sc;
 }
@@ -1559,7 +2086,7 @@ function projectToScreen(pos){
 const G={
   party:null,L:null,depth:1,px:0,py:0,facing:0,
   time:0,paused:true,over:false,started:false,
-  moveCd:0,distField:null,lastSave:0,
+  moveCd:0,distField:null,lastSave:0,fx:[],
 };
 function tileAt(x,y){if(x<0||y<0||x>=G.L.w||y>=G.L.h)return T_WALL;return G.L.grid[y*G.L.w+x];}
 function setTile(x,y,t){G.L.grid[y*G.L.w+x]=t;}
@@ -1887,24 +2414,31 @@ function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
   UI.armCooldown(ch);UI.charFlash(ch,'atkflash');
   const targetAC=m.ac;
   const hit=nat===20||(nat!==1&&total>=targetAC);
-  if(!hit){
-    UI.floatAtMonster(m,'miss','#9a9da2');SFX.whiff();
+  const crit=hit&&nat>=wDef.crit[0];
+  let dmg=0,sneaked=false;
+  if(hit){
+    dmg=damageRoll(ch,wDef,wIt,crit);
+    if(CLASSES[ch.cls].favored&&['beast','humanoid'].includes(MONSTERS[m.key].type))dmg+=2;
+    if(CLASSES[ch.cls].sneak&&(m.sleep||m.held>0||(m.targetName&&m.targetName!==ch.name))){
+      dmg+=roll(Math.floor((ch.level+1)/2),6);
+      sneaked=true;
+    }
+    if(ch._smiting){dmg+=ch.level;ch._smiting=false;}
+  }
+  const deliver=()=>{
+    if(m.hp<=0||!G.L.monsters.includes(m))return;
     m.awake=true;
-    return;
-  }
-  const crit=nat>=wDef.crit[0];
-  let dmg=damageRoll(ch,wDef,wIt,crit);
-  if(CLASSES[ch.cls].favored&&['beast','humanoid'].includes(MONSTERS[m.key].type))dmg+=2;
-  // sneak attack
-  if(CLASSES[ch.cls].sneak&&(m.sleep||m.held>0||(m.targetName&&m.targetName!==ch.name))){
-    const dice=Math.floor((ch.level+1)/2);
-    dmg+=roll(dice,6);
-    UI.floatAtMonster(m,'sneak!','#d8b040');
-  }
-  // smite
-  if(ch._smiting){dmg+=ch.level;ch._smiting=false;}
-  SFX.hit();
-  damageMonster(m,dmg,ch,crit);
+    if(!hit){UI.floatAtMonster(m,'miss','#9a9da2');SFX.whiff();return;}
+    if(sneaked)UI.floatAtMonster(m,'sneak!','#d8b040');
+    SFX.hit();
+    damageMonster(m,dmg,ch,crit);
+  };
+  if(isRangedShot){
+    SFX.arrow();
+    spawnProjectile({from:partyMuzzle(),toFn:()=>monsterAim(m),
+      tex:wDef.spr==='sling'?fxStoneTex():fxArrowTex(),scale:wDef.spr==='sling'?0.12:0.2,speed:8,
+      onHit:deliver});
+  }else deliver();
 }
 function damageMonster(m,dmg,byChar,crit){
   m.awake=true;m.sleep=false;
@@ -2002,9 +2536,10 @@ function castSpell(ch,key,opts){
     if(any)commit();
     return any;
   }
-  // offensive
+  // offensive: the spell flies as a glowing bolt and resolves on impact
   commit();
-  for(const m of foes){
+  const resolveFoe=(m)=>{
+    if(m.hp<=0||!G.L.monsters.includes(m))return;
     let dmg=sp.dmgFn?sp.dmgFn(cl):0;
     if(sp.vsUndead&&m.type==='undead')dmg*=2;
     let negated=false,halved=false;
@@ -2012,27 +2547,41 @@ function castSpell(ch,key,opts){
       const s=monsterSave(m,sp.save.type);
       if(s>=dc){if(sp.save.negate){negated=true;}else halved=true;}
     }
-    if(sp.humanoidOnly&&m.type!=='humanoid'){UI.floatAtMonster(m,'immune','#9a9da2');continue;}
-    if(negated){UI.floatAtMonster(m,'resisted','#9a9da2');continue;}
+    if(sp.humanoidOnly&&m.type!=='humanoid'){UI.floatAtMonster(m,'immune','#9a9da2');return;}
+    if(negated){UI.floatAtMonster(m,'resisted','#9a9da2');return;}
     if(halved)dmg=Math.floor(dmg/2);
     if(sp.sleep){
       if(MONSTERS[m.key].cr<=1&&m.type!=='undead'){m.sleep=true;UI.floatAtMonster(m,'asleep','#9db4d6');}
       else UI.floatAtMonster(m,'unaffected','#9a9da2');
-      continue;
+      return;
     }
     if(sp.hold){m.held=Math.max(m.held,sp.hold);UI.floatAtMonster(m,'held!','#9db4d6');}
     if(sp.slow){m.slowed=Math.max(m.slowed,sp.slow);UI.floatAtMonster(m,'slowed','#9db4d6');}
     if(sp.slowAll){m.slowed=Math.max(m.slowed,sp.slowAll);UI.floatAtMonster(m,'slowed','#9db4d6');}
     if(sp.stun){const s=monsterSave(m,'fort');if(s<dc){m.stunned=sp.stun;UI.floatAtMonster(m,'stunned','#e8c840');}}
     if(sp.shaken){m.shaken=sp.shaken;}
-    if(sp.negLevels){m.atk-=sp.negLevels;m.hp-=sp.negLevels*5;UI.floatAtMonster(m,'drained','#b48ae0');if(m.hp<=0){killMonster(m,ch);continue;}}
+    if(sp.negLevels){m.atk-=sp.negLevels;m.hp-=sp.negLevels*5;UI.floatAtMonster(m,'drained','#b48ae0');if(m.hp<=0){killMonster(m,ch);return;}}
     if(sp.dispel){m.held=0;m.slowed=Math.max(m.slowed,5);UI.floatAtMonster(m,'dispelled','#9db4d6');}
     if(dmg>0){
       if(sp.drain)healChar(ch,dmg);
       damageMonster(m,dmg,ch,false);
       if(sp.dot&&m.hp>0){m.dot={dmg:sp.dot.dmg,ticks:sp.dot.ticks,t:1.5};}
     }
-  }
+  };
+  const c0=foes[0];
+  const color=SPELL_FX[key]||'#9db4d6';
+  spawnProjectile({from:partyMuzzle(),toFn:()=>monsterAim(c0),
+    tex:fxGlowTex(color),scale:0.4,speed:5.5,
+    onHit:()=>{
+      const at=monsterAim(c0);
+      if(sp.target==='foes'){
+        spawnBurst(at,color,2.2);
+        for(const m of foes)resolveFoe(m);
+      }else{
+        spawnBurst(at,color,0.9);
+        resolveFoe(c0);
+      }
+    }});
   return true;
 }
 function applySpellToAlly(caster,t,sp,cl){
@@ -2213,7 +2762,7 @@ function stepOk(m,nx,ny){
 function moveMonster(m,nx,ny){
   m.x=nx;m.y=ny;
   const s=R3.monsterSprites[m.id];
-  if(s){s.userData.tx=nx+0.5;s.userData.tz=ny+0.5;}
+  if(s){s.userData.tx=nx+0.5;s.userData.tz=ny+0.5;s.userData.walkUntil=performance.now()+650;}
 }
 function pickMeleeTarget(){
   const front=G.party.slice(0,2).filter(ch=>!isDown(ch));
@@ -2225,10 +2774,11 @@ function pickMeleeTarget(){
 function monsterMelee(m){
   const ch=pickMeleeTarget();
   if(!ch)return;
-  telegraph(m);
+  windupAnim(m);
   setTimeout(()=>{
     if(m.hp<=0||G.over||G.paused)return;
     if(Math.abs(m.x-G.px)+Math.abs(m.y-G.py)!==1)return;
+    strikeAnim(m);
     m.targetName=ch.name;
     let atk=m.atk-(m.shaken>0?2:0);
     const nat=d20();
@@ -2242,7 +2792,7 @@ function monsterMelee(m){
     }else{
       UI.float(ch,'miss','#9a9da2');
     }
-  },450);
+  },500);
 }
 function monsterSpecials(m,ch){
   const sp=m.special;
@@ -2279,41 +2829,132 @@ function monsterSpecials(m,ch){
   }
 }
 function monsterShoot(m){
-  const ch=pickMeleeTarget();
-  if(!ch)return;
-  telegraph(m);
+  if(!pickMeleeTarget())return;
+  windupAnim(m);
   setTimeout(()=>{
     if(m.hp<=0||G.over||G.paused)return;
     if(!losClear(m.x,m.y,G.px,G.py))return;
-    const nat=d20();
+    strikeAnim(m);
     SFX.arrow();
-    if(nat!==1&&(nat===20||nat+m.atk>=charAC(ch))){
-      hurtChar(ch,roll(m.dmg[0],m.dmg[1],Math.max(0,m.dmg[2])),m.name);
-    }else UI.float(ch,'miss','#9a9da2');
-  },420);
+    // aim at where the party stands NOW; sidestepping before impact dodges it
+    const aim={x:G.px+0.5,y:EYE-0.05,z:G.py+0.5};
+    spawnProjectile({from:{x:m.x+0.5,y:0.55,z:m.y+0.5},toFn:()=>aim,
+      tex:m.key==='koboldsl'?fxStoneTex():fxArrowTex(),scale:m.key==='koboldsl'?0.12:0.2,speed:7,
+      onHit:()=>{
+        if(G.over)return;
+        const off=Math.hypot(R3.camera.position.x-aim.x,R3.camera.position.z-aim.z);
+        const ch=pickMeleeTarget();
+        if(off>0.75||!ch){SFX.whiff();return;} // the party stepped aside
+        const nat=d20();
+        if(nat!==1&&(nat===20||nat+m.atk>=charAC(ch)))
+          hurtChar(ch,roll(m.dmg[0],m.dmg[1],Math.max(0,m.dmg[2])),m.name);
+        else UI.float(ch,'miss','#9a9da2');
+      }});
+  },450);
 }
 function monsterCast(m){
-  const alive=G.party.filter(ch=>!isDown(ch));
-  if(!alive.length)return;
-  const ch=pick(alive);
-  telegraph(m,m.caster.fx);
+  if(!G.party.some(ch=>!isDown(ch)))return;
+  windupAnim(m);
   setTimeout(()=>{
     if(m.hp<=0||G.over||G.paused)return;
     if(!losClear(m.x,m.y,G.px,G.py))return;
+    strikeAnim(m);
     SFX.cast();
-    const dmg=roll(m.caster.dmg[0],m.caster.dmg[1],m.caster.dmg[2]);
-    const sv=charSaves(ch).ref+saveBonusVs(ch,'spell');
-    const dc=12+Math.floor(MONSTERS[m.key].cr);
-    if(d20()+sv>=dc)hurtChar(ch,Math.floor(dmg/2),m.name);
-    else hurtChar(ch,dmg,m.name);
-  },500);
+    const aim={x:G.px+0.5,y:EYE-0.02,z:G.py+0.5};
+    spawnProjectile({from:{x:m.x+0.5,y:0.6,z:m.y+0.5},toFn:()=>aim,
+      tex:fxGlowTex(m.caster.fx),scale:0.42,speed:4.2,
+      onHit:()=>{
+        if(G.over)return;
+        const off=Math.hypot(R3.camera.position.x-aim.x,R3.camera.position.z-aim.z);
+        spawnBurst(aim,m.caster.fx,1.2);
+        if(off>0.75){SFX.whiff();return;} // dodged the bolt
+        const alive=G.party.filter(ch=>!isDown(ch));
+        if(!alive.length)return;
+        const ch=pick(alive);
+        const dmg=roll(m.caster.dmg[0],m.caster.dmg[1],m.caster.dmg[2]);
+        const sv=charSaves(ch).ref+saveBonusVs(ch,'spell');
+        const dc=12+Math.floor(MONSTERS[m.key].cr);
+        if(d20()+sv>=dc)hurtChar(ch,Math.floor(dmg/2),m.name);
+        else hurtChar(ch,dmg,m.name);
+      }});
+  },550);
 }
-function telegraph(m,color){
+/* ---------- attack animation phases ---------- */
+function windupAnim(m){
   const s=R3.monsterSprites[m.id];
   if(!s)return;
-  s.userData.tele=performance.now();
-  s.userData.teleColor=color||null;
+  s.userData.attackPhase='windup';s.userData.phaseT=performance.now();
 }
+function strikeAnim(m){
+  const s=R3.monsterSprites[m.id];
+  if(!s)return;
+  s.userData.attackPhase='strike';s.userData.phaseT=performance.now();
+}
+/* ---------- projectiles & transient effects ---------- */
+function spawnProjectile(o){ // {from:{x,y,z}, toFn, speed, tex, scale, onHit, color?}
+  const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:o.tex,transparent:true,depthWrite:false}));
+  spr.scale.set(o.scale,o.scale,1);
+  spr.position.set(o.from.x,o.from.y,o.from.z);
+  R3.levelGroup.add(spr);
+  G.fx.push({kind:'proj',spr,speed:o.speed,toFn:o.toFn,onHit:o.onHit,baseScale:o.scale,t:0});
+}
+function spawnBurst(pos,color,size){
+  const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:fxGlowTex(color),transparent:true,depthWrite:false}));
+  spr.scale.set(0.25,0.25,1);
+  spr.position.set(pos.x,pos.y,pos.z);
+  R3.levelGroup.add(spr);
+  G.fx.push({kind:'burst',spr,t:0,dur:0.4,s1:size||1.4});
+}
+function updateFx(dt){
+  for(const f of G.fx.slice()){
+    if(f.kind==='proj'){
+      f.t+=dt;
+      const tgt=f.toFn();
+      const dx=tgt.x-f.spr.position.x,dy=tgt.y-f.spr.position.y,dz=tgt.z-f.spr.position.z;
+      const dist=Math.hypot(dx,dy,dz);
+      const step=f.speed*dt;
+      if(dist<=Math.max(step,0.08)||f.t>6){
+        R3.levelGroup.remove(f.spr);
+        G.fx.splice(G.fx.indexOf(f),1);
+        if(f.onHit)f.onHit();
+      }else{
+        f.spr.position.x+=dx/dist*step;
+        f.spr.position.y+=dy/dist*step;
+        f.spr.position.z+=dz/dist*step;
+        const p=1+Math.sin(f.t*22)*0.13;
+        f.spr.scale.set(f.baseScale*p,f.baseScale*p,1);
+      }
+    }else if(f.kind==='burst'){
+      f.t+=dt;
+      const k=f.t/f.dur;
+      if(k>=1){R3.levelGroup.remove(f.spr);G.fx.splice(G.fx.indexOf(f),1);}
+      else{
+        const s=0.25+(f.s1-0.25)*k;
+        f.spr.scale.set(s,s,1);
+        f.spr.material.opacity=1-k;
+      }
+    }
+  }
+}
+function clearFx(){
+  for(const f of G.fx)if(f.spr&&f.spr.parent)f.spr.parent.remove(f.spr);
+  G.fx.length=0;
+}
+function partyMuzzle(){
+  const [dx,dy]=DIRS[G.facing];
+  return {x:R3.camera.position.x+dx*0.3,y:EYE-0.08,z:R3.camera.position.z+dy*0.3};
+}
+function monsterAim(m){
+  const s=R3.monsterSprites[m.id];
+  if(s)return {x:s.position.x,y:s.position.y,z:s.position.z};
+  return {x:m.x+0.5,y:0.4,z:m.y+0.5};
+}
+const SPELL_FX={magicmissile:'#c8a0ff',rayfrost:'#a8e0ff',burninghands:'#ff8c2a',scorchingray:'#ff7a1e',
+  acidarrow:'#9fdc39',flamingsphere:'#ff8c2a',websp:'#d8d8c8',sleep:'#c8b8e8',fireball:'#ff7a1e',
+  lightning:'#bfe8ff',slow:'#b8c8e8',vampirictouch:'#c04858',icestorm:'#a8e0ff',phantasmalkiller:'#b48ae0',
+  enervation:'#8a4ae0',conecold:'#a8e0ff',holdmonster:'#e8d048',cloudkill:'#9fdc39',wavesfatigue:'#8a8aa0',
+  doom:'#a05545',holdperson:'#e8d048',soundburst:'#e8e8b0',searinglight:'#ffe8a0',dispelmagic:'#b8b8ff',
+  flamestrike:'#ffb020',slayliving:'#802020'};
 /* ---------- conditions & buffs tick ---------- */
 let bleedTimer=0,poisonTimer=0;
 function updateParty(dt){
@@ -2386,6 +3027,7 @@ function descend(){
   saveGame();
 }
 function startLevel(L){
+  clearFx();
   G.L=L;
   G.px=L.start.x;G.py=L.start.y;
   // face an open direction
@@ -2430,6 +3072,7 @@ function deserializeGame(o){
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
     traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
   };
+  clearFx();
   G.L=L;G.over=false;
   buildLevel(L);
   // restore found-trap decals & found secrets
@@ -2464,6 +3107,7 @@ function loop(now){
     if(G.moveCd>0)G.moveCd-=dt;
     updateParty(dt);
     updateMonsters(dt);
+    updateFx(dt);
     UI.tickCooldowns();
     if(G.time-G.lastSave>15){G.lastSave=G.time;saveGame();}
   }
@@ -2477,29 +3121,42 @@ function updateSprites(now){
   for(const m of G.L.monsters){
     const s=R3.monsterSprites[m.id];
     if(!s)continue;
+    const ud=s.userData;
     // smooth movement
-    if(s.userData.tx!==undefined){
-      s.position.x+=(s.userData.tx-s.position.x)*0.15;
-      s.position.z+=(s.userData.tz-s.position.z)*0.15;
+    if(ud.tx!==undefined){
+      s.position.x+=(ud.tx-s.position.x)*0.15;
+      s.position.z+=(ud.tz-s.position.z)*0.15;
     }
-    // idle bob + telegraph lunge
+    // animation state machine: attack phases > walking > idle breathing
+    if(ud.attackPhase==='windup'&&now-ud.phaseT>1100)ud.attackPhase=null;
+    if(ud.attackPhase==='strike'&&now-ud.phaseT>240)ud.attackPhase=null;
+    let frame;
+    if(ud.attackPhase==='windup')frame='windup';
+    else if(ud.attackPhase==='strike')frame='strike';
+    else{
+      const moving=ud.tx!==undefined&&(Math.abs(ud.tx-s.position.x)+Math.abs(ud.tz-s.position.z)>0.04);
+      if(moving||now<(ud.walkUntil||0))frame=(Math.floor(now/250)%2)?'walk1':'walk0';
+      else frame=(Math.floor(now/700+(m.id%7))%2)?'idle1':'idle0';
+    }
+    if(ud.curFrame!==frame&&ud.frames){ud.curFrame=frame;s.material.map=ud.frames[frame];}
+    // idle bob + strike lunge toward the party
     let yb=Math.sin(now/300+m.id%10)*0.012;
-    if(s.userData.tele){
-      const k=(now-s.userData.tele)/450;
-      if(k<1){
-        const lunge=Math.sin(k*Math.PI)*0.22;
-        const dx=G.px+0.5-s.position.x,dz=G.py+0.5-s.position.z;
-        const dl=Math.hypot(dx,dz)||1;
-        s.position.x+=dx/dl*lunge*0.1;s.position.z+=dz/dl*lunge*0.1;
-        yb+=Math.sin(k*Math.PI)*0.06;
-      }else s.userData.tele=0;
+    if(ud.attackPhase==='strike'){
+      const k=Math.min(1,(now-ud.phaseT)/240);
+      const lunge=Math.sin(k*Math.PI);
+      const dx=G.px+0.5-s.position.x,dz=G.py+0.5-s.position.z;
+      const dl=Math.hypot(dx,dz)||1;
+      s.position.x+=dx/dl*lunge*0.07;s.position.z+=dz/dl*lunge*0.07;
     }
     s.position.y=m._sc/2+0.02+yb;
+    // torch attenuation: monsters darken with distance and loom out of the gloom
+    const ddx=s.position.x-R3.camera.position.x,ddz=s.position.z-R3.camera.position.z;
+    const att=clamp(1.5/(1+0.55*Math.hypot(ddx,ddz)),0.22,1);
     // bloodied tint
     const r=m.hp/m.maxHp;
     const gb=0.35+r*0.65;
-    s.material.color.setRGB(1,gb,gb);
-    if(m.sleep||m.held>0)s.material.color.setRGB(0.6,0.7,1);
+    if(m.sleep||m.held>0)s.material.color.setRGB(0.6*att,0.7*att,att);
+    else s.material.color.setRGB(att,gb*att,gb*att);
   }
 }
 /* ============================== AUDIO ============================== */
