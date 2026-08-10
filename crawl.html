@@ -1020,7 +1020,7 @@ function itemDesc(it){
     if(def.heal)return `Drink: heals ${def.heal[0]}d${def.heal[1]}+${def.heal[2]}. Also stops bleeding.`;
     return `Drink: cures ${def.cures.join(', ')}.`;
   }
-  if(def.kind==='scroll')return `Single use: casts ${SPELLS[it.spell].name}. ${SPELLS[it.spell].desc} Casters only.`;
+  if(def.kind==='scroll')return `Single use: casts ${SPELLS[it.spell].name}. ${SPELLS[it.spell].desc} ${it.spell==='raisedead'?'Anyone may beseech it.':'Casters only.'}`;
   if(def.kind==='wand')return `${it.charges} charges: casts ${SPELLS[it.spell].name}. ${SPELLS[it.spell].desc} Casters only.`;
   if(def.kind==='key')return 'Opens a locked door somewhere on this level.';
   return '';
@@ -2536,6 +2536,9 @@ function monsterLoot(depth){
   const healNeed=clamp(1-s.heals/Math.max(1,s.alive*1.5),0,1);
   const hasCaster=G.party.some(c=>!c.dead&&CLASSES[c.cls].caster);
   const scrollNeed=hasCaster?clamp(1-s.scrolls/3,0,1):0;
+  // a fallen comrade can be brought back: small chance of a revival scroll
+  if(G.party.some(c=>c.dead)&&Math.random()<0.08)
+    return mkItem('scroll',{spell:'raisedead'});
   const pHeal=0.12+0.38*healNeed;    // 12%..50%
   const pScroll=0.06+0.24*scrollNeed;// 6%..30%
   const r=Math.random();
@@ -2580,7 +2583,8 @@ function drinkPotion(giver,target,it,consume,slot){
   UI.refreshParty();
 }
 function useSpellItem(ch,it,consume){
-  if(!CLASSES[ch.cls].caster){UI.toast('Only casters can use scrolls and wands.');return;}
+  // a Raise Dead scroll answers anyone's plea — the only caster may be the corpse
+  if(!CLASSES[ch.cls].caster&&it.spell!=='raisedead'){UI.toast('Only casters can use scrolls and wands.');return;}
   const sp=SPELLS[it.spell];
   castSpell(ch,it.spell,{item:true,onCast:()=>{
     if(it.base==='wand'){it.charges--;if(it.charges<=0){stripItemEverywhere(ch,it);UI.toast('The wand crumbles to dust.');}}
