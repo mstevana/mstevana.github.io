@@ -2758,31 +2758,39 @@ const UI=(()=>{
   function tryPlace(from,to){
     const it=getItem(from);
     if(!it)return;
+    if(from.type===to.type&&from.idx===to.idx&&from.slot===to.slot)return;
     const dst=getItem(to);
     if(to.type==='equip'&&!slotAccepts(to.slot,it)){toast("That doesn't go there.");return;}
-    if(from.type===to.type&&(from.idx===to.idx&&from.slot===to.slot))return;
-    // two-handed weapon into a hand: other hand must be free
+    // hand constraints; stashSlot = off-hand that must be emptied to grip a two-hander
+    let stashSlot=null;
     if(to.type==='equip'&&(to.slot==='rhand'||to.slot==='lhand')){
       const def=ITEM_DEFS[it.base];
+      const otherSlot=to.slot==='rhand'?'lhand':'rhand';
+      const other=(from.type==='equip'&&from.slot===otherSlot)?null:invChar.equip[otherSlot];
       if(def.kind==='weapon'&&def.hands===2){
-        const otherSlot=to.slot==='rhand'?'lhand':'rhand';
         if(to.slot==='lhand'){toast('Two-handed weapons are gripped in the right hand.');return;}
-        if(invChar.equip[otherSlot]){toast('Both hands are needed — empty the left hand first.');return;}
-      }
-      const other=invChar.equip[to.slot==='rhand'?'lhand':'rhand'];
-      if(other&&ITEM_DEFS[other.base].kind==='weapon'&&ITEM_DEFS[other.base].hands===2){
-        toast('Both hands grip the '+ITEM_DEFS[other.base].name+'.');return;
+        if(other)stashSlot=otherSlot;
+      }else if(other&&ITEM_DEFS[other.base].kind==='weapon'&&ITEM_DEFS[other.base].hands===2){
+        toast('Both hands grip the '+ITEM_DEFS[other.base].name+'. Replace it via the right hand.');return;
       }
     }
-    if(from.type==='equip'&&dst&&to.type==='equip'){ /* swap equip-equip ok */ }
-    setItem(from,dst||null);
+    // capacity: displaced items that cannot go back to the source slot need pack space
+    const dstNeedsPack=!!(dst&&from.type==='equip'&&!slotAccepts(from.slot,dst));
+    const packNeeded=(stashSlot?1:0)+(dstNeedsPack?1:0);
+    const packFree=invChar.inventory.filter(x=>!x).length+(from.type==='grid'&&!dst?1:0);
+    if(packNeeded>packFree){toast('Not enough room in the pack to swap.');return;}
+    // perform: lift dragged item, re-home displaced items, place dragged item
+    setItem(from,null);
+    if(dst){
+      if(from.type==='grid'||slotAccepts(from.slot,dst))setItem(from,dst);
+      else invChar.inventory[invChar.inventory.findIndex(x=>!x)]=dst;
+    }
+    if(stashSlot&&invChar.equip[stashSlot]){
+      invChar.inventory[invChar.inventory.findIndex(x=>!x)]=invChar.equip[stashSlot];
+      invChar.equip[stashSlot]=null;
+      toast('The '+itemName(it)+' needs both hands — off-hand item stowed in the pack.');
+    }
     setItem(to,it);
-    // swapped item validity check
-    if(dst&&from.type==='equip'&&!slotAccepts(from.slot,dst)){
-      // undo
-      setItem(from,it);setItem(to,dst);
-      toast("Can't swap those.");return;
-    }
     SFX.turn();
     renderInv();refreshParty();saveGame();
   }
