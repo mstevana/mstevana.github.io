@@ -30,7 +30,9 @@
     grid-template-areas:
       "header header header"
       "sidebar path map";
-    height:100vh;
+    height:100vh; /* fallback for browsers without dvh support */
+    height:100dvh; /* tracks the actual visible viewport, avoiding Android browsers'
+                       100vh-includes-the-address-bar mismatch that hides the bottom tab bar */
     overflow:hidden;
     transition:grid-template-columns .18s ease;
   }
