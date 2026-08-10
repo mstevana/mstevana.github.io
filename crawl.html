@@ -119,6 +119,17 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 .inv-cell{border:1px solid #3a3227;border-radius:5px;background:#0d0b08;position:relative;
   display:flex;align-items:center;justify-content:center;}
 .qty{position:absolute;right:1px;bottom:0;font-size:9px;color:#fff;text-shadow:0 1px 1px #000;pointer-events:none;}
+#inv-party{display:flex;flex-direction:column;gap:5px;min-width:118px;max-width:140px;}
+#inv-party .col-lbl{font-size:9px;color:var(--ink-dim);text-align:center;}
+.give-char{border:1px solid var(--line);border-radius:6px;background:#0d0b08;padding:5px 7px;position:relative;}
+.give-char.self{border-color:var(--ink);background:#171310;}
+.give-char.drag-over{background:#2c2415;border-color:var(--ink);}
+.give-char.gc-dead{opacity:.45;}
+.give-char .gc-name{font-size:12px;color:var(--ink);white-space:nowrap;overflow:hidden;padding-right:34px;}
+.give-char .gc-sub{font-size:9px;color:var(--ink-dim);white-space:nowrap;}
+.give-char .gc-free{position:absolute;top:5px;right:6px;font-size:9px;color:var(--ink-dim);}
+.give-char .gc-bar{height:5px;background:#2a0d0d;border-radius:2px;margin-top:3px;overflow:hidden;}
+.give-char .gc-fill{height:100%;}
 #drag-ghost{position:fixed;width:52px;height:52px;z-index:99;pointer-events:none;display:none;filter:drop-shadow(0 2px 6px #000);}
 #drag-ghost svg{width:100%;height:100%;}
 #item-tip{font-size:12px;color:var(--ink-dim);min-height:30px;margin-top:6px;max-width:340px;}
@@ -217,7 +228,8 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   <h2 id="inv-title">Inventory</h2>
   <div id="inv-wrap">
     <div id="inv-doll"></div>
-    <div><div id="inv-grid"></div><div id="item-tip">Drag items between the pack and body slots. Tap an item to inspect.</div></div>
+    <div><div id="inv-grid"></div><div id="item-tip">Drag items between the pack, body slots and companions. Tap an item to inspect.</div></div>
+    <div id="inv-party"></div>
   </div>
   <div class="row"><button class="mbtn small" id="inv-drop">Drop selected</button><button class="mbtn small" id="inv-close">Close</button></div>
 </div></div>
@@ -2656,6 +2668,43 @@ const UI=(()=>{
       attachDnD(cell,{type:'grid',idx:i});
       grid.appendChild(cell);
     });
+    renderInvParty();
+  }
+  let suppressCardClick=false;
+  function renderInvParty(){
+    const pc=$('inv-party');
+    pc.innerHTML='<div class="col-lbl">Drop an item on a companion to hand it over</div>';
+    G.party.forEach((ch,i)=>{
+      const card=document.createElement('div');
+      card.className='give-char'+(ch===invChar?' self':'')+(ch.dead?' gc-dead':'');
+      card.dataset.gidx=i;
+      const free=ch.inventory.filter(x=>!x).length;
+      const frac=clamp(ch.hp/ch.maxHp,0,1);
+      const barCol=ch.dead?'#555':frac>0.5?'#3f7d3a':frac>0.25?'#a89b2a':'#8c1f1f';
+      card.innerHTML=`<div class="gc-name">${ch.name}${ch===invChar?' ◂':''}</div>
+        <div class="gc-sub">${CLASSES[ch.cls].name} ${ch.level}${ch.dead?' — DEAD':''}</div>
+        <div class="gc-free">${free} free</div>
+        <div class="gc-bar"><div class="gc-fill" style="width:${Math.round(frac*100)}%;background:${barCol}"></div></div>`;
+      card.addEventListener('click',()=>{
+        if(suppressCardClick)return;
+        if(ch!==invChar)openInventory(ch);
+      });
+      pc.appendChild(card);
+    });
+  }
+  function giveTo(idx,from){
+    const target=G.party[idx];
+    const it=getItem(from);
+    if(!it)return;
+    if(target.dead){toast(target.name+' has no more need of things.');return;}
+    if(target===invChar&&from.type==='grid')return;
+    const s=target.inventory.findIndex(x=>!x);
+    if(s<0){toast(target.name+"'s pack is full.");return;}
+    setItem(from,null);
+    target.inventory[s]=it;
+    if(target!==invChar)toast(invChar.name+' hands the '+itemName(it)+' to '+target.name+'.');
+    SFX.turn();
+    renderInv();refreshParty();saveGame();
   }
   function getItem(ref){return ref.type==='grid'?invChar.inventory[ref.idx]:invChar.equip[ref.slot];}
   function setItem(ref,it){if(ref.type==='grid')invChar.inventory[ref.idx]=it;else invChar.equip[ref.slot]=it;}
@@ -2737,7 +2786,7 @@ const UI=(()=>{
     if(dnd.moved){
       const g=$('drag-ghost');
       g.style.left=(e.clientX-26)+'px';g.style.top=(e.clientY-26)+'px';
-      document.querySelectorAll('.inv-cell,.doll-slot').forEach(c=>{
+      document.querySelectorAll('.inv-cell,.doll-slot,.give-char').forEach(c=>{
         const r=c.getBoundingClientRect();
         c.classList.toggle('drag-over',e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom);
       });
@@ -2746,14 +2795,19 @@ const UI=(()=>{
   window.addEventListener('pointerup',(e)=>{
     if(dnd&&dnd.moved){
       $('drag-ghost').style.display='none';
-      const target=[...document.querySelectorAll('.inv-cell,.doll-slot')].find(c=>{
+      suppressCardClick=true;setTimeout(()=>{suppressCardClick=false;},0);
+      const target=[...document.querySelectorAll('.inv-cell,.doll-slot,.give-char')].find(c=>{
         const r=c.getBoundingClientRect();
         return e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom;
       });
-      document.querySelectorAll('.inv-cell,.doll-slot').forEach(c=>c.classList.remove('drag-over'));
+      document.querySelectorAll('.inv-cell,.doll-slot,.give-char').forEach(c=>c.classList.remove('drag-over'));
       if(target){
-        const to=target.classList.contains('inv-cell')?{type:'grid',idx:+target.dataset.idx}:{type:'equip',slot:target.dataset.slot};
-        tryPlace(dnd.from,to);
+        if(target.classList.contains('give-char')){
+          giveTo(+target.dataset.gidx,dnd.from);
+        }else{
+          const to=target.classList.contains('inv-cell')?{type:'grid',idx:+target.dataset.idx}:{type:'equip',slot:target.dataset.slot};
+          tryPlace(dnd.from,to);
+        }
       }
     }
     dnd=null;
