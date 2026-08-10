@@ -582,9 +582,11 @@ function glowGrad(id,c){
     `<stop offset="100%" stop-color="${c}" stop-opacity="0"/></radialGradient>`;
 }
 function roughF(id,scale,freq,seed){
+  // low-frequency warp keeps silhouettes organic but SMOOTH: high-frequency
+  // displacement shuffles individual pixels and reads as jagged edges up close
   return `<filter id="${id}" x="-25%" y="-25%" width="150%" height="150%">`+
-    `<feTurbulence type="fractalNoise" baseFrequency="${freq}" numOctaves="3" seed="${seed}" result="n"/>`+
-    `<feDisplacementMap in="SourceGraphic" in2="n" scale="${scale}"/></filter>`;
+    `<feTurbulence type="fractalNoise" baseFrequency="${(freq*0.28).toFixed(3)}" numOctaves="2" seed="${seed}" result="n"/>`+
+    `<feDisplacementMap in="SourceGraphic" in2="n" scale="${(scale*1.5).toFixed(1)}"/></filter>`;
 }
 function gEye(x,y,r,opts){ // glowing eye: soft halo + hot core (+ optional slit pupil)
   opts=opts||{};
@@ -1656,11 +1658,15 @@ function wallCanvas(th,variant,grid,baseCv){
   return cv;
 }
 function wallVariant(x,y){return (((x*73856093)^(y*19349663))>>>0)%6;}
-function svgToTexture(svg,cacheKey){
+function svgToTexture(svg,cacheKey,opt){
+  opt=opt||{};
   if(cacheKey&&R3.texCache[cacheKey])return R3.texCache[cacheKey];
-  const S=256; // raster SVG sprites at 2x for crisper edges when a monster is close
+  const S=opt.size||256;
+  // mipmaps kill distant-sprite shimmer; the dark transparent-edge fringe they
+  // introduce is invisible against the dark dungeon
+  const tex_opts=opt.mipmap?{}:{mipmap:false};
   const cv=document.createElement('canvas');cv.width=cv.height=S;
-  const tex=texFromCanvas(cv,{mipmap:false}); // linear, no mipmaps (avoids transparent-edge fringe)
+  const tex=texFromCanvas(cv,tex_opts);
   const img=new Image();
   img.onload=()=>{const ctx=cv.getContext('2d');ctx.clearRect(0,0,S,S);ctx.drawImage(img,0,0,S,S);tex.needsUpdate=true;};
   img.src='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg)));
@@ -1871,7 +1877,7 @@ function addMonsterSprite(m){
   const sprKey=MONSTERS[m.key].spr;
   const frames={};
   for(const p of MONSTER_POSES){
-    frames[p]=svgToTexture(monsterSVG(sprKey,m.boss,p),'mon_'+sprKey+(m.boss?'_b':'')+'_'+p);
+    frames[p]=svgToTexture(monsterSVG(sprKey,m.boss,p),'mon_'+sprKey+(m.boss?'_b':'')+'_'+p,{size:384,mipmap:true});
   }
   const mat=new THREE.SpriteMaterial({map:frames.idle0,transparent:true});
   const spr=new THREE.Sprite(mat);
