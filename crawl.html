@@ -1962,12 +1962,18 @@ function buildLevel(L){
     // passage direction: if east/west neighbors are open the party travels along x,
     // so the door slab must be thin along x and span the full tile along z (and vice versa)
     const passageX=x>0&&x<L.w-1&&L.grid[y*L.w+x-1]!==T_WALL&&L.grid[y*L.w+x+1]!==T_WALL;
-    const g=new THREE.BoxGeometry(passageX?0.22:TILE,WALLH,passageX?TILE:0.22);
-    const m=new THREE.Mesh(g,t===T_DOOR_LOCKED?doorMatLocked:doorMatBase);
-    m.position.set(x+0.5,WALLH/2,y+0.5);
-    m.userData={kind:'door',x,y};
-    if(t===T_DOOR_OPEN)m.position.y=WALLH/2+WALLH*1.02; // fully retracted above the ceiling
-    grp.add(m);R3.doorMeshes[y*L.w+x]=m;
+    // the door hangs from a hinge at its top edge and swings up like a trapdoor:
+    // a pivot group sits on the ceiling line, the slab is its child hanging below
+    const geo=new THREE.BoxGeometry(passageX?0.22:TILE,WALLH,passageX?TILE:0.22);
+    const mesh=new THREE.Mesh(geo,t===T_DOOR_LOCKED?doorMatLocked:doorMatBase);
+    mesh.position.set(0,-WALLH/2,0);
+    mesh.userData={kind:'door',x,y};
+    const pv=new THREE.Group();
+    pv.position.set(x+0.5,WALLH,y+0.5);
+    pv.userData={passageX,mesh};
+    pv.add(mesh);
+    if(t===T_DOOR_OPEN){if(passageX)pv.rotation.z=Math.PI/2;else pv.rotation.x=-Math.PI/2;}
+    grp.add(pv);R3.doorMeshes[y*L.w+x]=pv;
   }
   // stairs
   {
@@ -2207,18 +2213,21 @@ function afterPartyMove(rotOnly){
 }
 function openDoorAt(x,y){
   setTile(x,y,T_DOOR_OPEN);
-  const mesh=R3.doorMeshes[y*G.L.w+x];
-  if(mesh)animateDoorOpen(mesh);
+  const pv=R3.doorMeshes[y*G.L.w+x];
+  if(pv)animateDoorSwing(pv,x,y);
   G.moveCd=0.25;SFX.door();
   computeDistField();
 }
-function animateDoorOpen(mesh){
-  // slide all the way up: the bottom edge must clear the ceiling plane so no
-  // slab is left hanging at the top of the doorway
-  const y0=mesh.position.y,y1=WALLH/2+WALLH*1.02,t0=performance.now();
+function animateDoorSwing(pv,x,y){
+  // hinged at the ceiling: swing the slab 90 degrees up and AWAY from the opener
+  const passageX=pv.userData.passageX;
+  const sign=passageX?(G.px<x?1:-1):(G.py<y?-1:1);
+  const t0=performance.now();
   const step=()=>{
-    const k=Math.min(1,(performance.now()-t0)/380);
-    mesh.position.y=y0+(y1-y0)*k;
+    const k=Math.min(1,(performance.now()-t0)/520);
+    const e=1-Math.pow(1-k,3);
+    const a=sign*(Math.PI/2)*e;
+    if(passageX)pv.rotation.z=a;else pv.rotation.x=a;
     if(k<1)requestAnimationFrame(step);
   };
   step();
@@ -2232,8 +2241,8 @@ function tryUnlock(x,y){
   if(!holder){SFX.bump();UI.toast('Locked. There must be a key somewhere…');return;}
   holder.inventory[slot]=null;
   setTile(x,y,T_DOOR);
-  const mesh=R3.doorMeshes[y*G.L.w+x];
-  if(mesh&&R3.doorMatBase)mesh.material=R3.doorMatBase;
+  const pv=R3.doorMeshes[y*G.L.w+x];
+  if(pv&&pv.userData.mesh&&R3.doorMatBase)pv.userData.mesh.material=R3.doorMatBase;
   UI.toast(holder.name+' unlocks the door.');SFX.unlock();
   openDoorAt(x,y);
 }
