@@ -47,7 +47,10 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 .hand.empty-hand{opacity:.5;}
 .p-btns{display:flex;gap:3px;padding:2px 4px 4px;}
 .pbtn{flex:1;height:26px;background:var(--btn);border:1px solid var(--btn-line);border-radius:4px;color:var(--ink);
-  display:flex;align-items:center;justify-content:center;font-size:13px;padding:0;}
+  display:flex;align-items:center;justify-content:center;font-size:13px;padding:0;position:relative;}
+.slotbadge{position:absolute;top:-4px;right:-3px;font-size:9px;line-height:1;background:#2a3a5a;
+  border:1px solid #4a5a7a;border-radius:7px;padding:2px 4px;color:#c9d4e6;pointer-events:none;}
+.slotbadge.empty{background:#3a2020;border-color:#6a3a3a;color:#c9a0a0;}
 .pbtn svg{width:18px;height:18px;}
 .pbtn:active{background:#332a1c;}
 .pbtn.spellbtn{color:#9db4d6;}
@@ -73,6 +76,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
   animation:dmgfloat 1.1s forwards;pointer-events:none;}
 @keyframes dmgfloat{0%{opacity:0;transform:translate(-50%,0) scale(.6);}15%{opacity:1;transform:translate(-50%,-12px) scale(1.15);}
   100%{opacity:0;transform:translate(-50%,-64px) scale(1);}}
+#fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .9s ease;z-index:40;}
 #toast{position:absolute;left:50%;bottom:100px;transform:translateX(-50%);z-index:6;background:#000c;border:1px solid var(--line);
   border-radius:6px;padding:6px 14px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:80%;text-align:center;}
 /* overlays */
@@ -119,6 +123,17 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 .inv-cell{border:1px solid #3a3227;border-radius:5px;background:#0d0b08;position:relative;
   display:flex;align-items:center;justify-content:center;}
 .qty{position:absolute;right:1px;bottom:0;font-size:9px;color:#fff;text-shadow:0 1px 1px #000;pointer-events:none;}
+#inv-party{display:flex;flex-direction:column;gap:5px;min-width:118px;max-width:140px;}
+#inv-party .col-lbl{font-size:9px;color:var(--ink-dim);text-align:center;}
+.give-char{border:1px solid var(--line);border-radius:6px;background:#0d0b08;padding:5px 7px;position:relative;}
+.give-char.self{border-color:var(--ink);background:#171310;}
+.give-char.drag-over{background:#2c2415;border-color:var(--ink);}
+.give-char.gc-dead{opacity:.45;}
+.give-char .gc-name{font-size:12px;color:var(--ink);white-space:nowrap;overflow:hidden;padding-right:34px;}
+.give-char .gc-sub{font-size:9px;color:var(--ink-dim);white-space:nowrap;}
+.give-char .gc-free{position:absolute;top:5px;right:6px;font-size:9px;color:var(--ink-dim);}
+.give-char .gc-bar{height:5px;background:#2a0d0d;border-radius:2px;margin-top:3px;overflow:hidden;}
+.give-char .gc-fill{height:100%;}
 #drag-ghost{position:fixed;width:52px;height:52px;z-index:99;pointer-events:none;display:none;filter:drop-shadow(0 2px 6px #000);}
 #drag-ghost svg{width:100%;height:100%;}
 #item-tip{font-size:12px;color:var(--ink-dim);min-height:30px;margin-top:6px;max-width:340px;}
@@ -217,7 +232,8 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   <h2 id="inv-title">Inventory</h2>
   <div id="inv-wrap">
     <div id="inv-doll"></div>
-    <div><div id="inv-grid"></div><div id="item-tip">Drag items between the pack and body slots. Tap an item to inspect.</div></div>
+    <div><div id="inv-grid"></div><div id="item-tip">Drag items between the pack, body slots and companions. Tap an item to inspect.</div></div>
+    <div id="inv-party"></div>
   </div>
   <div class="row"><button class="mbtn small" id="inv-drop">Drop selected</button><button class="mbtn small" id="inv-close">Close</button></div>
 </div></div>
@@ -252,6 +268,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   <button class="mbtn small" id="tg-cancel">Cancel</button>
 </div></div>
 
+<div id="fade"></div>
 <div id="drag-ghost"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -1213,8 +1230,10 @@ function buildLevel(L){
   for(let y=0;y<L.h;y++)for(let x=0;x<L.w;x++){
     const t=L.grid[y*L.w+x];
     if(t!==T_DOOR&&t!==T_DOOR_OPEN&&t!==T_DOOR_LOCKED)continue;
-    const horiz=x>0&&x<L.w-1&&L.grid[y*L.w+x-1]!==T_WALL&&L.grid[y*L.w+x+1]!==T_WALL;
-    const g=new THREE.BoxGeometry(horiz?TILE:0.22,WALLH,horiz?0.22:TILE);
+    // passage direction: if east/west neighbors are open the party travels along x,
+    // so the door slab must be thin along x and span the full tile along z (and vice versa)
+    const passageX=x>0&&x<L.w-1&&L.grid[y*L.w+x-1]!==T_WALL&&L.grid[y*L.w+x+1]!==T_WALL;
+    const g=new THREE.BoxGeometry(passageX?0.22:TILE,WALLH,passageX?TILE:0.22);
     const m=new THREE.Mesh(g,t===T_DOOR_LOCKED?doorMatLocked:doorMatBase);
     m.position.set(x+0.5,WALLH/2,y+0.5);
     m.userData={kind:'door',x,y};
@@ -1770,7 +1789,7 @@ function castSpell(ch,key,opts){
   const cl=ch.level;
   if(G.paused&&!opts.fromUI){/* allowed from spell menu which unpauses */}
   if(!canAct(ch)){UI.toast(ch.name+' cannot act.');return false;}
-  if(ch.cd>0&&!opts.item)return false;
+  if(ch.cd>0&&!opts.item){UI.toast(ch.name+' is still recovering.');return false;}
   if(!opts.item){
     const slots=charSlots(ch);
     const c=sp.circle;
@@ -1795,12 +1814,17 @@ function castSpell(ch,key,opts){
     SFX.cast();
     UI.spellFlash(sp);
   };
-  if(sp.target==='self'){applySpellToAlly(ch,ch,sp,cl);commit();return true;}
+  if(sp.target==='self'){if(applySpellToAlly(ch,ch,sp,cl))commit();return true;}
   if(sp.target==='ally'){
-    UI.pickAlly(sp.name+' on…',(t)=>{applySpellToAlly(ch,t,sp,cl);commit();},sp.raise);
+    UI.pickAlly(sp.name+' on…',(t)=>{if(applySpellToAlly(ch,t,sp,cl))commit();},sp.raise);
     return true;
   }
-  if(sp.target==='allies'){for(const t of G.party)if(!t.dead)applySpellToAlly(ch,t,sp,cl);commit();return true;}
+  if(sp.target==='allies'){
+    let any=false;
+    for(const t of G.party)if(!t.dead&&applySpellToAlly(ch,t,sp,cl))any=true;
+    if(any)commit();
+    return any;
+  }
   // offensive
   commit();
   for(const m of foes){
@@ -1836,13 +1860,13 @@ function castSpell(ch,key,opts){
 }
 function applySpellToAlly(caster,t,sp,cl){
   if(sp.raise){
-    if(!t.dead){UI.toast(t.name+' is not dead.');return;}
+    if(!t.dead){UI.toast(t.name+' is not dead. The slot is spared.');return false;}
     t.dead=false;t.level=Math.max(1,t.level-1);t.xp=XP_FOR_LEVEL(t.level);
     recalcHp(t,false);t.hp=1;t.stable=true;
     UI.toast(t.name+' returns, gasping, to life!');
-    UI.refreshParty();return;
+    UI.refreshParty();return true;
   }
-  if(t.dead){UI.toast(t.name+' is dead. Only Raise Dead can help.');return;}
+  if(t.dead){UI.toast(t.name+' is dead. Only Raise Dead can help.');return false;}
   if(sp.healFn){healChar(t,sp.healFn(cl));}
   if(sp.cures)for(const c of sp.cures){removeCond(t,c);if(c==='paralysis')removeCond(t,'hold');}
   if(sp.restoreAbility){
@@ -1859,6 +1883,7 @@ function applySpellToAlly(caster,t,sp,cl){
     UI.float(t,sp.name,'#9db4d6');
   }
   UI.refreshParty();
+  return true;
 }
 function ordSuffix(n){return n===1?'st':n===2?'nd':n===3?'rd':'th';}
 /* ---------- class abilities ---------- */
@@ -2152,18 +2177,29 @@ function tryRest(){
   if(G.paused||G.over)return;
   const near=G.L.monsters.some(m=>m.hp>0&&m.awake&&G.distField&&G.distField[m.y*G.L.w+m.x]>=0&&G.distField[m.y*G.L.w+m.x]<=8);
   if(near){UI.toast('Too dangerous — enemies are near!');SFX.bump();return;}
-  for(const ch of G.party){
-    if(ch.dead)continue;
-    ch.hp=0;recalcHp(ch,false);
-    for(const a of ABILITIES)ch.abilDmg[a]=0;
-    recalcHp(ch,true);
-    ch.stable=true;ch.buffs=[];ch.conditions=ch.conditions.filter(c=>c.kind==='drained');
-    resetDaily(ch);
-  }
-  UI.refreshParty();
-  UI.toast('The party makes camp… and wakes whole. Spells restored.');
+  // fade to black, sleep in the dark, fade back in
+  G.paused=true;
+  const fade=document.getElementById('fade');
+  fade.style.pointerEvents='auto';
+  fade.style.opacity=1;
   SFX.rest();
-  saveGame();
+  setTimeout(()=>{
+    for(const ch of G.party){
+      if(ch.dead)continue;
+      for(const a of ABILITIES)ch.abilDmg[a]=0;
+      recalcHp(ch,true);
+      ch.stable=true;ch.buffs=[];ch.conditions=ch.conditions.filter(c=>c.kind==='drained');
+      resetDaily(ch);
+    }
+    UI.refreshParty();
+    saveGame();
+    setTimeout(()=>{
+      fade.style.opacity=0;
+      fade.style.pointerEvents='none';
+      G.paused=UI.anyOverlayOpen();
+      UI.toast('The party wakes whole. Spells restored.');
+    },1800);
+  },950);
 }
 function descend(){
   G.depth++;
@@ -2462,6 +2498,15 @@ const UI=(()=>{
         h.appendChild(cd);
         h.classList.toggle('empty-hand',!ch.equip[h.dataset.slot]);
       });
+      if(CLASSES[ch.cls].caster){
+        const ab=div.querySelector('[data-act=ability]');
+        const slots=charSlots(ch);
+        const left=slots.reduce((s,n,ci)=>s+Math.max(0,n-ch.slotsUsed[ci]),0);
+        let badge=ab.querySelector('.slotbadge');
+        if(!badge){badge=document.createElement('span');badge.className='slotbadge';ab.appendChild(badge);}
+        badge.textContent=left;
+        badge.classList.toggle('empty',left===0);
+      }
     });
   }
   function armCooldown(ch){ch._cdTotal=ch.cd;}
@@ -2589,7 +2634,11 @@ const UI=(()=>{
     list.innerHTML='';
     const slots=charSlots(ch);
     const known=spellsKnown(ch.cls,ch.level);
-    let lastCircle=0;
+    const sum=slots.map((n,i)=>n>0?`${i+1}${ordSuffix(i+1)} ${Math.max(0,n-ch.slotsUsed[i])}/${n}`:null).filter(Boolean).join(' · ');
+    const hdr=document.createElement('div');
+    hdr.className='dim-note';
+    hdr.textContent='Slots left — '+sum+' (rest to recover)';
+    list.appendChild(hdr);
     for(const key of known.sort((a,b)=>SPELLS[a].circle-SPELLS[b].circle)){
       const sp=SPELLS[key];
       const left=slots[sp.circle-1]-ch.slotsUsed[sp.circle-1];
@@ -2656,6 +2705,43 @@ const UI=(()=>{
       attachDnD(cell,{type:'grid',idx:i});
       grid.appendChild(cell);
     });
+    renderInvParty();
+  }
+  let suppressCardClick=false;
+  function renderInvParty(){
+    const pc=$('inv-party');
+    pc.innerHTML='<div class="col-lbl">Drop an item on a companion to hand it over</div>';
+    G.party.forEach((ch,i)=>{
+      const card=document.createElement('div');
+      card.className='give-char'+(ch===invChar?' self':'')+(ch.dead?' gc-dead':'');
+      card.dataset.gidx=i;
+      const free=ch.inventory.filter(x=>!x).length;
+      const frac=clamp(ch.hp/ch.maxHp,0,1);
+      const barCol=ch.dead?'#555':frac>0.5?'#3f7d3a':frac>0.25?'#a89b2a':'#8c1f1f';
+      card.innerHTML=`<div class="gc-name">${ch.name}${ch===invChar?' ◂':''}</div>
+        <div class="gc-sub">${CLASSES[ch.cls].name} ${ch.level}${ch.dead?' — DEAD':''}</div>
+        <div class="gc-free">${free} free</div>
+        <div class="gc-bar"><div class="gc-fill" style="width:${Math.round(frac*100)}%;background:${barCol}"></div></div>`;
+      card.addEventListener('click',()=>{
+        if(suppressCardClick)return;
+        if(ch!==invChar)openInventory(ch);
+      });
+      pc.appendChild(card);
+    });
+  }
+  function giveTo(idx,from){
+    const target=G.party[idx];
+    const it=getItem(from);
+    if(!it)return;
+    if(target.dead){toast(target.name+' has no more need of things.');return;}
+    if(target===invChar&&from.type==='grid')return;
+    const s=target.inventory.findIndex(x=>!x);
+    if(s<0){toast(target.name+"'s pack is full.");return;}
+    setItem(from,null);
+    target.inventory[s]=it;
+    if(target!==invChar)toast(invChar.name+' hands the '+itemName(it)+' to '+target.name+'.');
+    SFX.turn();
+    renderInv();refreshParty();saveGame();
   }
   function getItem(ref){return ref.type==='grid'?invChar.inventory[ref.idx]:invChar.equip[ref.slot];}
   function setItem(ref,it){if(ref.type==='grid')invChar.inventory[ref.idx]=it;else invChar.equip[ref.slot]=it;}
@@ -2672,31 +2758,39 @@ const UI=(()=>{
   function tryPlace(from,to){
     const it=getItem(from);
     if(!it)return;
+    if(from.type===to.type&&from.idx===to.idx&&from.slot===to.slot)return;
     const dst=getItem(to);
     if(to.type==='equip'&&!slotAccepts(to.slot,it)){toast("That doesn't go there.");return;}
-    if(from.type===to.type&&(from.idx===to.idx&&from.slot===to.slot))return;
-    // two-handed weapon into a hand: other hand must be free
+    // hand constraints; stashSlot = off-hand that must be emptied to grip a two-hander
+    let stashSlot=null;
     if(to.type==='equip'&&(to.slot==='rhand'||to.slot==='lhand')){
       const def=ITEM_DEFS[it.base];
+      const otherSlot=to.slot==='rhand'?'lhand':'rhand';
+      const other=(from.type==='equip'&&from.slot===otherSlot)?null:invChar.equip[otherSlot];
       if(def.kind==='weapon'&&def.hands===2){
-        const otherSlot=to.slot==='rhand'?'lhand':'rhand';
         if(to.slot==='lhand'){toast('Two-handed weapons are gripped in the right hand.');return;}
-        if(invChar.equip[otherSlot]){toast('Both hands are needed — empty the left hand first.');return;}
-      }
-      const other=invChar.equip[to.slot==='rhand'?'lhand':'rhand'];
-      if(other&&ITEM_DEFS[other.base].kind==='weapon'&&ITEM_DEFS[other.base].hands===2){
-        toast('Both hands grip the '+ITEM_DEFS[other.base].name+'.');return;
+        if(other)stashSlot=otherSlot;
+      }else if(other&&ITEM_DEFS[other.base].kind==='weapon'&&ITEM_DEFS[other.base].hands===2){
+        toast('Both hands grip the '+ITEM_DEFS[other.base].name+'. Replace it via the right hand.');return;
       }
     }
-    if(from.type==='equip'&&dst&&to.type==='equip'){ /* swap equip-equip ok */ }
-    setItem(from,dst||null);
+    // capacity: displaced items that cannot go back to the source slot need pack space
+    const dstNeedsPack=!!(dst&&from.type==='equip'&&!slotAccepts(from.slot,dst));
+    const packNeeded=(stashSlot?1:0)+(dstNeedsPack?1:0);
+    const packFree=invChar.inventory.filter(x=>!x).length+(from.type==='grid'&&!dst?1:0);
+    if(packNeeded>packFree){toast('Not enough room in the pack to swap.');return;}
+    // perform: lift dragged item, re-home displaced items, place dragged item
+    setItem(from,null);
+    if(dst){
+      if(from.type==='grid'||slotAccepts(from.slot,dst))setItem(from,dst);
+      else invChar.inventory[invChar.inventory.findIndex(x=>!x)]=dst;
+    }
+    if(stashSlot&&invChar.equip[stashSlot]){
+      invChar.inventory[invChar.inventory.findIndex(x=>!x)]=invChar.equip[stashSlot];
+      invChar.equip[stashSlot]=null;
+      toast('The '+itemName(it)+' needs both hands — off-hand item stowed in the pack.');
+    }
     setItem(to,it);
-    // swapped item validity check
-    if(dst&&from.type==='equip'&&!slotAccepts(from.slot,dst)){
-      // undo
-      setItem(from,it);setItem(to,dst);
-      toast("Can't swap those.");return;
-    }
     SFX.turn();
     renderInv();refreshParty();saveGame();
   }
@@ -2737,7 +2831,7 @@ const UI=(()=>{
     if(dnd.moved){
       const g=$('drag-ghost');
       g.style.left=(e.clientX-26)+'px';g.style.top=(e.clientY-26)+'px';
-      document.querySelectorAll('.inv-cell,.doll-slot').forEach(c=>{
+      document.querySelectorAll('.inv-cell,.doll-slot,.give-char').forEach(c=>{
         const r=c.getBoundingClientRect();
         c.classList.toggle('drag-over',e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom);
       });
@@ -2746,14 +2840,19 @@ const UI=(()=>{
   window.addEventListener('pointerup',(e)=>{
     if(dnd&&dnd.moved){
       $('drag-ghost').style.display='none';
-      const target=[...document.querySelectorAll('.inv-cell,.doll-slot')].find(c=>{
+      suppressCardClick=true;setTimeout(()=>{suppressCardClick=false;},0);
+      const target=[...document.querySelectorAll('.inv-cell,.doll-slot,.give-char')].find(c=>{
         const r=c.getBoundingClientRect();
         return e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom;
       });
-      document.querySelectorAll('.inv-cell,.doll-slot').forEach(c=>c.classList.remove('drag-over'));
+      document.querySelectorAll('.inv-cell,.doll-slot,.give-char').forEach(c=>c.classList.remove('drag-over'));
       if(target){
-        const to=target.classList.contains('inv-cell')?{type:'grid',idx:+target.dataset.idx}:{type:'equip',slot:target.dataset.slot};
-        tryPlace(dnd.from,to);
+        if(target.classList.contains('give-char')){
+          giveTo(+target.dataset.gidx,dnd.from);
+        }else{
+          const to=target.classList.contains('inv-cell')?{type:'grid',idx:+target.dataset.idx}:{type:'equip',slot:target.dataset.slot};
+          tryPlace(dnd.from,to);
+        }
       }
     }
     dnd=null;
@@ -2816,8 +2915,20 @@ const UI=(()=>{
     cv.width=L.w*cs;cv.height=L.h*cs;
     ctx.fillStyle='#0b0a08';ctx.fillRect(0,0,cv.width,cv.height);
     for(let y=0;y<L.h;y++)for(let x=0;x<L.w;x++){
-      if(!L.explored[y*L.w+x])continue;
       const t=L.grid[y*L.w+x];
+      if(!L.explored[y*L.w+x]){
+        // hint at passable tiles bordering explored ground, without revealing what they hold
+        if(t&&t!==T_SECRET){
+          for(const [dx,dy] of DIRS){
+            const nx=x+dx,ny=y+dy;
+            if(nx>=0&&ny>=0&&nx<L.w&&ny<L.h&&L.explored[ny*L.w+nx]){
+              ctx.fillStyle='#3c3c3c';ctx.fillRect(x*cs,y*cs,cs,cs);
+              break;
+            }
+          }
+        }
+        continue;
+      }
       let col=null;
       if(t===T_FLOOR)col='#4a4436';
       else if(t===T_DOOR||t===T_DOOR_OPEN)col='#7a5a30';
