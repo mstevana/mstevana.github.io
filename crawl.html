@@ -1108,7 +1108,28 @@ const R3={ // renderer state
   camAnim:null,shake:0,
 };
 const TILE=1,WALLH=1.3,EYE=0.62;
-function texFromCanvas(cv){const t=new THREE.CanvasTexture(cv);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;return t;}
+const TEXSS=2; // supersample factor: textures are drawn in 128-space but backed at 128*TEXSS px
+// a canvas backed at higher resolution, with the context pre-scaled so all
+// drawing code keeps using the logical 128x128 coordinate space unchanged
+function newCanvas(logical){
+  const cv=document.createElement('canvas');cv.width=cv.height=logical*TEXSS;
+  const ctx=cv.getContext('2d');ctx.scale(TEXSS,TEXSS);
+  return {cv,ctx};
+}
+// smooth (trilinear + anisotropic) filtering removes the blocky look up close at
+// no render cost; mipmaps also cut shimmer and cost on distant surfaces
+function texFromCanvas(cv,opt){
+  const t=new THREE.CanvasTexture(cv);
+  opt=opt||{};
+  if(opt.pixel){t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;t.generateMipmaps=false;}
+  else{
+    t.magFilter=THREE.LinearFilter;
+    t.minFilter=opt.mipmap===false?THREE.LinearFilter:THREE.LinearMipmapLinearFilter;
+    t.generateMipmaps=opt.mipmap!==false;
+    if(R3.maxAniso)t.anisotropy=R3.maxAniso;
+  }
+  return t;
+}
 // draw fn at the 9 wrap offsets so the tile repeats seamlessly in x and y
 function wrap9(ctx,fn){
   for(const oy of [-128,0,128])for(const ox of [-128,0,128]){
@@ -1116,8 +1137,7 @@ function wrap9(ctx,fn){
   }
 }
 function noiseCanvas(base,accent,brick,mossC){ // seamless: used for floor and ceiling
-  const cv=document.createElement('canvas');cv.width=cv.height=128;
-  const ctx=cv.getContext('2d');
+  const {cv,ctx}=newCanvas(128);
   ctx.fillStyle=base;ctx.fillRect(0,0,128,128);
   for(let i=0;i<2600;i++){
     ctx.fillStyle=Math.random()<0.5?accent:base;
@@ -1173,8 +1193,7 @@ function pickBrickPoint(grid){ // a random point sitting on a brick face (for ch
 // by every variant, so any two adjacent wall tiles (whatever their variants)
 // share an identical texel column at their join. Only the aging overlay differs.
 function baseWallCanvas(th,grid){
-  const cv=document.createElement('canvas');cv.width=cv.height=128;
-  const ctx=cv.getContext('2d');
+  const {cv,ctx}=newCanvas(128);
   const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
   ctx.fillStyle=shade(th.wall,-0.55);ctx.fillRect(0,0,128,128); // dark mortar base
   for(const row of grid){
@@ -1208,10 +1227,9 @@ function baseWallCanvas(th,grid){
   return cv;
 }
 function wallCanvas(th,variant,grid,baseCv){
-  const cv=document.createElement('canvas');cv.width=cv.height=128;
-  const ctx=cv.getContext('2d');
+  const {cv,ctx}=newCanvas(128);
   const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
-  ctx.drawImage(baseCv,0,0); // identical brick+grime base for every variant
+  ctx.drawImage(baseCv,0,0,128,128); // identical brick+grime base for every variant (drawn in logical space)
   // --- per-variant aging decoration on top of the shared base ---
   if(variant===1){ // chipped corners bitten out of brick edges
     for(let i=0;i<14;i++){
@@ -1279,10 +1297,11 @@ function wallCanvas(th,variant,grid,baseCv){
 function wallVariant(x,y){return (((x*73856093)^(y*19349663))>>>0)%6;}
 function svgToTexture(svg,cacheKey){
   if(cacheKey&&R3.texCache[cacheKey])return R3.texCache[cacheKey];
-  const cv=document.createElement('canvas');cv.width=cv.height=128;
-  const tex=texFromCanvas(cv);
+  const S=256; // raster SVG sprites at 2x for crisper edges when a monster is close
+  const cv=document.createElement('canvas');cv.width=cv.height=S;
+  const tex=texFromCanvas(cv,{mipmap:false}); // linear, no mipmaps (avoids transparent-edge fringe)
   const img=new Image();
-  img.onload=()=>{const ctx=cv.getContext('2d');ctx.clearRect(0,0,128,128);ctx.drawImage(img,0,0,128,128);tex.needsUpdate=true;};
+  img.onload=()=>{const ctx=cv.getContext('2d');ctx.clearRect(0,0,S,S);ctx.drawImage(img,0,0,S,S);tex.needsUpdate=true;};
   img.src='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg)));
   if(cacheKey)R3.texCache[cacheKey]=tex;
   return tex;
@@ -1291,6 +1310,7 @@ function initRenderer(){
   const cv=document.getElementById('view3d');
   R3.renderer=new THREE.WebGLRenderer({canvas:cv,antialias:false});
   R3.renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  R3.maxAniso=R3.renderer.capabilities.getMaxAnisotropy(); // sharpen textures at grazing angles, free on GPU
   R3.scene=new THREE.Scene();
   R3.camera=new THREE.PerspectiveCamera(68,1,0.05,30);
   // low ambient so the observer's own light dominates and near walls read brighter than far ones
@@ -1415,8 +1435,7 @@ function buildLevel(L){
   for(const m of L.monsters)addMonsterSprite(m);
 }
 function doorCanvas(th,locked){
-  const cv=document.createElement('canvas');cv.width=cv.height=128;
-  const ctx=cv.getContext('2d');
+  const {cv,ctx}=newCanvas(128);
   ctx.fillStyle='#241a10';ctx.fillRect(0,0,128,128);
   ctx.strokeStyle='#0d0906';ctx.lineWidth=3;
   for(let x=8;x<128;x+=24){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,128);ctx.stroke();}
