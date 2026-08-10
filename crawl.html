@@ -76,6 +76,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
   animation:dmgfloat 1.1s forwards;pointer-events:none;}
 @keyframes dmgfloat{0%{opacity:0;transform:translate(-50%,0) scale(.6);}15%{opacity:1;transform:translate(-50%,-12px) scale(1.15);}
   100%{opacity:0;transform:translate(-50%,-64px) scale(1);}}
+#fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .9s ease;z-index:40;}
 #toast{position:absolute;left:50%;bottom:100px;transform:translateX(-50%);z-index:6;background:#000c;border:1px solid var(--line);
   border-radius:6px;padding:6px 14px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:80%;text-align:center;}
 /* overlays */
@@ -267,6 +268,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   <button class="mbtn small" id="tg-cancel">Cancel</button>
 </div></div>
 
+<div id="fade"></div>
 <div id="drag-ghost"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -2175,18 +2177,29 @@ function tryRest(){
   if(G.paused||G.over)return;
   const near=G.L.monsters.some(m=>m.hp>0&&m.awake&&G.distField&&G.distField[m.y*G.L.w+m.x]>=0&&G.distField[m.y*G.L.w+m.x]<=8);
   if(near){UI.toast('Too dangerous — enemies are near!');SFX.bump();return;}
-  for(const ch of G.party){
-    if(ch.dead)continue;
-    ch.hp=0;recalcHp(ch,false);
-    for(const a of ABILITIES)ch.abilDmg[a]=0;
-    recalcHp(ch,true);
-    ch.stable=true;ch.buffs=[];ch.conditions=ch.conditions.filter(c=>c.kind==='drained');
-    resetDaily(ch);
-  }
-  UI.refreshParty();
-  UI.toast('The party makes camp… and wakes whole. Spells restored.');
+  // fade to black, sleep in the dark, fade back in
+  G.paused=true;
+  const fade=document.getElementById('fade');
+  fade.style.pointerEvents='auto';
+  fade.style.opacity=1;
   SFX.rest();
-  saveGame();
+  setTimeout(()=>{
+    for(const ch of G.party){
+      if(ch.dead)continue;
+      for(const a of ABILITIES)ch.abilDmg[a]=0;
+      recalcHp(ch,true);
+      ch.stable=true;ch.buffs=[];ch.conditions=ch.conditions.filter(c=>c.kind==='drained');
+      resetDaily(ch);
+    }
+    UI.refreshParty();
+    saveGame();
+    setTimeout(()=>{
+      fade.style.opacity=0;
+      fade.style.pointerEvents='none';
+      G.paused=UI.anyOverlayOpen();
+      UI.toast('The party wakes whole. Spells restored.');
+    },1800);
+  },950);
 }
 function descend(){
   G.depth++;
