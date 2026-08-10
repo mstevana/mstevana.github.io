@@ -47,7 +47,10 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 .hand.empty-hand{opacity:.5;}
 .p-btns{display:flex;gap:3px;padding:2px 4px 4px;}
 .pbtn{flex:1;height:26px;background:var(--btn);border:1px solid var(--btn-line);border-radius:4px;color:var(--ink);
-  display:flex;align-items:center;justify-content:center;font-size:13px;padding:0;}
+  display:flex;align-items:center;justify-content:center;font-size:13px;padding:0;position:relative;}
+.slotbadge{position:absolute;top:-4px;right:-3px;font-size:9px;line-height:1;background:#2a3a5a;
+  border:1px solid #4a5a7a;border-radius:7px;padding:2px 4px;color:#c9d4e6;pointer-events:none;}
+.slotbadge.empty{background:#3a2020;border-color:#6a3a3a;color:#c9a0a0;}
 .pbtn svg{width:18px;height:18px;}
 .pbtn:active{background:#332a1c;}
 .pbtn.spellbtn{color:#9db4d6;}
@@ -1784,7 +1787,7 @@ function castSpell(ch,key,opts){
   const cl=ch.level;
   if(G.paused&&!opts.fromUI){/* allowed from spell menu which unpauses */}
   if(!canAct(ch)){UI.toast(ch.name+' cannot act.');return false;}
-  if(ch.cd>0&&!opts.item)return false;
+  if(ch.cd>0&&!opts.item){UI.toast(ch.name+' is still recovering.');return false;}
   if(!opts.item){
     const slots=charSlots(ch);
     const c=sp.circle;
@@ -1809,12 +1812,17 @@ function castSpell(ch,key,opts){
     SFX.cast();
     UI.spellFlash(sp);
   };
-  if(sp.target==='self'){applySpellToAlly(ch,ch,sp,cl);commit();return true;}
+  if(sp.target==='self'){if(applySpellToAlly(ch,ch,sp,cl))commit();return true;}
   if(sp.target==='ally'){
-    UI.pickAlly(sp.name+' on…',(t)=>{applySpellToAlly(ch,t,sp,cl);commit();},sp.raise);
+    UI.pickAlly(sp.name+' on…',(t)=>{if(applySpellToAlly(ch,t,sp,cl))commit();},sp.raise);
     return true;
   }
-  if(sp.target==='allies'){for(const t of G.party)if(!t.dead)applySpellToAlly(ch,t,sp,cl);commit();return true;}
+  if(sp.target==='allies'){
+    let any=false;
+    for(const t of G.party)if(!t.dead&&applySpellToAlly(ch,t,sp,cl))any=true;
+    if(any)commit();
+    return any;
+  }
   // offensive
   commit();
   for(const m of foes){
@@ -1850,13 +1858,13 @@ function castSpell(ch,key,opts){
 }
 function applySpellToAlly(caster,t,sp,cl){
   if(sp.raise){
-    if(!t.dead){UI.toast(t.name+' is not dead.');return;}
+    if(!t.dead){UI.toast(t.name+' is not dead. The slot is spared.');return false;}
     t.dead=false;t.level=Math.max(1,t.level-1);t.xp=XP_FOR_LEVEL(t.level);
     recalcHp(t,false);t.hp=1;t.stable=true;
     UI.toast(t.name+' returns, gasping, to life!');
-    UI.refreshParty();return;
+    UI.refreshParty();return true;
   }
-  if(t.dead){UI.toast(t.name+' is dead. Only Raise Dead can help.');return;}
+  if(t.dead){UI.toast(t.name+' is dead. Only Raise Dead can help.');return false;}
   if(sp.healFn){healChar(t,sp.healFn(cl));}
   if(sp.cures)for(const c of sp.cures){removeCond(t,c);if(c==='paralysis')removeCond(t,'hold');}
   if(sp.restoreAbility){
@@ -1873,6 +1881,7 @@ function applySpellToAlly(caster,t,sp,cl){
     UI.float(t,sp.name,'#9db4d6');
   }
   UI.refreshParty();
+  return true;
 }
 function ordSuffix(n){return n===1?'st':n===2?'nd':n===3?'rd':'th';}
 /* ---------- class abilities ---------- */
@@ -2476,6 +2485,15 @@ const UI=(()=>{
         h.appendChild(cd);
         h.classList.toggle('empty-hand',!ch.equip[h.dataset.slot]);
       });
+      if(CLASSES[ch.cls].caster){
+        const ab=div.querySelector('[data-act=ability]');
+        const slots=charSlots(ch);
+        const left=slots.reduce((s,n,ci)=>s+Math.max(0,n-ch.slotsUsed[ci]),0);
+        let badge=ab.querySelector('.slotbadge');
+        if(!badge){badge=document.createElement('span');badge.className='slotbadge';ab.appendChild(badge);}
+        badge.textContent=left;
+        badge.classList.toggle('empty',left===0);
+      }
     });
   }
   function armCooldown(ch){ch._cdTotal=ch.cd;}
@@ -2603,7 +2621,11 @@ const UI=(()=>{
     list.innerHTML='';
     const slots=charSlots(ch);
     const known=spellsKnown(ch.cls,ch.level);
-    let lastCircle=0;
+    const sum=slots.map((n,i)=>n>0?`${i+1}${ordSuffix(i+1)} ${Math.max(0,n-ch.slotsUsed[i])}/${n}`:null).filter(Boolean).join(' · ');
+    const hdr=document.createElement('div');
+    hdr.className='dim-note';
+    hdr.textContent='Slots left — '+sum+' (rest to recover)';
+    list.appendChild(hdr);
     for(const key of known.sort((a,b)=>SPELLS[a].circle-SPELLS[b].circle)){
       const sp=SPELLS[key];
       const left=slots[sp.circle-1]-ch.slotsUsed[sp.circle-1];
