@@ -1966,7 +1966,7 @@ function buildLevel(L){
     const m=new THREE.Mesh(g,t===T_DOOR_LOCKED?doorMatLocked:doorMatBase);
     m.position.set(x+0.5,WALLH/2,y+0.5);
     m.userData={kind:'door',x,y};
-    if(t===T_DOOR_OPEN)m.position.y=WALLH/2+WALLH*0.92;
+    if(t===T_DOOR_OPEN)m.position.y=WALLH/2+WALLH*1.02; // fully retracted above the ceiling
     grp.add(m);R3.doorMeshes[y*L.w+x]=m;
   }
   // stairs
@@ -2213,7 +2213,9 @@ function openDoorAt(x,y){
   computeDistField();
 }
 function animateDoorOpen(mesh){
-  const y0=mesh.position.y,y1=WALLH/2+WALLH*0.92,t0=performance.now();
+  // slide all the way up: the bottom edge must clear the ceiling plane so no
+  // slab is left hanging at the top of the doorway
+  const y0=mesh.position.y,y1=WALLH/2+WALLH*1.02,t0=performance.now();
   const step=()=>{
     const k=Math.min(1,(performance.now()-t0)/380);
     mesh.position.y=y0+(y1-y0)*k;
