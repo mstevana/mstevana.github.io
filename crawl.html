@@ -4033,6 +4033,15 @@ const UI=(()=>{
       const tr=L.traps[y*L.w+x];
       if(tr&&tr.found&&tr.armed){ctx.fillStyle='#a03a2a';ctx.fillRect(x*cs+cs/3,y*cs+cs/3,cs/3,cs/3);}
       if(t===T_STAIRS){ctx.fillStyle='#100d09';ctx.fillRect(x*cs+cs/4,y*cs+cs/4,cs/2,cs/2);}
+      if(t===T_DOOR_LOCKED){ // a little golden key marks doors that need one
+        ctx.strokeStyle='#e8c84a';ctx.lineWidth=Math.max(1,cs*0.14);
+        const kx=x*cs+cs*0.32,ky=y*cs+cs*0.5,r=Math.max(1.2,cs*0.17);
+        ctx.beginPath();ctx.arc(kx,ky,r,0,7);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(kx+r,ky);ctx.lineTo(x*cs+cs*0.86,ky);
+        ctx.moveTo(x*cs+cs*0.72,ky);ctx.lineTo(x*cs+cs*0.72,ky+cs*0.18);
+        ctx.moveTo(x*cs+cs*0.86,ky);ctx.lineTo(x*cs+cs*0.86,ky+cs*0.22);
+        ctx.stroke();
+      }
     }
     // party arrow
     ctx.save();
