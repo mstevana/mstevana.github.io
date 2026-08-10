@@ -1293,10 +1293,16 @@ function initRenderer(){
   R3.renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
   R3.scene=new THREE.Scene();
   R3.camera=new THREE.PerspectiveCamera(68,1,0.05,30);
-  R3.ambient=new THREE.AmbientLight(0x484038,0.7);
+  // low ambient so the observer's own light dominates and near walls read brighter than far ones
+  R3.ambient=new THREE.AmbientLight(0x2a2620,0.32);
   R3.scene.add(R3.ambient);
-  R3.torch=new THREE.PointLight(0xd8a050,1.15,7.5,1.6);
+  // the observer carries a torch: strong warm point light with inverse-square falloff
+  R3.torchBase=2.4;
+  R3.torch=new THREE.PointLight(0xffb861,R3.torchBase,11,2);
   R3.scene.add(R3.torch);
+  // a soft short-range fill just around the observer so the nearest walls/floor glow
+  R3.torchFill=new THREE.PointLight(0xffd8a0,0.9,3.2,2);
+  R3.scene.add(R3.torchFill);
   onResize();
   window.addEventListener('resize',onResize);
 }
@@ -1516,8 +1522,14 @@ function updateCamera(now){
   let shx=0,shy=0;
   if(R3.shake>0){R3.shake-=0.016;shx=(Math.random()-0.5)*0.05*R3.shake*8;shy=(Math.random()-0.5)*0.04*R3.shake*8;}
   R3.camera.position.y=EYE+shy+Math.sin(now/900)*0.006;
-  R3.torch.position.set(R3.camera.position.x+shx,EYE+0.15,R3.camera.position.z);
-  R3.torch.intensity=1.05+Math.sin(now/90)*0.07+Math.random()*0.06;
+  // keep the observer's torch a touch ahead of the eye so the wall being faced is lit
+  const [fdx,fdy]=DIRS[G.facing]||[0,-1];
+  const tx=R3.camera.position.x+shx+fdx*0.25, tz=R3.camera.position.z+fdy*0.25;
+  R3.torch.position.set(tx,EYE+0.1,tz);
+  R3.torchFill.position.set(R3.camera.position.x+shx,EYE-0.05,R3.camera.position.z);
+  const flicker=Math.sin(now/90)*0.08+Math.sin(now/37)*0.05+Math.random()*0.06;
+  R3.torch.intensity=R3.torchBase*(1+flicker);
+  R3.torchFill.intensity=0.9*(1+flicker*0.6);
 }
 function projectToScreen(pos){
   const v=new THREE.Vector3(pos.x,pos.y,pos.z).project(R3.camera);
