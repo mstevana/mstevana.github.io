@@ -1321,7 +1321,7 @@ function mkCharacter(name,race,cls,scores){
     equip:{armor:mkItem('clothes'),helmet:null,boots:null,amulet:null,ring1:null,ring2:null,lhand:null,rhand:null},
     slotsUsed:[0,0,0,0,0],
     layPool:0,smiteUsed:false,rageUsed:false,rageUntil:0,
-    cd:0, // attack cooldown remaining (seconds)
+    cdL:0,cdR:0, // per-hand attack cooldowns (seconds) — dual wielders alternate hands
   };
   ch.equip.rhand=mkItem(CLASSES[cls].startWeapon);
   if(cls==='cleric'||cls==='paladin')ch.inventory[0]=mkItem('pot_clw');
@@ -2369,6 +2369,18 @@ function applyPoison(ch,p){
   if(p.abil==='con')recalcHp(ch,false);
 }
 /* ---------- party attacks & item use ---------- */
+// per-hand cooldowns: one-handed attacks arm only their hand; two-handed
+// weapons, spells and potions occupy both
+function armHand(ch,slot,v){
+  if(slot==='lhand'){ch.cdL=v;ch._cdTotL=v;}
+  else{ch.cdR=v;ch._cdTotR=v;}
+}
+function armBoth(ch,v){
+  ch.cdL=Math.max(ch.cdL||0,v);ch._cdTotL=Math.max(ch._cdTotL||0,ch.cdL);
+  ch.cdR=Math.max(ch.cdR||0,v);ch._cdTotR=Math.max(ch._cdTotR||0,ch.cdR);
+}
+function handCd(ch,slot){return slot==='lhand'?(ch.cdL||0):(ch.cdR||0);}
+function anyHandCd(ch){return Math.max(ch.cdL||0,ch.cdR||0);}
 function frontRow(ch){return G.party.indexOf(ch)<2;}
 function canMelee(ch,wDef){
   if(frontRow(ch))return true;
@@ -2387,7 +2399,7 @@ function firstMonsterAhead(maxRange){
 function useHand(ch,slot){
   if(G.paused||G.over)return;
   if(!canAct(ch)){UI.toast(ch.name+' cannot act.');return;}
-  if(ch.cd>0)return;
+  if(handCd(ch,slot)>0)return;
   const it=ch.equip[slot];
   // tapping the empty left hand while a two-hander is gripped swings the weapon
   if(!it&&slot==='lhand'){
@@ -2402,6 +2414,7 @@ function useHand(ch,slot){
   // weapon or unarmed
   let wDef=def&&def.kind==='weapon'?def:{name:'Fist',dmg:[1,3],crit:[20,2],hands:1,light:true,unarmed:true};
   let wIt=def&&def.kind==='weapon'?it:null;
+  if(wDef.hands===2&&anyHandCd(ch)>0)return; // a two-hander needs both hands free
   // ranged?
   if(wDef.ranged){
     const found=firstMonsterAhead(wDef.ranged);
@@ -2414,8 +2427,9 @@ function useHand(ch,slot){
   let m=monsterAt(ahead.x,ahead.y);
   if(!m&&wDef.reach){const a2=aheadTile(2);m=monsterAt(a2.x,a2.y);}
   if(!m){ // swing at air
-    ch.cd=attackCooldown(ch,wDef)*0.5;
-    UI.armCooldown(ch);SFX.whiff();
+    const cdv=attackCooldown(ch,wDef)*0.5;
+    if(wDef.hands===2)armBoth(ch,cdv);else armHand(ch,slot,cdv);
+    SFX.whiff();
     return;
   }
   doAttack(ch,slot,wDef,wIt,m,false);
@@ -2430,8 +2444,9 @@ function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
   if(m.sleep||m.held)atkB+=4;
   const nat=d20();
   const total=nat+atkB;
-  ch.cd=attackCooldown(ch,wDef);
-  UI.armCooldown(ch);UI.charFlash(ch,'atkflash');
+  const cdv=attackCooldown(ch,wDef);
+  if(wDef.hands===2)armBoth(ch,cdv);else armHand(ch,slot,cdv);
+  UI.charFlash(ch,'atkflash');
   const targetAC=m.ac;
   const hit=nat===20||(nat!==1&&total>=targetAC);
   const crit=hit&&nat>=wDef.crit[0];
@@ -2494,7 +2509,7 @@ function drinkPotion(giver,target,it,consume){
     UI.toast(target.name+' feels cleansed.');
   }
   SFX.drink();
-  giver.cd=Math.max(giver.cd,1.2);UI.armCooldown(giver);
+  armBoth(giver,1.2);
   UI.refreshParty();
 }
 function useSpellItem(ch,it,consume){
@@ -2520,7 +2535,7 @@ function castSpell(ch,key,opts){
   const cl=ch.level;
   if(G.paused&&!opts.fromUI){/* allowed from spell menu which unpauses */}
   if(!canAct(ch)){UI.toast(ch.name+' cannot act.');return false;}
-  if(ch.cd>0&&!opts.item){UI.toast(ch.name+' is still recovering.');return false;}
+  if(anyHandCd(ch)>0&&!opts.item){UI.toast(ch.name+' is still recovering.');return false;}
   if(!opts.item){
     const slots=charSlots(ch);
     const c=sp.circle;
@@ -2541,7 +2556,7 @@ function castSpell(ch,key,opts){
   const commit=()=>{
     if(!opts.item)ch.slotsUsed[sp.circle-1]++;
     if(opts.onCast)opts.onCast();
-    ch.cd=Math.max(ch.cd,1.8);UI.armCooldown(ch);
+    armBoth(ch,1.8); // casting occupies both hands
     SFX.cast();
     UI.spellFlash(sp);
   };
@@ -3062,7 +3077,8 @@ function updateParty(dt){
   const doPoisonTick=poisonTimer>=20;if(doPoisonTick)poisonTimer=0;
   for(const ch of G.party){
     if(ch.dead)continue;
-    if(ch.cd>0)ch.cd-=dt;
+    if(ch.cdL>0)ch.cdL-=dt;
+    if(ch.cdR>0)ch.cdR-=dt;
     if(ch.rageUntil&&ch.rageUntil<=G.time&&ch.rageUntil>0){ch.rageUntil=0;endRage(ch);}
     // buffs expiry
     const before=ch.buffs.length;
@@ -3161,7 +3177,7 @@ function serializeGame(){
     v:1,depth:G.depth,px:G.px,py:G.py,facing:G.facing,time:Math.round(G.time),
     party:G.party.map(ch=>{
       const c=Object.assign({},ch);
-      c.buffs=[];c.cd=0;delete c._smiting;
+      c.buffs=[];c.cdL=0;c.cdR=0;delete c.cd;delete c._smiting;
       return c;
     }),
     level:{
@@ -3475,7 +3491,6 @@ const UI=(()=>{
       }
     });
   }
-  function armCooldown(ch){ch._cdTotal=ch.cd;}
   function updateBossBar(){
     const el=$('bossbar');
     const boss=G.L&&G.L.monsters.find(m=>m.boss&&m.hp>0&&m.awake);
@@ -3489,8 +3504,14 @@ const UI=(()=>{
     G.party.forEach((ch,i)=>{
       const div=partyEl.children[i];
       if(!div)return;
-      const frac=ch.cd>0&&ch._cdTotal?clamp(ch.cd/ch._cdTotal,0,1):0;
-      div.querySelectorAll('.hand .cd').forEach(cd=>{cd.style.transform=`scaleY(${frac})`;});
+      div.querySelectorAll('.hand').forEach(h=>{
+        const isL=h.dataset.slot==='lhand';
+        const c=isL?(ch.cdL||0):(ch.cdR||0);
+        const t=isL?(ch._cdTotL||0):(ch._cdTotR||0);
+        const frac=c>0&&t?clamp(c/t,0,1):0;
+        const cd=h.querySelector('.cd');
+        if(cd)cd.style.transform=`scaleY(${frac})`;
+      });
     });
     // low hp heartbeat
     lowHpTimer-=0.016;
@@ -3584,7 +3605,7 @@ const UI=(()=>{
         const amt=Math.min(ch.layPool,t.maxHp-t.hp);
         if(amt<=0||t.dead){toast('It would do no good.');return;}
         ch.layPool-=amt;healChar(t,amt);t.stable=true;
-        ch.cd=Math.max(ch.cd,1.5);armCooldown(ch);
+        armBoth(ch,1.5);
         toast(`${ch.name} channels ${amt} healing.`);
       });
     });
@@ -3969,7 +3990,7 @@ const UI=(()=>{
     show('ovl-menu');
     refreshMenu();
   });
-  return {buildPartyDom,refreshParty,armCooldown,tickCooldowns,charFlash,float,floatAtMonster,vignette,toast,
+  return {buildPartyDom,refreshParty,tickCooldowns,charFlash,float,floatAtMonster,vignette,toast,
     refreshDepthTag,pickAlly,paladinMenu,openSpells,spellFlash,openInventory,openStats,openMap,gameOver,show,hide,anyOverlayOpen};
 })();
 /* ============================== INPUT ============================== */
