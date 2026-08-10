@@ -70,6 +70,10 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 .topbtn:active{background:#3a2f1d;}
 #b-map{left:8px;} #b-rest{left:58px;} #b-mute{left:108px;} #b-menu{left:158px;}
 #depth-tag{position:absolute;top:14px;right:10px;z-index:4;font-size:13px;color:var(--ink-dim);text-shadow:0 1px 2px #000;}
+#bossbar{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:4;width:min(340px,62%);text-align:center;pointer-events:none;}
+#bossbar .bb-name{font-size:12px;color:#d8a0a0;text-shadow:0 1px 2px #000;margin-bottom:2px;letter-spacing:1px;}
+#bossbar .bb-track{height:7px;background:#1a0808;border:1px solid #000;border-radius:3px;overflow:hidden;box-shadow:0 0 8px #000;}
+#bossbar-fill{height:100%;width:100%;background:linear-gradient(90deg,#7a1210,#c03028);transition:width .25s;}
 #vignette{position:absolute;inset:0;pointer-events:none;z-index:3;opacity:0;background:radial-gradient(ellipse at center,transparent 55%,#a00 130%);}
 #dmg-layer{position:absolute;inset:0;pointer-events:none;z-index:4;overflow:hidden;}
 .dmgnum{position:absolute;font-weight:bold;font-size:22px;text-shadow:0 1px 2px #000,0 0 6px #000;
@@ -170,6 +174,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
     <div id="vignette"></div>
     <div id="dmg-layer"></div>
     <div id="depth-tag"></div>
+    <div id="bossbar" class="hidden"><div class="bb-name" id="bossbar-name"></div><div class="bb-track"><div id="bossbar-fill"></div></div></div>
     <button class="topbtn" id="b-map" title="Map">🗺</button>
     <button class="topbtn" id="b-rest" title="Rest">⛺</button>
     <button class="topbtn" id="b-mute" title="Sound">🔊</button>
@@ -1808,8 +1813,11 @@ function fxGlowTex(color){
   if(R3.texCache[key])return R3.texCache[key];
   const cv=document.createElement('canvas');cv.width=cv.height=64;
   const ctx=cv.getContext('2d');
+  // canonicalize any CSS color to #rrggbb so the transparent stop is always valid
+  ctx.fillStyle=color;
+  const solid=/^#[0-9a-f]{6}$/i.test(ctx.fillStyle)?ctx.fillStyle:'#ffffff';
   const g=ctx.createRadialGradient(32,32,2,32,32,30);
-  g.addColorStop(0,'#ffffff');g.addColorStop(0.28,color);g.addColorStop(1,color+'00');
+  g.addColorStop(0,'#ffffff');g.addColorStop(0.28,solid);g.addColorStop(1,solid+'00');
   ctx.fillStyle=g;ctx.fillRect(0,0,64,64);
   const tex=texFromCanvas(cv,{mipmap:false});
   R3.texCache[key]=tex;return tex;
@@ -2001,11 +2009,15 @@ function refreshItemSprite(L,i){
   R3.levelGroup.add(spr);R3.itemSprites[i]=spr;
 }
 function itemTexKey(it){return 'it_'+it.base+'_'+it.bonus+'_'+(it.tint||'')+'_'+(ITEM_DEFS[it.base].tint||'');}
+// single source of truth for monster frame textures (cache key + raster options)
+function monsterFrameTex(sprKey,boss,pose){
+  return svgToTexture(monsterSVG(sprKey,boss,pose),'mon_'+sprKey+(boss?'_b':'')+'_'+pose,{size:384,mipmap:true});
+}
 function addMonsterSprite(m){
   const sprKey=MONSTERS[m.key].spr;
   // only the resting frame up front; walk/windup/strike rasterize lazily on first
   // use (the global texture cache still shares frames across same-type monsters)
-  const frames={idle0:svgToTexture(monsterSVG(sprKey,m.boss,'idle0'),'mon_'+sprKey+(m.boss?'_b':'')+'_idle0',{size:384,mipmap:true})};
+  const frames={idle0:monsterFrameTex(sprKey,m.boss,'idle0')};
   const mat=new THREE.SpriteMaterial({map:frames.idle0,transparent:true});
   const spr=new THREE.Sprite(mat);
   const sc=m.boss?1.05:(['ogre','troll','minotaur','ogremage','dragon'].includes(m.key)?0.95:0.72);
@@ -2097,7 +2109,7 @@ function projectToScreen(pos){
 const G={
   party:null,L:null,depth:1,px:0,py:0,facing:0,
   time:0,paused:true,over:false,started:false,
-  moveCd:0,distField:null,lastSave:0,fx:[],
+  moveCd:0,distField:null,lastSave:0,fx:[],resting:false,
 };
 function tileAt(x,y){if(x<0||y<0||x>=G.L.w||y>=G.L.h)return T_WALL;return G.L.grid[y*G.L.w+x];}
 function setTile(x,y,t){G.L.grid[y*G.L.w+x]=t;}
@@ -2663,6 +2675,8 @@ function endRage(ch){
     ch.stable=false;
     UI.toast(ch.name+' collapses as the rage fades!');
   }else UI.toast(ch.name+"'s rage subsides.");
+  // rage-end can leave the whole party down (whether it downed them now or earlier)
+  if(ch.hp<=0)checkPartyWipe();
   UI.refreshParty();
 }
 /* ---------- monsters AI ---------- */
@@ -2683,7 +2697,7 @@ function updateMonsters(dt){
     const di=df?df[m.y*L.w+m.x]:-1;
     if(!m.awake){
       if(di>=0&&di<=7&&(di<=2||losClear(m.x,m.y,G.px,G.py))){
-        m.awake=true;SFX.growl();
+        m.awake=true;SFX.growl(di);
         if(m.boss)UI.toast(m.name+' bars the way down!');
       }
       else{
@@ -2691,6 +2705,11 @@ function updateMonsters(dt){
         if(m.moveCd<=0){m.moveCd=m.speed*2.5*slowMult;wanderStep(m);}
         continue;
       }
+    }else{
+      // lose interest: far away and out of sight long enough sends it back to its haunts
+      const seen=(di>=0&&di<=10)||losClear(m.x,m.y,G.px,G.py);
+      if(seen)m.loseT=0;
+      else if((m.loseT=(m.loseT||0)+dt)>10){m.awake=false;m.loseT=0;continue;}
     }
     // boss signature move on its own timer, alongside normal attacks
     if(m.boss&&m.awake){
@@ -2856,7 +2875,7 @@ function monsterShoot(m){
     if(m.hp<=0||G.over||G.paused||!G.L.monsters.includes(m))return;
     if(!losClear(m.x,m.y,G.px,G.py))return;
     strikeAnim(m);
-    SFX.arrow();
+    SFX.arrow(Math.abs(m.x-G.px)+Math.abs(m.y-G.py));
     // aim at where the party stands NOW; sidestepping before impact dodges it
     const aim={x:G.px+0.5,y:EYE-0.05,z:G.py+0.5};
     spawnProjectile({from:{x:m.x+0.5,y:0.55,z:m.y+0.5},toFn:()=>aim,
@@ -2874,7 +2893,7 @@ function monsterShoot(m){
   },450);
 }
 function fireSpellOrb(m){
-  SFX.cast();
+  SFX.cast(Math.abs(m.x-G.px)+Math.abs(m.y-G.py));
   const aim={x:G.px+0.5,y:EYE-0.02,z:G.py+0.5};
   spawnProjectile({from:{x:m.x+0.5,y:0.6,z:m.y+0.5},toFn:()=>aim,
     tex:fxGlowTex(m.caster.fx),scale:0.42,speed:4.2,
@@ -2973,6 +2992,7 @@ function spawnProjectile(o){ // {from:{x,y,z}, toFn, speed, tex, scale, onHit, c
   const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:o.tex,transparent:true,depthWrite:false}));
   spr.scale.set(o.scale,o.scale,1);
   spr.position.set(o.from.x,o.from.y,o.from.z);
+  spr.userData={kind:'fx'}; // tagged so view taps pass through instead of being blocked
   R3.levelGroup.add(spr);
   G.fx.push({kind:'proj',spr,speed:o.speed,toFn:o.toFn,onHit:o.onHit,baseScale:o.scale,t:0});
 }
@@ -2980,6 +3000,7 @@ function spawnBurst(pos,color,size){
   const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:fxGlowTex(color),transparent:true,depthWrite:false}));
   spr.scale.set(0.25,0.25,1);
   spr.position.set(pos.x,pos.y,pos.z);
+  spr.userData={kind:'fx'};
   R3.levelGroup.add(spr);
   G.fx.push({kind:'burst',spr,t:0,dur:0.4,s1:size||1.4});
 }
@@ -3074,7 +3095,7 @@ function tryRest(){
   const near=G.L.monsters.some(m=>m.hp>0&&m.awake&&G.distField&&G.distField[m.y*G.L.w+m.x]>=0&&G.distField[m.y*G.L.w+m.x]<=8);
   if(near){UI.toast('Too dangerous — enemies are near!');SFX.bump();return;}
   // fade to black, sleep in the dark, fade back in
-  G.paused=true;
+  G.paused=true;G.resting=true;
   const fade=document.getElementById('fade');
   fade.style.pointerEvents='auto';
   fade.style.opacity=1;
@@ -3104,6 +3125,7 @@ function tryRest(){
     setTimeout(()=>{
       fade.style.opacity=0;
       fade.style.pointerEvents='none';
+      G.resting=false;
       G.paused=UI.anyOverlayOpen();
       UI.toast('The party wakes whole. Spells restored.');
     },1800);
@@ -3186,7 +3208,9 @@ function loadGame(){
     const o=JSON.parse(s);
     if(o.v!==1){
       console.warn('incompatible save version',o.v);
-      UI.toast('Saved game is from an incompatible version.');
+      localStorage.removeItem('crawl_save'); // keep the menu from offering it forever
+      refreshMenu();
+      UI.toast('Saved game was from an incompatible version and has been cleared.');
       return false;
     }
     deserializeGame(o);
@@ -3242,11 +3266,7 @@ function updateSprites(now){
     if(ud.curFrame!==frame&&ud.frames){
       // frames are generated lazily on first use; keep the old frame until loaded
       let t=ud.frames[frame];
-      if(!t){
-        t=svgToTexture(monsterSVG(ud.sprKey,ud.boss,frame),
-          'mon_'+ud.sprKey+(ud.boss?'_b':'')+'_'+frame,{size:384,mipmap:true});
-        ud.frames[frame]=t;
-      }
+      if(!t){t=monsterFrameTex(ud.sprKey,ud.boss,frame);ud.frames[frame]=t;}
       if(t.__ready!==false){ud.curFrame=frame;s.material.map=t;}
     }
     // idle bob + strike lunge toward the party
@@ -3294,6 +3314,8 @@ const SFX=(()=>{
     if(lp){const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=lp;s.connect(f);node=f;}
     node.connect(g).connect(c.destination);s.start();
   }
+  // monster-origin sounds fall off with distance (in tiles)
+  const att=(d)=>clamp(1.6/(1+0.5*Math.max(0,d||0)),0.12,1);
   return {
     unlock:()=>{tone(700,0.08,'square',0.06);setTimeout(()=>tone(1000,0.1,'square',0.06),90);},
     toggleMute:()=>{muted=!muted;return muted;},resume:()=>ac(),
@@ -3309,13 +3331,13 @@ const SFX=(()=>{
     hurt:()=>{tone(140,0.18,'sawtooth',0.1,70);},
     kill:()=>{noise(0.3,0.12,900);tone(110,0.35,'sawtooth',0.07,35);},
     die:()=>{tone(300,0.7,'sawtooth',0.1,50);},
-    cast:()=>{tone(500,0.22,'sine',0.07,1400);},
+    cast:(d)=>{tone(500,0.22,'sine',0.07*att(d),1400);},
     heal:()=>{tone(600,0.15,'sine',0.06,900);setTimeout(()=>tone(900,0.2,'sine',0.05,1200),120);},
     drink:()=>{tone(300,0.1,'sine',0.06,500);setTimeout(()=>tone(200,0.08,'sine',0.05),110);},
     levelup:()=>{[440,554,659,880].forEach((f,i)=>setTimeout(()=>tone(f,0.18,'square',0.06),i*110));},
-    growl:()=>tone(80,0.3,'sawtooth',0.07,55),
-    monAttack:()=>noise(0.1,0.09,1200),
-    arrow:()=>{tone(1200,0.08,'square',0.04,300);},
+    growl:(d)=>tone(80,0.3,'sawtooth',0.07*att(d),55),
+    monAttack:(d)=>noise(0.1,0.09*att(d),1200),
+    arrow:(d)=>{tone(1200,0.08,'square',0.04*att(d),300);},
     rage:()=>{tone(100,0.4,'sawtooth',0.12,240);},
     rest:()=>{[300,250,200].forEach((f,i)=>setTimeout(()=>tone(f,0.4,'sine',0.05),i*300));},
     stairs:()=>{[200,160,120,90].forEach((f,i)=>setTimeout(()=>noise(0.15,0.08,500),i*180));},
@@ -3454,7 +3476,16 @@ const UI=(()=>{
     });
   }
   function armCooldown(ch){ch._cdTotal=ch.cd;}
+  function updateBossBar(){
+    const el=$('bossbar');
+    const boss=G.L&&G.L.monsters.find(m=>m.boss&&m.hp>0&&m.awake);
+    if(!boss){el.classList.add('hidden');return;}
+    el.classList.remove('hidden');
+    $('bossbar-name').textContent=boss.name;
+    $('bossbar-fill').style.width=Math.round(100*boss.hp/boss.maxHp)+'%';
+  }
   function tickCooldowns(){
+    updateBossBar();
     G.party.forEach((ch,i)=>{
       const div=partyEl.children[i];
       if(!div)return;
@@ -3724,34 +3755,31 @@ const UI=(()=>{
       return;
     }
     if(to.type==='equip'&&!slotAccepts(to.slot,it)){toast("That doesn't go there.");return;}
-    // hand constraints; stashSlot = off-hand that must be emptied to grip a two-hander
-    let stashSlot=null;
-    if(to.type==='equip'&&(to.slot==='rhand'||to.slot==='lhand')){
-      const def=ITEM_DEFS[it.base];
-      const otherSlot=to.slot==='rhand'?'lhand':'rhand';
-      const other=(from.type==='equip'&&from.slot===otherSlot)?null:invChar.equip[otherSlot];
-      if(def.kind==='weapon'&&def.hands===2){
-        if(to.slot==='lhand'){toast('Two-handed weapons are gripped in the right hand.');return;}
-        if(other)stashSlot=otherSlot;
+    // one source of truth for the hand rules: returns null when the slot can take
+    // the item, 'needs-stash' when a two-hander needs the off-hand emptied, or a
+    // human-readable refusal. ignoreSlot is treated as empty (the drag source).
+    const handBlock=(slot,item,ignoreSlot)=>{
+      if(slot!=='rhand'&&slot!=='lhand')return null;
+      const d=ITEM_DEFS[item.base];
+      const otherSlot=slot==='rhand'?'lhand':'rhand';
+      const other=otherSlot===ignoreSlot?null:invChar.equip[otherSlot];
+      if(d.kind==='weapon'&&d.hands===2){
+        if(slot==='lhand')return 'Two-handed weapons are gripped in the right hand.';
+        if(other)return 'needs-stash';
       }else if(other&&ITEM_DEFS[other.base].kind==='weapon'&&ITEM_DEFS[other.base].hands===2){
-        toast('Both hands grip the '+ITEM_DEFS[other.base].name+'. Replace it via the right hand.');return;
+        return 'Both hands grip the '+ITEM_DEFS[other.base].name+'. Replace it via the right hand.';
       }
+      return null;
+    };
+    // stashSlot = off-hand that must be emptied to grip a two-hander
+    let stashSlot=null;
+    if(to.type==='equip'){
+      const blk=handBlock(to.slot,it,from.type==='equip'?from.slot:null);
+      if(blk==='needs-stash')stashSlot=to.slot==='rhand'?'lhand':'rhand';
+      else if(blk){toast(blk);return;}
     }
     // a displaced item returning to a hand slot obeys the same hand rules as a drop
-    const canReturnTo=(slot,item)=>{
-      if(!slotAccepts(slot,item))return false;
-      if(slot==='rhand'||slot==='lhand'){
-        const d=ITEM_DEFS[item.base];
-        if(d.kind==='weapon'&&d.hands===2){
-          if(slot==='lhand')return false;
-          if(invChar.equip.lhand)return false;
-        }else{
-          const other=invChar.equip[slot==='rhand'?'lhand':'rhand'];
-          if(other&&ITEM_DEFS[other.base].kind==='weapon'&&ITEM_DEFS[other.base].hands===2)return false;
-        }
-      }
-      return true;
-    };
+    const canReturnTo=(slot,item)=>slotAccepts(slot,item)&&!handBlock(slot,item,null);
     // capacity: displaced items that cannot go back to the source slot need pack space
     const dstNeedsPack=!!(dst&&from.type==='equip'&&!canReturnTo(from.slot,dst));
     const packNeeded=(stashSlot?1:0)+(dstNeedsPack?1:0);
@@ -4064,7 +4092,7 @@ function initMenu(){
     goFull();
     if(G.started&&!G.over){UI.hide('ovl-menu');return;}
     if(loadGame()){G.started=true;UI.hide('ovl-menu');UI.toast('The descent continues. Depth '+G.depth+'.');}
-    else UI.toast('No saved crawl found.');
+    else refreshMenu(); // loadGame explains any failure itself
   });
   $('m-new').addEventListener('click',()=>{goFull();UI.hide('ovl-menu');startCreation();});
   $('m-quick').addEventListener('click',()=>{
@@ -4237,10 +4265,11 @@ document.addEventListener('visibilitychange',()=>{
 function checkOrientation(){
   const portrait=window.innerHeight>window.innerWidth;
   document.getElementById('ovl-rotate').classList.toggle('show',portrait);
-  // the rotate overlay blocks all input, so the world must freeze behind it
+  // the rotate overlay blocks all input, so the world must freeze behind it;
+  // the rest fade also pauses without an overlay, so a resize must not resume it
   if(G.started&&!G.over){
     if(portrait)G.paused=true;
-    else G.paused=UI.anyOverlayOpen();
+    else G.paused=UI.anyOverlayOpen()||G.resting;
   }
 }
 window.addEventListener('resize',()=>{checkOrientation();onResize();});
