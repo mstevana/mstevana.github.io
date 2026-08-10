@@ -2872,8 +2872,20 @@ const UI=(()=>{
     cv.width=L.w*cs;cv.height=L.h*cs;
     ctx.fillStyle='#0b0a08';ctx.fillRect(0,0,cv.width,cv.height);
     for(let y=0;y<L.h;y++)for(let x=0;x<L.w;x++){
-      if(!L.explored[y*L.w+x])continue;
       const t=L.grid[y*L.w+x];
+      if(!L.explored[y*L.w+x]){
+        // hint at passable tiles bordering explored ground, without revealing what they hold
+        if(t&&t!==T_SECRET){
+          for(const [dx,dy] of DIRS){
+            const nx=x+dx,ny=y+dy;
+            if(nx>=0&&ny>=0&&nx<L.w&&ny<L.h&&L.explored[ny*L.w+nx]){
+              ctx.fillStyle='#3c3c3c';ctx.fillRect(x*cs,y*cs,cs,cs);
+              break;
+            }
+          }
+        }
+        continue;
+      }
       let col=null;
       if(t===T_FLOOR)col='#4a4436';
       else if(t===T_DOOR||t===T_DOOR_OPEN)col='#7a5a30';
