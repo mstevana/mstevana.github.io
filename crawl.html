@@ -1143,6 +1143,15 @@ function tryGen(depth,targetWalk,theme){
     if(ra!==rb){merged[ra]=rb; g[idx(x,y)]=T_DOOR; doorCells.push([x,y]);}
     else if(Math.random()<0.06){g[idx(x,y)]=T_FLOOR;} // extra loop
   }
+  // a door can only exist between two walls: demote any connector whose
+  // perpendicular sides aren't both solid to a plain opening
+  for(const [x,y] of doorCells){
+    const passX=g[idx(x-1,y)]!==T_WALL&&g[idx(x+1,y)]!==T_WALL;
+    const framed=passX
+      ?(g[idx(x,y-1)]===T_WALL&&g[idx(x,y+1)]===T_WALL)
+      :(g[idx(x-1,y)]===T_WALL&&g[idx(x+1,y)]===T_WALL);
+    if(!framed)g[idx(x,y)]=T_FLOOR;
+  }
   // verify single region
   const root=find(0);
   for(let i=0;i<nreg;i++)if(find(i)!==root)return null;
@@ -1962,17 +1971,18 @@ function buildLevel(L){
     // passage direction: if east/west neighbors are open the party travels along x,
     // so the door slab must be thin along x and span the full tile along z (and vice versa)
     const passageX=x>0&&x<L.w-1&&L.grid[y*L.w+x-1]!==T_WALL&&L.grid[y*L.w+x+1]!==T_WALL;
-    // the door hangs from a hinge at its top edge and swings up like a trapdoor:
-    // a pivot group sits on the ceiling line, the slab is its child hanging below
+    // the door hinges on a side jamb: a pivot group sits on one vertical edge
+    // of the frame and the slab is its child, so rotating the pivot around Y
+    // swings the door 90 degrees to the side like a real door
     const geo=new THREE.BoxGeometry(passageX?0.22:TILE,WALLH,passageX?TILE:0.22);
     const mesh=new THREE.Mesh(geo,t===T_DOOR_LOCKED?doorMatLocked:doorMatBase);
-    mesh.position.set(0,-WALLH/2,0);
-    mesh.userData={kind:'door',x,y};
     const pv=new THREE.Group();
-    pv.position.set(x+0.5,WALLH,y+0.5);
+    if(passageX){pv.position.set(x+0.5,WALLH/2,y);mesh.position.set(0,0,0.5);}
+    else{pv.position.set(x,WALLH/2,y+0.5);mesh.position.set(0.5,0,0);}
+    mesh.userData={kind:'door',x,y};
     pv.userData={passageX,mesh};
     pv.add(mesh);
-    if(t===T_DOOR_OPEN){if(passageX)pv.rotation.z=Math.PI/2;else pv.rotation.x=-Math.PI/2;}
+    if(t===T_DOOR_OPEN)pv.rotation.y=passageX?Math.PI/2:-Math.PI/2;
     grp.add(pv);R3.doorMeshes[y*L.w+x]=pv;
   }
   // stairs
@@ -2219,15 +2229,14 @@ function openDoorAt(x,y){
   computeDistField();
 }
 function animateDoorSwing(pv,x,y){
-  // hinged at the ceiling: swing the slab 90 degrees up and AWAY from the opener
+  // hinged on a side jamb: swing 90 degrees horizontally, AWAY from the opener
   const passageX=pv.userData.passageX;
   const sign=passageX?(G.px<x?1:-1):(G.py<y?-1:1);
   const t0=performance.now();
   const step=()=>{
     const k=Math.min(1,(performance.now()-t0)/520);
     const e=1-Math.pow(1-k,3);
-    const a=sign*(Math.PI/2)*e;
-    if(passageX)pv.rotation.z=a;else pv.rotation.x=a;
+    pv.rotation.y=sign*(Math.PI/2)*e;
     if(k<1)requestAnimationFrame(step);
   };
   step();
