@@ -1109,41 +1109,35 @@ const R3={ // renderer state
 };
 const TILE=1,WALLH=1.3,EYE=0.62;
 function texFromCanvas(cv){const t=new THREE.CanvasTexture(cv);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;return t;}
-function noiseCanvas(base,accent,brick,mossC){
+// draw fn at the 9 wrap offsets so the tile repeats seamlessly in x and y
+function wrap9(ctx,fn){
+  for(const oy of [-128,0,128])for(const ox of [-128,0,128]){
+    ctx.save();ctx.translate(ox,oy);fn();ctx.restore();
+  }
+}
+function noiseCanvas(base,accent,brick,mossC){ // seamless: used for floor and ceiling
   const cv=document.createElement('canvas');cv.width=cv.height=128;
   const ctx=cv.getContext('2d');
   ctx.fillStyle=base;ctx.fillRect(0,0,128,128);
-  // noise
   for(let i=0;i<2600;i++){
     ctx.fillStyle=Math.random()<0.5?accent:base;
     ctx.globalAlpha=0.12+Math.random()*0.22;
-    ctx.fillRect(rnd(128),rnd(128),1+rnd(3),1+rnd(3));
+    const x=rnd(128),y=rnd(128),w=1+rnd(3),h=1+rnd(3);
+    wrap9(ctx,()=>ctx.fillRect(x,y,w,h));
   }
   ctx.globalAlpha=1;
-  if(brick){ // brick lines
-    ctx.strokeStyle='rgba(0,0,0,0.55)';ctx.lineWidth=2;
-    for(let y=0;y<=128;y+=32){
-      ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(128,y);ctx.stroke();
-      const off=(y/32)%2?16:0;
-      for(let x=off;x<=128;x+=48){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y+32);ctx.stroke();}
-    }
-  }else{ // slabs
-    ctx.strokeStyle='rgba(0,0,0,0.45)';ctx.lineWidth=2;
-    for(let y=0;y<=128;y+=64){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(128,y);ctx.stroke();}
-    for(let x=0;x<=128;x+=64){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,128);ctx.stroke();}
-  }
-  if(mossC){ // moss patches
+  // slab joints at fixed positions wrap by construction
+  ctx.strokeStyle='rgba(0,0,0,0.45)';ctx.lineWidth=2;
+  for(let y=0;y<=128;y+=64){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(128,y);ctx.stroke();}
+  for(let x=0;x<=128;x+=64){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,128);ctx.stroke();}
+  if(mossC){
     for(let i=0;i<10;i++){
       ctx.fillStyle=mossC;ctx.globalAlpha=0.10+Math.random()*0.20;
       const x=rnd(128),y=rnd(128),r=4+rnd(12);
-      ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+      wrap9(ctx,()=>{ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();});
     }
     ctx.globalAlpha=1;
   }
-  // vignette darkening bottom
-  const gr=ctx.createLinearGradient(0,0,0,128);
-  gr.addColorStop(0,'rgba(0,0,0,0.12)');gr.addColorStop(1,'rgba(0,0,0,0.4)');
-  ctx.fillStyle=gr;ctx.fillRect(0,0,128,128);
   return cv;
 }
 function shade(hex,f){ // lighten (f>0) or darken (f<0) a #rrggbb color
@@ -1158,40 +1152,53 @@ function shade(hex,f){ // lighten (f>0) or darken (f<0) a #rrggbb color
 function wallCanvas(th,variant){
   const cv=document.createElement('canvas');cv.width=cv.height=128;
   const ctx=cv.getContext('2d');
+  // adjacent wall tiles sit side by side, so the texture must wrap in x;
+  // vertically each wall face maps the texture exactly once (no wrap needed)
+  const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
   ctx.fillStyle=shade(th.wall,-0.55);ctx.fillRect(0,0,128,128); // dark mortar base
   if(variant===2){ // broken stones: irregular slabs
     for(let i=0;i<30;i++){
       const x=rnd(128),y=rnd(128),w=16+rnd(24),h=12+rnd(18);
-      ctx.fillStyle=shade(th.wall,(Math.random()-0.5)*0.5);
-      ctx.beginPath();
-      const pts=5+rnd(3);
-      for(let p=0;p<pts;p++){
-        const a=p/pts*Math.PI*2,rr=0.55+Math.random()*0.45;
-        const px=x+Math.cos(a)*w*rr/1.6,py=y+Math.sin(a)*h*rr/1.6;
-        p?ctx.lineTo(px,py):ctx.moveTo(px,py);
+      const fill=shade(th.wall,(Math.random()-0.5)*0.5);
+      const pts=[];
+      const np=5+rnd(3);
+      for(let p=0;p<np;p++){
+        const a=p/np*Math.PI*2,rr=0.55+Math.random()*0.45;
+        pts.push([x+Math.cos(a)*w*rr/1.6,y+Math.sin(a)*h*rr/1.6]);
       }
-      ctx.closePath();ctx.fill();
-      ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=1.5;ctx.stroke();
+      wrapX(()=>{
+        ctx.fillStyle=fill;
+        ctx.beginPath();
+        pts.forEach(([px,py],p)=>p?ctx.lineTo(px,py):ctx.moveTo(px,py));
+        ctx.closePath();ctx.fill();
+        ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=1.5;ctx.stroke();
+      });
     }
   }else{ // brick courses with per-brick shading and jitter
     const rh=24+rnd(6);
     let row=0;
     for(let y=0;y<128;y+=rh){
-      let x=(row%2)?-(10+rnd(14)):0;
+      // lay one course from a random offset until it spans the full width;
+      // each brick is drawn at x and x±128 so the course wraps cleanly
+      let x=-rnd(24);
       while(x<128){
         const bw=28+rnd(22);
         const jx=variant<=1?rnd(3)-1:0,jy=variant<=1?rnd(3)-1:0;
-        ctx.fillStyle=shade(th.wall,(Math.random()-0.45)*0.45);
-        ctx.fillRect(x+1+jx,y+1+jy,bw-2,rh-2);
-        ctx.strokeStyle='rgba(255,255,255,0.07)';
-        ctx.strokeRect(x+1.5+jx,y+1.5+jy,bw-3,rh-3);
-        ctx.strokeStyle='rgba(0,0,0,0.35)';ctx.lineWidth=1;
-        ctx.beginPath();ctx.moveTo(x+1+jx,y+rh-1+jy);ctx.lineTo(x+bw-1+jx,y+rh-1+jy);ctx.lineTo(x+bw-1+jx,y+1+jy);ctx.stroke();
-        if(variant===1&&Math.random()<0.55){ // chipped corner
-          ctx.fillStyle=shade(th.wall,-0.6);
-          const cx=Math.random()<0.5?x+2:x+bw-12,cy=Math.random()<0.5?y+2:y+rh-9;
-          ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+8+rnd(6),cy);ctx.lineTo(cx,cy+6+rnd(5));ctx.closePath();ctx.fill();
-        }
+        const fill=shade(th.wall,(Math.random()-0.45)*0.45);
+        const chip=variant===1&&Math.random()<0.55?{
+          cx:Math.random()<0.5?x+2:x+bw-12,cy:Math.random()<0.5?y+2:y+rh-9,w:8+rnd(6),h:6+rnd(5)}:null;
+        wrapX(()=>{
+          ctx.fillStyle=fill;
+          ctx.fillRect(x+1+jx,y+1+jy,bw-2,rh-2);
+          ctx.strokeStyle='rgba(255,255,255,0.07)';ctx.lineWidth=1;
+          ctx.strokeRect(x+1.5+jx,y+1.5+jy,bw-3,rh-3);
+          ctx.strokeStyle='rgba(0,0,0,0.35)';
+          ctx.beginPath();ctx.moveTo(x+1+jx,y+rh-1+jy);ctx.lineTo(x+bw-1+jx,y+rh-1+jy);ctx.lineTo(x+bw-1+jx,y+1+jy);ctx.stroke();
+          if(chip){
+            ctx.fillStyle=shade(th.wall,-0.6);
+            ctx.beginPath();ctx.moveTo(chip.cx,chip.cy);ctx.lineTo(chip.cx+chip.w,chip.cy);ctx.lineTo(chip.cx,chip.cy+chip.h);ctx.closePath();ctx.fill();
+          }
+        });
         x+=bw;
       }
       row++;
@@ -1201,45 +1208,55 @@ function wallCanvas(th,variant){
   for(let i=0;i<3200;i++){
     ctx.fillStyle=Math.random()<0.45?th.wall2:(Math.random()<0.5?th.wall:'#000');
     ctx.globalAlpha=0.05+Math.random()*0.2;
-    ctx.fillRect(rnd(128),rnd(128),1+rnd(3),1+rnd(2));
+    const x=rnd(128),y=rnd(128),w=1+rnd(3),h=1+rnd(2);
+    wrapX(()=>ctx.fillRect(x,y,w,h));
   }
   ctx.globalAlpha=1;
   if(variant===3&&th.moss){ // moss creeping up from below
     for(let i=0;i<18;i++){
       ctx.fillStyle=th.moss;ctx.globalAlpha=0.16+Math.random()*0.3;
-      const x=rnd(128),y=56+rnd(72),r=5+rnd(14);
-      ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
-      ctx.fillRect(x-1,y,2,8+rnd(16));
+      const x=rnd(128),y=56+rnd(72),r=5+rnd(14),dl=8+rnd(16);
+      wrapX(()=>{
+        ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+        ctx.fillRect(x-1,y,2,dl);
+      });
     }
     ctx.globalAlpha=1;
   }
   if(variant===4){ // long branching cracks
     for(let c=0;c<2+rnd(2);c++){
       let x=rnd(128),y=rnd(40);
-      ctx.strokeStyle='rgba(0,0,0,0.65)';ctx.lineWidth=1.6;
-      ctx.beginPath();ctx.moveTo(x,y);
-      for(let s=0;s<6+rnd(4);s++){x+=rnd(17)-8;y+=8+rnd(12);ctx.lineTo(x,y);}
-      ctx.stroke();
-      ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=0.8;ctx.stroke();
+      const pts=[[x,y]];
+      for(let s=0;s<6+rnd(4);s++){x+=rnd(17)-8;y+=8+rnd(12);pts.push([x,y]);}
+      wrapX(()=>{
+        ctx.beginPath();pts.forEach(([px,py],p)=>p?ctx.lineTo(px,py):ctx.moveTo(px,py));
+        ctx.strokeStyle='rgba(0,0,0,0.65)';ctx.lineWidth=1.6;ctx.stroke();
+        ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=0.8;ctx.stroke();
+      });
     }
   }
   if(variant===5){ // damp stains and pale mineral streaks
     for(let i=0;i<5;i++){
-      ctx.fillStyle='rgba(0,0,0,0.22)';
-      ctx.beginPath();ctx.ellipse(rnd(128),rnd(128),10+rnd(18),8+rnd(14),Math.random()*3,0,7);ctx.fill();
+      const x=rnd(128),y=rnd(128),rx=10+rnd(18),ry=8+rnd(14),rot=Math.random()*3;
+      wrapX(()=>{
+        ctx.fillStyle='rgba(0,0,0,0.22)';
+        ctx.beginPath();ctx.ellipse(x,y,rx,ry,rot,0,7);ctx.fill();
+      });
     }
     for(let i=0;i<7;i++){
-      ctx.fillStyle='rgba(220,215,190,0.08)';
-      ctx.fillRect(rnd(128),rnd(30),1+rnd(2),40+rnd(80));
+      const x=rnd(128),y=rnd(30),w=1+rnd(2),h=40+rnd(80);
+      wrapX(()=>{ctx.fillStyle='rgba(220,215,190,0.08)';ctx.fillRect(x,y,w,h);});
     }
   }
   if(th.moss){ // faint moss dust everywhere
     for(let i=0;i<6;i++){
       ctx.fillStyle=th.moss;ctx.globalAlpha=0.07+Math.random()*0.1;
-      ctx.beginPath();ctx.arc(rnd(128),rnd(128),3+rnd(8),0,7);ctx.fill();
+      const x=rnd(128),y=rnd(128),r=3+rnd(8);
+      wrapX(()=>{ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();});
     }
     ctx.globalAlpha=1;
   }
+  // vertical ambient gradient is uniform in x, so it never breaks the horizontal wrap
   const gr=ctx.createLinearGradient(0,0,0,128);
   gr.addColorStop(0,'rgba(0,0,0,0.15)');gr.addColorStop(1,'rgba(0,0,0,0.45)');
   ctx.fillStyle=gr;ctx.fillRect(0,0,128,128);
@@ -1285,20 +1302,28 @@ function buildLevel(L){
   const grp=new THREE.Group();R3.levelGroup=grp;R3.scene.add(grp);
   R3.scene.fog=new THREE.FogExp2(th.fog,0.26);
   R3.scene.background=new THREE.Color(th.fog);
+  // walls: phong with the color map doubling as bump + displacement source
+  // (mortar and stains are dark = recessed, brick faces light = proud)
   const wallMats=[];
-  for(let v=0;v<6;v++)wallMats.push(new THREE.MeshLambertMaterial({map:texFromCanvas(wallCanvas(th,v))}));
+  for(let v=0;v<6;v++){
+    const tex=texFromCanvas(wallCanvas(th,v));
+    tex.wrapS=tex.wrapT=THREE.RepeatWrapping; // displacement samples can wrap at face edges
+    wallMats.push(new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,bumpScale:0.02,
+      displacementMap:tex,displacementScale:0.05,specular:0x191309,shininess:5}));
+  }
   const floorTex=texFromCanvas(noiseCanvas(th.floor,th.wall2,false,th.moss));
   const ceilTex=texFromCanvas(noiseCanvas(th.ceil,'#000',false,null));
   floorTex.wrapS=floorTex.wrapT=THREE.RepeatWrapping;floorTex.repeat.set(L.w,L.h);
   ceilTex.wrapS=ceilTex.wrapT=THREE.RepeatWrapping;ceilTex.repeat.set(L.w,L.h);
-  const floorMat=new THREE.MeshLambertMaterial({map:floorTex});
-  const ceilMat=new THREE.MeshLambertMaterial({map:ceilTex});
+  const floorMat=new THREE.MeshPhongMaterial({map:floorTex,bumpMap:floorTex,bumpScale:0.015,specular:0x120e08,shininess:4});
+  const ceilMat=new THREE.MeshPhongMaterial({map:ceilTex,bumpMap:ceilTex,bumpScale:0.012,specular:0x0c0a06,shininess:3});
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(L.w,L.h),floorMat);
   floor.rotation.x=-Math.PI/2;floor.position.set(L.w/2,0,L.h/2);grp.add(floor);
   const ceil=new THREE.Mesh(new THREE.PlaneGeometry(L.w,L.h),ceilMat);
   ceil.rotation.x=Math.PI/2;ceil.position.set(L.w/2,WALLH,L.h/2);grp.add(ceil);
-  // walls: instanced per texture variant. secret walls & doors get their own meshes
-  const wallGeo=new THREE.BoxGeometry(TILE,WALLH,TILE);
+  // walls: instanced per texture variant. secret walls & doors get their own meshes.
+  // subdivided so the displacement map can push vertices for coarse unevenness
+  const wallGeo=new THREE.BoxGeometry(TILE,WALLH,TILE,4,4,4);
   const cellsByV=[[],[],[],[],[],[]];
   for(let y=0;y<L.h;y++)for(let x=0;x<L.w;x++){
     const t=L.grid[y*L.w+x];
@@ -1328,8 +1353,9 @@ function buildLevel(L){
     grp.add(inst);
   }
   // doors
-  const doorMatBase=new THREE.MeshLambertMaterial({map:texFromCanvas(doorCanvas(th,false))});
-  const doorMatLocked=new THREE.MeshLambertMaterial({map:texFromCanvas(doorCanvas(th,true))});
+  const doorTexB=texFromCanvas(doorCanvas(th,false)),doorTexL=texFromCanvas(doorCanvas(th,true));
+  const doorMatBase=new THREE.MeshPhongMaterial({map:doorTexB,bumpMap:doorTexB,bumpScale:0.015,specular:0x1a150c,shininess:8});
+  const doorMatLocked=new THREE.MeshPhongMaterial({map:doorTexL,bumpMap:doorTexL,bumpScale:0.015,specular:0x1a150c,shininess:8});
   R3.doorMatBase=doorMatBase;
   for(let y=0;y<L.h;y++)for(let x=0;x<L.w;x++){
     const t=L.grid[y*L.w+x];
