@@ -1033,8 +1033,10 @@ function bonusForDepth(depth){
   const r=Math.random(), c=depth/10;
   if(r<c*0.15)return 3; if(r<c*0.4)return 2; if(r<c*0.9)return 1; return 0;
 }
-function randLoot(depth,rich){
-  const r=Math.random()*(rich?0.75:1);
+function randLoot(depth,rich,noPotion){
+  // noPotion skips the potion band (monster drops manage potions adaptively)
+  const lo=noPotion?0.30:0;
+  const r=lo+Math.random()*((rich?0.75:1)-lo);
   if(r<0.30){ // potion
     const p=depth<4?'pot_clw':depth<8?pick(['pot_clw','pot_cmw','pot_antitoxin']):pick(['pot_cmw','pot_csw','pot_antitoxin','pot_remedy']);
     return mkItem(p);
@@ -1239,8 +1241,20 @@ function tryGen(depth,targetWalk,theme){
     return null;
   };
   const inLocked=(x,y)=>lockedRoom&&x>=lockedRoom.x&&x<lockedRoom.x+lockedRoom.w&&y>=lockedRoom.y&&y<lockedRoom.y+lockedRoom.h;
-  const nItems=8+rnd(4)+Math.floor(depth/2);
-  for(let i=0;i<nItems;i++){
+  // floor loot is scarce: most goes to dead ends as exploration rewards,
+  // with only a couple of strays in the open (kills are the main loot source)
+  const deadEnds=[];
+  for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){
+    if(g[idx(x,y)]!==T_FLOOR)continue;
+    let exits=0;
+    for(const [ddx,ddy] of DIRS)if(g[idx(x+ddx,y+ddy)])exits++;
+    if(exits===1&&dist[idx(x,y)]>=6&&!inLocked(x,y))deadEnds.push([x,y]);
+  }
+  deadEnds.sort(()=>Math.random()-0.5);
+  const nDead=Math.min(deadEnds.length,3+rnd(2));
+  for(let i=0;i<nDead;i++)dropAt(deadEnds[i][0],deadEnds[i][1],randLoot(depth));
+  const nOpen=1+rnd(2);
+  for(let i=0;i<nOpen;i++){
     const p=randFloor(3,(x,y)=>!inLocked(x,y));
     if(p)dropAt(p.x,p.y,randLoot(depth));
   }
@@ -1253,7 +1267,7 @@ function tryGen(depth,targetWalk,theme){
       keyNeeded=false;
     }
     if(lockedRoom){ // treasure inside
-      for(let i=0;i<2+rnd(2);i++){
+      for(let i=0;i<3+rnd(2);i++){
         const tx=lockedRoom.x+rnd(lockedRoom.w),ty=lockedRoom.y+rnd(lockedRoom.h);
         if(g[idx(tx,ty)]===T_FLOOR)dropAt(tx,ty,randLoot(depth+2,true));
       }
@@ -2481,6 +2495,37 @@ function damageMonster(m,dmg,byChar,crit){
   UI.floatAtMonster(m,(crit?'CRIT ':'-')+dmg,crit?'#e8c840':'#e05545');
   if(m.hp<=0){killMonster(m,byChar);return;}
 }
+/* ---------- needs-aware monster loot ---------- */
+function partySupply(){
+  let heals=0,scrolls=0;
+  for(const ch of G.party){
+    if(ch.dead)continue;
+    for(const it of [...ch.inventory,ch.equip.lhand,ch.equip.rhand]){
+      if(!it)continue;
+      const d=ITEM_DEFS[it.base];
+      if(d.kind==='potion'&&d.heal)heals+=(it.qty||1);
+      if(d.kind==='scroll')scrolls+=(it.qty||1);
+    }
+  }
+  return {heals,scrolls,alive:G.party.filter(c=>!c.dead).length};
+}
+function monsterLoot(depth){
+  // drops lean toward what the party is running out of: healing potions
+  // when stocks are thin, scrolls when the casters' satchel is empty
+  const s=partySupply();
+  const healNeed=clamp(1-s.heals/Math.max(1,s.alive*1.5),0,1);
+  const hasCaster=G.party.some(c=>!c.dead&&CLASSES[c.cls].caster);
+  const scrollNeed=hasCaster?clamp(1-s.scrolls/3,0,1):0;
+  const pHeal=0.12+0.38*healNeed;    // 12%..50%
+  const pScroll=0.06+0.24*scrollNeed;// 6%..30%
+  const r=Math.random();
+  if(r<pHeal){
+    if(depth>=3&&Math.random()<0.15)return mkItem(pick(['pot_antitoxin','pot_remedy']));
+    return mkItem(depth<4?'pot_clw':depth<8?pick(['pot_clw','pot_cmw']):pick(['pot_cmw','pot_csw']));
+  }
+  if(r<pHeal+pScroll)return mkItem('scroll',{spell:pick(SCROLLABLE())});
+  return randLoot(depth,false,true); // gear only — potions come from the adaptive band above
+}
 function killMonster(m,byChar){
   m.hp=0;
   removeMonsterSprite(m);
@@ -2490,11 +2535,11 @@ function killMonster(m,byChar){
   const share=Math.max(1,Math.floor(m.xp/Math.max(1,alive.length)));
   for(const ch of alive)grantXp(ch,share);
   UI.toast(m.name+' is destroyed! (+'+share+' xp each)');
-  // loot
+  // loot: kills are the main faucet — most monsters drop something
   const i=m.y*G.L.w+m.x;
-  const dropN=m.boss?2+rnd(2):(Math.random()<0.4?1:0);
+  const dropN=m.boss?2+rnd(2):(m.minion?(Math.random()<0.2?1:0):(Math.random()<0.75?1:0));
   for(let k=0;k<dropN;k++){
-    (G.L.items[i]=G.L.items[i]||[]).push(randLoot(G.depth+(m.boss?2:0),m.boss));
+    (G.L.items[i]=G.L.items[i]||[]).push(m.boss?randLoot(G.depth+2,true):monsterLoot(G.depth));
   }
   if(dropN)refreshItemSprite(G.L,i);
   saveGame();
