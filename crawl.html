@@ -3216,6 +3216,13 @@ function tryRest(){
 }
 function descend(){
   G.depth++;
+  // keys only fit their own level's lock; they crumble on the way down
+  let hadKey=false;
+  for(const ch of G.party){
+    ch.inventory=ch.inventory.map(it=>{if(it&&it.base==='key'){hadKey=true;return null;}return it;});
+    for(const s of ['lhand','rhand'])if(ch.equip[s]&&ch.equip[s].base==='key'){hadKey=true;ch.equip[s]=null;}
+  }
+  if(hadKey)setTimeout(()=>UI.toast('The old iron key crumbles to rust.'),600);
   SFX.stairs();
   startLevel(genLevel(G.depth));
   UI.toast('Depth '+G.depth+' — '+G.L.theme.name);
