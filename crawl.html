@@ -929,7 +929,19 @@ const MONSTER_ART={
     `<path d="M60 12 Q62 8 61 4 M62 14 Q65 12 65 9" stroke="#8a8a8a" stroke-width="0.9" opacity="0.35" fill="none"/>`+
     `<circle cx="58" cy="26" r="0.8" fill="#ff8c1e" opacity="0.8"/><circle cx="61" cy="17" r="0.7" fill="#ffb84a" opacity="0.7"/><circle cx="44" cy="10" r="0.6" fill="#ff8c1e" opacity="0.6"/>`}),
 };
-function monsterSVG(key,boss){
+// pose transforms pivoting at the feet (32,62): breathing, gait lean, rear-up, lunge
+function poseXf(pose){
+  const S=(sx,sy)=>`translate(32 62) scale(${sx} ${sy}) translate(-32 -62)`;
+  switch(pose){
+    case 'idle1': return S(1.025,0.972);
+    case 'walk0': return `rotate(-3.5 32 62) translate(0 -0.8)`;
+    case 'walk1': return `rotate(3.5 32 62) translate(0 -0.8)`;
+    case 'windup':return `rotate(-6 32 62) ${S(1.05,1.09)}`;
+    case 'strike':return `translate(0 1) ${S(1.17,1.1)}`;
+    default: return '';
+  }
+}
+function monsterSVG(key,boss,pose){
   const a=(MONSTER_ART[key]||MONSTER_ART.goblin)();
   const o=a.o;
   const defs='<defs>'+bodyGrad('bg',o.lit,o.mid)+glowGrad('eg',o.eye)+
@@ -942,7 +954,10 @@ function monsterSVG(key,boss){
   const crown=boss
     ?`<path d="M24 7 L25.5 1 L28.5 5 L32 0 L35.5 5 L38.5 1 L40 7 L38 9 L26 9 Z" fill="#2c3034" stroke="#101314" stroke-width="1"/><circle cx="32" cy="5.5" r="1.5" fill="#d82a20"/>`
     :'';
-  return `<svg xmlns="${SVGNS}" viewBox="0 0 64 64">${defs}${ground}<g filter="url(#rf)">${a.body}</g>${a.sharp||''}${crown}</svg>`;
+  // windup frame flares an eye-colored aura as the warning
+  const flare=pose==='windup'?`<ellipse cx="32" cy="30" rx="26" ry="27" fill="url(#eg)" opacity="0.17"/>`:'';
+  const xf=poseXf(pose);
+  return `<svg xmlns="${SVGNS}" viewBox="0 0 64 64">${defs}${ground}<g${xf?` transform="${xf}"`:''}>${flare}<g filter="url(#rf)">${a.body}</g>${a.sharp||''}${crown}</g></svg>`;
 }
 const STAIRS_SVG=`<svg xmlns="${SVGNS}" viewBox="0 0 64 64"><g stroke="#080706" stroke-width="1.6"><rect x="8" y="8" width="48" height="48" fill="#12100c"/><path d="M8 8 L56 8 L56 20 L44 20 L44 32 L32 32 L32 44 L20 44 L20 56 L8 56 Z" fill="#3a352c"/><path d="M56 20 L44 20 L44 32 L32 32 L32 44 L20 44 L20 56 L56 56 Z" fill="#1e1b15"/></g></svg>`;
 /* ============================== ITEM REGISTRY & LOOT ============================== */
@@ -1652,6 +1667,45 @@ function svgToTexture(svg,cacheKey){
   if(cacheKey)R3.texCache[cacheKey]=tex;
   return tex;
 }
+/* fx textures: glow orbs for spells, streaks for arrows and stones */
+function fxGlowTex(color){
+  const key='fxg_'+color;
+  if(R3.texCache[key])return R3.texCache[key];
+  const cv=document.createElement('canvas');cv.width=cv.height=64;
+  const ctx=cv.getContext('2d');
+  const g=ctx.createRadialGradient(32,32,2,32,32,30);
+  g.addColorStop(0,'#ffffff');g.addColorStop(0.28,color);g.addColorStop(1,color+'00');
+  ctx.fillStyle=g;ctx.fillRect(0,0,64,64);
+  const tex=texFromCanvas(cv,{mipmap:false});
+  R3.texCache[key]=tex;return tex;
+}
+function fxArrowTex(){
+  const key='fx_arrow';
+  if(R3.texCache[key])return R3.texCache[key];
+  const cv=document.createElement('canvas');cv.width=cv.height=64;
+  const ctx=cv.getContext('2d');
+  ctx.strokeStyle='rgba(150,130,100,0.4)';ctx.lineWidth=5;
+  ctx.beginPath();ctx.moveTo(6,38);ctx.lineTo(50,29);ctx.stroke();
+  ctx.strokeStyle='#3a2c1a';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(8,36);ctx.lineTo(52,28);ctx.stroke();
+  ctx.fillStyle='#9a9da2';
+  ctx.beginPath();ctx.moveTo(58,26);ctx.lineTo(49,25);ctx.lineTo(51,32);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#8a8270';ctx.lineWidth=1.6;
+  ctx.beginPath();ctx.moveTo(8,36);ctx.lineTo(13,31);ctx.moveTo(11,37);ctx.lineTo(16,32);ctx.stroke();
+  const tex=texFromCanvas(cv,{mipmap:false});
+  R3.texCache[key]=tex;return tex;
+}
+function fxStoneTex(){
+  const key='fx_stone';
+  if(R3.texCache[key])return R3.texCache[key];
+  const cv=document.createElement('canvas');cv.width=cv.height=64;
+  const ctx=cv.getContext('2d');
+  const g=ctx.createRadialGradient(30,30,3,32,32,20);
+  g.addColorStop(0,'#b0b3b8');g.addColorStop(0.5,'#6f7276');g.addColorStop(1,'#6f727600');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(32,32,18,0,7);ctx.fill();
+  const tex=texFromCanvas(cv,{mipmap:false});
+  R3.texCache[key]=tex;return tex;
+}
 function initRenderer(){
   const cv=document.getElementById('view3d');
   R3.renderer=new THREE.WebGLRenderer({canvas:cv,antialias:false});
@@ -1812,14 +1866,19 @@ function refreshItemSprite(L,i){
   R3.levelGroup.add(spr);R3.itemSprites[i]=spr;
 }
 function itemTexKey(it){return 'it_'+it.base+'_'+it.bonus+'_'+(it.tint||'')+'_'+(ITEM_DEFS[it.base].tint||'');}
+const MONSTER_POSES=['idle0','idle1','walk0','walk1','windup','strike'];
 function addMonsterSprite(m){
-  const svg=monsterSVG(MONSTERS[m.key].spr,m.boss);
-  const mat=new THREE.SpriteMaterial({map:svgToTexture(svg,'mon_'+m.key+(m.boss?'_b':'')),transparent:true});
+  const sprKey=MONSTERS[m.key].spr;
+  const frames={};
+  for(const p of MONSTER_POSES){
+    frames[p]=svgToTexture(monsterSVG(sprKey,m.boss,p),'mon_'+sprKey+(m.boss?'_b':'')+'_'+p);
+  }
+  const mat=new THREE.SpriteMaterial({map:frames.idle0,transparent:true});
   const spr=new THREE.Sprite(mat);
   const sc=m.boss?1.05:(['ogre','troll','minotaur','ogremage','dragon'].includes(m.key)?0.95:0.72);
   spr.scale.set(sc,sc,1);
   spr.position.set(m.x+0.5,sc/2+0.02,m.y+0.5);
-  spr.userData={kind:'monster',id:m.id};
+  spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0'};
   R3.levelGroup.add(spr);R3.monsterSprites[m.id]=spr;
   m._sc=sc;
 }
@@ -1905,7 +1964,7 @@ function projectToScreen(pos){
 const G={
   party:null,L:null,depth:1,px:0,py:0,facing:0,
   time:0,paused:true,over:false,started:false,
-  moveCd:0,distField:null,lastSave:0,
+  moveCd:0,distField:null,lastSave:0,fx:[],
 };
 function tileAt(x,y){if(x<0||y<0||x>=G.L.w||y>=G.L.h)return T_WALL;return G.L.grid[y*G.L.w+x];}
 function setTile(x,y,t){G.L.grid[y*G.L.w+x]=t;}
@@ -2233,24 +2292,31 @@ function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
   UI.armCooldown(ch);UI.charFlash(ch,'atkflash');
   const targetAC=m.ac;
   const hit=nat===20||(nat!==1&&total>=targetAC);
-  if(!hit){
-    UI.floatAtMonster(m,'miss','#9a9da2');SFX.whiff();
+  const crit=hit&&nat>=wDef.crit[0];
+  let dmg=0,sneaked=false;
+  if(hit){
+    dmg=damageRoll(ch,wDef,wIt,crit);
+    if(CLASSES[ch.cls].favored&&['beast','humanoid'].includes(MONSTERS[m.key].type))dmg+=2;
+    if(CLASSES[ch.cls].sneak&&(m.sleep||m.held>0||(m.targetName&&m.targetName!==ch.name))){
+      dmg+=roll(Math.floor((ch.level+1)/2),6);
+      sneaked=true;
+    }
+    if(ch._smiting){dmg+=ch.level;ch._smiting=false;}
+  }
+  const deliver=()=>{
+    if(m.hp<=0||!G.L.monsters.includes(m))return;
     m.awake=true;
-    return;
-  }
-  const crit=nat>=wDef.crit[0];
-  let dmg=damageRoll(ch,wDef,wIt,crit);
-  if(CLASSES[ch.cls].favored&&['beast','humanoid'].includes(MONSTERS[m.key].type))dmg+=2;
-  // sneak attack
-  if(CLASSES[ch.cls].sneak&&(m.sleep||m.held>0||(m.targetName&&m.targetName!==ch.name))){
-    const dice=Math.floor((ch.level+1)/2);
-    dmg+=roll(dice,6);
-    UI.floatAtMonster(m,'sneak!','#d8b040');
-  }
-  // smite
-  if(ch._smiting){dmg+=ch.level;ch._smiting=false;}
-  SFX.hit();
-  damageMonster(m,dmg,ch,crit);
+    if(!hit){UI.floatAtMonster(m,'miss','#9a9da2');SFX.whiff();return;}
+    if(sneaked)UI.floatAtMonster(m,'sneak!','#d8b040');
+    SFX.hit();
+    damageMonster(m,dmg,ch,crit);
+  };
+  if(isRangedShot){
+    SFX.arrow();
+    spawnProjectile({from:partyMuzzle(),toFn:()=>monsterAim(m),
+      tex:wDef.spr==='sling'?fxStoneTex():fxArrowTex(),scale:wDef.spr==='sling'?0.12:0.2,speed:8,
+      onHit:deliver});
+  }else deliver();
 }
 function damageMonster(m,dmg,byChar,crit){
   m.awake=true;m.sleep=false;
@@ -2348,9 +2414,10 @@ function castSpell(ch,key,opts){
     if(any)commit();
     return any;
   }
-  // offensive
+  // offensive: the spell flies as a glowing bolt and resolves on impact
   commit();
-  for(const m of foes){
+  const resolveFoe=(m)=>{
+    if(m.hp<=0||!G.L.monsters.includes(m))return;
     let dmg=sp.dmgFn?sp.dmgFn(cl):0;
     if(sp.vsUndead&&m.type==='undead')dmg*=2;
     let negated=false,halved=false;
@@ -2358,27 +2425,41 @@ function castSpell(ch,key,opts){
       const s=monsterSave(m,sp.save.type);
       if(s>=dc){if(sp.save.negate){negated=true;}else halved=true;}
     }
-    if(sp.humanoidOnly&&m.type!=='humanoid'){UI.floatAtMonster(m,'immune','#9a9da2');continue;}
-    if(negated){UI.floatAtMonster(m,'resisted','#9a9da2');continue;}
+    if(sp.humanoidOnly&&m.type!=='humanoid'){UI.floatAtMonster(m,'immune','#9a9da2');return;}
+    if(negated){UI.floatAtMonster(m,'resisted','#9a9da2');return;}
     if(halved)dmg=Math.floor(dmg/2);
     if(sp.sleep){
       if(MONSTERS[m.key].cr<=1&&m.type!=='undead'){m.sleep=true;UI.floatAtMonster(m,'asleep','#9db4d6');}
       else UI.floatAtMonster(m,'unaffected','#9a9da2');
-      continue;
+      return;
     }
     if(sp.hold){m.held=Math.max(m.held,sp.hold);UI.floatAtMonster(m,'held!','#9db4d6');}
     if(sp.slow){m.slowed=Math.max(m.slowed,sp.slow);UI.floatAtMonster(m,'slowed','#9db4d6');}
     if(sp.slowAll){m.slowed=Math.max(m.slowed,sp.slowAll);UI.floatAtMonster(m,'slowed','#9db4d6');}
     if(sp.stun){const s=monsterSave(m,'fort');if(s<dc){m.stunned=sp.stun;UI.floatAtMonster(m,'stunned','#e8c840');}}
     if(sp.shaken){m.shaken=sp.shaken;}
-    if(sp.negLevels){m.atk-=sp.negLevels;m.hp-=sp.negLevels*5;UI.floatAtMonster(m,'drained','#b48ae0');if(m.hp<=0){killMonster(m,ch);continue;}}
+    if(sp.negLevels){m.atk-=sp.negLevels;m.hp-=sp.negLevels*5;UI.floatAtMonster(m,'drained','#b48ae0');if(m.hp<=0){killMonster(m,ch);return;}}
     if(sp.dispel){m.held=0;m.slowed=Math.max(m.slowed,5);UI.floatAtMonster(m,'dispelled','#9db4d6');}
     if(dmg>0){
       if(sp.drain)healChar(ch,dmg);
       damageMonster(m,dmg,ch,false);
       if(sp.dot&&m.hp>0){m.dot={dmg:sp.dot.dmg,ticks:sp.dot.ticks,t:1.5};}
     }
-  }
+  };
+  const c0=foes[0];
+  const color=SPELL_FX[key]||'#9db4d6';
+  spawnProjectile({from:partyMuzzle(),toFn:()=>monsterAim(c0),
+    tex:fxGlowTex(color),scale:0.4,speed:5.5,
+    onHit:()=>{
+      const at=monsterAim(c0);
+      if(sp.target==='foes'){
+        spawnBurst(at,color,2.2);
+        for(const m of foes)resolveFoe(m);
+      }else{
+        spawnBurst(at,color,0.9);
+        resolveFoe(c0);
+      }
+    }});
   return true;
 }
 function applySpellToAlly(caster,t,sp,cl){
@@ -2559,7 +2640,7 @@ function stepOk(m,nx,ny){
 function moveMonster(m,nx,ny){
   m.x=nx;m.y=ny;
   const s=R3.monsterSprites[m.id];
-  if(s){s.userData.tx=nx+0.5;s.userData.tz=ny+0.5;}
+  if(s){s.userData.tx=nx+0.5;s.userData.tz=ny+0.5;s.userData.walkUntil=performance.now()+650;}
 }
 function pickMeleeTarget(){
   const front=G.party.slice(0,2).filter(ch=>!isDown(ch));
@@ -2571,10 +2652,11 @@ function pickMeleeTarget(){
 function monsterMelee(m){
   const ch=pickMeleeTarget();
   if(!ch)return;
-  telegraph(m);
+  windupAnim(m);
   setTimeout(()=>{
     if(m.hp<=0||G.over||G.paused)return;
     if(Math.abs(m.x-G.px)+Math.abs(m.y-G.py)!==1)return;
+    strikeAnim(m);
     m.targetName=ch.name;
     let atk=m.atk-(m.shaken>0?2:0);
     const nat=d20();
@@ -2588,7 +2670,7 @@ function monsterMelee(m){
     }else{
       UI.float(ch,'miss','#9a9da2');
     }
-  },450);
+  },500);
 }
 function monsterSpecials(m,ch){
   const sp=m.special;
@@ -2625,41 +2707,132 @@ function monsterSpecials(m,ch){
   }
 }
 function monsterShoot(m){
-  const ch=pickMeleeTarget();
-  if(!ch)return;
-  telegraph(m);
+  if(!pickMeleeTarget())return;
+  windupAnim(m);
   setTimeout(()=>{
     if(m.hp<=0||G.over||G.paused)return;
     if(!losClear(m.x,m.y,G.px,G.py))return;
-    const nat=d20();
+    strikeAnim(m);
     SFX.arrow();
-    if(nat!==1&&(nat===20||nat+m.atk>=charAC(ch))){
-      hurtChar(ch,roll(m.dmg[0],m.dmg[1],Math.max(0,m.dmg[2])),m.name);
-    }else UI.float(ch,'miss','#9a9da2');
-  },420);
+    // aim at where the party stands NOW; sidestepping before impact dodges it
+    const aim={x:G.px+0.5,y:EYE-0.05,z:G.py+0.5};
+    spawnProjectile({from:{x:m.x+0.5,y:0.55,z:m.y+0.5},toFn:()=>aim,
+      tex:m.key==='koboldsl'?fxStoneTex():fxArrowTex(),scale:m.key==='koboldsl'?0.12:0.2,speed:7,
+      onHit:()=>{
+        if(G.over)return;
+        const off=Math.hypot(R3.camera.position.x-aim.x,R3.camera.position.z-aim.z);
+        const ch=pickMeleeTarget();
+        if(off>0.75||!ch){SFX.whiff();return;} // the party stepped aside
+        const nat=d20();
+        if(nat!==1&&(nat===20||nat+m.atk>=charAC(ch)))
+          hurtChar(ch,roll(m.dmg[0],m.dmg[1],Math.max(0,m.dmg[2])),m.name);
+        else UI.float(ch,'miss','#9a9da2');
+      }});
+  },450);
 }
 function monsterCast(m){
-  const alive=G.party.filter(ch=>!isDown(ch));
-  if(!alive.length)return;
-  const ch=pick(alive);
-  telegraph(m,m.caster.fx);
+  if(!G.party.some(ch=>!isDown(ch)))return;
+  windupAnim(m);
   setTimeout(()=>{
     if(m.hp<=0||G.over||G.paused)return;
     if(!losClear(m.x,m.y,G.px,G.py))return;
+    strikeAnim(m);
     SFX.cast();
-    const dmg=roll(m.caster.dmg[0],m.caster.dmg[1],m.caster.dmg[2]);
-    const sv=charSaves(ch).ref+saveBonusVs(ch,'spell');
-    const dc=12+Math.floor(MONSTERS[m.key].cr);
-    if(d20()+sv>=dc)hurtChar(ch,Math.floor(dmg/2),m.name);
-    else hurtChar(ch,dmg,m.name);
-  },500);
+    const aim={x:G.px+0.5,y:EYE-0.02,z:G.py+0.5};
+    spawnProjectile({from:{x:m.x+0.5,y:0.6,z:m.y+0.5},toFn:()=>aim,
+      tex:fxGlowTex(m.caster.fx),scale:0.42,speed:4.2,
+      onHit:()=>{
+        if(G.over)return;
+        const off=Math.hypot(R3.camera.position.x-aim.x,R3.camera.position.z-aim.z);
+        spawnBurst(aim,m.caster.fx,1.2);
+        if(off>0.75){SFX.whiff();return;} // dodged the bolt
+        const alive=G.party.filter(ch=>!isDown(ch));
+        if(!alive.length)return;
+        const ch=pick(alive);
+        const dmg=roll(m.caster.dmg[0],m.caster.dmg[1],m.caster.dmg[2]);
+        const sv=charSaves(ch).ref+saveBonusVs(ch,'spell');
+        const dc=12+Math.floor(MONSTERS[m.key].cr);
+        if(d20()+sv>=dc)hurtChar(ch,Math.floor(dmg/2),m.name);
+        else hurtChar(ch,dmg,m.name);
+      }});
+  },550);
 }
-function telegraph(m,color){
+/* ---------- attack animation phases ---------- */
+function windupAnim(m){
   const s=R3.monsterSprites[m.id];
   if(!s)return;
-  s.userData.tele=performance.now();
-  s.userData.teleColor=color||null;
+  s.userData.attackPhase='windup';s.userData.phaseT=performance.now();
 }
+function strikeAnim(m){
+  const s=R3.monsterSprites[m.id];
+  if(!s)return;
+  s.userData.attackPhase='strike';s.userData.phaseT=performance.now();
+}
+/* ---------- projectiles & transient effects ---------- */
+function spawnProjectile(o){ // {from:{x,y,z}, toFn, speed, tex, scale, onHit, color?}
+  const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:o.tex,transparent:true,depthWrite:false}));
+  spr.scale.set(o.scale,o.scale,1);
+  spr.position.set(o.from.x,o.from.y,o.from.z);
+  R3.levelGroup.add(spr);
+  G.fx.push({kind:'proj',spr,speed:o.speed,toFn:o.toFn,onHit:o.onHit,baseScale:o.scale,t:0});
+}
+function spawnBurst(pos,color,size){
+  const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:fxGlowTex(color),transparent:true,depthWrite:false}));
+  spr.scale.set(0.25,0.25,1);
+  spr.position.set(pos.x,pos.y,pos.z);
+  R3.levelGroup.add(spr);
+  G.fx.push({kind:'burst',spr,t:0,dur:0.4,s1:size||1.4});
+}
+function updateFx(dt){
+  for(const f of G.fx.slice()){
+    if(f.kind==='proj'){
+      f.t+=dt;
+      const tgt=f.toFn();
+      const dx=tgt.x-f.spr.position.x,dy=tgt.y-f.spr.position.y,dz=tgt.z-f.spr.position.z;
+      const dist=Math.hypot(dx,dy,dz);
+      const step=f.speed*dt;
+      if(dist<=Math.max(step,0.08)||f.t>6){
+        R3.levelGroup.remove(f.spr);
+        G.fx.splice(G.fx.indexOf(f),1);
+        if(f.onHit)f.onHit();
+      }else{
+        f.spr.position.x+=dx/dist*step;
+        f.spr.position.y+=dy/dist*step;
+        f.spr.position.z+=dz/dist*step;
+        const p=1+Math.sin(f.t*22)*0.13;
+        f.spr.scale.set(f.baseScale*p,f.baseScale*p,1);
+      }
+    }else if(f.kind==='burst'){
+      f.t+=dt;
+      const k=f.t/f.dur;
+      if(k>=1){R3.levelGroup.remove(f.spr);G.fx.splice(G.fx.indexOf(f),1);}
+      else{
+        const s=0.25+(f.s1-0.25)*k;
+        f.spr.scale.set(s,s,1);
+        f.spr.material.opacity=1-k;
+      }
+    }
+  }
+}
+function clearFx(){
+  for(const f of G.fx)if(f.spr&&f.spr.parent)f.spr.parent.remove(f.spr);
+  G.fx.length=0;
+}
+function partyMuzzle(){
+  const [dx,dy]=DIRS[G.facing];
+  return {x:R3.camera.position.x+dx*0.3,y:EYE-0.08,z:R3.camera.position.z+dy*0.3};
+}
+function monsterAim(m){
+  const s=R3.monsterSprites[m.id];
+  if(s)return {x:s.position.x,y:s.position.y,z:s.position.z};
+  return {x:m.x+0.5,y:0.4,z:m.y+0.5};
+}
+const SPELL_FX={magicmissile:'#c8a0ff',rayfrost:'#a8e0ff',burninghands:'#ff8c2a',scorchingray:'#ff7a1e',
+  acidarrow:'#9fdc39',flamingsphere:'#ff8c2a',websp:'#d8d8c8',sleep:'#c8b8e8',fireball:'#ff7a1e',
+  lightning:'#bfe8ff',slow:'#b8c8e8',vampirictouch:'#c04858',icestorm:'#a8e0ff',phantasmalkiller:'#b48ae0',
+  enervation:'#8a4ae0',conecold:'#a8e0ff',holdmonster:'#e8d048',cloudkill:'#9fdc39',wavesfatigue:'#8a8aa0',
+  doom:'#a05545',holdperson:'#e8d048',soundburst:'#e8e8b0',searinglight:'#ffe8a0',dispelmagic:'#b8b8ff',
+  flamestrike:'#ffb020',slayliving:'#802020'};
 /* ---------- conditions & buffs tick ---------- */
 let bleedTimer=0,poisonTimer=0;
 function updateParty(dt){
@@ -2732,6 +2905,7 @@ function descend(){
   saveGame();
 }
 function startLevel(L){
+  clearFx();
   G.L=L;
   G.px=L.start.x;G.py=L.start.y;
   // face an open direction
@@ -2776,6 +2950,7 @@ function deserializeGame(o){
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
     traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
   };
+  clearFx();
   G.L=L;G.over=false;
   buildLevel(L);
   // restore found-trap decals & found secrets
@@ -2810,6 +2985,7 @@ function loop(now){
     if(G.moveCd>0)G.moveCd-=dt;
     updateParty(dt);
     updateMonsters(dt);
+    updateFx(dt);
     UI.tickCooldowns();
     if(G.time-G.lastSave>15){G.lastSave=G.time;saveGame();}
   }
@@ -2823,22 +2999,32 @@ function updateSprites(now){
   for(const m of G.L.monsters){
     const s=R3.monsterSprites[m.id];
     if(!s)continue;
+    const ud=s.userData;
     // smooth movement
-    if(s.userData.tx!==undefined){
-      s.position.x+=(s.userData.tx-s.position.x)*0.15;
-      s.position.z+=(s.userData.tz-s.position.z)*0.15;
+    if(ud.tx!==undefined){
+      s.position.x+=(ud.tx-s.position.x)*0.15;
+      s.position.z+=(ud.tz-s.position.z)*0.15;
     }
-    // idle bob + telegraph lunge
+    // animation state machine: attack phases > walking > idle breathing
+    if(ud.attackPhase==='windup'&&now-ud.phaseT>1100)ud.attackPhase=null;
+    if(ud.attackPhase==='strike'&&now-ud.phaseT>240)ud.attackPhase=null;
+    let frame;
+    if(ud.attackPhase==='windup')frame='windup';
+    else if(ud.attackPhase==='strike')frame='strike';
+    else{
+      const moving=ud.tx!==undefined&&(Math.abs(ud.tx-s.position.x)+Math.abs(ud.tz-s.position.z)>0.04);
+      if(moving||now<(ud.walkUntil||0))frame=(Math.floor(now/250)%2)?'walk1':'walk0';
+      else frame=(Math.floor(now/700+(m.id%7))%2)?'idle1':'idle0';
+    }
+    if(ud.curFrame!==frame&&ud.frames){ud.curFrame=frame;s.material.map=ud.frames[frame];}
+    // idle bob + strike lunge toward the party
     let yb=Math.sin(now/300+m.id%10)*0.012;
-    if(s.userData.tele){
-      const k=(now-s.userData.tele)/450;
-      if(k<1){
-        const lunge=Math.sin(k*Math.PI)*0.22;
-        const dx=G.px+0.5-s.position.x,dz=G.py+0.5-s.position.z;
-        const dl=Math.hypot(dx,dz)||1;
-        s.position.x+=dx/dl*lunge*0.1;s.position.z+=dz/dl*lunge*0.1;
-        yb+=Math.sin(k*Math.PI)*0.06;
-      }else s.userData.tele=0;
+    if(ud.attackPhase==='strike'){
+      const k=Math.min(1,(now-ud.phaseT)/240);
+      const lunge=Math.sin(k*Math.PI);
+      const dx=G.px+0.5-s.position.x,dz=G.py+0.5-s.position.z;
+      const dl=Math.hypot(dx,dz)||1;
+      s.position.x+=dx/dl*lunge*0.07;s.position.z+=dz/dl*lunge*0.07;
     }
     s.position.y=m._sc/2+0.02+yb;
     // torch attenuation: monsters darken with distance and loom out of the gloom
