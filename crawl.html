@@ -1225,8 +1225,10 @@ function buildLevel(L){
   for(let y=0;y<L.h;y++)for(let x=0;x<L.w;x++){
     const t=L.grid[y*L.w+x];
     if(t!==T_DOOR&&t!==T_DOOR_OPEN&&t!==T_DOOR_LOCKED)continue;
-    const horiz=x>0&&x<L.w-1&&L.grid[y*L.w+x-1]!==T_WALL&&L.grid[y*L.w+x+1]!==T_WALL;
-    const g=new THREE.BoxGeometry(horiz?TILE:0.22,WALLH,horiz?0.22:TILE);
+    // passage direction: if east/west neighbors are open the party travels along x,
+    // so the door slab must be thin along x and span the full tile along z (and vice versa)
+    const passageX=x>0&&x<L.w-1&&L.grid[y*L.w+x-1]!==T_WALL&&L.grid[y*L.w+x+1]!==T_WALL;
+    const g=new THREE.BoxGeometry(passageX?0.22:TILE,WALLH,passageX?TILE:0.22);
     const m=new THREE.Mesh(g,t===T_DOOR_LOCKED?doorMatLocked:doorMatBase);
     m.position.set(x+0.5,WALLH/2,y+0.5);
     m.userData={kind:'door',x,y};
