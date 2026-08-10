@@ -2408,7 +2408,7 @@ function useHand(ch,slot){
   }
   const def=it?ITEM_DEFS[it.base]:null;
   const consumeOne=()=>{if((it.qty||1)>1)it.qty--;else ch.equip[slot]=null;};
-  if(it&&def.kind==='potion'){UI.pickAlly('Give '+itemName(it)+' to…',(target)=>{drinkPotion(ch,target,it,consumeOne);});return;}
+  if(it&&def.kind==='potion'){UI.pickAlly('Give '+itemName(it)+' to…',(target)=>{drinkPotion(ch,target,it,consumeOne,slot);});return;}
   if(it&&(def.kind==='scroll'||def.kind==='wand')){useSpellItem(ch,it,()=>{if(def.kind==='scroll')consumeOne();});return;}
   if(it&&def.kind==='shield'){UI.toast('A shield guards; it does not strike.');return;}
   // weapon or unarmed
@@ -2499,7 +2499,7 @@ function killMonster(m,byChar){
   if(dropN)refreshItemSprite(G.L,i);
   saveGame();
 }
-function drinkPotion(giver,target,it,consume){
+function drinkPotion(giver,target,it,consume,slot){
   const def=ITEM_DEFS[it.base];
   if(target.dead){UI.toast(target.name+' is beyond potions.');return;}
   consume();
@@ -2509,7 +2509,9 @@ function drinkPotion(giver,target,it,consume){
     UI.toast(target.name+' feels cleansed.');
   }
   SFX.drink();
-  armBoth(giver,1.2);
+  // only the hand holding the potion is busy; the weapon arm stays live
+  if(slot)armHand(giver,slot,Math.max(handCd(giver,slot),1.2));
+  else armBoth(giver,1.2);
   UI.refreshParty();
 }
 function useSpellItem(ch,it,consume){
