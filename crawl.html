@@ -1149,62 +1149,47 @@ function shade(hex,f){ // lighten (f>0) or darken (f<0) a #rrggbb color
 }
 // 6 aged wall variations: 0 uneven bricks, 1 chipped bricks, 2 broken stones,
 // 3 mossy, 4 cracked, 5 damp-stained
-function wallCanvas(th,variant){
+// One shared brick skeleton for the whole level: identical course heights,
+// brick edges and base shading across every variant, so adjacent wall tiles
+// join with no visible offset. Widths divide 128 and alternate rows use a
+// half-brick offset, so the pattern is periodic in x and wraps seamlessly.
+function brickGrid(th){
+  const nRows=5, rh=128/nRows, perRow=3, bw=128/perRow;
+  const rows=[];
+  for(let r=0;r<nRows;r++){
+    const y=r*rh, phase=(r%2)?bw/2:0, bricks=[];
+    for(let k=-1;k<=perRow;k++){
+      bricks.push({x0:phase+k*bw, shade:(Math.random()-0.45)*0.4});
+    }
+    rows.push({y,rh,bw,bricks});
+  }
+  return rows;
+}
+function pickBrickPoint(grid){ // a random point sitting on a brick face (for chips/spalls)
+  const row=grid[rnd(grid.length)], b=row.bricks[1+rnd(Math.max(1,row.bricks.length-2))];
+  return {x:b.x0+3+rnd(Math.max(1,row.bw-6)),y:row.y+3+rnd(Math.max(1,row.rh-6)),row,b};
+}
+// The shared base — mortar, bricks and grime — drawn once per level and reused
+// by every variant, so any two adjacent wall tiles (whatever their variants)
+// share an identical texel column at their join. Only the aging overlay differs.
+function baseWallCanvas(th,grid){
   const cv=document.createElement('canvas');cv.width=cv.height=128;
   const ctx=cv.getContext('2d');
-  // adjacent wall tiles sit side by side, so the texture must wrap in x;
-  // vertically each wall face maps the texture exactly once (no wrap needed)
   const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
   ctx.fillStyle=shade(th.wall,-0.55);ctx.fillRect(0,0,128,128); // dark mortar base
-  if(variant===2){ // broken stones: irregular slabs
-    for(let i=0;i<30;i++){
-      const x=rnd(128),y=rnd(128),w=16+rnd(24),h=12+rnd(18);
-      const fill=shade(th.wall,(Math.random()-0.5)*0.5);
-      const pts=[];
-      const np=5+rnd(3);
-      for(let p=0;p<np;p++){
-        const a=p/np*Math.PI*2,rr=0.55+Math.random()*0.45;
-        pts.push([x+Math.cos(a)*w*rr/1.6,y+Math.sin(a)*h*rr/1.6]);
-      }
-      wrapX(()=>{
-        ctx.fillStyle=fill;
-        ctx.beginPath();
-        pts.forEach(([px,py],p)=>p?ctx.lineTo(px,py):ctx.moveTo(px,py));
-        ctx.closePath();ctx.fill();
-        ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=1.5;ctx.stroke();
-      });
-    }
-  }else{ // brick courses with per-brick shading and jitter
-    const rh=24+rnd(6);
-    let row=0;
-    for(let y=0;y<128;y+=rh){
-      // lay one course from a random offset until it spans the full width;
-      // each brick is drawn at x and x±128 so the course wraps cleanly
-      let x=-rnd(24);
-      while(x<128){
-        const bw=28+rnd(22);
-        const jx=variant<=1?rnd(3)-1:0,jy=variant<=1?rnd(3)-1:0;
-        const fill=shade(th.wall,(Math.random()-0.45)*0.45);
-        const chip=variant===1&&Math.random()<0.55?{
-          cx:Math.random()<0.5?x+2:x+bw-12,cy:Math.random()<0.5?y+2:y+rh-9,w:8+rnd(6),h:6+rnd(5)}:null;
-        wrapX(()=>{
-          ctx.fillStyle=fill;
-          ctx.fillRect(x+1+jx,y+1+jy,bw-2,rh-2);
-          ctx.strokeStyle='rgba(255,255,255,0.07)';ctx.lineWidth=1;
-          ctx.strokeRect(x+1.5+jx,y+1.5+jy,bw-3,rh-3);
-          ctx.strokeStyle='rgba(0,0,0,0.35)';
-          ctx.beginPath();ctx.moveTo(x+1+jx,y+rh-1+jy);ctx.lineTo(x+bw-1+jx,y+rh-1+jy);ctx.lineTo(x+bw-1+jx,y+1+jy);ctx.stroke();
-          if(chip){
-            ctx.fillStyle=shade(th.wall,-0.6);
-            ctx.beginPath();ctx.moveTo(chip.cx,chip.cy);ctx.lineTo(chip.cx+chip.w,chip.cy);ctx.lineTo(chip.cx,chip.cy+chip.h);ctx.closePath();ctx.fill();
-          }
-        });
-        x+=bw;
-      }
-      row++;
+  for(const row of grid){
+    const {y,rh,bw}=row;
+    for(const b of row.bricks){
+      const x=b.x0;
+      ctx.fillStyle=shade(th.wall,b.shade);
+      ctx.fillRect(x+1,y+1,bw-2,rh-2);
+      ctx.strokeStyle='rgba(255,255,255,0.07)';ctx.lineWidth=1;
+      ctx.strokeRect(x+1.5,y+1.5,bw-3,rh-3);
+      ctx.strokeStyle='rgba(0,0,0,0.38)';
+      ctx.beginPath();ctx.moveTo(x+1,y+rh-1);ctx.lineTo(x+bw-1,y+rh-1);ctx.lineTo(x+bw-1,y+1);ctx.stroke();
     }
   }
-  // heavy grime and pitting on every variant
+  // heavy grime and pitting (periodic via wrapX so it also tiles seamlessly)
   for(let i=0;i<3200;i++){
     ctx.fillStyle=Math.random()<0.45?th.wall2:(Math.random()<0.5?th.wall:'#000');
     ctx.globalAlpha=0.05+Math.random()*0.2;
@@ -1212,6 +1197,43 @@ function wallCanvas(th,variant){
     wrapX(()=>ctx.fillRect(x,y,w,h));
   }
   ctx.globalAlpha=1;
+  if(th.moss){ // faint moss dust everywhere (shared, so it matches at joins)
+    for(let i=0;i<6;i++){
+      ctx.fillStyle=th.moss;ctx.globalAlpha=0.07+Math.random()*0.1;
+      const x=rnd(128),y=rnd(128),r=3+rnd(8);
+      wrapX(()=>{ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();});
+    }
+    ctx.globalAlpha=1;
+  }
+  return cv;
+}
+function wallCanvas(th,variant,grid,baseCv){
+  const cv=document.createElement('canvas');cv.width=cv.height=128;
+  const ctx=cv.getContext('2d');
+  const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
+  ctx.drawImage(baseCv,0,0); // identical brick+grime base for every variant
+  // --- per-variant aging decoration on top of the shared base ---
+  if(variant===1){ // chipped corners bitten out of brick edges
+    for(let i=0;i<14;i++){
+      const p=pickBrickPoint(grid);
+      const cx=Math.random()<0.5?p.b.x0+2:p.b.x0+p.row.bw-12;
+      const cy=Math.random()<0.5?p.row.y+2:p.row.y+p.row.rh-9;
+      const w=8+rnd(6),h=6+rnd(5);
+      wrapX(()=>{ctx.fillStyle=shade(th.wall,-0.62);
+        ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+w,cy);ctx.lineTo(cx,cy+h);ctx.closePath();ctx.fill();});
+    }
+  }else if(variant===2){ // heavily worn: spalled bites and bleached brick centres
+    for(let i=0;i<10;i++){
+      const p=pickBrickPoint(grid),r=4+rnd(7);
+      wrapX(()=>{ctx.fillStyle=shade(th.wall,-0.55);ctx.globalAlpha=0.85;
+        ctx.beginPath();ctx.arc(p.x,p.y,r,0,7);ctx.fill();ctx.globalAlpha=1;});
+    }
+    for(let i=0;i<7;i++){
+      const p=pickBrickPoint(grid);
+      wrapX(()=>{ctx.fillStyle=shade(th.wall,0.18);ctx.globalAlpha=0.25;
+        ctx.beginPath();ctx.ellipse(p.x,p.y,6+rnd(8),4+rnd(6),0,0,7);ctx.fill();ctx.globalAlpha=1;});
+    }
+  }
   if(variant===3&&th.moss){ // moss creeping up from below
     for(let i=0;i<18;i++){
       ctx.fillStyle=th.moss;ctx.globalAlpha=0.16+Math.random()*0.3;
@@ -1247,14 +1269,6 @@ function wallCanvas(th,variant){
       const x=rnd(128),y=rnd(30),w=1+rnd(2),h=40+rnd(80);
       wrapX(()=>{ctx.fillStyle='rgba(220,215,190,0.08)';ctx.fillRect(x,y,w,h);});
     }
-  }
-  if(th.moss){ // faint moss dust everywhere
-    for(let i=0;i<6;i++){
-      ctx.fillStyle=th.moss;ctx.globalAlpha=0.07+Math.random()*0.1;
-      const x=rnd(128),y=rnd(128),r=3+rnd(8);
-      wrapX(()=>{ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();});
-    }
-    ctx.globalAlpha=1;
   }
   // vertical ambient gradient is uniform in x, so it never breaks the horizontal wrap
   const gr=ctx.createLinearGradient(0,0,0,128);
@@ -1305,8 +1319,10 @@ function buildLevel(L){
   // walls: phong with the color map doubling as bump + displacement source
   // (mortar and stains are dark = recessed, brick faces light = proud)
   const wallMats=[];
+  const grid=brickGrid(th); // shared brick skeleton so all variants align tile-to-tile
+  const baseWall=baseWallCanvas(th,grid); // shared brick+grime base under every variant
   for(let v=0;v<6;v++){
-    const tex=texFromCanvas(wallCanvas(th,v));
+    const tex=texFromCanvas(wallCanvas(th,v,grid,baseWall));
     tex.wrapS=tex.wrapT=THREE.RepeatWrapping; // displacement samples can wrap at face edges
     wallMats.push(new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,bumpScale:0.02,
       displacementMap:tex,displacementScale:0.05,specular:0x191309,shininess:5}));
