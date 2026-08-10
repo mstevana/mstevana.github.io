@@ -979,11 +979,19 @@ ITEM_DEFS.key={kind:'key',name:'Iron key',spr:'key'};
 function mkItem(base,opts){return Object.assign({base,bonus:0,qty:1,id:Math.floor(Math.random()*1e9)},opts||{});}
 function itemName(it){
   const def=ITEM_DEFS[it.base];
-  if(it.base==='scroll')return 'Scroll of '+SPELLS[it.spell].name;
-  if(it.base==='wand')return 'Wand of '+SPELLS[it.spell].name+' ('+it.charges+')';
-  let n=def.name;
-  if(it.bonus)n+=' +'+it.bonus;
+  let n;
+  if(it.base==='scroll')n='Scroll of '+SPELLS[it.spell].name;
+  else if(it.base==='wand')n='Wand of '+SPELLS[it.spell].name+' ('+it.charges+')';
+  else{n=def.name;if(it.bonus)n+=' +'+it.bonus;}
+  if((it.qty||1)>1)n+=' ×'+it.qty;
   return n;
+}
+// potions of the same kind and scrolls of the same spell pile into one slot
+function stackKey(it){
+  const def=ITEM_DEFS[it.base];
+  if(def.kind==='potion')return 'p_'+it.base;
+  if(def.kind==='scroll')return 's_'+it.spell;
+  return null;
 }
 function itemDesc(it){
   const def=ITEM_DEFS[it.base];
@@ -1154,7 +1162,7 @@ function tryGen(depth,targetWalk,theme){
   if(unreached>0)return null;
   if(walk<targetWalk)return null;
   // 5. locked treasure room: a room with exactly one door
-  let lockedRoom=null,keyNeeded=false;
+  let lockedRoom=null,keyNeeded=false,lockedDoor=null;
   for(const r of rooms.slice(1)){
     const doors=[];
     for(let x=r.x-1;x<=r.x+r.w;x++)for(let y=r.y-1;y<=r.y+r.h;y++){
@@ -1163,7 +1171,7 @@ function tryGen(depth,targetWalk,theme){
     }
     if(doors.length===1&&!(start.x>=r.x&&start.x<r.x+r.w&&start.y>=r.y&&start.y<r.y+r.h)){
       g[idx(doors[0][0],doors[0][1])]=T_DOOR_LOCKED;
-      lockedRoom=r; keyNeeded=true; break;
+      lockedRoom=r; keyNeeded=true; lockedDoor=doors[0]; break;
     }
   }
   // 6. stairs: furthest tile (outside locked room), recompute dist treating locked door as wall
@@ -1234,7 +1242,11 @@ function tryGen(depth,targetWalk,theme){
   if(keyNeeded){
     const kp=randFloor(4,(x,y)=>!inLocked(x,y));
     if(kp)dropAt(kp.x,kp.y,mkItem('key'));
-    else {g[idx(sx,sy)]=T_STAIRS;keyNeeded=false;}
+    else {
+      // nowhere to put the key: unlock the door so the room stays reachable
+      if(lockedDoor)g[idx(lockedDoor[0],lockedDoor[1])]=T_DOOR;
+      keyNeeded=false;
+    }
     if(lockedRoom){ // treasure inside
       for(let i=0;i<2+rnd(2);i++){
         const tx=lockedRoom.x+rnd(lockedRoom.w),ty=lockedRoom.y+rnd(lockedRoom.h);
@@ -1783,8 +1795,9 @@ function svgToTexture(svg,cacheKey,opt){
   const tex_opts=opt.mipmap?{}:{mipmap:false};
   const cv=document.createElement('canvas');cv.width=cv.height=S;
   const tex=texFromCanvas(cv,tex_opts);
+  tex.__ready=false; // callers can hold the previous frame until the raster lands
   const img=new Image();
-  img.onload=()=>{const ctx=cv.getContext('2d');ctx.clearRect(0,0,S,S);ctx.drawImage(img,0,0,S,S);tex.needsUpdate=true;};
+  img.onload=()=>{const ctx=cv.getContext('2d');ctx.clearRect(0,0,S,S);ctx.drawImage(img,0,0,S,S);tex.needsUpdate=true;tex.__ready=true;};
   img.src='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg)));
   if(cacheKey)R3.texCache[cacheKey]=tex;
   return tex;
@@ -1988,19 +2001,17 @@ function refreshItemSprite(L,i){
   R3.levelGroup.add(spr);R3.itemSprites[i]=spr;
 }
 function itemTexKey(it){return 'it_'+it.base+'_'+it.bonus+'_'+(it.tint||'')+'_'+(ITEM_DEFS[it.base].tint||'');}
-const MONSTER_POSES=['idle0','idle1','walk0','walk1','windup','strike'];
 function addMonsterSprite(m){
   const sprKey=MONSTERS[m.key].spr;
-  const frames={};
-  for(const p of MONSTER_POSES){
-    frames[p]=svgToTexture(monsterSVG(sprKey,m.boss,p),'mon_'+sprKey+(m.boss?'_b':'')+'_'+p,{size:384,mipmap:true});
-  }
+  // only the resting frame up front; walk/windup/strike rasterize lazily on first
+  // use (the global texture cache still shares frames across same-type monsters)
+  const frames={idle0:svgToTexture(monsterSVG(sprKey,m.boss,'idle0'),'mon_'+sprKey+(m.boss?'_b':'')+'_idle0',{size:384,mipmap:true})};
   const mat=new THREE.SpriteMaterial({map:frames.idle0,transparent:true});
   const spr=new THREE.Sprite(mat);
   const sc=m.boss?1.05:(['ogre','troll','minotaur','ogremage','dragon'].includes(m.key)?0.95:0.72);
   spr.scale.set(sc,sc,1);
   spr.position.set(m.x+0.5,sc/2+0.02,m.y+0.5);
-  spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0'};
+  spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss};
   R3.levelGroup.add(spr);R3.monsterSprites[m.id]=spr;
   m._sc=sc;
 }
@@ -2092,12 +2103,6 @@ function tileAt(x,y){if(x<0||y<0||x>=G.L.w||y>=G.L.h)return T_WALL;return G.L.gr
 function setTile(x,y,t){G.L.grid[y*G.L.w+x]=t;}
 function aheadTile(n){const [dx,dy]=DIRS[G.facing];return {x:G.px+dx*(n||1),y:G.py+dy*(n||1)};}
 function monsterAt(x,y){return G.L.monsters.find(m=>m.x===x&&m.y===y&&m.hp>0);}
-function passableForParty(x,y){
-  const t=tileAt(x,y);
-  if(t===T_WALL||t===T_SECRET)return false;
-  if(monsterAt(x,y))return false;
-  return true;
-}
 function computeDistField(){
   const L=G.L,df=new Int16Array(L.w*L.h).fill(-1);
   const q=[[G.px,G.py]];df[G.py*L.w+G.px]=0;let qi=0;
@@ -2331,7 +2336,7 @@ function healChar(ch,amount){
 }
 function charDies(ch){
   if(ch.dead)return;
-  ch.dead=true;ch.hp=-10;ch.conditions=[];ch.buffs=[];
+  ch.dead=true;ch.hp=-10;ch.conditions=[];ch.buffs=[];ch.rageUntil=0;
   UI.toast(ch.name+' has died.');SFX.die();
   UI.refreshParty();
   checkPartyWipe();
@@ -2372,15 +2377,19 @@ function useHand(ch,slot){
   if(!canAct(ch)){UI.toast(ch.name+' cannot act.');return;}
   if(ch.cd>0)return;
   const it=ch.equip[slot];
-  const other=slot==='rhand'?'lhand':'rhand';
+  // tapping the empty left hand while a two-hander is gripped swings the weapon
+  if(!it&&slot==='lhand'){
+    const r=ch.equip.rhand;
+    if(r&&ITEM_DEFS[r.base].kind==='weapon'&&ITEM_DEFS[r.base].hands===2){useHand(ch,'rhand');return;}
+  }
   const def=it?ITEM_DEFS[it.base]:null;
-  if(it&&def.kind==='potion'){UI.pickAlly('Give '+itemName(it)+' to…',(target)=>{drinkPotion(ch,target,it,()=>{ch.equip[slot]=null;});});return;}
-  if(it&&(def.kind==='scroll'||def.kind==='wand')){useSpellItem(ch,it,()=>{if(def.kind==='scroll')ch.equip[slot]=null;});return;}
+  const consumeOne=()=>{if((it.qty||1)>1)it.qty--;else ch.equip[slot]=null;};
+  if(it&&def.kind==='potion'){UI.pickAlly('Give '+itemName(it)+' to…',(target)=>{drinkPotion(ch,target,it,consumeOne);});return;}
+  if(it&&(def.kind==='scroll'||def.kind==='wand')){useSpellItem(ch,it,()=>{if(def.kind==='scroll')consumeOne();});return;}
   if(it&&def.kind==='shield'){UI.toast('A shield guards; it does not strike.');return;}
   // weapon or unarmed
   let wDef=def&&def.kind==='weapon'?def:{name:'Fist',dmg:[1,3],crit:[20,2],hands:1,light:true,unarmed:true};
   let wIt=def&&def.kind==='weapon'?it:null;
-  if(wDef.hands===2&&it!==ch.equip.rhand&&slot==='lhand'){/* allow either icon for 2h */}
   // ranged?
   if(wDef.ranged){
     const found=firstMonsterAhead(wDef.ranged);
@@ -2406,7 +2415,6 @@ function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
   })();
   const offhand=dualWielding&&slot==='lhand'?true:(dualWielding?false:undefined);
   let atkB=attackBonus(ch,wDef,wIt,dualWielding?offhand:undefined);
-  if(CLASSES[ch.cls].favored&&['beast','humanoid'].includes(MONSTERS[m.key].type))atkB+=0;
   if(m.sleep||m.held)atkB+=4;
   const nat=d20();
   const total=nat+atkB;
@@ -2604,7 +2612,9 @@ function applySpellToAlly(caster,t,sp,cl){
   if(sp.restoreLevels&&t.negLevels>0){t.negLevels=0;recalcHp(t,false);UI.toast('Lost life-force floods back into '+t.name+'.');}
   if(sp.buff){
     const b=Object.assign({},sp.buff);
+    b.tag=b.tag||sp.name;
     b.until=G.time+(b.dur||60);delete b.dur;
+    t.buffs=t.buffs.filter(x=>x.tag!==b.tag); // recasting refreshes, never stacks
     t.buffs.push(b);
     UI.float(t,sp.name,'#9db4d6');
   }
@@ -2645,8 +2655,14 @@ function useClassAbility(ch){
 }
 function endRage(ch){
   const conBoost=2*ch.level;
-  ch.maxHp-=conBoost;ch.hp=Math.max(1,Math.min(ch.hp-conBoost,ch.maxHp));
-  UI.toast(ch.name+"'s rage subsides.");
+  ch.maxHp-=conBoost;
+  const wasUp=ch.hp>0;
+  // losing the rage hp can drop the barbarian, but never revives or outright kills
+  ch.hp=Math.max(-9,Math.min(ch.hp-conBoost,ch.maxHp));
+  if(wasUp&&ch.hp<=0){
+    ch.stable=false;
+    UI.toast(ch.name+' collapses as the rage fades!');
+  }else UI.toast(ch.name+"'s rage subsides.");
   UI.refreshParty();
 }
 /* ---------- monsters AI ---------- */
@@ -2675,6 +2691,11 @@ function updateMonsters(dt){
         if(m.moveCd<=0){m.moveCd=m.speed*2.5*slowMult;wanderStep(m);}
         continue;
       }
+    }
+    // boss signature move on its own timer, alongside normal attacks
+    if(m.boss&&m.awake){
+      m.bossCd=(m.bossCd===undefined?6:m.bossCd)-dt;
+      if(m.bossCd<=0){m.bossCd=11+Math.random()*4;bossSignature(m);}
     }
     const adjacent=Math.abs(m.x-G.px)+Math.abs(m.y-G.py)===1;
     // ranged / caster action
@@ -2776,7 +2797,7 @@ function monsterMelee(m){
   if(!ch)return;
   windupAnim(m);
   setTimeout(()=>{
-    if(m.hp<=0||G.over||G.paused)return;
+    if(m.hp<=0||G.over||G.paused||!G.L.monsters.includes(m))return;
     if(Math.abs(m.x-G.px)+Math.abs(m.y-G.py)!==1)return;
     strikeAnim(m);
     m.targetName=ch.name;
@@ -2832,7 +2853,7 @@ function monsterShoot(m){
   if(!pickMeleeTarget())return;
   windupAnim(m);
   setTimeout(()=>{
-    if(m.hp<=0||G.over||G.paused)return;
+    if(m.hp<=0||G.over||G.paused||!G.L.monsters.includes(m))return;
     if(!losClear(m.x,m.y,G.px,G.py))return;
     strikeAnim(m);
     SFX.arrow();
@@ -2852,32 +2873,89 @@ function monsterShoot(m){
       }});
   },450);
 }
+function fireSpellOrb(m){
+  SFX.cast();
+  const aim={x:G.px+0.5,y:EYE-0.02,z:G.py+0.5};
+  spawnProjectile({from:{x:m.x+0.5,y:0.6,z:m.y+0.5},toFn:()=>aim,
+    tex:fxGlowTex(m.caster.fx),scale:0.42,speed:4.2,
+    onHit:()=>{
+      if(G.over)return;
+      const off=Math.hypot(R3.camera.position.x-aim.x,R3.camera.position.z-aim.z);
+      spawnBurst(aim,m.caster.fx,1.2);
+      if(off>0.75){SFX.whiff();return;} // dodged the bolt
+      const alive=G.party.filter(ch=>!isDown(ch));
+      if(!alive.length)return;
+      const ch=pick(alive);
+      const dmg=roll(m.caster.dmg[0],m.caster.dmg[1],m.caster.dmg[2]);
+      const sv=charSaves(ch).ref+saveBonusVs(ch,'spell');
+      const dc=12+Math.floor(MONSTERS[m.key].cr);
+      if(d20()+sv>=dc)hurtChar(ch,Math.floor(dmg/2),m.name);
+      else hurtChar(ch,dmg,m.name);
+    }});
+}
 function monsterCast(m){
   if(!G.party.some(ch=>!isDown(ch)))return;
   windupAnim(m);
   setTimeout(()=>{
-    if(m.hp<=0||G.over||G.paused)return;
+    if(m.hp<=0||G.over||G.paused||!G.L.monsters.includes(m))return;
     if(!losClear(m.x,m.y,G.px,G.py))return;
     strikeAnim(m);
-    SFX.cast();
-    const aim={x:G.px+0.5,y:EYE-0.02,z:G.py+0.5};
-    spawnProjectile({from:{x:m.x+0.5,y:0.6,z:m.y+0.5},toFn:()=>aim,
-      tex:fxGlowTex(m.caster.fx),scale:0.42,speed:4.2,
-      onHit:()=>{
-        if(G.over)return;
-        const off=Math.hypot(R3.camera.position.x-aim.x,R3.camera.position.z-aim.z);
-        spawnBurst(aim,m.caster.fx,1.2);
-        if(off>0.75){SFX.whiff();return;} // dodged the bolt
-        const alive=G.party.filter(ch=>!isDown(ch));
-        if(!alive.length)return;
-        const ch=pick(alive);
-        const dmg=roll(m.caster.dmg[0],m.caster.dmg[1],m.caster.dmg[2]);
-        const sv=charSaves(ch).ref+saveBonusVs(ch,'spell');
-        const dc=12+Math.floor(MONSTERS[m.key].cr);
-        if(d20()+sv>=dc)hurtChar(ch,Math.floor(dmg/2),m.name);
-        else hurtChar(ch,dmg,m.name);
-      }});
+    fireSpellOrb(m);
   },550);
+}
+/* ---------- boss signature moves ---------- */
+function bossSignature(m){
+  const type=MONSTERS[m.key].type;
+  if(type==='undead')bossSummon(m);
+  else if(m.caster)bossBarrage(m);
+  else bossSweep(m);
+}
+function bossSummon(m){ // undead bosses drag skeletons out of the ground
+  if(G.L.monsters.filter(x=>x.minion&&x.hp>0).length>=3){m.bossCd=6;return;}
+  windupAnim(m);
+  setTimeout(()=>{
+    if(m.hp<=0||G.over||G.paused||!G.L.monsters.includes(m))return;
+    let n=0;
+    for(const [dx,dy] of DIRS){
+      if(n>=2)break;
+      const x=m.x+dx,y=m.y+dy;
+      if(!stepOk(m,x,y))continue;
+      const sk=mkMonster('skeleton',x,y,G.depth);
+      sk.minion=true;sk.awake=true;sk.xp=Math.floor(sk.xp/2);
+      G.L.monsters.push(sk);addMonsterSprite(sk);
+      spawnBurst({x:x+0.5,y:0.5,z:y+0.5},'#86d8ff',1);
+      n++;
+    }
+    if(n){UI.toast(m.name+' drags the dead up from the earth!');SFX.cast();}
+  },700);
+}
+function bossBarrage(m){ // caster bosses hurl three bolts in a volley
+  windupAnim(m);
+  UI.toast(m.name+' gathers power!');
+  setTimeout(()=>{
+    for(let k=0;k<3;k++)setTimeout(()=>{
+      if(m.hp<=0||G.over||G.paused||!G.L.monsters.includes(m))return;
+      if(!losClear(m.x,m.y,G.px,G.py))return;
+      strikeAnim(m);
+      fireSpellOrb(m);
+    },k*300);
+  },650);
+}
+function bossSweep(m){ // bruiser bosses wind up a slow sweeping blow that hits the whole front row
+  if(Math.abs(m.x-G.px)+Math.abs(m.y-G.py)!==1){m.bossCd=2;return;}
+  windupAnim(m);
+  UI.toast(m.name+' rears back for a massive blow!');
+  setTimeout(()=>{
+    if(m.hp<=0||G.over||G.paused||!G.L.monsters.includes(m))return;
+    if(Math.abs(m.x-G.px)+Math.abs(m.y-G.py)!==1)return; // party stepped out of reach
+    strikeAnim(m);SFX.monAttack();R3.shake=Math.max(R3.shake,0.8);
+    for(const ch of G.party.slice(0,2).filter(c=>!isDown(c))){
+      const nat=d20();
+      if(nat!==1&&(nat===20||nat+m.atk>=charAC(ch)))
+        hurtChar(ch,roll(m.dmg[0],m.dmg[1],m.dmg[2]+2),m.name);
+      else UI.float(ch,'miss','#9a9da2');
+    }
+  },900);
 }
 /* ---------- attack animation phases ---------- */
 function windupAnim(m){
@@ -3009,6 +3087,18 @@ function tryRest(){
       ch.stable=true;ch.buffs=[];ch.conditions=ch.conditions.filter(c=>c.kind==='drained');
       resetDaily(ch);
     }
+    // camping twice on the same spot draws the level's attention
+    const ri=G.py*G.L.w+G.px;
+    G.L.restCount=G.L.restCount||{};
+    G.L.restCount[ri]=(G.L.restCount[ri]||0)+1;
+    if(G.L.restCount[ri]>=2){
+      let drawn=false;
+      for(const m of G.L.monsters){
+        const md=G.distField?G.distField[m.y*G.L.w+m.x]:-1;
+        if(m.hp>0&&!m.awake&&!m.guard&&md>=0&&md<=15){m.awake=true;drawn=true;}
+      }
+      if(drawn)setTimeout(()=>UI.toast('The lingering camp has drawn attention…'),2100);
+    }
     UI.refreshParty();
     saveGame();
     setTimeout(()=>{
@@ -3057,7 +3147,7 @@ function serializeGame(){
       start:L.start,stairs:L.stairs,themeIdx:THEMES.indexOf(L.theme),depth:L.depth,
       traps:Object.values(L.traps),items:Object.keys(L.items).map(i=>[+i,L.items[i]]),
       monsters:L.monsters.map(m=>{const c=Object.assign({},m);delete c._sc;delete c._regenT;delete c.dot;return c;}),
-      secrets:L.secrets,lockedRoom:L.lockedRoom,
+      secrets:L.secrets,lockedRoom:L.lockedRoom,restCount:L.restCount||{},
     },
   };
 }
@@ -3071,6 +3161,7 @@ function deserializeGame(o){
     w:lv.w,h:lv.h,grid:b64ToU8(lv.grid),explored:b64ToU8(lv.explored),
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
     traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
+    restCount:lv.restCount||{},
   };
   clearFx();
   G.L=L;G.over=false;
@@ -3092,12 +3183,18 @@ function loadGame(){
   try{
     const s=localStorage.getItem('crawl_save');
     if(!s)return false;
-    deserializeGame(JSON.parse(s));
+    const o=JSON.parse(s);
+    if(o.v!==1){
+      console.warn('incompatible save version',o.v);
+      UI.toast('Saved game is from an incompatible version.');
+      return false;
+    }
+    deserializeGame(o);
     return true;
   }catch(e){console.warn('load failed',e);return false;}
 }
 /* ---------- main loop ---------- */
-let lastT=0;
+let lastT=0,idleSkip=0;
 function loop(now){
   requestAnimationFrame(loop);
   const dt=Math.min(0.1,(now-lastT)/1000)||0.016;
@@ -3112,6 +3209,10 @@ function loop(now){
     if(G.time-G.lastSave>15){G.lastSave=G.time;saveGame();}
   }
   if(G.L){
+    // throttle rendering to ~20fps when nothing moves: big battery win on phones
+    const busy=G.started&&!G.paused&&(R3.camAnim||R3.shake>0||G.fx.length>0||G.moveCd>0||
+      G.L.monsters.some(mm=>mm.awake&&mm.hp>0));
+    if(!busy){idleSkip=(idleSkip+1)%3;if(idleSkip)return;}
     updateCamera(now);
     updateSprites(now);
     R3.renderer.render(R3.scene,R3.camera);
@@ -3138,7 +3239,16 @@ function updateSprites(now){
       if(moving||now<(ud.walkUntil||0))frame=(Math.floor(now/250)%2)?'walk1':'walk0';
       else frame=(Math.floor(now/700+(m.id%7))%2)?'idle1':'idle0';
     }
-    if(ud.curFrame!==frame&&ud.frames){ud.curFrame=frame;s.material.map=ud.frames[frame];}
+    if(ud.curFrame!==frame&&ud.frames){
+      // frames are generated lazily on first use; keep the old frame until loaded
+      let t=ud.frames[frame];
+      if(!t){
+        t=svgToTexture(monsterSVG(ud.sprKey,ud.boss,frame),
+          'mon_'+ud.sprKey+(ud.boss?'_b':'')+'_'+frame,{size:384,mipmap:true});
+        ud.frames[frame]=t;
+      }
+      if(t.__ready!==false){ud.curFrame=frame;s.material.map=t;}
+    }
     // idle bob + strike lunge toward the party
     let yb=Math.sin(now/300+m.id%10)*0.012;
     if(ud.attackPhase==='strike'){
@@ -3301,7 +3411,7 @@ const UI=(()=>{
   });
   function handHTML(ch,slot){
     const it=ch.equip[slot];
-    if(it)return itemSVG(it);
+    if(it)return itemSVG(it)+((it.qty||1)>1?`<div class="qty">${it.qty}</div>`:'');
     const r=ch.equip.rhand;
     if(slot==='lhand'&&r&&ITEM_DEFS[r.base].kind==='weapon'&&ITEM_DEFS[r.base].hands===2){
       return `<div style="opacity:.4;width:88%;height:88%">${itemSVG(r)}</div>`;
@@ -3440,7 +3550,7 @@ const UI=(()=>{
     lay.addEventListener('click',()=>{
       hide('ovl-target');
       pickAlly('Lay hands on…',(t)=>{
-        const amt=Math.min(ch.layPool,Math.max(1,t.maxHp-t.hp));
+        const amt=Math.min(ch.layPool,t.maxHp-t.hp);
         if(amt<=0||t.dead){toast('It would do no good.');return;}
         ch.layPool-=amt;healChar(t,amt);t.stable=true;
         ch.cd=Math.max(ch.cd,1.5);armCooldown(ch);
@@ -3569,7 +3679,17 @@ const UI=(()=>{
     if(!it)return;
     if(target.dead){toast(target.name+' has no more need of things.');return;}
     if(target===invChar&&from.type==='grid')return;
-    const s=target.inventory.findIndex(x=>!x);
+    const sk=stackKey(it);
+    let s=sk?target.inventory.findIndex(x=>x&&stackKey(x)===sk):-1;
+    if(s>=0){
+      setItem(from,null);
+      target.inventory[s].qty=(target.inventory[s].qty||1)+(it.qty||1);
+      if(target!==invChar)toast(invChar.name+' hands the '+itemName(it)+' to '+target.name+'.');
+      SFX.turn();
+      renderInv();refreshParty();saveGame();
+      return;
+    }
+    s=target.inventory.findIndex(x=>!x);
     if(s<0){toast(target.name+"'s pack is full.");return;}
     setItem(from,null);
     target.inventory[s]=it;
@@ -3594,6 +3714,15 @@ const UI=(()=>{
     if(!it)return;
     if(from.type===to.type&&from.idx===to.idx&&from.slot===to.slot)return;
     const dst=getItem(to);
+    // dropping onto a matching stack merges instead of swapping
+    const sk=stackKey(it);
+    if(dst&&sk&&stackKey(dst)===sk){
+      dst.qty=(dst.qty||1)+(it.qty||1);
+      setItem(from,null);
+      SFX.turn();
+      renderInv();refreshParty();saveGame();
+      return;
+    }
     if(to.type==='equip'&&!slotAccepts(to.slot,it)){toast("That doesn't go there.");return;}
     // hand constraints; stashSlot = off-hand that must be emptied to grip a two-hander
     let stashSlot=null;
@@ -3608,15 +3737,30 @@ const UI=(()=>{
         toast('Both hands grip the '+ITEM_DEFS[other.base].name+'. Replace it via the right hand.');return;
       }
     }
+    // a displaced item returning to a hand slot obeys the same hand rules as a drop
+    const canReturnTo=(slot,item)=>{
+      if(!slotAccepts(slot,item))return false;
+      if(slot==='rhand'||slot==='lhand'){
+        const d=ITEM_DEFS[item.base];
+        if(d.kind==='weapon'&&d.hands===2){
+          if(slot==='lhand')return false;
+          if(invChar.equip.lhand)return false;
+        }else{
+          const other=invChar.equip[slot==='rhand'?'lhand':'rhand'];
+          if(other&&ITEM_DEFS[other.base].kind==='weapon'&&ITEM_DEFS[other.base].hands===2)return false;
+        }
+      }
+      return true;
+    };
     // capacity: displaced items that cannot go back to the source slot need pack space
-    const dstNeedsPack=!!(dst&&from.type==='equip'&&!slotAccepts(from.slot,dst));
+    const dstNeedsPack=!!(dst&&from.type==='equip'&&!canReturnTo(from.slot,dst));
     const packNeeded=(stashSlot?1:0)+(dstNeedsPack?1:0);
     const packFree=invChar.inventory.filter(x=>!x).length+(from.type==='grid'&&!dst?1:0);
     if(packNeeded>packFree){toast('Not enough room in the pack to swap.');return;}
     // perform: lift dragged item, re-home displaced items, place dragged item
     setItem(from,null);
     if(dst){
-      if(from.type==='grid'||slotAccepts(from.slot,dst))setItem(from,dst);
+      if(from.type==='grid'||canReturnTo(from.slot,dst))setItem(from,dst);
       else invChar.inventory[invChar.inventory.findIndex(x=>!x)]=dst;
     }
     if(stashSlot&&invChar.equip[stashSlot]){
@@ -3856,7 +4000,7 @@ function initInput(){
     const hits=ray.intersectObjects(R3.levelGroup.children,true);
     for(const h of hits){
       const u=h.object.userData;
-      if(!u||!u.kind)continue;
+      if(!u||!u.kind)break; // solid geometry (walls, floor, stairs steps) blocks the tap
       if(u.kind==='item'){
         const dist=Math.abs(u.x-G.px)+Math.abs(u.y-G.py);
         if(dist>2){UI.toast('Too far away.');return;}
@@ -3870,7 +4014,11 @@ function initInput(){
         else if(t===T_DOOR_LOCKED)tryUnlock(u.x,u.y);
         return;
       }
-      if(u.kind==='secret'&&u.found){openSecretAt(u.x,u.y);return;}
+      if(u.kind==='secret'){
+        // an unfound secret wall is solid; a found one opens only from adjacent
+        if(u.found&&Math.abs(u.x-G.px)+Math.abs(u.y-G.py)<=1)openSecretAt(u.x,u.y);
+        return;
+      }
       if(u.kind==='trap'){disarmAttempt(u.x,u.y);return;}
       if(u.kind==='monster')return; // attacks come from hands
     }
@@ -3880,9 +4028,15 @@ function pickupItem(i){
   const arr=G.L.items[i];
   if(!arr||!arr.length)return;
   const it=arr[arr.length-1];
-  // find a character with a free pack slot (prefer front of party order)
+  const sk=stackKey(it);
+  // stackables join an existing stack; otherwise first character with a free slot takes it
   let taker=null,slot=-1;
-  for(const ch of G.party){
+  if(sk)for(const ch of G.party){
+    if(ch.dead)continue;
+    const s=ch.inventory.findIndex(x=>x&&stackKey(x)===sk);
+    if(s>=0){taker=ch;slot=s;break;}
+  }
+  if(!taker)for(const ch of G.party){
     if(ch.dead)continue;
     const s=ch.inventory.findIndex(x=>!x);
     if(s>=0){taker=ch;slot=s;break;}
@@ -3890,7 +4044,9 @@ function pickupItem(i){
   if(!taker){UI.toast('All packs are full.');return;}
   arr.pop();
   if(!arr.length)delete G.L.items[i];
-  taker.inventory[slot]=it;
+  const dst=taker.inventory[slot];
+  if(dst&&sk&&stackKey(dst)===sk)dst.qty=(dst.qty||1)+(it.qty||1);
+  else taker.inventory[slot]=it;
   refreshItemSprite(G.L,i);
   UI.toast(taker.name+' takes the '+itemName(it)+'.');
   SFX.drink();
@@ -3935,7 +4091,8 @@ function initMenu(){
     if(!v.startsWith('CRAWL1.')){UI.toast('That is not a valid save code.');return;}
     try{
       const json=decodeURIComponent(escape(atob(v.slice(7))));
-      JSON.parse(json);
+      const parsed=JSON.parse(json);
+      if(parsed.v!==1){UI.toast('That save is from an incompatible version.');return;}
       localStorage.setItem('crawl_save',json);
       UI.toast('Save imported. Continue the descent!');
       $('m-io').classList.add('hidden');
@@ -4080,6 +4237,11 @@ document.addEventListener('visibilitychange',()=>{
 function checkOrientation(){
   const portrait=window.innerHeight>window.innerWidth;
   document.getElementById('ovl-rotate').classList.toggle('show',portrait);
+  // the rotate overlay blocks all input, so the world must freeze behind it
+  if(G.started&&!G.over){
+    if(portrait)G.paused=true;
+    else G.paused=UI.anyOverlayOpen();
+  }
 }
 window.addEventListener('resize',()=>{checkOrientation();onResize();});
 /* ============================== BOOT ============================== */
