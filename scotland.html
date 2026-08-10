@@ -1383,11 +1383,28 @@ function decodePathCode(raw){
   return { ok:true, ids: indices.map(i => ALL_LOCATION_IDS[i]) };
 }
 
-function syncPathToUrl(){
+const PATH_STORAGE_KEY = 'scotlandPathCode';
+
+// Reads the last locally-saved path code, if any. Wrapped in try/catch since localStorage
+// can throw (private browsing, storage disabled by policy, etc.) — a missing saved path
+// just means nothing to restore, not a hard failure.
+function loadStoredPathCode(){
+  try { return localStorage.getItem(PATH_STORAGE_KEY); } catch (e) { return null; }
+}
+
+// Keeps the current path in sync with both the URL (shareable/bookmarkable) and
+// localStorage (survives a plain reload with no ?path= in the URL).
+function persistPath(){
+  const code = selectedPath.length ? encodePathCode(selectedPath) : '';
+
   const url = new URL(window.location.href);
-  if (selectedPath.length) url.searchParams.set('path', encodePathCode(selectedPath));
-  else url.searchParams.delete('path');
+  if (code) url.searchParams.set('path', code); else url.searchParams.delete('path');
   history.replaceState(null, '', url.toString());
+
+  try {
+    if (code) localStorage.setItem(PATH_STORAGE_KEY, code);
+    else localStorage.removeItem(PATH_STORAGE_KEY);
+  } catch (e) { /* private browsing / storage disabled — URL sync above still works */ }
 }
 
 /* ============ PATH (selected locations) ============ */
@@ -1396,7 +1413,7 @@ function addToPath(id){
   selectedPath.push(id);
   renderPathColumn();
   updatePathLine();
-  syncPathToUrl();
+  persistPath();
   return true;
 }
 
@@ -1407,7 +1424,7 @@ function removeFromPath(id){
   selectedPath = selectedPath.filter(x => x !== id);
   renderPathColumn();
   updatePathLine();
-  syncPathToUrl();
+  persistPath();
   return true;
 }
 
@@ -1724,7 +1741,7 @@ function promptLoadPathCode(){
   selectedPath = result.ids;
   renderPathColumn();
   updatePathLine();
-  syncPathToUrl();
+  persistPath();
 }
 
 function formatKm(km){ return km.toFixed(km < 10 ? 1 : 0) + ' km'; }
@@ -1792,7 +1809,7 @@ function attachRowDrag(row, id, list){
       if (newIndex !== startIndex) {
         const [moved] = selectedPath.splice(startIndex, 1);
         selectedPath.splice(newIndex, 0, moved);
-        syncPathToUrl();
+        persistPath();
       }
       renderPathColumn();
       updatePathLine();
@@ -2005,9 +2022,13 @@ wireColumnToggle(document.getElementById('sidebarToggle'), 'sidebar-collapsed', 
 wireColumnToggle(document.getElementById('pathToggle'), 'path-collapsed', 'Collapse path', 'Expand path');
 
 /* ============ INIT ============ */
-// A ?path=<code> in the URL restores a shared/bookmarked path — invalid or stale codes
-// are ignored silently here (an explicit "Load code" action is the place for an alert).
-const initialPathCode = new URLSearchParams(window.location.search).get('path');
+// A ?path=<code> in the URL takes precedence (e.g. opening a link someone shared)
+// — otherwise fall back to the path last saved locally, so a plain reload with no
+// query param keeps your selection. Just viewing a shared link doesn't overwrite
+// that saved copy; only actually editing the path does (see persistPath() above).
+// Invalid/stale codes are ignored silently here — an explicit "Load code" action
+// is the place for an alert.
+const initialPathCode = new URLSearchParams(window.location.search).get('path') || loadStoredPathCode();
 if (initialPathCode) {
   const result = decodePathCode(initialPathCode);
   if (result.ok) selectedPath = result.ids;
