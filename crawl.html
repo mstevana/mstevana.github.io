@@ -3142,6 +3142,10 @@ function useSpellItem(ch,it,consume){
 function stripItemEverywhere(ch,it){
   for(const s in ch.equip)if(ch.equip[s]===it)ch.equip[s]=null;
   const i=ch.inventory.indexOf(it);if(i>=0)ch.inventory[i]=null;
+  // the item has just ceased to exist, so redraw whatever was showing it:
+  // the hand panels always, and the open pack if there is one
+  UI.refreshParty();
+  if(UI.refreshInv)UI.refreshInv();
 }
 /* ---------- spells ---------- */
 function monsterSave(m,type){
@@ -3895,7 +3899,7 @@ function loop(now){
   }
   if(G.L){
     // throttle rendering to ~20fps when nothing moves: big battery win on phones
-    const busy=G.started&&!G.paused&&(R3.camAnim||R3.shake>0||G.fx.length>0||G.moveCd>0||
+    const busy=G.started&&!G.paused&&(R3.camAnim||R3.shake>0||G.fx.length>0||G.moveCd>0||R3.viewDrag||
       G.L.monsters.some(mm=>mm.awake&&mm.hp>0));
     if(!busy){idleSkip=(idleSkip+1)%3;if(idleSkip)return;}
     updateCamera(now);
@@ -4370,6 +4374,10 @@ const UI=(()=>{
     updateUseBtn();
     renderInvParty();
   }
+  // redraw the pack if it is on screen (an item may have been consumed under it)
+  function refreshInv(){
+    if(invChar&&$('ovl-inv').classList.contains('show'))renderInv();
+  }
   function selRef(){
     if(selInvIdx===null)return null;
     return selInvChar==='grid'?{type:'grid',idx:selInvIdx}:{type:'equip',slot:selInvIdx};
@@ -4683,7 +4691,7 @@ const UI=(()=>{
     refreshMenu();
   });
   return {buildPartyDom,refreshParty,tickCooldowns,charFlash,float,floatAtMonster,vignette,trapFlash,toast,
-    refreshDepthTag,pickAlly,paladinMenu,openSpells,spellFlash,openInventory,openStats,openMap,gameOver,show,hide,anyOverlayOpen};
+    refreshDepthTag,pickAlly,paladinMenu,openSpells,spellFlash,openInventory,openStats,openMap,gameOver,show,hide,anyOverlayOpen,refreshInv};
 })();
 /* ============================== INPUT ============================== */
 function bindPad(id,fn){
@@ -4732,7 +4740,9 @@ function initInput(){
   // tap in 3D view: pick up items / open doors / disarm found traps
   const cv=document.getElementById('view3d');
   const ray=new THREE.Raycaster(),ptr=new THREE.Vector2();
+  let vDrag=null,vDragged=false;
   cv.addEventListener('click',(e)=>{
+    if(vDragged){vDragged=false;return;} // that press was a look-around, not a tap
     if(!G.started||G.paused||G.over||!R3.levelGroup)return;
     const r=cv.getBoundingClientRect();
     ptr.x=((e.clientX-r.left)/r.width)*2-1;
@@ -4764,6 +4774,40 @@ function initInput(){
       if(u.kind==='monster')return; // attacks come from hands
     }
   });
+  // drag across the view to look around: the scene follows the finger, and on
+  // release the view swings to whichever grid direction it ended up nearest,
+  // so a drag past the halfway point turns the party and a short one springs back
+  const YAW_PER_PX=0.0075; // a quarter turn over roughly 210px of travel
+  cv.addEventListener('pointerdown',(e)=>{
+    if(!G.started||G.paused||G.over||!e.isPrimary)return;
+    R3.camAnim=null; // take the wheel from any turn still animating
+    vDrag={x:e.clientX,yaw:R3.camera.rotation.y,id:e.pointerId};
+    vDragged=false;
+    try{cv.setPointerCapture(e.pointerId);}catch(err){}
+  });
+  cv.addEventListener('pointermove',(e)=>{
+    if(!vDrag||e.pointerId!==vDrag.id)return;
+    const dx=e.clientX-vDrag.x;
+    if(!vDragged&&Math.abs(dx)<6)return; // a small wobble is still a tap
+    vDragged=true;R3.viewDrag=true;
+    R3.camera.rotation.set(0,vDrag.yaw+dx*YAW_PER_PX,0,'YXZ');
+  });
+  const endViewDrag=(e)=>{
+    if(!vDrag||(e&&e.pointerId!==vDrag.id))return;
+    try{cv.releasePointerCapture(vDrag.id);}catch(err){}
+    const dragged=vDragged;
+    vDrag=null;R3.viewDrag=false;
+    if(!dragged)return;
+    const q=Math.PI/2;
+    let f=Math.round(-R3.camera.rotation.y/q)%4;
+    if(f<0)f+=4;
+    const turned=f!==G.facing;
+    G.facing=f;
+    animCamera(160); // swing to the grid, whether that is a new heading or the old one
+    if(turned){G.moveCd=0.15;SFX.turn();afterPartyMove(true);}
+  };
+  cv.addEventListener('pointerup',endViewDrag);
+  cv.addEventListener('pointercancel',endViewDrag);
 }
 function pickupItem(i){
   const arr=G.L.items[i];
