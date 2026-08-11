@@ -2304,8 +2304,17 @@ function buildLevel(L){
       if(nt===T_FLOOR||nt===T_DOOR_OPEN||nt===T_DOOR||nt===T_DOOR_LOCKED){ndx=dx;ndy=dy;break;}
     }
     const DEPTH=1.05,N=7,drop=DEPTH/N;
-    // dark shaft (inner faces) enclosing the pit, a touch deeper than the steps
-    const shaftMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,-0.5)),side:THREE.BackSide,shininess:2});
+    // shaft (inner faces) enclosing the pit, a touch deeper than the steps.
+    // the stairwell is cut through the same masonry as the rest of the level,
+    // so its walls are faced with the wall texture — using the variant this
+    // tile would have had, and scaled so the brick courses stand the same
+    // height as the walls above the floor
+    const shaftTex=wallMats[wallVariant(sxs,sys)].map.clone();
+    shaftTex.needsUpdate=true;
+    shaftTex.wrapS=shaftTex.wrapT=THREE.RepeatWrapping;
+    shaftTex.repeat.set(1,(DEPTH+0.06)/WALLH);
+    const shaftMat=new THREE.MeshPhongMaterial({map:shaftTex,bumpMap:shaftTex,bumpScale:0.02,
+      side:THREE.BackSide,specular:0x191309,shininess:5});
     const shaft=new THREE.Mesh(new THREE.BoxGeometry(0.995,DEPTH+0.06,0.995),shaftMat);
     shaft.position.set(cx,-(DEPTH+0.06)/2,cz);sg.add(shaft);
     // single-tread slabs step down toward local +Z (each only one drop tall, so
