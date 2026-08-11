@@ -86,7 +86,9 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 #trap-flash svg{width:min(46vh,240px);height:min(46vh,240px);filter:drop-shadow(0 4px 14px #000);animation:trapPop .72s ease-out forwards;}
 @keyframes trapBg{0%{opacity:0;}12%{opacity:1;}68%{opacity:1;}100%{opacity:0;}}
 @keyframes trapPop{0%{opacity:0;transform:scale(.45) rotate(-7deg);}16%{opacity:1;transform:scale(1.12) rotate(0);}70%{opacity:1;transform:scale(1);}100%{opacity:0;transform:scale(1.06);}}
-#toast{position:absolute;left:50%;bottom:100px;transform:translateX(-50%);z-index:6;background:#000c;border:1px solid var(--line);
+/* above the overlays (z 20): messages raised while a panel is open — "no slots
+   left", item notes — have to clear the panel or they cannot be read */
+#toast{position:absolute;left:50%;bottom:100px;transform:translateX(-50%);z-index:30;background:#000e;border:1px solid var(--line);
   border-radius:6px;padding:6px 14px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:80%;text-align:center;}
 /* overlays */
 .ovl{position:fixed;inset:0;background:#000c;z-index:20;display:none;align-items:center;justify-content:center;}
@@ -145,7 +147,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 .give-char .gc-fill{height:100%;}
 #drag-ghost{position:fixed;width:52px;height:52px;z-index:99;pointer-events:none;display:none;filter:drop-shadow(0 2px 6px #000);}
 #drag-ghost svg{width:100%;height:100%;}
-#item-tip{font-size:12px;color:var(--ink-dim);min-height:30px;margin-top:6px;max-width:340px;}
+#item-tip,#spell-tip{font-size:12px;color:var(--ink-dim);min-height:30px;margin-top:6px;max-width:340px;}
 /* stats screen */
 .stat-lines{font-size:13px;line-height:1.55;}
 .stat-lines b{color:#e0cf9e;font-weight:normal;}
@@ -258,6 +260,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 <div class="ovl" id="ovl-spells"><div class="panel">
   <h2 id="sp-title">Spells</h2>
   <div id="spell-list"></div>
+  <div id="spell-tip"></div>
   <button class="mbtn small" id="sp-close">Close</button>
 </div></div>
 
@@ -4251,6 +4254,9 @@ const UI=(()=>{
     hdr.className='dim-note';
     hdr.textContent='Slots left — '+sum+' (rest to recover)';
     list.appendChild(hdr);
+    const tip=$('spell-tip');
+    const HINT='Tap and hold a spell to read what it does.';
+    tip.textContent=HINT;
     for(const key of known.sort((a,b)=>SPELLS[a].circle-SPELLS[b].circle)){
       const sp=SPELLS[key];
       const left=slots[sp.circle-1]-ch.slotsUsed[sp.circle-1];
@@ -4258,24 +4264,28 @@ const UI=(()=>{
       row.className='spell-row'+(left<=0?' nosl':'');
       row.innerHTML=`<span class="scircle">${sp.circle}</span><span class="sname">${sp.name}</span><span class="sslots">${Math.max(0,left)} left</span>`;
       row.title=sp.desc;
+      // hold to read: the description goes in the panel itself, so it can't end
+      // up behind the overlay, and the hold must not also cast the spell
+      let holdT=null,held=false;
+      row.addEventListener('pointerdown',()=>{
+        held=false;clearTimeout(holdT);
+        holdT=setTimeout(()=>{
+          held=true;
+          tip.innerHTML=`<b style="color:#e0cf9e">${sp.name}</b> · ${sp.circle}${ordSuffix(sp.circle)} circle<br>${sp.desc}`;
+        },450);
+      });
+      const endHold=()=>clearTimeout(holdT);
+      row.addEventListener('pointerup',endHold);
+      row.addEventListener('pointerleave',endHold);
+      row.addEventListener('pointercancel',endHold);
       row.addEventListener('click',()=>{
+        if(held){held=false;return;} // that press was to read, not to cast
         if(left<=0){toast('No slots of that circle left. Rest.');return;}
         hide('ovl-spells');
         castSpell(ch,key,{fromUI:true});
       });
       list.appendChild(row);
     }
-    const tip=document.createElement('div');
-    tip.className='dim-note';tip.style.marginTop='4px';
-    tip.textContent='Tap and hold a spell name to read what it does.';
-    // long-press to show desc
-    list.querySelectorAll('.spell-row').forEach(r=>{
-      let t;
-      r.addEventListener('pointerdown',()=>{t=setTimeout(()=>toast(r.title),450);});
-      r.addEventListener('pointerup',()=>clearTimeout(t));
-      r.addEventListener('pointerleave',()=>clearTimeout(t));
-    });
-    list.appendChild(tip);
     show('ovl-spells');
   }
   $('sp-close').addEventListener('click',()=>hide('ovl-spells'));
