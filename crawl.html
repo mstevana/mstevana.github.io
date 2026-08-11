@@ -81,6 +81,11 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 @keyframes dmgfloat{0%{opacity:0;transform:translate(-50%,0) scale(.6);}15%{opacity:1;transform:translate(-50%,-12px) scale(1.15);}
   100%{opacity:0;transform:translate(-50%,-64px) scale(1);}}
 #fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .9s ease;z-index:40;}
+#trap-flash{position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:6;pointer-events:none;}
+#trap-flash.show{display:flex;animation:trapBg .72s ease-out forwards;}
+#trap-flash svg{width:min(46vh,240px);height:min(46vh,240px);filter:drop-shadow(0 4px 14px #000);animation:trapPop .72s ease-out forwards;}
+@keyframes trapBg{0%{opacity:0;}12%{opacity:1;}68%{opacity:1;}100%{opacity:0;}}
+@keyframes trapPop{0%{opacity:0;transform:scale(.45) rotate(-7deg);}16%{opacity:1;transform:scale(1.12) rotate(0);}70%{opacity:1;transform:scale(1);}100%{opacity:0;transform:scale(1.06);}}
 #toast{position:absolute;left:50%;bottom:100px;transform:translateX(-50%);z-index:6;background:#000c;border:1px solid var(--line);
   border-radius:6px;padding:6px 14px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:80%;text-align:center;}
 /* overlays */
@@ -173,6 +178,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
     <canvas id="view3d"></canvas>
     <div id="vignette"></div>
     <div id="dmg-layer"></div>
+    <div id="trap-flash"></div>
     <div id="depth-tag"></div>
     <div id="bossbar" class="hidden"><div class="bb-name" id="bossbar-name"></div><div class="bb-track"><div id="bossbar-fill"></div></div></div>
     <button class="topbtn" id="b-map" title="Map">🗺</button>
@@ -970,6 +976,33 @@ function monsterSVG(key,boss,pose){
   const xf=poseXf(pose);
   return `<svg xmlns="${SVGNS}" viewBox="0 0 64 64">${defs}${ground}<g${xf?` transform="${xf}"`:''}>${flare}<g filter="url(#rf)">${a.body}</g>${a.sharp||''}${crown}</g></svg>`;
 }
+/* ---------- trap flash drawings (shown for an instant when a trap fires) ---------- */
+const TRAP_ART={
+  dart:()=>`<svg xmlns="${SVGNS}" viewBox="0 0 100 100"><g stroke="#0d0b08" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">`+
+    `<path d="M84 50 L99 43 L89 52 L100 59 L86 57 L93 71 L82 60 L79 76 L73 60 L62 69 L69 55 L56 54 L69 48 L62 37 L76 46 L81 33 Z" fill="#ffd24a"/>`+
+    `<path d="M2 50 L32 50 M0 63 L24 63 M6 38 L26 39" stroke="#e0902e" stroke-width="6" opacity="0.75"/>`+
+    `<rect x="24" y="45" width="50" height="10" rx="3" fill="#6a5636"/>`+
+    `<path d="M24 37 L10 50 L24 63 Z M35 37 L23 50 L35 63 Z" fill="#8c1f1f"/>`+
+    `<path d="M68 35 L95 50 L68 65 Z" fill="#b8bcc0"/><path d="M75 47 L88 50 L75 53 Z" fill="#82868a"/>`+
+    `</g></svg>`,
+  spike:()=>`<svg xmlns="${SVGNS}" viewBox="0 0 100 100"><g stroke="#0d0b08" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">`+
+    `<path d="M18 30 L18 18 M18 18 L13 24 M18 18 L23 24 M50 20 L50 8 M50 8 L45 14 M50 8 L55 14 M82 30 L82 18 M82 18 L77 24 M82 18 L87 24" stroke="#d0d0c0" stroke-width="3" opacity="0.55"/>`+
+    `<rect x="6" y="82" width="88" height="14" fill="#3a352c"/>`+
+    `<path d="M14 84 L24 40 L34 84 Z" fill="#8f9296"/><path d="M22 52 L24 40 L28 56 Z" fill="#c93b2b"/>`+
+    `<path d="M40 84 L52 26 L64 84 Z" fill="#a3a6aa"/><path d="M49 46 L52 26 L57 50 Z" fill="#c93b2b"/>`+
+    `<path d="M68 84 L78 44 L88 84 Z" fill="#8f9296"/><path d="M75 56 L78 44 L82 60 Z" fill="#c93b2b"/>`+
+    `</g></svg>`,
+  gas:()=>`<svg xmlns="${SVGNS}" viewBox="0 0 100 100"><g stroke="#173a17" stroke-width="2.2" stroke-linejoin="round">`+
+    `<ellipse cx="50" cy="52" rx="40" ry="30" fill="#6f9e3a" opacity="0.9"/>`+
+    `<circle cx="26" cy="46" r="15" fill="#7fb043"/><circle cx="74" cy="46" r="15" fill="#7fb043"/>`+
+    `<circle cx="40" cy="34" r="14" fill="#8cc14a"/><circle cx="62" cy="36" r="13" fill="#8cc14a"/>`+
+    `<circle cx="50" cy="54" r="20" fill="#5f8a30"/>`+
+    `<path d="M30 20 Q34 12 30 6 M52 16 Q57 8 52 2 M72 22 Q77 14 72 8" fill="none" stroke="#8cc14a" stroke-width="3" opacity="0.7"/>`+
+    `<g stroke="none" fill="#20360f"><ellipse cx="42" cy="52" rx="6" ry="8"/><ellipse cx="60" cy="52" rx="6" ry="8"/>`+
+    `<path d="M46 66 L48 62 L50 66 L52 62 L54 66 Z"/></g>`+
+    `<path d="M40 68 Q51 74 62 68" fill="none" stroke="#20360f" stroke-width="3"/>`+
+    `</g></svg>`,
+};
 const STAIRS_SVG=`<svg xmlns="${SVGNS}" viewBox="0 0 64 64"><g stroke="#080706" stroke-width="1.6"><rect x="8" y="8" width="48" height="48" fill="#12100c"/><path d="M8 8 L56 8 L56 20 L44 20 L44 32 L32 32 L32 44 L20 44 L20 56 L8 56 Z" fill="#3a352c"/><path d="M56 20 L44 20 L44 32 L32 32 L32 44 L20 44 L20 56 L56 56 Z" fill="#1e1b15"/></g></svg>`;
 /* ============================== ITEM REGISTRY & LOOT ============================== */
 const ITEM_DEFS={};
@@ -2332,6 +2365,7 @@ function triggerTrap(tr){
   const L=G.L,i=tr.y*L.w+tr.x;
   if(R3.trapDecals[i]){R3.levelGroup.remove(R3.trapDecals[i]);delete R3.trapDecals[i];}
   SFX.trap();R3.shake=Math.max(R3.shake,0.7);
+  UI.trapFlash(tr.kind); // instant drawing so the player sees what struck
   const foundBonus=tr.found?4:0;
   const alive=G.party.filter(ch=>!isDown(ch));
   if(!alive.length)return;
@@ -3664,6 +3698,19 @@ const UI=(()=>{
     $('dmg-layer').appendChild(el);
     setTimeout(()=>el.remove(),1150);
   }
+  let trapFlashTimer=null;
+  function trapFlash(kind){
+    const el=$('trap-flash');
+    if(!TRAP_ART[kind])return;
+    el.innerHTML=TRAP_ART[kind]();
+    // hazard tint (physical red / poison green) over a dark backdrop so the drawing always pops
+    const tint=kind==='gas'?'rgba(120,200,80,0.22)':'rgba(200,45,30,0.20)';
+    el.style.background='radial-gradient(circle at center, '+tint+', transparent 60%),'
+      +'radial-gradient(circle at center, rgba(0,0,0,0.30), rgba(0,0,0,0.52) 78%)';
+    el.classList.remove('show');void el.offsetWidth;el.classList.add('show');
+    clearTimeout(trapFlashTimer);
+    trapFlashTimer=setTimeout(()=>el.classList.remove('show'),720);
+  }
   function vignette(){
     const v=$('vignette');
     v.style.opacity=0.8;
@@ -4113,7 +4160,7 @@ const UI=(()=>{
     show('ovl-menu');
     refreshMenu();
   });
-  return {buildPartyDom,refreshParty,tickCooldowns,charFlash,float,floatAtMonster,vignette,toast,
+  return {buildPartyDom,refreshParty,tickCooldowns,charFlash,float,floatAtMonster,vignette,trapFlash,toast,
     refreshDepthTag,pickAlly,paladinMenu,openSpells,spellFlash,openInventory,openStats,openMap,gameOver,show,hide,anyOverlayOpen};
 })();
 /* ============================== INPUT ============================== */
