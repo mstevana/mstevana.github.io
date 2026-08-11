@@ -3331,6 +3331,23 @@ function updateMonsters(dt){
       chaseStep(m);
     }
   }
+  resolvePartyTileOverlap();
+}
+// the party's own tile is exclusively theirs: no monster may rest there. every
+// movement path already avoids stepping onto it (see stepOk/wanderStep), but
+// this sweep is the backstop that guarantees the invariant no matter how a
+// monster got there (a stale/legacy save, a future move source, etc.) — if
+// one is ever found sharing the party's tile it's bumped to a free neighbor
+function resolvePartyTileOverlap(){
+  for(const m of G.L.monsters){
+    if(m.hp<=0)continue;
+    if(m.x!==G.px||m.y!==G.py)continue;
+    const opts=DIRS.slice().sort(()=>Math.random()-0.5).filter(([dx,dy])=>{
+      const t=tileAt(m.x+dx,m.y+dy);
+      return (t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS)&&!monsterAt(m.x+dx,m.y+dy);
+    });
+    if(opts.length){const [dx,dy]=opts[0];moveMonster(m,m.x+dx,m.y+dy);}
+  }
 }
 function wanderStep(m){
   if(m.guard)return;
@@ -3784,6 +3801,7 @@ function deserializeGame(o){
   for(const s of L.secrets){if(L.grid[s.y*L.w+s.x]===T_SECRET_FOUND)revealSecret(L,s);}
   snapCamera();
   computeDistField();
+  resolvePartyTileOverlap();
   UI.refreshDepthTag();
   UI.buildPartyDom();
   UI.refreshParty();
