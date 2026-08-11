@@ -977,6 +977,15 @@ function monsterSVG(key,boss,pose){
   return `<svg xmlns="${SVGNS}" viewBox="0 0 64 64">${defs}${ground}<g${xf?` transform="${xf}"`:''}>${flare}<g filter="url(#rf)">${a.body}</g>${a.sharp||''}${crown}</g></svg>`;
 }
 /* ---------- trap flash drawings (shown for an instant when a trap fires) ---------- */
+// one spear thrust up from the floor (steel leaf-blade on a wooden shaft, bloodied)
+function SPEAR(cx,tipY){
+  const bb=tipY+23, floorY=84;                     // blade bottom (taller blade)
+  return `<rect x="${cx-2.2}" y="${bb-3}" width="4.4" height="${floorY-(bb-3)}" fill="#6a5636"/>`+ // shaft
+    `<rect x="${cx-4}" y="${bb-4}" width="8" height="5" rx="1.2" fill="#4a3a22"/>`+                // binding collar
+    `<path d="M${cx} ${tipY} Q${cx+8} ${tipY+10} ${cx+3.5} ${bb} L${cx-3.5} ${bb} Q${cx-8} ${tipY+10} ${cx} ${tipY} Z" fill="#c8ccd0" stroke-width="1.5"/>`+ // steel blade (thin outline)
+    `<path d="M${cx} ${tipY} Q${cx+6} ${tipY+7} ${cx+2.6} ${tipY+13} L${cx-2.6} ${tipY+13} Q${cx-6} ${tipY+7} ${cx} ${tipY} Z" fill="#c93b2b" stroke="none"/>`+ // bloodied upper blade
+    `<path d="M${cx} ${tipY+2} L${cx} ${bb-2}" stroke="#7a7d81" stroke-width="1.3"/>`;             // midrib
+}
 const TRAP_ART={
   dart:()=>`<svg xmlns="${SVGNS}" viewBox="0 0 100 100"><g stroke="#0d0b08" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">`+
     `<path d="M84 50 L99 43 L89 52 L100 59 L86 57 L93 71 L82 60 L79 76 L73 60 L62 69 L69 55 L56 54 L69 48 L62 37 L76 46 L81 33 Z" fill="#ffd24a"/>`+
@@ -985,12 +994,14 @@ const TRAP_ART={
     `<path d="M24 37 L10 50 L24 63 Z M35 37 L23 50 L35 63 Z" fill="#8c1f1f"/>`+
     `<path d="M68 35 L95 50 L68 65 Z" fill="#b8bcc0"/><path d="M75 47 L88 50 L75 53 Z" fill="#82868a"/>`+
     `</g></svg>`,
-  spike:()=>`<svg xmlns="${SVGNS}" viewBox="0 0 100 100"><g stroke="#0d0b08" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">`+
-    `<path d="M18 30 L18 18 M18 18 L13 24 M18 18 L23 24 M50 20 L50 8 M50 8 L45 14 M50 8 L55 14 M82 30 L82 18 M82 18 L77 24 M82 18 L87 24" stroke="#d0d0c0" stroke-width="3" opacity="0.55"/>`+
-    `<rect x="6" y="82" width="88" height="14" fill="#3a352c"/>`+
-    `<path d="M14 84 L24 40 L34 84 Z" fill="#8f9296"/><path d="M22 52 L24 40 L28 56 Z" fill="#c93b2b"/>`+
-    `<path d="M40 84 L52 26 L64 84 Z" fill="#a3a6aa"/><path d="M49 46 L52 26 L57 50 Z" fill="#c93b2b"/>`+
-    `<path d="M68 84 L78 44 L88 84 Z" fill="#8f9296"/><path d="M75 56 L78 44 L82 60 Z" fill="#c93b2b"/>`+
+  spike:()=>`<svg xmlns="${SVGNS}" viewBox="0 0 100 100"><g stroke="#0d0b08" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">`+
+    // upward motion arrows
+    `<path d="M20 34 L20 22 M15 28 L20 22 L25 28 M50 22 L50 8 M45 14 L50 8 L55 14 M80 34 L80 22 M75 28 L80 22 L85 28" stroke="#d0d0c0" stroke-width="2.6" opacity="0.5" fill="none"/>`+
+    // spears burst up through the floorboards
+    SPEAR(50,22)+SPEAR(22,38)+SPEAR(78,40)+
+    `<rect x="4" y="84" width="92" height="12" fill="#3a352c"/>`+
+    // splintered floor around each shaft
+    `<path d="M14 84 L20 80 L26 84 M44 84 L50 79 L56 84 M72 84 L78 80 L84 84" fill="none" stroke="#2a251c" stroke-width="2"/>`+
     `</g></svg>`,
   gas:()=>`<svg xmlns="${SVGNS}" viewBox="0 0 100 100">`+
     // toxic cloud
