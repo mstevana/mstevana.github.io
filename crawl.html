@@ -1665,32 +1665,37 @@ function noiseCanvas(base,accent,brick,mossC){ // seamless: used for floor and c
   }
   return cv;
 }
-function liquidCanvas(){ // seamless brown-green putrid sewage, animated by uv scrolling
+function liquidCanvas(){ // seamless murky green sewage: smooth soft mottling, no hard patches
   const {cv,ctx}=newCanvas(128);
-  ctx.fillStyle='#3a3d1c';ctx.fillRect(0,0,128,128);
-  const tints=['#4c5224','#42481f','#524a20','#585327','#303618'];
-  for(let i=0;i<70;i++){
-    ctx.fillStyle=tints[rnd(tints.length)];
-    ctx.globalAlpha=0.16+Math.random()*0.25;
-    const b=genBlob(rnd(128),rnd(128),3+rnd(9),0.5);
-    wrap9(ctx,()=>{pathBlob(ctx,b);ctx.fill();});
+  ctx.fillStyle='#1a2c10';ctx.fillRect(0,0,128,128);
+  // large soft clouds of lighter/darker green, painted with radial gradients so
+  // the surface reads as continuous murk instead of a checkerboard of blobs
+  const clouds=[];
+  for(let i=0;i<46;i++)clouds.push({x:rnd(128),y:rnd(128),r:14+rnd(30),
+    c:Math.random()<0.55?'44,72,26':(Math.random()<0.5?'24,38,14':'56,88,34'),
+    a:0.09+Math.random()*0.12});
+  for(const cl of clouds){
+    wrap9(ctx,()=>{
+      const g=ctx.createRadialGradient(cl.x,cl.y,0,cl.x,cl.y,cl.r);
+      g.addColorStop(0,`rgba(${cl.c},${cl.a})`);
+      g.addColorStop(1,`rgba(${cl.c},0)`);
+      ctx.fillStyle=g;
+      ctx.fillRect(cl.x-cl.r,cl.y-cl.r,cl.r*2,cl.r*2);
+    });
   }
-  // dark murk patches under the surface
-  for(let i=0;i<14;i++){
-    ctx.fillStyle='rgba(14,18,8,0.6)';
-    ctx.globalAlpha=0.25+Math.random()*0.3;
-    const b=genBlob(rnd(128),rnd(128),6+rnd(14),0.6);
-    wrap9(ctx,()=>{pathBlob(ctx,b);ctx.fill();});
-  }
-  // pale scum streaks drawn along the flow
-  for(let i=0;i<24;i++){
-    ctx.strokeStyle='rgba(118,124,58,0.22)';
-    ctx.globalAlpha=0.5+Math.random()*0.5;
-    ctx.lineWidth=0.6+Math.random()*1.3;
-    const x=rnd(128),y=rnd(128),len=14+rnd(30),bow=(Math.random()-0.5)*7;
+  // faint drifting scum wisps, soft-edged and sparse
+  for(let i=0;i<10;i++){
+    const x=rnd(128),y=rnd(128),len=20+rnd(36),bow=(Math.random()-0.5)*10,a=0.05+Math.random()*0.06;
+    ctx.strokeStyle=`rgba(128,150,72,${a.toFixed(3)})`;
+    ctx.lineWidth=2.5+Math.random()*3;ctx.lineCap='round';
     wrap9(ctx,()=>{ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x+bow,y+len/2,x,y+len);ctx.stroke();});
   }
-  ctx.globalAlpha=1;
+  // barely-there fine grain so the surface isn't glass-smooth
+  for(let i=0;i<500;i++){
+    ctx.fillStyle=Math.random()<0.5?'rgba(90,120,50,0.06)':'rgba(20,32,12,0.06)';
+    const x=rnd(128),y=rnd(128),r=1+rnd(2);
+    wrap9(ctx,()=>{ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();});
+  }
   return cv;
 }
 /* --- liquid shader: injected into MeshPhongMaterial so the sewage keeps
@@ -1716,10 +1721,10 @@ const LIQ_FRAG_MAP=`{
   vec2 buv=mix(vUv,vLiqPos,uWorld);
   vec2 uvA=buv+uFlow*t;
   vec2 uvB=buv*1.63-uFlow*(t*0.57)+vec2(0.37,0.19);
-  vec2 warp=(texture2D(map,buv*0.53+uFlow*(t*0.31)).rg-0.5)*0.10;
+  vec2 warp=(texture2D(map,buv*0.53+uFlow*(t*0.31)).rg-0.5)*0.06;
   vec4 texelColor=mix(texture2D(map,uvA+warp),texture2D(map,uvB-warp),0.5);
-  float scum=smoothstep(0.60,0.92,texelColor.g*1.4+texture2D(map,uvA*0.71-warp).g*0.6);
-  texelColor.rgb+=scum*vec3(0.085,0.095,0.035);
+  float scum=smoothstep(0.72,1.05,texelColor.g*1.4+texture2D(map,uvA*0.71-warp).g*0.6);
+  texelColor.rgb+=scum*vec3(0.045,0.075,0.025);
   texelColor=mapTexelToLinear(texelColor);
   diffuseColor*=texelColor;
 }`;
@@ -2213,8 +2218,11 @@ function buildLevel(L){
       const tex=texFromCanvas(liqCv);
       tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
       R3.liquidFlows.push({tex}); // kept for disposal; motion lives in the shader
-      // modest gloss: ripple normals break the torch glare into moving glints
-      const mat=new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,bumpScale:0.02,specular:0x1c2010,shininess:18});
+      // modest gloss: ripple normals break the torch glare into moving glints.
+      // the faint green emissive makes the sewage glow softly in the dark,
+      // holding its sickly hue instead of going brown under the warm torch
+      const mat=new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,bumpScale:0.02,
+        specular:0x1e2a12,shininess:18,emissive:0x12260a,emissiveIntensity:0.4});
       mat.onBeforeCompile=(sh)=>{
         sh.uniforms.uTime={value:0};
         sh.uniforms.uFlow={value:new THREE.Vector2(sx,sy)};
