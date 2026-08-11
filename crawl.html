@@ -1318,7 +1318,7 @@ function mkMonster(key,x,y,depth){
   const over=Math.max(0,depth-((SPAWN_DEPTH[key]||[1,99])[0]+2));
   const hp=def.hp+Math.floor(over*def.hp*0.15);
   return {key,name:def.name,x,y,hp,maxHp:hp,ac:def.ac,atk:def.atk+Math.floor(over/3),dmg:def.dmg,
-    xp:XP_AWARD(def.cr)+over*15,speed:def.speed,type:def.type,ranged:def.ranged||0,caster:def.caster||null,
+    xp:(XP_AWARD(def.cr)+over*15)*2,speed:def.speed,type:def.type,ranged:def.ranged||0,caster:def.caster||null,
     special:{disease:def.disease,poison:def.poison,paralysis:def.paralysis,energyDrain:def.energyDrain,regen:def.regen},
     atkCd:1.5+Math.random()*2,castCd:def.caster?def.caster.cd*(0.5+Math.random()):0,
     moveCd:Math.random(),held:0,slowed:0,sleep:false,shaken:0,stunned:0,awake:false,boss:false,
