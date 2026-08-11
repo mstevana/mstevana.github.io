@@ -81,6 +81,11 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 @keyframes dmgfloat{0%{opacity:0;transform:translate(-50%,0) scale(.6);}15%{opacity:1;transform:translate(-50%,-12px) scale(1.15);}
   100%{opacity:0;transform:translate(-50%,-64px) scale(1);}}
 #fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .9s ease;z-index:40;}
+#trap-flash{position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:6;pointer-events:none;}
+#trap-flash.show{display:flex;animation:trapBg .72s ease-out forwards;}
+#trap-flash svg{width:min(46vh,240px);height:min(46vh,240px);filter:drop-shadow(0 4px 14px #000);animation:trapPop .72s ease-out forwards;}
+@keyframes trapBg{0%{opacity:0;}12%{opacity:1;}68%{opacity:1;}100%{opacity:0;}}
+@keyframes trapPop{0%{opacity:0;transform:scale(.45) rotate(-7deg);}16%{opacity:1;transform:scale(1.12) rotate(0);}70%{opacity:1;transform:scale(1);}100%{opacity:0;transform:scale(1.06);}}
 #toast{position:absolute;left:50%;bottom:100px;transform:translateX(-50%);z-index:6;background:#000c;border:1px solid var(--line);
   border-radius:6px;padding:6px 14px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:80%;text-align:center;}
 /* overlays */
@@ -173,6 +178,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
     <canvas id="view3d"></canvas>
     <div id="vignette"></div>
     <div id="dmg-layer"></div>
+    <div id="trap-flash"></div>
     <div id="depth-tag"></div>
     <div id="bossbar" class="hidden"><div class="bb-name" id="bossbar-name"></div><div class="bb-track"><div id="bossbar-fill"></div></div></div>
     <button class="topbtn" id="b-map" title="Map">🗺</button>
@@ -970,6 +976,54 @@ function monsterSVG(key,boss,pose){
   const xf=poseXf(pose);
   return `<svg xmlns="${SVGNS}" viewBox="0 0 64 64">${defs}${ground}<g${xf?` transform="${xf}"`:''}>${flare}<g filter="url(#rf)">${a.body}</g>${a.sharp||''}${crown}</g></svg>`;
 }
+/* ---------- trap flash drawings (shown for an instant when a trap fires) ---------- */
+// one spear thrust up from the floor (steel leaf-blade on a wooden shaft, bloodied)
+function SPEAR(cx,tipY){
+  const bb=tipY+23, floorY=84;                     // blade bottom (taller blade)
+  return `<rect x="${cx-2.2}" y="${bb-3}" width="4.4" height="${floorY-(bb-3)}" fill="#6a5636"/>`+ // shaft
+    `<rect x="${cx-4}" y="${bb-4}" width="8" height="5" rx="1.2" fill="#4a3a22"/>`+                // binding collar
+    `<path d="M${cx} ${tipY} Q${cx+8} ${tipY+10} ${cx+3.5} ${bb} L${cx-3.5} ${bb} Q${cx-8} ${tipY+10} ${cx} ${tipY} Z" fill="#c8ccd0" stroke-width="1.5"/>`+ // steel blade (thin outline)
+    `<path d="M${cx} ${tipY} Q${cx+6} ${tipY+7} ${cx+2.6} ${tipY+13} L${cx-2.6} ${tipY+13} Q${cx-6} ${tipY+7} ${cx} ${tipY} Z" fill="#c93b2b" stroke="none"/>`+ // bloodied upper blade
+    `<path d="M${cx} ${tipY+2} L${cx} ${bb-2}" stroke="#7a7d81" stroke-width="1.3"/>`;             // midrib
+}
+const TRAP_ART={
+  dart:()=>`<svg xmlns="${SVGNS}" viewBox="0 0 100 100"><g stroke="#0d0b08" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">`+
+    `<path d="M84 50 L99 43 L89 52 L100 59 L86 57 L93 71 L82 60 L79 76 L73 60 L62 69 L69 55 L56 54 L69 48 L62 37 L76 46 L81 33 Z" fill="#ffd24a"/>`+
+    `<path d="M2 50 L32 50 M0 63 L24 63 M6 38 L26 39" stroke="#e0902e" stroke-width="6" opacity="0.75"/>`+
+    `<rect x="24" y="45" width="50" height="10" rx="3" fill="#6a5636"/>`+
+    `<path d="M24 37 L10 50 L24 63 Z M35 37 L23 50 L35 63 Z" fill="#8c1f1f"/>`+
+    `<path d="M68 35 L95 50 L68 65 Z" fill="#b8bcc0"/><path d="M75 47 L88 50 L75 53 Z" fill="#82868a"/>`+
+    `</g></svg>`,
+  spike:()=>`<svg xmlns="${SVGNS}" viewBox="0 0 100 100"><g stroke="#0d0b08" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">`+
+    // upward motion arrows
+    `<path d="M20 34 L20 22 M15 28 L20 22 L25 28 M50 22 L50 8 M45 14 L50 8 L55 14 M80 34 L80 22 M75 28 L80 22 L85 28" stroke="#d0d0c0" stroke-width="2.6" opacity="0.5" fill="none"/>`+
+    // spears burst up through the floorboards
+    SPEAR(50,22)+SPEAR(22,38)+SPEAR(78,40)+
+    `<rect x="4" y="84" width="92" height="12" fill="#3a352c"/>`+
+    // splintered floor around each shaft
+    `<path d="M14 84 L20 80 L26 84 M44 84 L50 79 L56 84 M72 84 L78 80 L84 84" fill="none" stroke="#2a251c" stroke-width="2"/>`+
+    `</g></svg>`,
+  gas:()=>`<svg xmlns="${SVGNS}" viewBox="0 0 100 100">`+
+    // toxic cloud
+    `<g stroke="#173a17" stroke-width="2.2" stroke-linejoin="round">`+
+    `<ellipse cx="50" cy="54" rx="42" ry="31" fill="#6f9e3a" opacity="0.9"/>`+
+    `<circle cx="23" cy="50" r="15" fill="#7fb043"/><circle cx="77" cy="50" r="15" fill="#7fb043"/>`+
+    `<circle cx="36" cy="34" r="14" fill="#8cc14a"/><circle cx="64" cy="34" r="14" fill="#8cc14a"/><circle cx="50" cy="30" r="13" fill="#8cc14a"/>`+
+    `<path d="M30 18 Q34 10 30 4 M50 14 Q55 6 50 0 M70 18 Q75 10 70 4" fill="none" stroke="#8cc14a" stroke-width="3" opacity="0.7"/>`+
+    `</g>`+
+    // bone skull: cranium tapering through cheekbones to a jaw
+    `<g stroke="#12240c" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">`+
+    `<path d="M31 42 Q31 21 50 21 Q69 21 69 42 Q69 53 61 57 Q61 66 53 69 Q50 70 47 69 Q39 66 39 57 Q31 53 31 42 Z" fill="#e6ead2"/>`+
+    // eye sockets, angled inward for menace
+    `<ellipse cx="42" cy="44" rx="7" ry="8" fill="#14260d" transform="rotate(13 42 44)"/>`+
+    `<ellipse cx="58" cy="44" rx="7" ry="8" fill="#14260d" transform="rotate(-13 58 44)"/>`+
+    // nasal cavity
+    `<path d="M50 50 L45.5 59 L50 57 L54.5 59 Z" fill="#14260d"/>`+
+    // grinning teeth: a dark mouth split by bone separators (not a smile curve)
+    `<path d="M41 60 L59 60 L57.5 66 L42.5 66 Z" fill="#14260d"/>`+
+    `<path d="M45 60 L44.5 66 M50 60 L50 66 M55 60 L55.5 66" stroke="#e6ead2" stroke-width="1.5"/>`+
+    `</g></svg>`,
+};
 const STAIRS_SVG=`<svg xmlns="${SVGNS}" viewBox="0 0 64 64"><g stroke="#080706" stroke-width="1.6"><rect x="8" y="8" width="48" height="48" fill="#12100c"/><path d="M8 8 L56 8 L56 20 L44 20 L44 32 L32 32 L32 44 L20 44 L20 56 L8 56 Z" fill="#3a352c"/><path d="M56 20 L44 20 L44 32 L32 32 L32 44 L20 44 L20 56 L56 56 Z" fill="#1e1b15"/></g></svg>`;
 /* ============================== ITEM REGISTRY & LOOT ============================== */
 const ITEM_DEFS={};
@@ -1020,7 +1074,7 @@ function itemDesc(it){
     if(def.heal)return `Drink: heals ${def.heal[0]}d${def.heal[1]}+${def.heal[2]}. Also stops bleeding.`;
     return `Drink: cures ${def.cures.join(', ')}.`;
   }
-  if(def.kind==='scroll')return `Single use: casts ${SPELLS[it.spell].name}. ${SPELLS[it.spell].desc} Casters only.`;
+  if(def.kind==='scroll')return `Single use: casts ${SPELLS[it.spell].name}. ${SPELLS[it.spell].desc} ${it.spell==='raisedead'?'Anyone may beseech it.':'Casters only.'}`;
   if(def.kind==='wand')return `${it.charges} charges: casts ${SPELLS[it.spell].name}. ${SPELLS[it.spell].desc} Casters only.`;
   if(def.kind==='key')return 'Opens a locked door somewhere on this level.';
   return '';
@@ -1143,6 +1197,15 @@ function tryGen(depth,targetWalk,theme){
     if(ra!==rb){merged[ra]=rb; g[idx(x,y)]=T_DOOR; doorCells.push([x,y]);}
     else if(Math.random()<0.06){g[idx(x,y)]=T_FLOOR;} // extra loop
   }
+  // a door can only exist between two walls: demote any connector whose
+  // perpendicular sides aren't both solid to a plain opening
+  for(const [x,y] of doorCells){
+    const passX=g[idx(x-1,y)]!==T_WALL&&g[idx(x+1,y)]!==T_WALL;
+    const framed=passX
+      ?(g[idx(x,y-1)]===T_WALL&&g[idx(x,y+1)]===T_WALL)
+      :(g[idx(x-1,y)]===T_WALL&&g[idx(x+1,y)]===T_WALL);
+    if(!framed)g[idx(x,y)]=T_FLOOR;
+  }
   // verify single region
   const root=find(0);
   for(let i=0;i<nreg;i++)if(find(i)!==root)return null;
@@ -1224,7 +1287,7 @@ function tryGen(depth,targetWalk,theme){
     const x=1+rnd(W-2),y=1+rnd(H-2),i=idx(x,y);
     if(g[i]!==T_FLOOR||dist[i]<6||traps[i]||(x===sx&&y===sy))continue;
     const kind=pick(['dart','spike','gas']);
-    traps[i]={kind,found:false,armed:true,dc:15+Math.floor(depth/2),
+    traps[i]={kind,found:false,armed:true,dc:12+Math.floor(depth/2),
       dmg:kind==='gas'?null:[Math.min(6,1+Math.floor(depth/3)),6],x,y};
     placedTraps++;
   }
@@ -1309,7 +1372,7 @@ function mkMonster(key,x,y,depth){
   const over=Math.max(0,depth-((SPAWN_DEPTH[key]||[1,99])[0]+2));
   const hp=def.hp+Math.floor(over*def.hp*0.15);
   return {key,name:def.name,x,y,hp,maxHp:hp,ac:def.ac,atk:def.atk+Math.floor(over/3),dmg:def.dmg,
-    xp:XP_AWARD(def.cr)+over*15,speed:def.speed,type:def.type,ranged:def.ranged||0,caster:def.caster||null,
+    xp:(XP_AWARD(def.cr)+over*15)*2,speed:def.speed,type:def.type,ranged:def.ranged||0,caster:def.caster||null,
     special:{disease:def.disease,poison:def.poison,paralysis:def.paralysis,energyDrain:def.energyDrain,regen:def.regen},
     atkCd:1.5+Math.random()*2,castCd:def.caster?def.caster.cd*(0.5+Math.random()):0,
     moveCd:Math.random(),held:0,slowed:0,sleep:false,shaken:0,stunned:0,awake:false,boss:false,
@@ -1426,6 +1489,11 @@ function searchBonus(ch){
   let s=(r.search||0)+(r.skill||0)+abilMod(ch,'int');
   if(CLASSES[ch.cls].trapfind)s+=ch.level+3;
   return s;
+}
+// a non-specialist's alertness for noticing a trap: keener of wits or intuition
+function noticeBonus(ch){
+  const r=RACES[ch.race];
+  return (r.search||0)+(r.skill||0)+Math.max(abilMod(ch,'int'),abilMod(ch,'wis'));
 }
 function weaponOf(ch,slot){
   const it=ch.equip[slot];
@@ -1916,8 +1984,22 @@ function buildLevel(L){
   ceilTex.wrapS=ceilTex.wrapT=THREE.RepeatWrapping;ceilTex.repeat.set(L.w,L.h);
   const floorMat=new THREE.MeshPhongMaterial({map:floorTex,bumpMap:floorTex,bumpScale:0.015,specular:0x120e08,shininess:4});
   const ceilMat=new THREE.MeshPhongMaterial({map:ceilTex,bumpMap:ceilTex,bumpScale:0.012,specular:0x0c0a06,shininess:3});
-  const floor=new THREE.Mesh(new THREE.PlaneGeometry(L.w,L.h),floorMat);
-  floor.rotation.x=-Math.PI/2;floor.position.set(L.w/2,0,L.h/2);grp.add(floor);
+  // floor with a rectangular hole cut at the stairs tile so the descent is visible.
+  // strips are aligned to tile boundaries (integer offsets), and the floor texture
+  // repeats once per tile, so the seamless noise stays continuous across the gap.
+  const sxh=L.stairs.x,syh=L.stairs.y;
+  const addFloorStrip=(w,h,cx,cz)=>{
+    if(w<=0||h<=0)return;
+    const ftex=floorTex.clone();ftex.needsUpdate=true;
+    ftex.wrapS=ftex.wrapT=THREE.RepeatWrapping;ftex.repeat.set(w,h);
+    const mat=new THREE.MeshPhongMaterial({map:ftex,bumpMap:ftex,bumpScale:0.015,specular:0x120e08,shininess:4});
+    const strip=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);
+    strip.rotation.x=-Math.PI/2;strip.position.set(cx,0,cz);grp.add(strip);
+  };
+  addFloorStrip(L.w,syh,L.w/2,syh/2);                   // north of the hole
+  addFloorStrip(L.w,L.h-syh-1,L.w/2,(syh+1+L.h)/2);     // south of the hole
+  addFloorStrip(sxh,1,sxh/2,syh+0.5);                   // west of the hole
+  addFloorStrip(L.w-sxh-1,1,(sxh+1+L.w)/2,syh+0.5);     // east of the hole
   const ceil=new THREE.Mesh(new THREE.PlaneGeometry(L.w,L.h),ceilMat);
   ceil.rotation.x=Math.PI/2;ceil.position.set(L.w/2,WALLH,L.h/2);grp.add(ceil);
   // walls: instanced per texture variant. secret walls & doors get their own meshes.
@@ -1962,28 +2044,51 @@ function buildLevel(L){
     // passage direction: if east/west neighbors are open the party travels along x,
     // so the door slab must be thin along x and span the full tile along z (and vice versa)
     const passageX=x>0&&x<L.w-1&&L.grid[y*L.w+x-1]!==T_WALL&&L.grid[y*L.w+x+1]!==T_WALL;
-    const g=new THREE.BoxGeometry(passageX?0.22:TILE,WALLH,passageX?TILE:0.22);
-    const m=new THREE.Mesh(g,t===T_DOOR_LOCKED?doorMatLocked:doorMatBase);
-    m.position.set(x+0.5,WALLH/2,y+0.5);
-    m.userData={kind:'door',x,y};
-    if(t===T_DOOR_OPEN)m.position.y=WALLH/2+WALLH*0.92;
-    grp.add(m);R3.doorMeshes[y*L.w+x]=m;
+    // the door hinges on a side jamb: a pivot group sits on one vertical edge
+    // of the frame and the slab is its child, so rotating the pivot around Y
+    // swings the door 90 degrees to the side like a real door
+    const geo=new THREE.BoxGeometry(passageX?0.22:TILE,WALLH,passageX?TILE:0.22);
+    const mesh=new THREE.Mesh(geo,t===T_DOOR_LOCKED?doorMatLocked:doorMatBase);
+    const pv=new THREE.Group();
+    if(passageX){pv.position.set(x+0.5,WALLH/2,y);mesh.position.set(0,0,0.5);}
+    else{pv.position.set(x,WALLH/2,y+0.5);mesh.position.set(0.5,0,0);}
+    mesh.userData={kind:'door',x,y};
+    pv.userData={passageX,mesh};
+    pv.add(mesh);
+    if(t===T_DOOR_OPEN)pv.rotation.y=passageX?Math.PI/2:-Math.PI/2;
+    grp.add(pv);R3.doorMeshes[y*L.w+x]=pv;
   }
-  // stairs
+  // stairs: a real recessed staircase descending below the floor into a dark shaft
   {
     const sg=new THREE.Group();
-    const sx=L.stairs.x,sy=L.stairs.y;
-    const hole=new THREE.Mesh(new THREE.BoxGeometry(0.95,0.05,0.95),new THREE.MeshLambertMaterial({color:0x050404}));
-    hole.position.set(sx+0.5,0.03,sy+0.5);sg.add(hole);
-    for(let i=0;i<4;i++){
-      const step=new THREE.Mesh(new THREE.BoxGeometry(0.9-i*0.2,0.04,0.9-i*0.2),
-        new THREE.MeshLambertMaterial({color:0x2c2820}));
-      step.position.set(sx+0.5,0.09+i*0.001-i*0.0,sy+0.5);
-      step.position.y=0.06-i*0.015;sg.add(step);
+    const sxs=L.stairs.x,sys=L.stairs.y,cx=sxs+0.5,cz=sys+0.5;
+    // the party enters from a walkable neighbor; the steps descend away from it
+    let ndx=0,ndy=-1;
+    for(const [dx,dy] of DIRS){
+      const nt=L.grid[(sys+dy)*L.w+(sxs+dx)];
+      if(nt===T_FLOOR||nt===T_DOOR_OPEN||nt===T_DOOR||nt===T_DOOR_LOCKED){ndx=dx;ndy=dy;break;}
     }
-    const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:svgToTexture(STAIRS_SVG,'stairs'),transparent:true,opacity:0.95}));
-    spr.scale.set(0.7,0.7,1);spr.position.set(sx+0.5,0.42,sy+0.5);
-    spr.userData={kind:'stairs'};sg.add(spr);
+    const DEPTH=1.05,N=7,drop=DEPTH/N;
+    // dark shaft (inner faces) enclosing the pit, a touch deeper than the steps
+    const shaftMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,-0.5)),side:THREE.BackSide,shininess:2});
+    const shaft=new THREE.Mesh(new THREE.BoxGeometry(0.995,DEPTH+0.06,0.995),shaftMat);
+    shaft.position.set(cx,-(DEPTH+0.06)/2,cz);sg.add(shaft);
+    // single-tread slabs step down toward local +Z (each only one drop tall, so
+    // you see over each tread to the next), then rotated to face the entry edge
+    const stepGrp=new THREE.Group();stepGrp.position.set(cx,0,cz);
+    const dz=1.0/N;
+    for(let i=0;i<N;i++){
+      // alternate tread shade slightly so adjacent steps read as distinct
+      const stepMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,(i%2?-0.08:-0.22))),specular:0x141009,shininess:6});
+      const box=new THREE.Mesh(new THREE.BoxGeometry(0.9,drop+0.03,dz+0.03),stepMat);
+      box.position.set(0,-i*drop-drop/2+0.015,-0.5+(i+0.5)*dz);
+      stepGrp.add(box);
+    }
+    stepGrp.rotation.y=Math.atan2(-ndx,-ndy); // local +Z descent -> world run direction
+    sg.add(stepGrp);
+    // a faint glow rising from the depths lights the treads and lures the party down
+    const glow=new THREE.PointLight(0xffcf8a,0.9,2.6,2);
+    glow.position.set(cx,-0.5,cz);sg.add(glow);
     grp.add(sg);R3.stairsGroup=sg;
   }
   // items on floor
@@ -2207,16 +2312,20 @@ function afterPartyMove(rotOnly){
 }
 function openDoorAt(x,y){
   setTile(x,y,T_DOOR_OPEN);
-  const mesh=R3.doorMeshes[y*G.L.w+x];
-  if(mesh)animateDoorOpen(mesh);
+  const pv=R3.doorMeshes[y*G.L.w+x];
+  if(pv)animateDoorSwing(pv,x,y);
   G.moveCd=0.25;SFX.door();
   computeDistField();
 }
-function animateDoorOpen(mesh){
-  const y0=mesh.position.y,y1=WALLH/2+WALLH*0.92,t0=performance.now();
+function animateDoorSwing(pv,x,y){
+  // hinged on a side jamb: swing 90 degrees horizontally, AWAY from the opener
+  const passageX=pv.userData.passageX;
+  const sign=passageX?(G.px<x?1:-1):(G.py<y?-1:1);
+  const t0=performance.now();
   const step=()=>{
-    const k=Math.min(1,(performance.now()-t0)/380);
-    mesh.position.y=y0+(y1-y0)*k;
+    const k=Math.min(1,(performance.now()-t0)/520);
+    const e=1-Math.pow(1-k,3);
+    pv.rotation.y=sign*(Math.PI/2)*e;
     if(k<1)requestAnimationFrame(step);
   };
   step();
@@ -2230,8 +2339,8 @@ function tryUnlock(x,y){
   if(!holder){SFX.bump();UI.toast('Locked. There must be a key somewhere…');return;}
   holder.inventory[slot]=null;
   setTile(x,y,T_DOOR);
-  const mesh=R3.doorMeshes[y*G.L.w+x];
-  if(mesh&&R3.doorMatBase)mesh.material=R3.doorMatBase;
+  const pv=R3.doorMeshes[y*G.L.w+x];
+  if(pv&&pv.userData.mesh&&R3.doorMatBase)pv.userData.mesh.material=R3.doorMatBase;
   UI.toast(holder.name+' unlocks the door.');SFX.unlock();
   openDoorAt(x,y);
 }
@@ -2264,15 +2373,30 @@ function passiveSearch(){
       UI.toast('You notice a seam in the wall…');SFX.found();
     }
   }
-  // traps: rogue spots armed traps in current + ahead tiles
-  const spotter=G.party.find(ch=>!isDown(ch)&&CLASSES[ch.cls].trapfind);
-  if(spotter){
+  // traps: a rogue reliably scouts two tiles ahead (take 10); without one, the
+  // sharpest-eyed companion still gets a single notice roll on the tile just ahead
+  const trapAlive=G.party.filter(ch=>!isDown(ch));
+  const trapfinder=trapAlive.find(ch=>CLASSES[ch.cls].trapfind);
+  if(trapfinder){
     for(const c of [ {x:G.px,y:G.py}, aheadTile(1), aheadTile(2) ]){
       const i=c.y*L.w+c.x;
       const tr=L.traps[i];
-      if(tr&&tr.armed&&!tr.found&&10+searchBonus(spotter)>=tr.dc){
+      if(tr&&tr.armed&&!tr.found&&10+searchBonus(trapfinder)>=tr.dc){
         tr.found=true;addTrapDecal(L,tr);
-        UI.toast(spotter.name+' spots a trap!');SFX.found();
+        UI.toast(trapfinder.name+' spots a trap!');SFX.found();
+      }
+    }
+  }else if(trapAlive.length){
+    const eyes=trapAlive.reduce((a,b)=>noticeBonus(b)>noticeBonus(a)?b:a);
+    for(const c of [ aheadTile(1), {x:G.px,y:G.py} ]){
+      const i=c.y*L.w+c.x;
+      const tr=L.traps[i];
+      if(tr&&tr.armed&&!tr.found&&!tr.noticeTried){
+        tr.noticeTried=true; // one glance per trap, so persistence never guarantees it
+        if(d20()+noticeBonus(eyes)>=tr.dc){
+          tr.found=true;addTrapDecal(L,tr);
+          UI.toast(eyes.name+' notices something amiss underfoot!');SFX.found();
+        }
       }
     }
   }
@@ -2282,6 +2406,7 @@ function triggerTrap(tr){
   const L=G.L,i=tr.y*L.w+tr.x;
   if(R3.trapDecals[i]){R3.levelGroup.remove(R3.trapDecals[i]);delete R3.trapDecals[i];}
   SFX.trap();R3.shake=Math.max(R3.shake,0.7);
+  UI.trapFlash(tr.kind); // instant drawing so the player sees what struck
   const foundBonus=tr.found?4:0;
   const alive=G.party.filter(ch=>!isDown(ch));
   if(!alive.length)return;
@@ -2315,18 +2440,24 @@ function disarmAttempt(x,y){
   const tr=L.traps[i];
   if(!tr||!tr.armed||!tr.found)return;
   if(Math.abs(x-G.px)+Math.abs(y-G.py)>1){UI.toast('Too far to disarm.');return;}
-  const rogue=G.party.find(ch=>!isDown(ch)&&CLASSES[ch.cls].trapfind);
-  if(!rogue){UI.toast('No one knows how to disarm traps. Step around it… if you can.');return;}
-  const r=d20()+searchBonus(rogue);
+  const alive=G.party.filter(ch=>!isDown(ch));
+  if(!alive.length)return;
+  // a rogue works deftly with real skill; anyone else may try with clumsy hands,
+  // relying on raw dexterity and far more likely to set the trap off
+  const rogue=alive.find(ch=>CLASSES[ch.cls].trapfind);
+  const deft=!!rogue;
+  const doer=rogue||alive.slice().sort((a,b)=>abilMod(b,'dex')-abilMod(a,'dex'))[0];
+  const r=d20()+(deft?searchBonus(doer):abilMod(doer,'dex'));
+  const fumbleAt=deft?tr.dc-5:tr.dc-2; // clumsy fingers slip more easily
   if(r>=tr.dc){
     tr.armed=false;
     if(R3.trapDecals[i]){R3.trapDecals[i].material.map=null;R3.levelGroup.remove(R3.trapDecals[i]);delete R3.trapDecals[i];}
-    UI.toast(rogue.name+' disarms the trap.');SFX.unlock();
-    grantXp(rogue,tr.dc*5);
-  }else if(r<=tr.dc-5){
-    UI.toast(rogue.name+' fumbles — the trap goes off!');
+    UI.toast(doer.name+(deft?' disarms the trap.':' gingerly disables the trap!'));SFX.unlock();
+    grantXp(doer,tr.dc*(deft?5:3));
+  }else if(r<=fumbleAt){
+    UI.toast(doer.name+' fumbles — the trap goes off!');
     triggerTrap(tr);
-  }else UI.toast(rogue.name+' cannot find the catch. (Try again)');
+  }else UI.toast(doer.name+' cannot find the catch. (Try again)');
 }
 /* ---------- damage to party ---------- */
 function hurtChar(ch,dmg,source){
@@ -2516,6 +2647,9 @@ function monsterLoot(depth){
   const healNeed=clamp(1-s.heals/Math.max(1,s.alive*1.5),0,1);
   const hasCaster=G.party.some(c=>!c.dead&&CLASSES[c.cls].caster);
   const scrollNeed=hasCaster?clamp(1-s.scrolls/3,0,1):0;
+  // a fallen comrade can be brought back: small chance of a revival scroll
+  if(G.party.some(c=>c.dead)&&Math.random()<0.08)
+    return mkItem('scroll',{spell:'raisedead'});
   const pHeal=0.12+0.38*healNeed;    // 12%..50%
   const pScroll=0.06+0.24*scrollNeed;// 6%..30%
   const r=Math.random();
@@ -2560,7 +2694,8 @@ function drinkPotion(giver,target,it,consume,slot){
   UI.refreshParty();
 }
 function useSpellItem(ch,it,consume){
-  if(!CLASSES[ch.cls].caster){UI.toast('Only casters can use scrolls and wands.');return;}
+  // a Raise Dead scroll answers anyone's plea — the only caster may be the corpse
+  if(!CLASSES[ch.cls].caster&&it.spell!=='raisedead'){UI.toast('Only casters can use scrolls and wands.');return;}
   const sp=SPELLS[it.spell];
   castSpell(ch,it.spell,{item:true,onCast:()=>{
     if(it.base==='wand'){it.charges--;if(it.charges<=0){stripItemEverywhere(ch,it);UI.toast('The wand crumbles to dust.');}}
@@ -3196,6 +3331,13 @@ function tryRest(){
 }
 function descend(){
   G.depth++;
+  // keys only fit their own level's lock; they crumble on the way down
+  let hadKey=false;
+  for(const ch of G.party){
+    ch.inventory=ch.inventory.map(it=>{if(it&&it.base==='key'){hadKey=true;return null;}return it;});
+    for(const s of ['lhand','rhand'])if(ch.equip[s]&&ch.equip[s].base==='key'){hadKey=true;ch.equip[s]=null;}
+  }
+  if(hadKey)setTimeout(()=>UI.toast('The old iron key crumbles to rust.'),600);
   SFX.stairs();
   startLevel(genLevel(G.depth));
   UI.toast('Depth '+G.depth+' — '+G.L.theme.name);
@@ -3596,6 +3738,19 @@ const UI=(()=>{
     el.textContent=text;
     $('dmg-layer').appendChild(el);
     setTimeout(()=>el.remove(),1150);
+  }
+  let trapFlashTimer=null;
+  function trapFlash(kind){
+    const el=$('trap-flash');
+    if(!TRAP_ART[kind])return;
+    el.innerHTML=TRAP_ART[kind]();
+    // hazard tint (physical red / poison green) over a dark backdrop so the drawing always pops
+    const tint=kind==='gas'?'rgba(120,200,80,0.22)':'rgba(200,45,30,0.20)';
+    el.style.background='radial-gradient(circle at center, '+tint+', transparent 60%),'
+      +'radial-gradient(circle at center, rgba(0,0,0,0.30), rgba(0,0,0,0.52) 78%)';
+    el.classList.remove('show');void el.offsetWidth;el.classList.add('show');
+    clearTimeout(trapFlashTimer);
+    trapFlashTimer=setTimeout(()=>el.classList.remove('show'),720);
   }
   function vignette(){
     const v=$('vignette');
@@ -4013,6 +4168,15 @@ const UI=(()=>{
       const tr=L.traps[y*L.w+x];
       if(tr&&tr.found&&tr.armed){ctx.fillStyle='#a03a2a';ctx.fillRect(x*cs+cs/3,y*cs+cs/3,cs/3,cs/3);}
       if(t===T_STAIRS){ctx.fillStyle='#100d09';ctx.fillRect(x*cs+cs/4,y*cs+cs/4,cs/2,cs/2);}
+      if(t===T_DOOR_LOCKED){ // a little golden key marks doors that need one
+        ctx.strokeStyle='#e8c84a';ctx.lineWidth=Math.max(1,cs*0.14);
+        const kx=x*cs+cs*0.32,ky=y*cs+cs*0.5,r=Math.max(1.2,cs*0.17);
+        ctx.beginPath();ctx.arc(kx,ky,r,0,7);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(kx+r,ky);ctx.lineTo(x*cs+cs*0.86,ky);
+        ctx.moveTo(x*cs+cs*0.72,ky);ctx.lineTo(x*cs+cs*0.72,ky+cs*0.18);
+        ctx.moveTo(x*cs+cs*0.86,ky);ctx.lineTo(x*cs+cs*0.86,ky+cs*0.22);
+        ctx.stroke();
+      }
     }
     // party arrow
     ctx.save();
@@ -4037,7 +4201,7 @@ const UI=(()=>{
     show('ovl-menu');
     refreshMenu();
   });
-  return {buildPartyDom,refreshParty,tickCooldowns,charFlash,float,floatAtMonster,vignette,toast,
+  return {buildPartyDom,refreshParty,tickCooldowns,charFlash,float,floatAtMonster,vignette,trapFlash,toast,
     refreshDepthTag,pickAlly,paladinMenu,openSpells,spellFlash,openInventory,openStats,openMap,gameOver,show,hide,anyOverlayOpen};
 })();
 /* ============================== INPUT ============================== */
