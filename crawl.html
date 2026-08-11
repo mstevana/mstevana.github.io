@@ -2291,7 +2291,10 @@ function buildLevel(L){
     // the door hinges on a side jamb: a pivot group sits on one vertical edge
     // of the frame and the slab is its child, so rotating the pivot around Y
     // swings the door 90 degrees to the side like a real door
-    const geo=new THREE.BoxGeometry(passageX?0.22:TILE,WALLH,passageX?TILE:0.22);
+    // a plank, not a block: at tile scale 0.22 read as a foot and a half of
+    // timber, which looked like a wall segment rather than a door
+    const DOORTH=0.07;
+    const geo=new THREE.BoxGeometry(passageX?DOORTH:TILE,WALLH,passageX?TILE:DOORTH);
     const mesh=new THREE.Mesh(geo,t===T_DOOR_LOCKED?doorMatLocked:doorMatBase);
     const pv=new THREE.Group();
     if(passageX){pv.position.set(x+0.5,WALLH/2,y);mesh.position.set(0,0,0.5);}
