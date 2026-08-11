@@ -2365,18 +2365,24 @@ function disarmAttempt(x,y){
   const tr=L.traps[i];
   if(!tr||!tr.armed||!tr.found)return;
   if(Math.abs(x-G.px)+Math.abs(y-G.py)>1){UI.toast('Too far to disarm.');return;}
-  const rogue=G.party.find(ch=>!isDown(ch)&&CLASSES[ch.cls].trapfind);
-  if(!rogue){UI.toast('No one knows how to disarm traps. Step around it… if you can.');return;}
-  const r=d20()+searchBonus(rogue);
+  const alive=G.party.filter(ch=>!isDown(ch));
+  if(!alive.length)return;
+  // a rogue works deftly with real skill; anyone else may try with clumsy hands,
+  // relying on raw dexterity and far more likely to set the trap off
+  const rogue=alive.find(ch=>CLASSES[ch.cls].trapfind);
+  const deft=!!rogue;
+  const doer=rogue||alive.slice().sort((a,b)=>abilMod(b,'dex')-abilMod(a,'dex'))[0];
+  const r=d20()+(deft?searchBonus(doer):abilMod(doer,'dex'));
+  const fumbleAt=deft?tr.dc-5:tr.dc-2; // clumsy fingers slip more easily
   if(r>=tr.dc){
     tr.armed=false;
     if(R3.trapDecals[i]){R3.trapDecals[i].material.map=null;R3.levelGroup.remove(R3.trapDecals[i]);delete R3.trapDecals[i];}
-    UI.toast(rogue.name+' disarms the trap.');SFX.unlock();
-    grantXp(rogue,tr.dc*5);
-  }else if(r<=tr.dc-5){
-    UI.toast(rogue.name+' fumbles — the trap goes off!');
+    UI.toast(doer.name+(deft?' disarms the trap.':' gingerly disables the trap!'));SFX.unlock();
+    grantXp(doer,tr.dc*(deft?5:3));
+  }else if(r<=fumbleAt){
+    UI.toast(doer.name+' fumbles — the trap goes off!');
     triggerTrap(tr);
-  }else UI.toast(rogue.name+' cannot find the catch. (Try again)');
+  }else UI.toast(doer.name+' cannot find the catch. (Try again)');
 }
 /* ---------- damage to party ---------- */
 function hurtChar(ch,dmg,source){
