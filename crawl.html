@@ -254,7 +254,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
     <div><div id="inv-grid"></div><div id="item-tip">Drag items between the pack, body slots and companions. Tap an item to inspect.</div></div>
     <div id="inv-party"></div>
   </div>
-  <div class="row"><button class="mbtn small" id="inv-drop">Drop selected</button><button class="mbtn small" id="inv-close">Close</button></div>
+  <div class="row"><button class="mbtn small" id="inv-use" disabled>Use</button><button class="mbtn small" id="inv-drop">Drop selected</button><button class="mbtn small" id="inv-close">Close</button></div>
 </div></div>
 
 <div class="ovl" id="ovl-stats"><div class="panel" style="min-width:330px">
@@ -2983,6 +2983,39 @@ function useHand(ch,slot){
   }
   doAttack(ch,slot,wDef,wIt,m,false);
 }
+// consumables can be used straight from the pack or a body slot, without first
+// moving them into a hand. it still costs hands, so it is no cheaper than
+// holding the thing: the holding hand if it is held, otherwise both, since
+// fishing something out of the pack takes a free hand to begin with
+function itemUsable(it){
+  if(!it)return false;
+  const k=ITEM_DEFS[it.base].kind;
+  return k==='potion'||k==='scroll'||k==='wand';
+}
+function useInventoryItem(ch,ref){
+  if(G.over)return false;
+  if(!canAct(ch)){UI.toast(ch.name+' cannot act.');return false;}
+  const it=ref.type==='grid'?ch.inventory[ref.idx]:ch.equip[ref.slot];
+  if(!itemUsable(it))return false;
+  const held=(ref.type==='equip'&&(ref.slot==='lhand'||ref.slot==='rhand'))?ref.slot:null;
+  // gate on cooldown exactly as using it from the hand would, so reaching into
+  // the pack can't be used to slip a potion past a swing that's still landing
+  if(held?handCd(ch,held)>0:(handCd(ch,'lhand')>0&&handCd(ch,'rhand')>0)){
+    UI.toast(ch.name+' has no hand free.');return false;
+  }
+  const def=ITEM_DEFS[it.base];
+  const consumeOne=()=>{
+    if((it.qty||1)>1)it.qty--;
+    else if(ref.type==='grid')ch.inventory[ref.idx]=null;
+    else ch.equip[ref.slot]=null;
+  };
+  if(def.kind==='potion'){
+    UI.pickAlly('Give '+itemName(it)+' to…',(target)=>{drinkPotion(ch,target,it,consumeOne,held);});
+    return true;
+  }
+  useSpellItem(ch,it,()=>{if(def.kind==='scroll')consumeOne();});
+  return true;
+}
 function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
   const dualWielding=(()=>{
     const l=weaponOf(ch,'lhand'),r=weaponOf(ch,'rhand');
@@ -4334,7 +4367,17 @@ const UI=(()=>{
       attachDnD(cell,{type:'grid',idx:i});
       grid.appendChild(cell);
     });
+    updateUseBtn();
     renderInvParty();
+  }
+  function selRef(){
+    if(selInvIdx===null)return null;
+    return selInvChar==='grid'?{type:'grid',idx:selInvIdx}:{type:'equip',slot:selInvIdx};
+  }
+  // the Use button only lights up for things there is something to do with
+  function updateUseBtn(){
+    const ref=selRef();
+    $('inv-use').disabled=!(ref&&itemUsable(getItem(ref)));
   }
   let suppressCardClick=false;
   function renderInvParty(){
@@ -4513,6 +4556,15 @@ const UI=(()=>{
       }
     }
     dnd=null;
+  });
+  $('inv-use').addEventListener('click',()=>{
+    const ref=selRef();
+    if(!ref||!itemUsable(getItem(ref)))return;
+    const ch=invChar;
+    // step out of the pack first: drinking or reading happens in the world, and
+    // a potion still has to ask who it is for
+    hide('ovl-inv');
+    if(useInventoryItem(ch,ref)){selInvIdx=null;selInvChar=null;refreshParty();saveGame();}
   });
   $('inv-drop').addEventListener('click',()=>{
     if(selInvIdx===null){toast('Tap an item first.');return;}
