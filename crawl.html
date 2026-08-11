@@ -1088,31 +1088,38 @@ function bonusForDepth(depth){
   if(r<c*0.15)return 3; if(r<c*0.4)return 2; if(r<c*0.9)return 1; return 0;
 }
 function randLoot(depth,rich,noPotion){
-  // noPotion skips the potion band (monster drops manage potions adaptively)
-  const lo=noPotion?0.30:0;
-  const r=lo+Math.random()*((rich?0.75:1)-lo);
-  if(r<0.30){ // potion
+  // weighted loot categories; `rich` (locked rooms, bosses, secret pockets) shifts
+  // weight toward wands, trinkets and higher bonuses; `noPotion` drops the potion band
+  const W=[
+    ['potion', noPotion?0:(rich?6:22)],
+    ['weapon', rich?18:22],
+    ['armor',  rich?16:20],
+    ['scroll', 14],
+    ['wand',   rich?18:11],
+    ['trinket',rich?16:11],
+  ];
+  let tot=0;for(const e of W)tot+=e[1];
+  let r=Math.random()*tot,kind=W[W.length-1][0];
+  for(const e of W){if(r<e[1]){kind=e[0];break;}r-=e[1];}
+  const gbon=()=>bonusForDepth(depth)+(rich?1:0);
+  if(kind==='potion'){
     const p=depth<4?'pot_clw':depth<8?pick(['pot_clw','pot_cmw','pot_antitoxin']):pick(['pot_cmw','pot_csw','pot_antitoxin','pot_remedy']);
     return mkItem(p);
   }
-  if(r<0.50){ // weapon
+  if(kind==='weapon'){
     const w=Math.random()<0.75?pick(MELEE_KEYS):pick(RANGED_KEYS);
-    return mkItem(w,{bonus:bonusForDepth(depth)});
+    return mkItem(w,{bonus:gbon()});
   }
-  if(r<0.68){ // armor piece
+  if(kind==='armor'){
     const pool=depth<3?['lightarmor','lhelm','lboots','lshield']:
       depth<7?['lightarmor','medarmor','lhelm','hhelm','lboots','hboots','lshield','hshield']:
       ['medarmor','heavyarmor','hhelm','hboots','hshield'];
-    return mkItem(pick(pool),{bonus:bonusForDepth(depth)});
+    return mkItem(pick(pool),{bonus:gbon()});
   }
-  if(r<0.80){ // scroll
-    return mkItem('scroll',{spell:pick(SCROLLABLE())});
-  }
-  if(r<0.90){ // wand
-    return mkItem('wand',{spell:pick(WANDABLE),charges:roll(2,6,3)});
-  }
-  // trinket
-  return mkItem(Math.random()<0.5?'ringprot':'amuletnat',{bonus:Math.max(1,bonusForDepth(depth))});
+  if(kind==='scroll')return mkItem('scroll',{spell:pick(SCROLLABLE())});
+  if(kind==='wand')return mkItem('wand',{spell:pick(WANDABLE),charges:roll(2,6,3)});
+  // trinket: ring of protection or amulet of natural armor
+  return mkItem(Math.random()<0.5?'ringprot':'amuletnat',{bonus:Math.max(1,gbon())});
 }
 
 /* ============================== DUNGEON GENERATION ============================== */
