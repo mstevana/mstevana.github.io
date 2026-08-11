@@ -627,21 +627,21 @@ function koboldBody(){
   `<path d="M26 32 Q20 36 21 46 Q21 54 26 58 L38 58 Q43 52 42 44 Q41 35 37 32 Z" fill="url(#bg)" ${RIM}/>`+
   `<path d="M24 31 L20 27 L25 29 Z M22 38 L17 35 L22 35 Z M21 45 L16 43 L21 42 Z" fill="#2c1c0c"/>`+
   `<path d="M27 57 L26 62 L30 62 M37 57 L38 62 L42 62" stroke="#241408" stroke-width="2.4" fill="none"/>`+
-  `<path d="M26 24 Q24 14 33 13 Q41 13 43 20 Q47 21 49 25 Q45 28 40 27 Q38 31 31 30 Q26 29 26 24 Z" fill="url(#bg)" ${RIM}/>`+
-  `<path d="M28 14 Q26 8 30 6 L31 12 Z M38 14 Q40 8 37 5 L35 11 Z" fill="#bdb294"/>`+
+  `|H|<path d="M26 24 Q24 14 33 13 Q41 13 43 20 Q47 21 49 25 Q45 28 40 27 Q38 31 31 30 Q26 29 26 24 Z" fill="url(#bg)" ${RIM}/>`+
+  `<path d="M28 14 Q26 8 30 6 L31 12 Z M38 14 Q40 8 37 5 L35 11 Z" fill="#bdb294"/>|/H|`+
   `<path d="M27 44 L37 44 L36 52 L29 53 Z" fill="#1c130a"/>`+
   `<path d="M29 41 Q30 46 29 50 M33 40 Q34 45 33 50" stroke="#170e06" stroke-width="1" fill="none" opacity="0.6"/>`;
 }
 function koboldSharp(){
-  return gEye(31,19,1.7,{slit:1})+gEye(40,21,1.4,{slit:1})+fangsDown(43,25,5,3,2.4);
+  return `|H|`+gEye(31,19,1.7,{slit:1})+gEye(40,21,1.4,{slit:1})+fangsDown(43,25,5,3,2.4)+`|/H|`;
 }
 // shared skeleton core used by both skeleton variants
 function skelCore(){
   return `<path d="M22 24 Q18 40 20 56 L23 53 L26 57 L30 53 L34 57 L38 53 L41 57 L44 56 Q46 38 42 24 Z" fill="#100e0a" opacity="0.9"/>`+
-  `<path d="M25 17 Q25 7 32 7 Q39 7 39 17 Q39 22 36 24 L36 27 L28 27 L28 24 Q25 22 25 17 Z" fill="url(#bg)" ${RIM}/>`+
+  `|H|<path d="M25 17 Q25 7 32 7 Q39 7 39 17 Q39 22 36 24 L36 27 L28 27 L28 24 Q25 22 25 17 Z" fill="url(#bg)" ${RIM}/>`+
   `<ellipse cx="28.6" cy="16" rx="2.5" ry="3" fill="#080606"/><ellipse cx="35.4" cy="16" rx="2.5" ry="3" fill="#080606"/>`+
   `<path d="M32 19 L30.9 22 L33.1 22 Z" fill="#080606"/>`+
-  `<path d="M28.5 24.5 L28.5 27 M30.5 24.5 L30.5 27.2 M32.5 24.5 L32.5 27.2 M34.5 24.5 L34.5 27" stroke="#0c0a08" stroke-width="0.8"/>`+
+  `<path d="M28.5 24.5 L28.5 27 M30.5 24.5 L30.5 27.2 M32.5 24.5 L32.5 27.2 M34.5 24.5 L34.5 27" stroke="#0c0a08" stroke-width="0.8"/>|/H|`+
   `<path d="M32 27 L32 41" stroke="#a89e82" stroke-width="2" stroke-dasharray="2.2 1.4"/>`+
   `<path d="M32 30 Q24 31 23 34 M32 33 Q25 34 24 37 M32 36 Q26 37 25 40 M32 30 Q40 31 41 34 M32 33 Q39 34 40 37 M32 36 Q38 37 39 40" stroke="#b3a98b" stroke-width="1.7" fill="none"/>`+
   `<path d="M27 41 Q32 45 37 41 L36 45 L28 45 Z" fill="#a89e82"/>`+
@@ -649,127 +649,127 @@ function skelCore(){
   `<path d="M25 61 L29 61 M35 61 L40 61" stroke="#b3a98b" stroke-width="1.6"/>`;
 }
 const MONSTER_ART={
-  rat:()=>({o:{lit:'#7a6552',mid:'#3a2f26',eye:'#ff4526',rough:[3,0.5],seed:7},
+  rat:()=>({o:{hp:[44,44],ap:[0,0],lit:'#7a6552',mid:'#3a2f26',eye:'#ff4526',rough:[3,0.5],seed:7},
     body:`<path d="M12 53 Q0 52 3 40 Q4 35 8 34" fill="none" stroke="#6d5a4e" stroke-width="2.4" stroke-linecap="round"/>`+
     `<path d="M4 44 L7 44 M3.4 40 L6.4 41" stroke="#40342a" stroke-width="0.8"/>`+
     `<path d="M10 53 Q10 39 24 35 Q38 31 47 38 Q54 43 53 50 Q52 58 40 59 L17 59 Q10 58 10 53 Z" fill="url(#bg)" ${RIM}/>`+
     `<ellipse cx="20" cy="49" rx="9" ry="8" fill="#241c15" opacity="0.75"/>`+
     `<path d="M28 40 Q29 48 28 54 M34 38 Q35 47 34 54 M40 38 Q41 46 40 52" stroke="#191009" stroke-width="1.2" fill="none" opacity="0.7"/>`+
-    `<path d="M45 37 Q52 34 58 42 Q60 45 57 47 L48 50 Q43 48 43 42 Z" fill="url(#bg)" ${RIM}/>`+
-    `<path d="M46 35 Q44 28 50 29 Q53 30 51 35 Z" fill="#1e1610"/>`+
+    `|H|<path d="M45 37 Q52 34 58 42 Q60 45 57 47 L48 50 Q43 48 43 42 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M46 35 Q44 28 50 29 Q53 30 51 35 Z" fill="#1e1610"/>|/H|`+
     `<path d="M18 58 L16 62 M26 58 L25 62 M38 58 L38 62 M46 55 L48 61" stroke="#1e150e" stroke-width="2.2"/>`+
     `<path d="M24 41 L30 44" stroke="#4c100c" stroke-width="2"/>`,
-    sharp:gEye(51,41,1.9,{pupil:1})+
+    sharp:`|H|`+gEye(51,41,1.9,{pupil:1})+
     `<path d="M55 46 L56 49.5 M57.5 45.5 L59 48.5" stroke="#cfc4a2" stroke-width="1.1"/>`+
     `<path d="M56 44 L63 42 M56 45.5 L63 46.5" stroke="#7a705e" stroke-width="0.5" opacity="0.6"/>`+
-    drip(56,49.5,3.5,'#6a1210')}),
-  kobold:()=>({o:{lit:'#8a5c38',mid:'#462c1a',eye:'#ffb32a',rough:[2.2,0.4],seed:11},
+    drip(56,49.5,3.5,'#6a1210')+`|/H|`}),
+  kobold:()=>({o:{hp:[33,31],ap:[0,0],lit:'#8a5c38',mid:'#462c1a',eye:'#ffb32a',rough:[2.2,0.4],seed:11},
     body:koboldBody(),sharp:koboldSharp()}),
-  koboldsl:()=>({o:{lit:'#7a5a40',mid:'#3c2e20',eye:'#ffb32a',rough:[2.2,0.4],seed:12},
-    body:koboldBody()+`<path d="M42 38 Q50 34 52 26" stroke="#6a533c" stroke-width="2" fill="none"/>`,
-    sharp:koboldSharp()+`<path d="M52 26 Q57 20 54 14" stroke="#7a624a" stroke-width="1.6" fill="none"/>`+
-    `<circle cx="53.6" cy="13" r="2.6" fill="#75787c"/><circle cx="53" cy="12.4" r="0.9" fill="#9a9da2"/>`}),
-  goblin:()=>({o:{lit:'#5f7a42',mid:'#2c3c1e',eye:'#e8e04a',rough:[2.4,0.5],seed:5},
-    body:`<path d="M20 18 Q7 12 5 20 Q12 23 19 24 Z" fill="#354a22"/><path d="M10 16 L13 20 L9 19 Z" fill="#060504"/>`+
+  koboldsl:()=>({o:{hp:[33,31],ap:[42,38],lit:'#7a5a40',mid:'#3c2e20',eye:'#ffb32a',rough:[2.2,0.4],seed:12},
+    body:koboldBody()+`|A|<path d="M42 38 Q50 34 52 26" stroke="#6a533c" stroke-width="2" fill="none"/>`,
+    sharp:koboldSharp()+`|A|<path d="M52 26 Q57 20 54 14" stroke="#7a624a" stroke-width="1.6" fill="none"/>`+
+    `<circle cx="53.6" cy="13" r="2.6" fill="#75787c"/><circle cx="53" cy="12.4" r="0.9" fill="#9a9da2"/>|/A|`}),
+  goblin:()=>({o:{hp:[32,32],ap:[39,36],lit:'#5f7a42',mid:'#2c3c1e',eye:'#e8e04a',rough:[2.4,0.5],seed:5},
+    body:`|H|<path d="M20 18 Q7 12 5 20 Q12 23 19 24 Z" fill="#354a22"/><path d="M10 16 L13 20 L9 19 Z" fill="#060504"/>`+
     `<path d="M44 18 Q57 12 59 20 Q52 23 45 24 Z" fill="#354a22"/><path d="M54 16 L51 20 L55 19 Z" fill="#060504"/>`+
     `<path d="M21 22 Q21 10 32 9 Q43 10 43 22 Q43 30 37 33 Q27 33 24 30 Q21 27 21 22 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M24 17.5 Q32 14.5 40 17.5 Q32 19 24 17.5 Z" fill="#131a0b"/>`+
-    `<path d="M24 27 Q32 34 40 26 Q36 31 32 31 Q27 31 24 27 Z" fill="#0a0505"/>`+
+    `<path d="M24 27 Q32 34 40 26 Q36 31 32 31 Q27 31 24 27 Z" fill="#0a0505"/>|/H|`+
     `<path d="M26 33 Q20 38 21 47 Q22 56 27 59 L38 59 Q42 54 41 46 Q40 37 37 33 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M27 38 Q28 44 27 50 M31 37 Q32 44 31 50 M35 37 Q36 43 35 49" stroke="#1a240e" stroke-width="1" fill="none" opacity="0.65"/>`+
     `<path d="M27 48 L38 48 L37 55 L28 55 Z" fill="#171208"/>`+
     `<path d="M25 36 Q16 42 15 52" stroke="#2e401e" stroke-width="3.4" fill="none"/>`+
-    `<path d="M39 36 Q47 40 48 47" stroke="#2e401e" stroke-width="3.4" fill="none"/>`+
+    `|A|<path d="M39 36 Q47 40 48 47" stroke="#2e401e" stroke-width="3.4" fill="none"/>|/A|`+
     `<path d="M28 58 L27 62 M36 58 L37 62" stroke="#223016" stroke-width="2.6"/>`,
-    sharp:gEye(27,21,2,{pupil:1})+gEye(38,21,2,{pupil:1})+
-    fangsDown(25.5,26.5,13,6,2.4)+fangsUp(27,30.5,10,4,2)+
+    sharp:`|H|`+gEye(27,21,2,{pupil:1})+gEye(38,21,2,{pupil:1})+
+    fangsDown(25.5,26.5,13,6,2.4)+fangsUp(27,30.5,10,4,2)+`|/H|`+
     clawsAt(15,52,[100,120,140],3.6)+
-    `<path d="M48 46 L57 39.5 L58 43 L50 50 Z" fill="#787d81"/><path d="M52 42 L55 44" stroke="#6b3a22" stroke-width="1.4" opacity="0.8"/>`}),
-  skeleton:()=>({o:{lit:'#cfc4a8',mid:'#6b6350',eye:'#9adfff',rough:[1.8,0.35],seed:9},
+    `|A|<path d="M48 46 L57 39.5 L58 43 L50 50 Z" fill="#787d81"/><path d="M52 42 L55 44" stroke="#6b3a22" stroke-width="1.4" opacity="0.8"/>|/A|`}),
+  skeleton:()=>({o:{hp:[32,27],ap:[27,30],ad:-0.62,lit:'#cfc4a8',mid:'#6b6350',eye:'#9adfff',rough:[1.8,0.35],seed:9},
     body:skelCore()+
-    `<path d="M27 30 L20 38 M20 38 L22 47" stroke="#b3a98b" stroke-width="2"/>`+
+    `|A|<path d="M27 30 L20 38 M20 38 L22 47" stroke="#b3a98b" stroke-width="2"/>|/A|`+
     `<path d="M37 30 L43 38 M43 38 L42 48" stroke="#b3a98b" stroke-width="2"/>`+
     `<path d="M42 48 L41 51 M42 48 L44 51" stroke="#b3a98b" stroke-width="1.1"/>`,
-    sharp:gEye(28.6,16,1.2)+gEye(35.4,16,1.2)+
-    `<path d="M22 46 L14 59 L11.6 56.5 L19.4 44.5 Z" fill="#6e6a5e"/>`+
+    sharp:`|H|`+gEye(28.6,16,1.2)+gEye(35.4,16,1.2)+`|/H|`+
+    `|A|<path d="M22 46 L14 59 L11.6 56.5 L19.4 44.5 Z" fill="#6e6a5e"/>`+
     `<path d="M15 55 L17 53 M13.5 57 L15 56" stroke="#6b3a22" stroke-width="1.2" opacity="0.85"/>`+
-    `<path d="M19 44 L23 48" stroke="#4a4436" stroke-width="1.6"/>`}),
-  skelarcher:()=>({o:{lit:'#c2b89c',mid:'#615a48',eye:'#7ce89a',rough:[1.8,0.35],seed:10},
+    `<path d="M19 44 L23 48" stroke="#4a4436" stroke-width="1.6"/>|/A|`}),
+  skelarcher:()=>({o:{hp:[32,27],ap:[37,30],lit:'#c2b89c',mid:'#615a48',eye:'#7ce89a',rough:[1.8,0.35],seed:10},
     body:skelCore()+
     `<path d="M27 30 L21 36 M21 36 L27 33" stroke="#b3a98b" stroke-width="2"/>`+
-    `<path d="M37 30 L45 30" stroke="#b3a98b" stroke-width="2"/>`,
-    sharp:gEye(28.6,16,1.2)+gEye(35.4,16,1.2)+
-    `<path d="M46 12 Q58 30 46 48" stroke="#42311e" stroke-width="2.6" fill="none"/>`+
+    `|A|<path d="M37 30 L45 30" stroke="#b3a98b" stroke-width="2"/>|/A|`,
+    sharp:`|H|`+gEye(28.6,16,1.2)+gEye(35.4,16,1.2)+`|/H|`+
+    `|A|<path d="M46 12 Q58 30 46 48" stroke="#42311e" stroke-width="2.6" fill="none"/>`+
     `<path d="M46 12 L46 48" stroke="#b8b096" stroke-width="0.8"/>`+
     `<path d="M46 30 L28 30" stroke="#5c4728" stroke-width="1.4"/><path d="M28 30 L33 27.6 L33 32.4 Z" fill="#8f9296"/>`+
-    `<path d="M46 30 L49 28 M46 30 L49 32" stroke="#8a8270" stroke-width="0.9"/>`}),
-  zombie:()=>({o:{lit:'#7a8a68',mid:'#39422f',eye:'#cfd8c0',rough:[3.2,0.6],seed:13},
+    `<path d="M46 30 L49 28 M46 30 L49 32" stroke="#8a8270" stroke-width="0.9"/>|/A|`}),
+  zombie:()=>({o:{hp:[33,29],ap:[40,34],lit:'#7a8a68',mid:'#39422f',eye:'#cfd8c0',rough:[3.2,0.6],seed:13},
     body:`<path d="M23 31 Q19 40 21 50 Q22 58 26 61 L40 61 Q43 56 42 47 Q41 36 38 32 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M23 38 Q28 36 30 42 Q28 47 23 46 Z" fill="#170b08"/>`+
     `<path d="M24 39.5 Q27 39.5 29 41.5 M24 42.5 Q27 42.5 29 44.5" stroke="#a89e82" stroke-width="1.1" fill="none"/>`+
-    `<g transform="rotate(9 33 20)"><path d="M24 21 Q24 10 33 10 Q41 11 41 20 Q41 27 36 29 L29 29 Q24 26 24 21 Z" fill="url(#bg)" ${RIM}/></g>`+
+    `|H|<g transform="rotate(9 33 20)"><path d="M24 21 Q24 10 33 10 Q41 11 41 20 Q41 27 36 29 L29 29 Q24 26 24 21 Z" fill="url(#bg)" ${RIM}/></g>`+
     `<path d="M29 28 Q30 34.5 34 34.5 Q37 33.5 37.5 29 Q33 31.5 29 28 Z" fill="#0d0706"/>`+
-    `<path d="M27 12 Q31 9 35 12 L33 15 Q30 14 27 12 Z" fill="#42100d"/>`+
+    `<path d="M27 12 Q31 9 35 12 L33 15 Q30 14 27 12 Z" fill="#42100d"/>|/H|`+
     `<path d="M24 33 Q14 36 10 44" stroke="#44503a" stroke-width="4.4" fill="none" stroke-linecap="round"/>`+
-    `<path d="M40 34 Q45 38 45 44" stroke="#44503a" stroke-width="4.4" fill="none" stroke-linecap="round"/>`+
-    `<circle cx="45" cy="45" r="2.2" fill="#42100d"/><path d="M45 45 L46.5 50" stroke="#b3a98b" stroke-width="1.4"/>`+
+    `|A|<path d="M40 34 Q45 38 45 44" stroke="#44503a" stroke-width="4.4" fill="none" stroke-linecap="round"/>`+
+    `<circle cx="45" cy="45" r="2.2" fill="#42100d"/><path d="M45 45 L46.5 50" stroke="#b3a98b" stroke-width="1.4"/>|/A|`+
     `<path d="M26 50 L40 50 L39 55 L36 53 L33 56.5 L30 53 L27 56 Z" fill="#191712"/>`+
     `<path d="M28 56 L27 62 M37 56 L39 62" stroke="#39422f" stroke-width="3"/>`,
-    sharp:gEye(28,19,1.6)+gEye(37,21,1.4)+
-    `<path d="M30 26 L30 28 M32.5 26.5 L32.5 28.5" stroke="#b8b096" stroke-width="0.9"/>`+
+    sharp:`|H|`+gEye(28,19,1.6)+gEye(37,21,1.4)+
+    `<path d="M30 26 L30 28 M32.5 26.5 L32.5 28.5" stroke="#b8b096" stroke-width="0.9"/>|/H|`+
     clawsAt(10,44,[150,170,190,130],4)+
     drip(33,34,4,'#3c0f0b')}),
-  hobgoblin:()=>({o:{lit:'#9a5c38',mid:'#48291a',eye:'#ff9422',rough:[2,0.4],seed:15},
+  hobgoblin:()=>({o:{hp:[32,28],ap:[45,38],lit:'#9a5c38',mid:'#48291a',eye:'#ff9422',rough:[2,0.4],seed:15},
     body:`<path d="M18 32 L12 26 L20 28 Z M46 32 L52 26 L44 28 Z" fill="#33373b"/>`+
     `<path d="M20 32 Q17 42 19 52 L24 59 L40 59 L45 52 Q47 42 44 32 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M21 33 L43 33 L44 44 Q32 48 20 44 Z" fill="#26292c"/>`+
     `<path d="M21 33 L43 33" stroke="#5c6167" stroke-width="1.1"/>`+
     `<circle cx="24" cy="36" r="0.8" fill="#55585c"/><circle cx="32" cy="37" r="0.8" fill="#55585c"/><circle cx="40" cy="36" r="0.8" fill="#55585c"/>`+
     `<path d="M26 40 L31 43 M35 38 L39 42" stroke="#101214" stroke-width="0.9"/>`+
-    `<path d="M24 20 Q24 10 32 10 Q40 10 40 20 L40 24 Q36 28 28 28 Q24 26 24 20 Z" fill="url(#bg)" ${RIM}/>`+
+    `|H|<path d="M24 20 Q24 10 32 10 Q40 10 40 20 L40 24 Q36 28 28 28 Q24 26 24 20 Z" fill="url(#bg)" ${RIM}/>`+
     `<ellipse cx="32" cy="22" rx="7" ry="5" fill="#8a5230" opacity="0.85"/>`+
     `<path d="M23 16 Q24 7.5 32 7.5 Q40 7.5 41 16 Q36 12.5 32 12.5 Q28 12.5 23 16 Z" fill="#33373b"/>`+
     `<path d="M23 16 Q28 12.5 32 12.5" stroke="#5c6167" stroke-width="0.8" fill="none"/>`+
     `<path d="M24 16.5 L40 16.5 L40 20 L24 20 Z" fill="#000" opacity="0.5"/>`+
     `<path d="M27 26.5 L26 22.5 L29.5 25.5 Z M37 26.5 L38 22.5 L34.5 25.5 Z" fill="#d5cba8"/>`+
-    `<path d="M29 24.5 L35 24.5" stroke="#170d07" stroke-width="1.4"/>`+
-    `<path d="M45 38 L51 31" stroke="#42311e" stroke-width="2.2"/>`+
+    `<path d="M29 24.5 L35 24.5" stroke="#170d07" stroke-width="1.4"/>|/H|`+
+    `|A|<path d="M45 38 L51 31" stroke="#42311e" stroke-width="2.2"/>|/A|`+
     `<path d="M27 58 L26 62 M37 58 L38 62" stroke="#201a12" stroke-width="3.4"/>`,
-    sharp:gEye(28,18.5,1.7)+gEye(36,18.5,1.7)+
-    `<circle cx="52.5" cy="29" r="4" fill="#3a3e42"/>`+
-    `<path d="M52.5 24 L52.5 21.6 M56.5 27 L58.6 25.6 M56.5 31.5 L58.6 32.6 M48.5 27 L46.4 25.6 M48.5 31.5 L46.4 32.6" stroke="#4c5054" stroke-width="1.6"/>`}),
-  orc:()=>({o:{lit:'#5c7040',mid:'#2a361c',eye:'#d63a20',rough:[2.6,0.5],seed:17},
+    sharp:`|H|`+gEye(28,18.5,1.7)+gEye(36,18.5,1.7)+`|/H|`+
+    `|A|<circle cx="52.5" cy="29" r="4" fill="#3a3e42"/>`+
+    `<path d="M52.5 24 L52.5 21.6 M56.5 27 L58.6 25.6 M56.5 31.5 L58.6 32.6 M48.5 27 L46.4 25.6 M48.5 31.5 L46.4 32.6" stroke="#4c5054" stroke-width="1.6"/>|/A|`}),
+  orc:()=>({o:{hp:[32,29],ap:[47,34],lit:'#5c7040',mid:'#2a361c',eye:'#d63a20',rough:[2.6,0.5],seed:17},
     body:`<path d="M15 30 Q13 24 20 25 L23 30 Z" fill="#33291e"/><path d="M17 26 L15 21" stroke="#33291e" stroke-width="1.6"/>`+
     `<path d="M16 33 Q14 30 19 29 L45 29 Q50 30 48 33 Q50 44 46 53 L41 60 L23 60 L18 53 Q14 44 16 33 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M32 32 L32 46 M24 38 Q32 41 40 38" stroke="#16200c" stroke-width="1.3" opacity="0.8" fill="none"/>`+
     `<path d="M22 34 L27 40 M25 33 L29 38" stroke="#170c07" stroke-width="1.1"/>`+
     `<path d="M36 44 L40 49" stroke="#4c100c" stroke-width="1.4"/>`+
-    `<path d="M25 22 Q25 12 32 11 Q39 12 39 22 Q39 28 35 30 L29 30 Q25 27 25 22 Z" fill="url(#bg)" ${RIM}/>`+
+    `|H|<path d="M25 22 Q25 12 32 11 Q39 12 39 22 Q39 28 35 30 L29 30 Q25 27 25 22 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M31 11 Q30 5 34 4 Q33 8 33.5 11 Z" fill="#100e0a"/>`+
-    `<path d="M26 26 Q32 32 38 26 L38 29 Q32 34 26 29 Z" fill="#1e2a12"/>`+
+    `<path d="M26 26 Q32 32 38 26 L38 29 Q32 34 26 29 Z" fill="#1e2a12"/>|/H|`+
     `<path d="M17 34 Q11 42 13 51" stroke="#2c3c1a" stroke-width="5.6" fill="none" stroke-linecap="round"/>`+
-    `<path d="M47 34 Q53 40 52 47" stroke="#2c3c1a" stroke-width="5.6" fill="none" stroke-linecap="round"/>`+
+    `|A|<path d="M47 34 Q53 40 52 47" stroke="#2c3c1a" stroke-width="5.6" fill="none" stroke-linecap="round"/>|/A|`+
     `<path d="M25 59 L24 62 M39 59 L40 62" stroke="#1c140c" stroke-width="4"/>`,
-    sharp:gEye(28,19,1.5)+gEye(36,19,1.5)+
-    `<path d="M27.5 28 L25.5 21 L29.5 26 Z M36.5 28 L38.5 21 L34.5 26 Z" fill="#ddd5b6"/>`+
-    `<path d="M52 46 L62 42 L62 50 L53 51 Z" fill="#71777b"/>`+
-    `<path d="M62 42 L62 50" stroke="#6a1210" stroke-width="1.6"/><path d="M56 44 L58 46" stroke="#4c5054" stroke-width="1"/>`}),
-  gobshaman:()=>({o:{lit:'#4c4258',mid:'#221c30',eye:'#7fff6a',rough:[2.2,0.45],seed:19,
+    sharp:`|H|`+gEye(28,19,1.5)+gEye(36,19,1.5)+
+    `<path d="M27.5 28 L25.5 21 L29.5 26 Z M36.5 28 L38.5 21 L34.5 26 Z" fill="#ddd5b6"/>|/H|`+
+    `|A|<path d="M52 46 L62 42 L62 50 L53 51 Z" fill="#71777b"/>`+
+    `<path d="M62 42 L62 50" stroke="#6a1210" stroke-width="1.6"/><path d="M56 44 L58 46" stroke="#4c5054" stroke-width="1"/>|/A|`}),
+  gobshaman:()=>({o:{hp:[32,26],ap:[41,36],lit:'#4c4258',mid:'#221c30',eye:'#7fff6a',rough:[2.2,0.45],seed:19,
       extra:glowGrad('og','#7fd15f')},
     body:`<path d="M26 24 Q20 34 19 48 Q19 56 22 60 L28 57 L32 61 L36 57 L42 60 Q45 54 44 46 Q43 32 38 24 Z" fill="url(#bg)" ${RIM}/>`+
-    `<path d="M24 22 Q23 10 32 9 Q41 10 40 22 Q36 26 32 26 Q28 26 24 22 Z" fill="#191322"/>`+
+    `|H|<path d="M24 22 Q23 10 32 9 Q41 10 40 22 Q36 26 32 26 Q28 26 24 22 Z" fill="#191322"/>`+
     `<ellipse cx="32" cy="19" rx="6" ry="6.5" fill="#050305"/>`+
     `<path d="M27 29 Q32 32 37 29" stroke="#8a8270" stroke-width="1" fill="none"/>`+
-    `<path d="M29 30 L29 32 M32 31 L32 33.4 M35 30 L35 32" stroke="#b3a98b" stroke-width="1.1"/>`+
-    `<path d="M41 36 Q45 35 46.5 36.5" stroke="#354a22" stroke-width="2.4" fill="none"/>`,
-    sharp:gEye(29.5,19,1.3)+gEye(34.5,19,1.3)+
-    `<path d="M47 12 L46 58" stroke="#33230f" stroke-width="2.4"/>`+
+    `<path d="M29 30 L29 32 M32 31 L32 33.4 M35 30 L35 32" stroke="#b3a98b" stroke-width="1.1"/>|/H|`+
+    `|A|<path d="M41 36 Q45 35 46.5 36.5" stroke="#354a22" stroke-width="2.4" fill="none"/>|/A|`,
+    sharp:`|H|`+gEye(29.5,19,1.3)+gEye(34.5,19,1.3)+`|/H|`+
+    `|A|<path d="M47 12 L46 58" stroke="#33230f" stroke-width="2.4"/>`+
     `<circle cx="47" cy="10" r="4" fill="#b8ae90"/><circle cx="45.6" cy="9.4" r="0.9" fill="#0a0808"/><circle cx="48.4" cy="9.4" r="0.9" fill="#0a0808"/>`+
-    `<circle cx="47" cy="17.5" r="5.5" fill="url(#og)"/><circle cx="47" cy="17.5" r="1.9" fill="#c8ffb8"/>`+
+    `<circle cx="47" cy="17.5" r="5.5" fill="url(#og)"/><circle cx="47" cy="17.5" r="1.9" fill="#c8ffb8"/>|/A|`+
     `<path d="M13 19 l3.4 3.4 m0 -3.4 l-3.4 3.4" stroke="#7fd15f" stroke-width="1" opacity="0.75"/>`+
     `<path d="M17 33 h4 m-2 -2 v4" stroke="#7fd15f" stroke-width="1" opacity="0.6"/>`+
     `<circle cx="12" cy="42" r="1.2" fill="#7fd15f" opacity="0.6"/>`}),
-  spider:()=>({o:{lit:'#4c4340',mid:'#201b18',eye:'#ff2f1e',rough:[2.4,0.45],seed:21,
+  spider:()=>({o:{hp:[36,45],ap:[0,0],lit:'#4c4340',mid:'#201b18',eye:'#ff2f1e',rough:[2.4,0.45],seed:21,
       extra:glowGrad('og','#9fdc39')},
     body:`<path d="M26 40 L13 29 L5 36 M24 44 L9 42 L3 49 M25 48 L13 52 L8 60 M29 51 L22 57 L20 62" stroke="#181310" stroke-width="3" fill="none"/>`+
     `<path d="M26 40 L13 29 L5 36 M24 44 L9 42 L3 49 M25 48 L13 52 L8 60 M29 51 L22 57 L20 62" stroke="#4a3e34" stroke-width="1.3" fill="none"/>`+
@@ -779,184 +779,236 @@ const MONSTER_ART={
     `<path d="M19 37 Q24 33 29 37 Q28 42 24 44.5 Q20 42 19 37 Z" fill="#7d7460" opacity="0.45"/>`+
     `<circle cx="21.5" cy="38.5" r="1" fill="#14100d"/><circle cx="26.5" cy="38.5" r="1" fill="#14100d"/>`+
     `<path d="M12 49 L9 52 M15 52 L13 55 M33 50 L35 54" stroke="#2c2620" stroke-width="0.9"/>`+
-    `<ellipse cx="42" cy="46" rx="9" ry="7.5" fill="url(#bg)" ${RIM}/>`+
-    `<path d="M46 51 Q47.5 55 45.5 57.5 M50 50 Q52 54 50.5 56.5" stroke="#191310" stroke-width="2.2" fill="none"/>`,
-    sharp:gEye(44,44,1.6)+gEye(48,45.5,1.4)+
+    `|H|<ellipse cx="42" cy="46" rx="9" ry="7.5" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M46 51 Q47.5 55 45.5 57.5 M50 50 Q52 54 50.5 56.5" stroke="#191310" stroke-width="2.2" fill="none"/>|/H|`,
+    sharp:`|H|`+gEye(44,44,1.6)+gEye(48,45.5,1.4)+
     `<circle cx="41" cy="42.5" r="0.9" fill="#ff2f1e"/><circle cx="46" cy="41.5" r="0.9" fill="#ff2f1e"/><circle cx="51" cy="44" r="0.9" fill="#ff2f1e"/><circle cx="50.5" cy="48" r="0.8" fill="#ff2f1e"/>`+
     `<path d="M45.5 57.5 L45 60 M50.5 56.5 L50.7 59" stroke="#a89e82" stroke-width="1.3"/>`+
-    drip(45,60,3,'#9fdc39')}),
-  ghoul:()=>({o:{lit:'#8a8a72',mid:'#3f4034',eye:'#e8e87a',rough:[2.8,0.5],seed:23},
+    drip(45,60,3,'#9fdc39')+`|/H|`}),
+  ghoul:()=>({o:{hp:[35,29],ap:[37,33],lit:'#8a8a72',mid:'#3f4034',eye:'#e8e87a',rough:[2.8,0.5],seed:23},
     body:`<path d="M24 30 Q17 38 19 48 Q20 57 26 60 L36 60 Q40 55 39 46 Q38 35 34 30 Z" fill="url(#bg)" ${RIM}/>`+
     `<circle cx="24.5" cy="34" r="1" fill="#22231c"/><circle cx="22.5" cy="39" r="1" fill="#22231c"/><circle cx="21.5" cy="44" r="1" fill="#22231c"/>`+
     `<path d="M25 38 Q28 37 30 40 M24 43 Q27 42 29 45 M24 48 Q27 47 29 50" stroke="#191a12" stroke-width="1.2" fill="none" opacity="0.8"/>`+
-    `<path d="M32 24 Q31 15 39 14 Q46 15 47 22 Q47 28 42 30 Q35 30 32 24 Z" fill="url(#bg)" ${RIM}/>`+
+    `|H|<path d="M32 24 Q31 15 39 14 Q46 15 47 22 Q47 28 42 30 Q35 30 32 24 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M40 22 Q43 24 46 22" stroke="#2c2d24" stroke-width="1" fill="none"/>`+
     `<path d="M38 27 Q43 31 47.5 26 Q44 30.5 38 27 Z" fill="#0b0504"/>`+
-    `<path d="M39 28 Q42 33 40 36.5" stroke="#4c100c" stroke-width="2" opacity="0.85" fill="none"/>`+
+    `<path d="M39 28 Q42 33 40 36.5" stroke="#4c100c" stroke-width="2" opacity="0.85" fill="none"/>|/H|`+
     `<path d="M23 33 Q13 40 12 52" stroke="#545646" stroke-width="3.6" fill="none" stroke-linecap="round"/>`+
-    `<path d="M37 33 Q46 36 50 43" stroke="#545646" stroke-width="3.6" fill="none" stroke-linecap="round"/>`+
+    `|A|<path d="M37 33 Q46 36 50 43" stroke="#545646" stroke-width="3.6" fill="none" stroke-linecap="round"/>|/A|`+
     `<path d="M27 58 L25 62 M34 58 L36 62" stroke="#383a2e" stroke-width="2.8"/>`,
-    sharp:gEye(38,20,1.5)+gEye(44,21,1.5)+
-    fangsDown(39,27,7,4,2)+
-    clawsAt(12,52,[75,95,115,55],6)+clawsAt(50,43,[-10,10,30,-30],6)+
+    sharp:`|H|`+gEye(38,20,1.5)+gEye(44,21,1.5)+
+    fangsDown(39,27,7,4,2)+`|/H|`+
+    clawsAt(12,52,[75,95,115,55],6)+`|A|`+clawsAt(50,43,[-10,10,30,-30],6)+`|/A|`+
     drip(41,36,3,'#4c100c')}),
-  gnoll:()=>({o:{lit:'#8a6a3c',mid:'#42301a',eye:'#ffb62a',rough:[3,0.55],seed:25},
-    body:`<path d="M24 12 L20 6 L27 9 L26 4 L31 8 L32 2 L36 8 L41 4 L39 10 L45 7 L41 13 Z" fill="#1f1406"/>`+
+  gnoll:()=>({o:{hp:[33,29],ap:[40,34],lit:'#8a6a3c',mid:'#42301a',eye:'#ffb62a',rough:[3,0.55],seed:25},
+    body:`|H|<path d="M24 12 L20 6 L27 9 L26 4 L31 8 L32 2 L36 8 L41 4 L39 10 L45 7 L41 13 Z" fill="#1f1406"/>`+
     `<path d="M25 12 L22 4 L29 10 Z" fill="#33240f"/>`+
     `<path d="M24 20 Q24 11 33 10 Q41 11 42 17 L49 20 Q51 23 48 26 L42 27 Q40 31 33 30 Q25 29 24 20 Z" fill="url(#bg)" ${RIM}/>`+
     `<circle cx="49" cy="22" r="1.4" fill="#14100a"/>`+
-    `<path d="M41 24 Q45 27 49 24 L48 27.5 Q44 30.5 41 27.5 Z" fill="#0b0504"/>`+
+    `<path d="M41 24 Q45 27 49 24 L48 27.5 Q44 30.5 41 27.5 Z" fill="#0b0504"/>|/H|`+
     `<path d="M25 30 Q20 38 21 48 Q22 57 27 60 L39 60 Q44 53 43 44 Q42 34 38 30 Z" fill="url(#bg)" ${RIM}/>`+
     `<circle cx="27" cy="38" r="1.1" fill="#241708"/><circle cx="33" cy="42" r="1.1" fill="#241708"/><circle cx="28" cy="47" r="1.1" fill="#241708"/><circle cx="35" cy="52" r="1.1" fill="#241708"/><circle cx="38" cy="37" r="1.1" fill="#241708"/>`+
     `<path d="M26 34 Q22 40 23 46" stroke="#33240f" stroke-width="3" fill="none"/>`+
-    `<path d="M40 34 L50 44" stroke="#33240f" stroke-width="3"/>`+
+    `|A|<path d="M40 34 L50 44" stroke="#33240f" stroke-width="3"/>|/A|`+
     `<path d="M28 58 L26 62 M37 58 Q39 60 38 62" stroke="#2c1e0c" stroke-width="3"/>`,
-    sharp:gEye(29,17,1.8,{pupil:1})+gEye(37,17.5,1.7,{pupil:1})+
-    fangsDown(42,24.5,6,3,2.2)+fangsUp(43,27.2,5,2,2)+
-    `<path d="M48 42 L58 46" stroke="#42311e" stroke-width="2.2"/>`+
-    `<path d="M55 39 L63 43 L59 51 L52 47 Z" fill="#565a5e"/><path d="M63 43 L61 45" stroke="#2c2e30" stroke-width="1.2"/>`}),
-  bugbear:()=>({o:{lit:'#6f5238',mid:'#302218',eye:'#ffd24a',rough:[3.6,0.6],seed:27},
-    body:`<path d="M18 26 Q16 16 24 13 Q28 8 34 9 Q42 8 45 14 Q50 17 48 26 Q53 34 51 46 L47 59 L17 59 L13 46 Q11 34 18 26 Z" fill="url(#bg)" ${RIM}/>`+
-    `<circle cx="22" cy="11" r="2.6" fill="#4a3624"/><circle cx="43" cy="11" r="2.6" fill="#4a3624"/>`+
-    `<ellipse cx="32" cy="20" rx="10" ry="8" fill="#54402c" opacity="0.8"/>`+
-    `<path d="M26 25 Q32 29 38 25 L38 27.5 Q32 31.5 26 27.5 Z" fill="#0a0505"/>`+
+    sharp:`|H|`+gEye(29,17,1.8,{pupil:1})+gEye(37,17.5,1.7,{pupil:1})+
+    fangsDown(42,24.5,6,3,2.2)+fangsUp(43,27.2,5,2,2)+`|/H|`+
+    `|A|<path d="M48 42 L58 46" stroke="#42311e" stroke-width="2.2"/>`+
+    `<path d="M55 39 L63 43 L59 51 L52 47 Z" fill="#565a5e"/><path d="M63 43 L61 45" stroke="#2c2e30" stroke-width="1.2"/>|/A|`}),
+  // the hunched trunk now ends at the shoulders, with a shaggy head riding a
+  // short neck above it rather than being sculpted into the same silhouette
+  bugbear:()=>({o:{hp:[32,29],ap:[50,42],aw:-58,as:-4,lit:'#6f5238',mid:'#302218',eye:'#ffd24a',rough:[3.6,0.6],seed:27},
+    body:`<path d="M18 31 Q17 25 24 24 Q32 26.5 40 24 Q47 25 47 31 Q53 34 51 46 L47 59 L17 59 L13 46 Q11 34 18 31 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M27 21 L38 21 L39 28 L26 28 Z" fill="url(#bg)" stroke="#1c1208" stroke-width="0.8"/>`+
+    `<path d="M27 24 Q32.5 26 39 24" stroke="#241a10" stroke-width="1" fill="none" opacity="0.7"/>`+
     `<path d="M18 34 L48 42" stroke="#170f08" stroke-width="3"/>`+
     `<circle cx="33" cy="38.5" r="2.2" fill="#b3a98b"/><circle cx="32.2" cy="38" r="0.6" fill="#14100a"/><circle cx="34" cy="38" r="0.6" fill="#14100a"/>`+
     `<path d="M14 40 Q10 46 12 52 M50 40 Q54 46 52 52" stroke="#3c2c1c" stroke-width="4.4" fill="none" stroke-linecap="round"/>`+
-    `<path d="M24 58 L23 62 M42 58 L43 62" stroke="#1f150c" stroke-width="4.2"/>`,
-    sharp:gEye(29,19,1.4)+gEye(35,19,1.4)+
-    `<path d="M26.5 27.5 L25.5 23.5 L28.5 26.5 Z M37.5 27.5 L38.5 23.5 L35.5 26.5 Z" fill="#d5cba8"/>`+
-    fangsDown(28,25.5,8,4,1.8)+
-    `<path d="M50 42 L59 26" stroke="#33230f" stroke-width="3.2"/>`+
+    `<path d="M24 58 L23 62 M42 58 L43 62" stroke="#1f150c" stroke-width="4.2"/>`+
+    `|H|<path d="M19 20 Q16 12 23 9 Q27 4 33 5 Q41 5 45 11 Q49 14 47 21 Q45 27 32 29 Q22 27.5 19 20 Z" fill="url(#bg)" ${RIM}/>`+
+    `<circle cx="21" cy="11" r="2.8" fill="#4a3624"/><circle cx="44" cy="11" r="2.8" fill="#4a3624"/>`+
+    `<ellipse cx="32" cy="19.5" rx="9.5" ry="7.5" fill="#54402c" opacity="0.8"/>`+
+    `<path d="M26 24.5 Q32 28.5 38 24.5 L38 27 Q32 31 26 27 Z" fill="#0a0505"/>|/H|`,
+    sharp:`|H|`+gEye(29,18.5,1.4)+gEye(35,18.5,1.4)+
+    `<path d="M26.5 27 L25.5 23 L28.5 26 Z M37.5 27 L38.5 23 L35.5 26 Z" fill="#d5cba8"/>`+
+    fangsDown(28,25,8,4,1.8)+`|/H|`+
+    `|A|<path d="M50 42 L59 26" stroke="#33230f" stroke-width="3.2"/>`+
     `<path d="M56 30 L61 19 L64 22 L60 32 Z" fill="#3f3222"/>`+
-    `<path d="M58 27 L60.5 25.5 M59.5 23 L62 22" stroke="#55585c" stroke-width="1.4"/>`}),
-  ogre:()=>({o:{lit:'#8a7148',mid:'#40321e',eye:'#d88a2a',rough:[2.8,0.5],seed:29},
-    body:`<path d="M14 32 Q13 24 22 22 L26 16 Q28 12 33 12 Q38 12 39 17 L42 22 Q51 24 50 32 Q54 42 51 52 L46 60 L18 60 L13 52 Q10 42 14 32 Z" fill="url(#bg)" ${RIM}/>`+
-    `<path d="M27 20 Q27 12.5 33 12.5 Q39 13 39 20 Q39 25 33 26 Q28 25 27 20 Z" fill="url(#bg)" stroke="#100b06" stroke-width="1"/>`+
-    `<ellipse cx="33" cy="19" rx="5.5" ry="5" fill="#8a6a40" opacity="0.6"/>`+
+    `<path d="M58 27 L60.5 25.5 M59.5 23 L62 22" stroke="#55585c" stroke-width="1.4"/>|/A|`}),
+  // the torso stops at the shoulders and a squat neck stub carries the skull,
+  // so the head is its own body and can nod and swing free of the trunk
+  ogre:()=>({o:{hp:[33,26],ap:[14,44],aw:45,as:8,lit:'#8a7148',mid:'#40321e',eye:'#d88a2a',rough:[2.8,0.5],seed:29},
+    body:`<path d="M14 32 Q13 24 22 23 Q26 21 30 21 L36 21 Q40 21 44 23 Q51 24 50 32 Q54 42 51 52 L46 60 L18 60 L13 52 Q10 42 14 32 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M28 16 L38 16 L39 24 L27 24 Z" fill="url(#bg)" stroke="#100b06" stroke-width="0.8"/>`+
+    `<path d="M29 18 Q33 20 37 18" stroke="#2c2112" stroke-width="1" fill="none" opacity="0.7"/>`+
     `<ellipse cx="32" cy="45" rx="15" ry="12" fill="#57431f" opacity="0.3"/><circle cx="32" cy="47" r="1.4" fill="#241a0e"/>`+
     `<circle cx="20" cy="34" r="1.1" fill="#57431f"/><circle cx="45" cy="38" r="1.1" fill="#57431f"/><circle cx="23" cy="52" r="1.1" fill="#57431f"/><circle cx="43" cy="30" r="1" fill="#57431f"/>`+
-    `<path d="M28 22.5 Q33 26.5 38 22.5 L38 24.5 Q33 28.5 28 24.5 Z" fill="#1f1509"/>`+
     `<path d="M24 48 L40 48 L38 56 L26 56 Z" fill="#1f1910"/><path d="M27 49 L27 55 M31 49 L31 56 M35 49 L35 55" stroke="#0f0c07" stroke-width="0.8"/>`+
     `<path d="M23 59 L22 62 M41 59 L42 62" stroke="#1f150c" stroke-width="5"/>`+
-    `<path d="M14 44 L7 30" stroke="#33230f" stroke-width="3.8"/>`,
-    sharp:gEye(29.5,18,1.4)+gEye(36,18,1.4)+
-    `<path d="M28.5 24 L27.5 20 L30.5 23 Z M37.5 24 L38.5 20 L35.5 23 Z" fill="#ddd5b6"/>`+
-    `<path d="M9 33 L2 19 L8 16.5 L13.5 30 Z" fill="#42341f"/><path d="M5 26 L9 24 M4 22 L8 20.5" stroke="#241a0e" stroke-width="1"/>`}),
-  wight:()=>({o:{lit:'#9aa2ac',mid:'#3a3f48',eye:'#86d8ff',rough:[2,0.4],seed:31,
+    `|H|<path d="M26 19 Q26 10 33 10 Q40 10 40 19 Q40 25.5 33 27 Q26 25.5 26 19 Z" fill="url(#bg)" stroke="#100b06" stroke-width="1"/>`+
+    `<ellipse cx="33" cy="17.5" rx="5.5" ry="4.6" fill="#8a6a40" opacity="0.6"/>`+
+    `<path d="M28 21.5 Q33 25.5 38 21.5 L38 23.5 Q33 27.5 28 23.5 Z" fill="#1f1509"/>|/H|`+
+    `|A|<path d="M14 44 L7 30" stroke="#33230f" stroke-width="3.8"/>|/A|`,
+    sharp:`|H|`+gEye(29.5,17,1.4)+gEye(36,17,1.4)+
+    `<path d="M28.5 23 L27.5 19 L30.5 22 Z M37.5 23 L38.5 19 L35.5 22 Z" fill="#ddd5b6"/>|/H|`+
+    `|A|<path d="M9 33 L2 19 L8 16.5 L13.5 30 Z" fill="#42341f"/><path d="M5 26 L9 24 M4 22 L8 20.5" stroke="#241a0e" stroke-width="1"/>|/A|`}),
+  wight:()=>({o:{hp:[33,27],ap:[44,33],lit:'#9aa2ac',mid:'#3a3f48',eye:'#86d8ff',rough:[2,0.4],seed:31,
       extra:`<linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="55%" stop-color="#161920"/><stop offset="100%" stop-color="#161920" stop-opacity="0"/></linearGradient>`},
     body:`<path d="M22 26 Q18 40 20 59 Q26 54 32 60 Q38 54 44 59 Q46 40 42 26 Z" fill="url(#fade)"/>`+
     `<path d="M26 27 Q24 34 25 40 L39 40 Q40 34 38 27 Z" fill="url(#bg)" opacity="0.55"/>`+
-    `<path d="M26 20 Q26 10 33 10 Q40 11 40 19 Q40 26 34 28 Q28 27 26 20 Z" fill="url(#bg)" ${RIM}/>`+
+    `|H|<path d="M26 20 Q26 10 33 10 Q40 11 40 19 Q40 26 34 28 Q28 27 26 20 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M27 21 Q29 22 30 21 M36 21 Q38 22 39 21" stroke="#20242b" stroke-width="1.2" fill="none"/>`+
     `<path d="M30 24.5 L37 24.5" stroke="#0e1014" stroke-width="1"/>`+
     `<path d="M31 24.5 L31 25.8 M33 24.5 L33 26 M35 24.5 L35 25.8" stroke="#b8c0c8" stroke-width="0.7"/>`+
-    `<path d="M26 12 Q23 20 25 27 M40 13 Q43 20 41 26" stroke="#1e2228" stroke-width="1.6" fill="none"/>`+
+    `<path d="M26 12 Q23 20 25 27 M40 13 Q43 20 41 26" stroke="#1e2228" stroke-width="1.6" fill="none"/>|/H|`+
     `<path d="M23 32 Q16 34 14 40" stroke="#68707c" stroke-width="2.6" fill="none" stroke-linecap="round"/>`+
     `<ellipse cx="32" cy="58.5" rx="17" ry="3.6" fill="#aab4c2" opacity="0.1"/>`,
-    sharp:gEye(29.5,17,1.7)+gEye(36.5,17,1.7)+
+    sharp:`|H|`+gEye(29.5,17,1.7)+gEye(36.5,17,1.7)+`|/H|`+
     clawsAt(14,40,[70,90,110,50],5.5,'#aeb6c0')+
-    `<path d="M45 33 L53 52 L50 54 L43 36 Z" fill="#56534c"/>`+
-    `<path d="M47 40 L49 42 M48.5 46 L50.5 47.5" stroke="#6b3a22" stroke-width="1.2" opacity="0.8"/>`}),
-  wightnec:()=>({o:{lit:'#6a5a80',mid:'#282036',eye:'#c08aff',rough:[2,0.4],seed:33,
+    `|A|<path d="M45 33 L53 52 L50 54 L43 36 Z" fill="#56534c"/>`+
+    `<path d="M47 40 L49 42 M48.5 46 L50.5 47.5" stroke="#6b3a22" stroke-width="1.2" opacity="0.8"/>|/A|`}),
+  wightnec:()=>({o:{hp:[32,27],ap:[41,34],lit:'#6a5a80',mid:'#282036',eye:'#c08aff',rough:[2,0.4],seed:33,
       extra:glowGrad('og','#a06ae0')+`<linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="55%" stop-color="#1c1628"/><stop offset="100%" stop-color="#1c1628" stop-opacity="0"/></linearGradient>`},
     body:`<path d="M22 26 Q18 40 20 60 Q26 55 32 61 Q38 55 44 60 Q46 40 42 26 Z" fill="url(#fade)"/>`+
-    `<path d="M23 22 Q22 8 32 7 Q42 8 41 22 Q41 27 32 28 Q23 27 23 22 Z" fill="#1f1830"/>`+
-    `<ellipse cx="32" cy="19" rx="6.5" ry="7" fill="#040307"/>`+
+    `|H|<path d="M23 22 Q22 8 32 7 Q42 8 41 22 Q41 27 32 28 Q23 27 23 22 Z" fill="#1f1830"/>`+
+    `<ellipse cx="32" cy="19" rx="6.5" ry="7" fill="#040307"/>|/H|`+
     `<path d="M30 30 L34 30 L35 52 L29 52 Z" fill="#151021"/>`+
     `<path d="M31 33 h2 M31 37 l2 2 m0 -2 l-2 2 M31.4 43 h1.6 m-0.8 -0.8 v1.6" stroke="#8a6ab8" stroke-width="0.8" opacity="0.85"/>`+
-    `<path d="M41 34 Q45 33 47 34" stroke="#b8b0c8" stroke-width="1.8" fill="none"/>`,
-    sharp:gEye(29.5,19,1.4)+gEye(34.5,19,1.4)+
-    `<path d="M49 8 L48 58" stroke="#2a2114" stroke-width="2.4"/>`+
+    `|A|<path d="M41 34 Q45 33 47 34" stroke="#b8b0c8" stroke-width="1.8" fill="none"/>|/A|`,
+    sharp:`|H|`+gEye(29.5,19,1.4)+gEye(34.5,19,1.4)+`|/H|`+
+    `|A|<path d="M49 8 L48 58" stroke="#2a2114" stroke-width="2.4"/>`+
     `<circle cx="49" cy="8" r="4.2" fill="#b8ae90"/>`+
     `<path d="M46 5 Q44 2 46 1 M52 5 Q54 2 52 1" stroke="#b8ae90" stroke-width="1.4" fill="none"/>`+
     `<circle cx="47.6" cy="7.4" r="0.9" fill="#a06ae0"/><circle cx="50.4" cy="7.4" r="0.9" fill="#a06ae0"/>`+
-    `<circle cx="49" cy="16" r="6" fill="url(#og)"/><circle cx="49" cy="16" r="2" fill="#e0ccff"/>`+
+    `<circle cx="49" cy="16" r="6" fill="url(#og)"/><circle cx="49" cy="16" r="2" fill="#e0ccff"/>|/A|`+
     `<path d="M14 22 l3 0 m-1.5 -1.5 l0 3 M11 34 l3 3 m0 -3 l-3 3 M16 45 l2.6 0" stroke="#a06ae0" stroke-width="1" opacity="0.7"/>`}),
-  minotaur:()=>({o:{lit:'#7a4c30',mid:'#361e10',eye:'#ff3a1e',rough:[2.6,0.5],seed:35,
+  minotaur:()=>({o:{hp:[32,32],ap:[46,30],lit:'#7a4c30',mid:'#361e10',eye:'#ff3a1e',rough:[2.6,0.5],seed:35,
       extra:`<linearGradient id="horn" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ddd3b4"/><stop offset="100%" stop-color="#7d7560"/></linearGradient>`},
     body:`<path d="M14 36 Q14 30 22 32 Q26 34 32 34 Q38 34 42 32 Q50 30 50 36 Q52 46 49 54 L44 61 L20 61 L15 54 Q12 46 14 36 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M32 36 L32 50 M23 41 Q32 44 41 41" stroke="#1c0f06" stroke-width="1.4" opacity="0.85" fill="none"/>`+
     `<path d="M16 48 Q24 52 32 52 Q40 52 48 48 L47 54 L17 54 Z" fill="#241207" opacity="0.7"/>`+
-    `<path d="M24 20 Q24 10 32 9 Q40 10 40 20 L40 24 Q40 32 32 33 Q24 32 24 24 Z" fill="url(#bg)" ${RIM}/>`+
+    `|H|<path d="M24 20 Q24 10 32 9 Q40 10 40 20 L40 24 Q40 32 32 33 Q24 32 24 24 Z" fill="url(#bg)" ${RIM}/>`+
     `<ellipse cx="32" cy="28" rx="7" ry="5.5" fill="#4c2e18"/>`+
     `<ellipse cx="29.5" cy="28.5" rx="1.5" ry="2" fill="#0d0603" transform="rotate(-15 29.5 28.5)"/>`+
-    `<ellipse cx="34.5" cy="28.5" rx="1.5" ry="2" fill="#0d0603" transform="rotate(15 34.5 28.5)"/>`+
+    `<ellipse cx="34.5" cy="28.5" rx="1.5" ry="2" fill="#0d0603" transform="rotate(15 34.5 28.5)"/>|/H|`+
     `<path d="M24 60 L23 63 M40 60 L41 63" stroke="#1c0d04" stroke-width="4.6"/>`+
-    `<path d="M46 30 L58 50" stroke="#33230f" stroke-width="2.8"/>`,
-    sharp:`<path d="M23 14 Q10 12 8 2 Q17 5 22 9 Q24.5 11 24.5 14 Z" fill="url(#horn)" stroke="#141008" stroke-width="0.8"/>`+
+    `|A|<path d="M46 30 L58 50" stroke="#33230f" stroke-width="2.8"/>|/A|`,
+    sharp:`|H|<path d="M23 14 Q10 12 8 2 Q17 5 22 9 Q24.5 11 24.5 14 Z" fill="url(#horn)" stroke="#141008" stroke-width="0.8"/>`+
     `<path d="M41 14 Q54 12 56 2 Q47 5 42 9 Q39.5 11 39.5 14 Z" fill="url(#horn)" stroke="#141008" stroke-width="0.8"/>`+
     gEye(28,17,1.8)+gEye(36,17,1.8)+
     `<path d="M30 32.5 Q32 35 34 32.5" stroke="#8a8c90" stroke-width="1.4" fill="none"/>`+
-    `<path d="M27 24 Q26 21 28 20 M37 24 Q38 21 36 20" stroke="#c8ccd4" stroke-width="0.7" opacity="0.35" fill="none"/>`+
-    `<path d="M43 25 Q51 20 54 27 Q48 28 46 31 Z" fill="#565a5e"/><path d="M48 25 L51 27" stroke="#6a1210" stroke-width="1.3"/>`}),
-  troll:()=>({o:{lit:'#5c7050',mid:'#242e1d',eye:'#d8e04a',rough:[4,0.65],seed:37},
-    body:`<path d="M27 8 L24 3 L29 6 L30 1 L33 5 L37 2 L38 7 Z" fill="#131a0e"/>`+
+    `<path d="M27 24 Q26 21 28 20 M37 24 Q38 21 36 20" stroke="#c8ccd4" stroke-width="0.7" opacity="0.35" fill="none"/>|/H|`+
+    `|A|<path d="M43 25 Q51 20 54 27 Q48 28 46 31 Z" fill="#565a5e"/><path d="M48 25 L51 27" stroke="#6a1210" stroke-width="1.3"/>|/A|`}),
+  troll:()=>({o:{hp:[33,21],ap:[40,26],lit:'#5c7050',mid:'#242e1d',eye:'#d8e04a',rough:[4,0.65],seed:37},
+    body:`|H|<path d="M27 8 L24 3 L29 6 L30 1 L33 5 L37 2 L38 7 Z" fill="#131a0e"/>`+
     `<path d="M26 14 Q26 6 33 6 Q40 7 40 14 Q40 20 33 21 Q26 20 26 14 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M32 13 Q29.5 19 33 22 Q35.5 19.5 34 14 Z" fill="#42543a"/>`+
-    `<path d="M28 17 Q33 20 38 16 L38 18.5 Q33 22.5 28 19.5 Z" fill="#0a0705"/>`+
+    `<path d="M28 17 Q33 20 38 16 L38 18.5 Q33 22.5 28 19.5 Z" fill="#0a0705"/>|/H|`+
     `<path d="M27 21 Q20 26 20 36 Q19 46 24 52 L28 58 L38 58 Q43 50 42 40 Q42 27 37 21 Z" fill="url(#bg)" ${RIM}/>`+
     `<circle cx="25" cy="30" r="1.2" fill="#39482f"/><circle cx="38" cy="34" r="1.2" fill="#39482f"/><circle cx="23" cy="42" r="1.2" fill="#39482f"/><circle cx="36" cy="47" r="1.1" fill="#39482f"/><circle cx="29" cy="26" r="1" fill="#39482f"/>`+
     `<path d="M22 26 Q10 36 9 54" stroke="#39482f" stroke-width="3.8" fill="none" stroke-linecap="round"/>`+
-    `<path d="M40 26 Q52 36 52 52" stroke="#39482f" stroke-width="3.8" fill="none" stroke-linecap="round"/>`+
+    `|A|<path d="M40 26 Q52 36 52 52" stroke="#39482f" stroke-width="3.8" fill="none" stroke-linecap="round"/>|/A|`+
     `<path d="M29 57 L27 62 M36 57 L38 62" stroke="#28331f" stroke-width="3.2"/>`,
-    sharp:gEye(29,13,1.4)+gEye(36,13,1.4)+
+    sharp:`|H|`+gEye(29,13,1.4)+gEye(36,13,1.4)+
     `<path d="M28.5 18 L27.5 13.5 L30.5 16.5 Z M37.5 17 L38.5 12.5 L35.5 15.5 Z" fill="#d5cba8"/>`+
-    clawsAt(9,54,[70,90,110,50],6)+clawsAt(52,52,[70,90,110,130],6)+
-    drip(33,21,4,'#7da53c')}),
-  ogremage:()=>({o:{lit:'#3c5a80',mid:'#1a2740',eye:'#a0e8ff',rough:[2.2,0.4],seed:39,
+    clawsAt(9,54,[70,90,110,50],6)+`|A|`+clawsAt(52,52,[70,90,110,130],6)+`|/A|`+
+    drip(33,21,4,'#7da53c')+`|/H|`}),
+  ogremage:()=>({o:{hp:[32,29],ap:[48,40],lit:'#3c5a80',mid:'#1a2740',eye:'#a0e8ff',rough:[2.2,0.4],seed:39,
       extra:glowGrad('og','#7ec8e8')+`<linearGradient id="horn" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ddd3b4"/><stop offset="100%" stop-color="#7d7560"/></linearGradient>`},
     body:`<path d="M20 16 Q14 8 18 4 M44 16 Q50 8 46 4" stroke="#c8ccd4" stroke-width="0" fill="none"/>`+
-    `<path d="M22 20 Q16 22 14 18 Q18 14 21 12 Q19 8 23 6 Q25 10 26 12 Q29 8 32 8 Q35 8 38 12 Q39 10 41 6 Q45 8 43 12 Q46 14 50 18 Q48 22 42 20 Z" fill="#b8bec8" opacity="0.85"/>`+
+    `|H|<path d="M22 20 Q16 22 14 18 Q18 14 21 12 Q19 8 23 6 Q25 10 26 12 Q29 8 32 8 Q35 8 38 12 Q39 10 41 6 Q45 8 43 12 Q46 14 50 18 Q48 22 42 20 Z" fill="#b8bec8" opacity="0.85"/>`+
     `<path d="M25 20 Q25 10 32 10 Q39 10 39 20 Q39 27 32 29 Q25 27 25 20 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M26 17 L31 18.5 M38 17 L33 18.5" stroke="#0c1220" stroke-width="1.6"/>`+
-    `<path d="M28 25 Q32 28 36 25" stroke="#0c1220" stroke-width="1.4" fill="none"/>`+
+    `<path d="M28 25 Q32 28 36 25" stroke="#0c1220" stroke-width="1.4" fill="none"/>|/H|`+
     `<path d="M20 30 Q17 40 19 50 L24 60 L40 60 L45 50 Q47 40 44 30 Z" fill="#1e222c"/>`+
     `<path d="M22 32 Q32 36 42 32 M21 40 Q32 44 43 40" stroke="#8a7030" stroke-width="0.9" opacity="0.6" fill="none"/>`+
     `<path d="M40 30 L24 52" stroke="#4c1620" stroke-width="3.4"/>`+
     `<path d="M22 34 Q18 33 17 32" stroke="#31517a" stroke-width="2.6" fill="none"/>`+
     `<path d="M26 59 L25 62 M39 59 L40 62" stroke="#161a22" stroke-width="4"/>`,
-    sharp:`<path d="M26 12 Q22 4 27 1 Q29 6 29 11 Z" fill="url(#horn)" stroke="#141008" stroke-width="0.7"/>`+
+    sharp:`|H|<path d="M26 12 Q22 4 27 1 Q29 6 29 11 Z" fill="url(#horn)" stroke="#141008" stroke-width="0.7"/>`+
     `<path d="M38 12 Q42 4 37 1 Q35 6 35 11 Z" fill="url(#horn)" stroke="#141008" stroke-width="0.7"/>`+
     gEye(28,17.5,1.6)+gEye(36,17.5,1.6)+
-    `<path d="M29 26.5 L28.5 23.5 L31 26 Z M35 26.5 L35.5 23.5 L33 26 Z" fill="#ddd5b6"/>`+
+    `<path d="M29 26.5 L28.5 23.5 L31 26 Z M35 26.5 L35.5 23.5 L33 26 Z" fill="#ddd5b6"/>|/H|`+
     `<circle cx="15" cy="30" r="6.5" fill="url(#og)"/><circle cx="15" cy="30" r="2.2" fill="#dff4ff"/>`+
     `<circle cx="10" cy="25" r="0.8" fill="#c8e8f8" opacity="0.8"/><circle cx="20" cy="24" r="0.7" fill="#c8e8f8" opacity="0.7"/><circle cx="9" cy="35" r="0.7" fill="#c8e8f8" opacity="0.6"/>`+
-    `<path d="M49 12 L48 58" stroke="#2a2114" stroke-width="2.2"/>`+
-    `<path d="M49 12 Q55 6 53 1 Q48 5 48 12 Z" fill="#848a90"/>`}),
-  dragon:()=>({o:{lit:'#8a3020',mid:'#3c1108',eye:'#ffd23a',rough:[2.4,0.45],seed:41,
+    `|A|<path d="M49 12 L48 58" stroke="#2a2114" stroke-width="2.2"/>`+
+    `<path d="M49 12 Q55 6 53 1 Q48 5 48 12 Z" fill="#848a90"/>|/A|`}),
+  dragon:()=>({o:{hp:[46,26],ap:[34,30],lit:'#8a3020',mid:'#3c1108',eye:'#ffd23a',rough:[2.4,0.45],seed:41,
       extra:glowGrad('og','#ff8c1e')+`<linearGradient id="wg" x1="0" y1="1" x2="0.6" y2="0"><stop offset="0%" stop-color="#7a3020"/><stop offset="100%" stop-color="#2a0c06"/></linearGradient>`},
     body:`<path d="M22 34 Q8 26 4 8 Q14 16 18 14 Q20 20 24 20 Q24 28 26 32 Z" fill="url(#wg)" stroke="#c08a4a" stroke-opacity="0.3" stroke-width="1"/>`+
     `<path d="M8 12 L22 32 M13 13 L24 28 M18 15 L25 24" stroke="#190805" stroke-width="1.1" opacity="0.9"/>`+
-    `<path d="M34 30 Q30 20 34 10 Q38 16 42 16 Q40 24 42 30 Z" fill="url(#wg)" stroke="#c08a4a" stroke-opacity="0.3" stroke-width="1"/>`+
-    `<path d="M35 12 L36 28 M38 15 L38.5 28" stroke="#190805" stroke-width="1.1" opacity="0.9"/>`+
+    `|A|<path d="M34 30 Q30 20 34 10 Q38 16 42 16 Q40 24 42 30 Z" fill="url(#wg)" stroke="#c08a4a" stroke-opacity="0.3" stroke-width="1"/>`+
+    `<path d="M35 12 L36 28 M38 15 L38.5 28" stroke="#190805" stroke-width="1.1" opacity="0.9"/>|/A|`+
     `<path d="M18 52 Q6 56 8 46 Q9 42 14 42" stroke="#4c1a10" stroke-width="3.4" fill="none" stroke-linecap="round"/>`+
     `<path d="M8 46 L4 43 L6 49 Z" fill="#4c1a10"/>`+
     `<path d="M20 40 Q22 32 30 32 Q42 30 48 38 Q52 44 50 50 Q48 58 38 58 L24 58 Q18 52 20 40 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M24 48 Q32 51 42 49 M24 52 Q32 55 42 53" stroke="#a8663a" stroke-width="1.6" opacity="0.55" fill="none"/>`+
     `<path d="M42 36 Q46 28 46 20 L52 22 Q52 30 48 38 Z" fill="url(#bg)"/>`+
     `<path d="M44 32 L41.5 30.5 M45.5 27 L43 25.5 M46 22 L43.5 21" stroke="#2c0c06" stroke-width="1.3"/>`+
-    `<path d="M44 14 Q44 8 50 8 Q57 8 60 14 Q56 15 54 15 L58 19 Q54 22 48 20 Q44 19 44 14 Z" fill="url(#bg)" ${RIM}/>`+
-    `<path d="M48 20 Q52 24 58 22 L56 25.5 Q50 26.5 47 22 Z" fill="#260a05"/>`+
+    `|H|<path d="M44 14 Q44 8 50 8 Q57 8 60 14 Q56 15 54 15 L58 19 Q54 22 48 20 Q44 19 44 14 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M48 20 Q52 24 58 22 L56 25.5 Q50 26.5 47 22 Z" fill="#260a05"/>|/H|`+
     `<path d="M26 57 L25 61 M36 57 L37 61" stroke="#2c0e08" stroke-width="3"/>`,
-    sharp:`<path d="M47 9 Q45 4 48 2 Q50 6 50 9 Z M52 9 Q52 4 55 3 Q55 7 54 10 Z" fill="#b8a888"/>`+
+    sharp:`|H|<path d="M47 9 Q45 4 48 2 Q50 6 50 9 Z M52 9 Q52 4 55 3 Q55 7 54 10 Z" fill="#b8a888"/>`+
     gEye(52,13,1.6,{slit:1})+
     `<circle cx="54" cy="21.5" r="4" fill="url(#og)"/>`+
-    fangsDown(49,19.5,8,4,1.8,'#e8dfc0')+fangsUp(50,24.5,7,3,1.7,'#e8dfc0')+
+    fangsDown(49,19.5,8,4,1.8,'#e8dfc0')+fangsUp(50,24.5,7,3,1.7,'#e8dfc0')+`|/H|`+
     `<path d="M60 12 Q62 8 61 4 M62 14 Q65 12 65 9" stroke="#8a8a8a" stroke-width="0.9" opacity="0.35" fill="none"/>`+
     `<circle cx="58" cy="26" r="0.8" fill="#ff8c1e" opacity="0.8"/><circle cx="61" cy="17" r="0.7" fill="#ffb84a" opacity="0.7"/><circle cx="44" cy="10" r="0.6" fill="#ff8c1e" opacity="0.6"/>`}),
 };
-// pose transforms pivoting at the feet (32,62): breathing, gait lean, rear-up, lunge
+// pose transforms pivoting at the feet (32,62): breathing, gait lean, coil, lunge.
+// the body scale is squash-and-stretch, so the head travels while the feet stay planted
 function poseXf(pose){
   const S=(sx,sy)=>`translate(32 62) scale(${sx} ${sy}) translate(-32 -62)`;
   switch(pose){
-    case 'idle1': return S(1.025,0.972);
-    case 'walk0': return `rotate(-3.5 32 62) translate(0 -0.8)`;
-    case 'walk1': return `rotate(3.5 32 62) translate(0 -0.8)`;
-    case 'windup':return `rotate(-6 32 62) ${S(1.05,1.09)}`;
-    case 'strike':return `translate(0 1) ${S(1.17,1.1)}`;
+    case 'idle1': return S(1.03,0.955);
+    case 'walk0': return `rotate(-4 32 62) ${S(1.035,0.95)}`;
+    case 'walk1': return `rotate(4 32 62) ${S(0.985,1.05)}`;
+    case 'windup':return `rotate(-12 32 62) ${S(1.02,1.08)}`;
+    case 'strike':return `translate(0 1) rotate(7 32 62) ${S(1.16,0.965)}`;
     default: return '';
   }
+}
+// the head bobs and nods on its neck pivot: down on the planted step, up and
+// back as the blow is wound, thrust forward as it lands
+function headXf(pose,p){
+  const [x,y]=p, R=(a)=>`rotate(${a} ${x} ${y})`;
+  switch(pose){
+    case 'idle0': return `translate(0 0.35)`;
+    case 'idle1': return `translate(0 -0.5) ${R(-2.5)}`;
+    case 'walk0': return `translate(0 -0.7) ${R(-5)}`;
+    case 'walk1': return `translate(0 0.6) ${R(4.5)}`;
+    case 'windup':return `translate(0 -0.6) ${R(-11)}`;
+    case 'strike':return `translate(0 0.9) ${R(9)}`;
+    default: return '';
+  }
+}
+// the weapon arm swings on its shoulder: hauled up and back to telegraph,
+// then driven down and through on the strike
+function armXf(pose,p,o){
+  const d=o.ad||1,[x,y]=p,R=(a)=>`rotate(${(a).toFixed(1)} ${x} ${y})`;
+  switch(pose){
+    case 'idle1': return R(-3*d);
+    case 'walk0': return R(-11*d);
+    case 'walk1': return R(9*d);
+    case 'windup':return `translate(-3 -1.5) ${R(o.aw!==undefined?o.aw:-52*d)}`;
+    case 'strike':return `translate(1 1) ${R(o.as!==undefined?o.as:30*d)}`;
+    default: return '';
+  }
+}
+// art strings carry |H|..|/H| and |A|..|/A| markers around the head and weapon
+// arm, so those parts can be pulled out and animated apart from the torso
+function splitLayers(s){
+  const out={base:'',head:'',arm:''};
+  if(!s)return out;
+  const re=/\|(\/?)(H|A)\|/g;
+  let m,last=0,mode='base';
+  while((m=re.exec(s))){
+    out[mode]+=s.slice(last,m.index);
+    last=re.lastIndex;
+    mode=m[1]==='/'?'base':(m[2]==='H'?'head':'arm');
+  }
+  out[mode]+=s.slice(last);
+  return out;
 }
 function monsterSVG(key,boss,pose){
   const a=(MONSTER_ART[key]||MONSTER_ART.goblin)();
@@ -974,7 +1026,19 @@ function monsterSVG(key,boss,pose){
   // windup frame flares an eye-colored aura as the warning
   const flare=pose==='windup'?`<ellipse cx="32" cy="30" rx="26" ry="27" fill="url(#eg)" opacity="0.17"/>`:'';
   const xf=poseXf(pose);
-  return `<svg xmlns="${SVGNS}" viewBox="0 0 64 64">${defs}${ground}<g${xf?` transform="${xf}"`:''}>${flare}<g filter="url(#rf)">${a.body}</g>${a.sharp||''}${crown}</g></svg>`;
+  const B=splitLayers(a.body),S=splitLayers(a.sharp||'');
+  // each layer keeps its own roughness pass so the displacement stays clipped
+  // to that part's own silhouette rather than the whole creature's
+  const layer=(bd,sh,tf)=>{
+    if(!bd&&!sh)return '';
+    const inner=(bd?`<g filter="url(#rf)">${bd}</g>`:'')+sh;
+    return tf?`<g transform="${tf}">${inner}</g>`:inner;
+  };
+  const hp=o.hp||[32,30],ap=o.ap||[46,36];
+  const parts=layer(B.base,S.base,'')
+    +layer(B.head,S.head,headXf(pose,hp))
+    +layer(B.arm,S.arm,armXf(pose,ap,o));
+  return `<svg xmlns="${SVGNS}" viewBox="0 0 64 64">${defs}${ground}<g${xf?` transform="${xf}"`:''}>${flare}${parts}${crown}</g></svg>`;
 }
 /* ---------- trap flash drawings (shown for an instant when a trap fires) ---------- */
 // one spear thrust up from the floor (steel leaf-blade on a wooden shaft, bloodied)
@@ -1719,6 +1783,7 @@ const LIQ_FRAG_DECL=`#include <common>
 uniform float uTime;
 uniform vec2 uFlow;
 uniform float uWorld;
+uniform vec2 uEdge;
 varying vec2 vLiqPos;
 // value-noise fbm: the liquid is computed, not sampled, so it can never tile
 float lqHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);}
@@ -1732,36 +1797,64 @@ float lqFbm(vec2 p){
   float v=0.0,a=0.5;
   for(int i=0;i<3;i++){v+=a*lqNoise(p);p=p*2.03+vec2(17.0,9.2);a*=0.5;}
   return v;
-}`;
+}
+float lqFbm2(vec2 p){return 0.5*lqNoise(p)+0.25*lqNoise(p*2.03+vec2(17.0,9.2));}
+// surface height: swell plus transverse ripples riding the current, the way
+// real flowing water crests across its direction of travel. det fades the
+// short waves out with distance so they never alias into moire.
+float lqWave(vec2 p,vec2 f,float t,float det){
+  float n=lqFbm2(p*1.2);
+  float v=lqFbm2(p*2.1+vec2(t*0.15,-t*0.11));
+  v+=det*0.15*sin(dot(p,f)*7.0-t*2.6+n*6.283);
+  v+=det*0.07*sin(dot(p,vec2(-f.y,f.x))*11.0+t*1.7);
+  return v;
+}
+vec2 lqDomain(vec2 uv,vec2 lp,float t){return (mix(uv*vec2(3.0,1.2),lp,uWorld)-uFlow*(t*8.0))*2.6;}
+vec2 lqDir(){return length(uFlow)>0.0001?normalize(uFlow):vec2(0.0,1.0);}`;
 const LIQ_FRAG_MAP=`{
   float t=uTime;
-  // world-space domain advected along the flow; the fall keeps stretched uvs
-  vec2 wp=mix(vUv*vec2(3.0,1.2),vLiqPos,uWorld);
-  vec2 p=(wp-uFlow*(t*8.0))*2.6;
+  vec2 p=lqDomain(vUv,vLiqPos,t);
   // domain warp: two fbm fields bend the sampling domain so the murk swirls
   vec2 w=vec2(lqFbm(p*0.5+vec2(0.0,t*0.05)),lqFbm(p*0.5+vec2(5.2,1.3-t*0.04)));
   float h=lqFbm(p+(w-0.5)*2.6);
   float d=lqFbm(p*0.43-(w-0.5)*1.8+vec2(3.7,8.1));
-  vec3 deep=vec3(0.045,0.085,0.025);
-  vec3 mid =vec3(0.14,0.24,0.07);
+  // deep water is nearly black; only the churned-up murk carries the green
+  vec3 deep=vec3(0.028,0.056,0.018);
+  vec3 mid =vec3(0.145,0.25,0.07);
   vec3 col=mix(deep,mid,smoothstep(0.15,0.95,h*0.55+d*0.55));
   // sparse pale scum ribbons where the swirled field crests
   float scum=smoothstep(0.72,0.92,h)*smoothstep(0.85,0.45,d);
   col+=scum*vec3(0.07,0.11,0.035);
+  // banks: the channel shallows at its edges, showing the silted bed, and
+  // scummy foam piles up against the stonework in a ragged line
+  float side=dot(vUv,uEdge);
+  float bank=(1.0-smoothstep(0.0,0.30,min(side,1.0-side)))*(uEdge.x+uEdge.y);
+  col=mix(col,vec3(0.075,0.085,0.040),bank*0.55);
+  float foam=bank*smoothstep(0.42,0.72,lqFbm(p*1.6+vec2(0.0,t*0.25)));
+  col=mix(col,vec3(0.20,0.23,0.13),foam*0.7);
   diffuseColor.rgb*=col;
 }`;
 const LIQ_FRAG_NORMAL=`{
   float t=uTime;
-  vec2 wp=mix(vUv*vec2(3.0,1.2),vLiqPos,uWorld);
-  vec2 np=(wp-uFlow*(t*8.0))*2.6;
+  vec2 np=lqDomain(vUv,vLiqPos,t),fd=lqDir();
   vec2 dSTdx=dFdx(np),dSTdy=dFdy(np);
   // fade ripples as the pixel footprint grows so distant liquid stays calm
   float fw=max(length(dSTdx),length(dSTdy));
-  float fade=exp2(-fw*10.0);
-  #define LIQH(p) (lqFbm((p)*2.1+vec2(t*0.15,-t*0.11)))
-  float Hll=LIQH(np);
-  vec2 dHdxy=vec2(LIQH(np+dSTdx)-Hll,LIQH(np+dSTdy)-Hll)*(0.3*fade);
+  float det=exp2(-fw*10.0);
+  float Hll=lqWave(np,fd,t,det);
+  vec2 dHdxy=vec2(lqWave(np+dSTdx,fd,t,det)-Hll,lqWave(np+dSTdy,fd,t,det)-Hll)*0.16;
   normal=perturbNormalArb(-vViewPosition,normal,dHdxy,faceDirection);
+}`;
+// Fresnel: water is nearly transparent looked at head-on and turns mirror-like
+// at grazing angles. Boosting the specular lobe and damping the diffuse by the
+// same Schlick term is what makes a surface read as liquid rather than paint.
+const LIQ_FRAG_LIGHTS=`#include <lights_fragment_end>
+{
+  float fres=pow(1.0-clamp(dot(normalize(vViewPosition),normal),0.0,1.0),5.0);
+  reflectedLight.directSpecular*=1.0+2.6*fres;
+  reflectedLight.directDiffuse*=1.0-0.20*fres;
+  reflectedLight.indirectDiffuse*=1.0-0.26*fres;
+  reflectedLight.directSpecular+=fres*vec3(0.062,0.072,0.045); // dim tunnel sheen
 }`;
 function shade(hex,f){ // lighten (f>0) or darken (f<0) a #rrggbb color
   const n=parseInt(hex.slice(1),16);
@@ -2236,34 +2329,36 @@ function buildLevel(L){
   // sewers: putrid liquid — sunken lake pits, corridor rivers, wall pipes
   if(th.name==='Sewers'){
     const liqCv=liquidCanvas();
-    const mkLiquid=(sx,sy,world)=>{ // each flow direction gets its own shader-driven material
+    // edge: which uv axis crosses the channel, so foam can gather on the banks
+    const mkLiquid=(sx,sy,world,ex,ey)=>{ // each flow direction gets its own shader-driven material
       const tex=texFromCanvas(liqCv);
       tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
       R3.liquidFlows.push({tex}); // kept for disposal; motion lives in the shader
-      // modest gloss: ripple normals break the torch glare into moving glints.
-      // the faint green emissive makes the sewage glow softly in the dark,
-      // holding its sickly hue instead of going brown under the warm torch
+      // tight specular: the wave normals shatter the torch into moving glints,
+      // and a faint green emissive keeps the murk glowing in the dark
       const mat=new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,bumpScale:0.02,
-        specular:0x28321a,shininess:30,emissive:0x12260a,emissiveIntensity:0.4});
+        specular:0x2a3420,shininess:34,emissive:0x102208,emissiveIntensity:0.46});
       mat.onBeforeCompile=(sh)=>{
         sh.uniforms.uTime={value:0};
         sh.uniforms.uFlow={value:new THREE.Vector2(sx,sy)};
         sh.uniforms.uWorld={value:world?1:0};
+        sh.uniforms.uEdge={value:new THREE.Vector2(ex||0,ey||0)};
         sh.vertexShader=sh.vertexShader
           .replace('#include <common>',LIQ_VERT_DECL)
           .replace('#include <project_vertex>',LIQ_VERT_POS);
         sh.fragmentShader=sh.fragmentShader
           .replace('#include <common>',LIQ_FRAG_DECL)
           .replace('#include <map_fragment>',LIQ_FRAG_MAP)
-          .replace('#include <normal_fragment_maps>',LIQ_FRAG_NORMAL);
+          .replace('#include <normal_fragment_maps>',LIQ_FRAG_NORMAL)
+          .replace('#include <lights_fragment_end>',LIQ_FRAG_LIGHTS);
         R3.liquidShaders.push(sh);
       };
       return mat;
     };
-    const poolMat=mkLiquid(0.012,0.009,true);   // lakes & puddles drift slowly
-    const riverMatZ=mkLiquid(0.005,0.06,true);  // rivers crawl along their channel
-    const riverMatX=mkLiquid(0.06,0.005,true);
-    const fallMat=mkLiquid(0,-0.5,false);       // pipe spill races down mesh uvs
+    const poolMat=mkLiquid(0.012,0.009,true);        // lakes & puddles drift slowly
+    const riverMatZ=mkLiquid(0.005,0.06,true,1,0);   // rivers crawl along their channel
+    const riverMatX=mkLiquid(0.06,0.005,true,0,1);
+    const fallMat=mkLiquid(0,-0.5,false);            // pipe spill races down mesh uvs
     const bedMat=new THREE.MeshPhongMaterial({color:0x11150a,shininess:2});
     const m4b=new THREE.Matrix4();
     // lake pits: liquid surface sunk below floor level, ringed by a stone lip
