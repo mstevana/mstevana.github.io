@@ -17,6 +17,8 @@
     --distillery:#9A6A2F;
     --castle:#6E3B57;
     --viewpoint:#2E7D5B;
+    --mark-fill:#F7E9A8;
+    --mark-line:#C9A227;
   }
   *{box-sizing:border-box;}
   html,body{height:100%;margin:0;}
@@ -265,7 +267,11 @@
     border:1px solid var(--line);
     margin-bottom:6px;
     touch-action:none;
+    user-select:none;
   }
+  /* Held down, before the long-press registers — gives the gesture visible feedback. */
+  .path-row.press-hold{ background:#FBF7E4; }
+  .path-row.marked{ background:var(--mark-fill); border-color:var(--mark-line); }
   .path-row.path-row-dragging{
     box-shadow:0 6px 16px rgba(0,0,0,0.18);
     z-index:5;
@@ -329,6 +335,32 @@
     min-height:16px;
   }
   .path-leg-icon{ color:#2E86FF; }
+
+  /* Marked-range bracket: absolutely positioned in the gutter the list opens up on
+     the left while exactly two stops are marked, spanning first→last marked row. */
+  .path-list{ position:relative; }
+  .path-list.has-bracket{ padding-left:13px; }
+  .path-bracket{
+    position:absolute;
+    left:0;
+    width:7px;
+    border:1.5px solid var(--mark-line);
+    border-right:none;
+    border-radius:4px 0 0 4px;
+    pointer-events:none;
+  }
+  .path-span{
+    margin:-1px 0 6px 22px;
+    padding:5px 8px;
+    border-radius:6px;
+    background:var(--mark-fill);
+    border:1px solid var(--mark-line);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    color:rgba(27,29,27,0.7);
+  }
+  .path-span b{ color:var(--ink); font-weight:600; }
+
   .path-total{
     margin-top:8px;
     padding:9px 10px;
@@ -1258,6 +1290,11 @@ let filterQuery = '';
 const pathLocById = {};
 let selectedPath = [];      // ordered array of pathLocById keys
 
+// Up to two stops the user has long-pressed to mark, so the column can show the
+// partial distance across that stretch. Deliberately transient: never encoded into
+// the path code, the URL, or localStorage.
+let markedIds = [];
+
 // Markup for the "add to path" / "remove from path" button shown in a location's popup.
 // Regenerated on every popup open (see bindPopup(() => ...) below) so it reflects the
 // current selection state.
@@ -1422,10 +1459,74 @@ function removeFromPath(id){
   if (!loc) return false;
   if (!confirm(`Remove "${loc.name}" from your path?`)) return false;
   selectedPath = selectedPath.filter(x => x !== id);
+  markedIds = markedIds.filter(x => x !== id); // a stop that's gone can't stay marked
   renderPathColumn();
   updatePathLine();
   persistPath();
   return true;
+}
+
+/* ============ MARKED RANGE (long-press two stops for a partial distance) ============ */
+// Marking is capped at two stops: with both ends fixed, the stretch between them is
+// unambiguous. A third long-press is ignored until one end is un-marked.
+function toggleMark(id){
+  const at = markedIds.indexOf(id);
+  if (at >= 0) markedIds.splice(at, 1);
+  else if (markedIds.length < 2) markedIds.push(id);
+  else return;
+  renderPathColumn();
+}
+
+// The marked stops as path positions, low→high, or null unless exactly two are marked.
+function markedRange(){
+  if (markedIds.length !== 2) return null;
+  const a = selectedPath.indexOf(markedIds[0]);
+  const b = selectedPath.indexOf(markedIds[1]);
+  if (a < 0 || b < 0) return null;
+  return { from: Math.min(a, b), to: Math.max(a, b) };
+}
+
+// Sums the legs inside the marked range — every leg from `from` up to `to`, so
+// intermediate stops are counted. Null while routing hasn't produced leg data.
+function markedRangeTotals(range){
+  if (pathLegsState !== 'ready') return null;
+  let km = 0, hours = 0;
+  for (let k = range.from; k < range.to; k++) {
+    if (!pathLegs[k]) return null;
+    km += pathLegs[k].km;
+    hours += pathLegs[k].hours;
+  }
+  return { km, hours };
+}
+
+// A long-press on the row body marks/un-marks it. The drag handle and trash button
+// keep their own gestures, and a press that turns into a drag or scroll is abandoned.
+let suppressClickForId = null, suppressRowClickUntil = 0;
+function attachRowLongPress(row, id){
+  let timer = null, startX = 0, startY = 0;
+  function cancel(){
+    if (timer) { clearTimeout(timer); timer = null; }
+    row.classList.remove('press-hold');
+  }
+  row.addEventListener('pointerdown', e => {
+    if (e.target.closest('.path-drag-handle') || e.target.closest('.path-trash-btn')) return;
+    startX = e.clientX; startY = e.clientY;
+    row.classList.add('press-hold');
+    timer = setTimeout(() => {
+      timer = null;
+      // Swallow the click this press will produce, so marking doesn't also fire the
+      // row's "show on map" action. Scoped to this row — tapping a different stop
+      // right after marking should still work normally.
+      suppressClickForId = id;
+      suppressRowClickUntil = Date.now() + 600;
+      toggleMark(id);
+    }, 450);
+  });
+  row.addEventListener('pointermove', e => {
+    if (timer && (Math.abs(e.clientX - startX) > 8 || Math.abs(e.clientY - startY) > 8)) cancel();
+  });
+  ['pointerup','pointercancel','pointerleave'].forEach(ev => row.addEventListener(ev, cancel));
+  row.addEventListener('contextmenu', e => e.preventDefault()); // no iOS/Android callout mid-hold
 }
 
 // "Add/remove path" buttons live inside dynamically-opened Leaflet popups, so listen
@@ -1660,13 +1761,14 @@ function renderPathColumn(){
     note.textContent = 'Add locations from a map popup ("+ Add to path") to plan a route between them.';
     pathColEl.appendChild(note);
   } else {
+    const range = markedRange();
     const list = document.createElement('div');
-    list.className = 'path-list';
+    list.className = 'path-list' + (range ? ' has-bracket' : '');
     selectedPath.forEach((id, i) => {
       const loc = pathLocById[id];
       if (!loc) return;
       const row = document.createElement('div');
-      row.className = 'path-row';
+      row.className = 'path-row' + (markedIds.includes(id) ? ' marked' : '');
       row.dataset.id = id;
       row.innerHTML = `<span class="path-drag-handle" title="Drag to reorder">⠿</span>
         <span class="path-order">${i+1}</span>
@@ -1674,21 +1776,47 @@ function renderPathColumn(){
         <span class="path-name">${loc.name}</span>
         <button type="button" class="path-trash-btn" title="Remove" aria-label="Remove from path">🗑</button>`;
       row.querySelector('.path-name').addEventListener('click', () => {
+        // Ignore the click a long-press on this same row leaves behind.
+        if (id === suppressClickForId && Date.now() < suppressRowClickUntil) return;
         ensureMapTabVisible();
         map.setView([loc.lat, loc.lng], 12);
         loc.marker.openPopup();
       });
       row.querySelector('.path-trash-btn').addEventListener('click', () => removeFromPath(id));
       attachRowDrag(row, id, list);
+      attachRowLongPress(row, id);
       list.appendChild(row);
+      // The marked stretch's distance reads directly under the last marked stop.
+      if (range && i === range.to) list.appendChild(buildMarkedSpanEl(range));
       if (i < selectedPath.length - 1) list.appendChild(buildLegEl(i));
     });
+    if (range) {
+      const bracket = document.createElement('div');
+      bracket.className = 'path-bracket';
+      list.appendChild(bracket);
+    }
     pathColEl.appendChild(list);
+    updateMarkBracket();
 
     if (selectedPath.length >= 2) pathColEl.appendChild(buildPathTotalEl());
   }
 
   pathColEl.appendChild(buildPathCodeEl());
+}
+
+// Sizes the bracket to span first→last marked row. Kept separate from render so it can
+// re-run when the column becomes visible (mobile tab switch) or the layout reflows —
+// offset measurements are all zero while the column is display:none.
+function updateMarkBracket(){
+  const list = pathColEl.querySelector('.path-list');
+  const bracket = list && list.querySelector('.path-bracket');
+  if (!bracket) return;
+  const marked = Array.from(list.querySelectorAll('.path-row.marked'));
+  if (marked.length !== 2) { bracket.style.display = 'none'; return; }
+  const [first, last] = marked;
+  bracket.style.display = '';
+  bracket.style.top = first.offsetTop + 'px';
+  bracket.style.height = (last.offsetTop + last.offsetHeight - first.offsetTop) + 'px';
 }
 
 // A short code that encodes the whole path (order included) — copyable to type into
@@ -1739,6 +1867,7 @@ function promptLoadPathCode(){
   if (!result.ok) { alert(result.error); return; }
   if (!result.ids.length) { alert('That code has no locations in it.'); return; }
   selectedPath = result.ids;
+  markedIds = []; // marks belong to the path being replaced, not the incoming one
   renderPathColumn();
   updatePathLine();
   persistPath();
@@ -1764,6 +1893,21 @@ function buildLegEl(i){
   return el;
 }
 
+// Distance/time across the marked stretch, shown under the last marked stop.
+function buildMarkedSpanEl(range){
+  const el = document.createElement('div');
+  el.className = 'path-span';
+  const stops = range.to - range.from + 1;
+  const totals = markedRangeTotals(range);
+  if (pathLegsState === 'pending') el.textContent = 'Calculating selection…';
+  else if (!totals) el.textContent = 'Selection distance unavailable';
+  else {
+    el.innerHTML = `Stops ${range.from + 1}–${range.to + 1} (${stops}) · `
+      + `<b>${formatKm(totals.km)}</b> · <b>${formatDriveHours(totals.hours)}</b> drive`;
+  }
+  return el;
+}
+
 function buildPathTotalEl(){
   const el = document.createElement('div');
   el.className = 'path-total';
@@ -1783,7 +1927,9 @@ function attachRowDrag(row, id, list){
     e.preventDefault();
     const rows = Array.from(list.querySelectorAll('.path-row'));
     const startIndex = rows.indexOf(row);
-    const rowHeight = row.getBoundingClientRect().height + 6; // + margin-bottom
+    // Measure where each row actually sits: leg readouts (and the marked-range span)
+    // sit between rows, so the row-to-row pitch is neither uniform nor just the row height.
+    const tops = rows.map(r => r.offsetTop);
     const startY = e.clientY;
     let newIndex = startIndex;
     row.classList.add('path-row-dragging');
@@ -1792,13 +1938,16 @@ function attachRowDrag(row, id, list){
     function onMove(ev){
       const dy = ev.clientY - startY;
       row.style.transform = `translateY(${dy}px)`;
-      newIndex = Math.max(0, Math.min(rows.length - 1, startIndex + Math.round(dy / rowHeight)));
+      // Land on whichever slot the dragged row's top is now closest to.
+      const draggedTop = tops[startIndex] + dy;
+      newIndex = tops.reduce((best, t, i) =>
+        Math.abs(t - draggedTop) < Math.abs(tops[best] - draggedTop) ? i : best, 0);
       rows.forEach((r, i) => {
         if (r === row) return;
-        let shift = 0;
-        if (startIndex < newIndex && i > startIndex && i <= newIndex) shift = -1;
-        else if (newIndex < startIndex && i >= newIndex && i < startIndex) shift = 1;
-        r.style.transform = shift ? `translateY(${shift * rowHeight}px)` : '';
+        let offset = 0;
+        if (startIndex < newIndex && i > startIndex && i <= newIndex) offset = tops[i-1] - tops[i];
+        else if (newIndex < startIndex && i >= newIndex && i < startIndex) offset = tops[i+1] - tops[i];
+        r.style.transform = offset ? `translateY(${offset}px)` : '';
       });
     }
     function onUp(ev){
@@ -1958,6 +2107,8 @@ function setMobileTab(tab){
   document.body.dataset.mobileTab = tab;
   mobileTabsEl.querySelectorAll('.mobile-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
   if (tab === 'map') requestAnimationFrame(() => map.invalidateSize());
+  // The path column can't be measured while hidden, so size the bracket on reveal.
+  if (tab === 'path') requestAnimationFrame(updateMarkBracket);
 }
 // Locations/path rows and the "reset view"-style actions pan or open a popup on the map,
 // which is only meaningful once the map tab is actually showing.
@@ -2006,6 +2157,7 @@ mq.addEventListener('change', applyResponsiveLayout);
 window.addEventListener('resize', () => {
   if (mq.matches && headerEl.style.height) setHeaderHeight(parseFloat(headerEl.style.height));
   map.invalidateSize();
+  updateMarkBracket(); // rows can rewrap at a new width, moving the marked range
 });
 
 /* ============ COLUMN COLLAPSE (desktop only) ============ */
