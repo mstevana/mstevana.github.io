@@ -1925,8 +1925,22 @@ function buildLevel(L){
   ceilTex.wrapS=ceilTex.wrapT=THREE.RepeatWrapping;ceilTex.repeat.set(L.w,L.h);
   const floorMat=new THREE.MeshPhongMaterial({map:floorTex,bumpMap:floorTex,bumpScale:0.015,specular:0x120e08,shininess:4});
   const ceilMat=new THREE.MeshPhongMaterial({map:ceilTex,bumpMap:ceilTex,bumpScale:0.012,specular:0x0c0a06,shininess:3});
-  const floor=new THREE.Mesh(new THREE.PlaneGeometry(L.w,L.h),floorMat);
-  floor.rotation.x=-Math.PI/2;floor.position.set(L.w/2,0,L.h/2);grp.add(floor);
+  // floor with a rectangular hole cut at the stairs tile so the descent is visible.
+  // strips are aligned to tile boundaries (integer offsets), and the floor texture
+  // repeats once per tile, so the seamless noise stays continuous across the gap.
+  const sxh=L.stairs.x,syh=L.stairs.y;
+  const addFloorStrip=(w,h,cx,cz)=>{
+    if(w<=0||h<=0)return;
+    const ftex=floorTex.clone();ftex.needsUpdate=true;
+    ftex.wrapS=ftex.wrapT=THREE.RepeatWrapping;ftex.repeat.set(w,h);
+    const mat=new THREE.MeshPhongMaterial({map:ftex,bumpMap:ftex,bumpScale:0.015,specular:0x120e08,shininess:4});
+    const strip=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);
+    strip.rotation.x=-Math.PI/2;strip.position.set(cx,0,cz);grp.add(strip);
+  };
+  addFloorStrip(L.w,syh,L.w/2,syh/2);                   // north of the hole
+  addFloorStrip(L.w,L.h-syh-1,L.w/2,(syh+1+L.h)/2);     // south of the hole
+  addFloorStrip(sxh,1,sxh/2,syh+0.5);                   // west of the hole
+  addFloorStrip(L.w-sxh-1,1,(sxh+1+L.w)/2,syh+0.5);     // east of the hole
   const ceil=new THREE.Mesh(new THREE.PlaneGeometry(L.w,L.h),ceilMat);
   ceil.rotation.x=Math.PI/2;ceil.position.set(L.w/2,WALLH,L.h/2);grp.add(ceil);
   // walls: instanced per texture variant. secret walls & doors get their own meshes.
@@ -1985,21 +1999,37 @@ function buildLevel(L){
     if(t===T_DOOR_OPEN)pv.rotation.y=passageX?Math.PI/2:-Math.PI/2;
     grp.add(pv);R3.doorMeshes[y*L.w+x]=pv;
   }
-  // stairs
+  // stairs: a real recessed staircase descending below the floor into a dark shaft
   {
     const sg=new THREE.Group();
-    const sx=L.stairs.x,sy=L.stairs.y;
-    const hole=new THREE.Mesh(new THREE.BoxGeometry(0.95,0.05,0.95),new THREE.MeshLambertMaterial({color:0x050404}));
-    hole.position.set(sx+0.5,0.03,sy+0.5);sg.add(hole);
-    for(let i=0;i<4;i++){
-      const step=new THREE.Mesh(new THREE.BoxGeometry(0.9-i*0.2,0.04,0.9-i*0.2),
-        new THREE.MeshLambertMaterial({color:0x2c2820}));
-      step.position.set(sx+0.5,0.09+i*0.001-i*0.0,sy+0.5);
-      step.position.y=0.06-i*0.015;sg.add(step);
+    const sxs=L.stairs.x,sys=L.stairs.y,cx=sxs+0.5,cz=sys+0.5;
+    // the party enters from a walkable neighbor; the steps descend away from it
+    let ndx=0,ndy=-1;
+    for(const [dx,dy] of DIRS){
+      const nt=L.grid[(sys+dy)*L.w+(sxs+dx)];
+      if(nt===T_FLOOR||nt===T_DOOR_OPEN||nt===T_DOOR||nt===T_DOOR_LOCKED){ndx=dx;ndy=dy;break;}
     }
-    const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:svgToTexture(STAIRS_SVG,'stairs'),transparent:true,opacity:0.95}));
-    spr.scale.set(0.7,0.7,1);spr.position.set(sx+0.5,0.42,sy+0.5);
-    spr.userData={kind:'stairs'};sg.add(spr);
+    const DEPTH=1.05,N=7,drop=DEPTH/N;
+    // dark shaft (inner faces) enclosing the pit, a touch deeper than the steps
+    const shaftMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,-0.5)),side:THREE.BackSide,shininess:2});
+    const shaft=new THREE.Mesh(new THREE.BoxGeometry(0.995,DEPTH+0.06,0.995),shaftMat);
+    shaft.position.set(cx,-(DEPTH+0.06)/2,cz);sg.add(shaft);
+    // single-tread slabs step down toward local +Z (each only one drop tall, so
+    // you see over each tread to the next), then rotated to face the entry edge
+    const stepGrp=new THREE.Group();stepGrp.position.set(cx,0,cz);
+    const dz=1.0/N;
+    for(let i=0;i<N;i++){
+      // alternate tread shade slightly so adjacent steps read as distinct
+      const stepMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,(i%2?-0.08:-0.22))),specular:0x141009,shininess:6});
+      const box=new THREE.Mesh(new THREE.BoxGeometry(0.9,drop+0.03,dz+0.03),stepMat);
+      box.position.set(0,-i*drop-drop/2+0.015,-0.5+(i+0.5)*dz);
+      stepGrp.add(box);
+    }
+    stepGrp.rotation.y=Math.atan2(-ndx,-ndy); // local +Z descent -> world run direction
+    sg.add(stepGrp);
+    // a faint glow rising from the depths lights the treads and lures the party down
+    const glow=new THREE.PointLight(0xffcf8a,0.9,2.6,2);
+    glow.position.set(cx,-0.5,cz);sg.add(glow);
     grp.add(sg);R3.stairsGroup=sg;
   }
   // items on floor
