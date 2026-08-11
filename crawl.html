@@ -86,7 +86,9 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 #trap-flash svg{width:min(46vh,240px);height:min(46vh,240px);filter:drop-shadow(0 4px 14px #000);animation:trapPop .72s ease-out forwards;}
 @keyframes trapBg{0%{opacity:0;}12%{opacity:1;}68%{opacity:1;}100%{opacity:0;}}
 @keyframes trapPop{0%{opacity:0;transform:scale(.45) rotate(-7deg);}16%{opacity:1;transform:scale(1.12) rotate(0);}70%{opacity:1;transform:scale(1);}100%{opacity:0;transform:scale(1.06);}}
-#toast{position:absolute;left:50%;bottom:100px;transform:translateX(-50%);z-index:6;background:#000c;border:1px solid var(--line);
+/* above the overlays (z 20): messages raised while a panel is open — "no slots
+   left", item notes — have to clear the panel or they cannot be read */
+#toast{position:absolute;left:50%;bottom:100px;transform:translateX(-50%);z-index:30;background:#000e;border:1px solid var(--line);
   border-radius:6px;padding:6px 14px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:80%;text-align:center;}
 /* overlays */
 .ovl{position:fixed;inset:0;background:#000c;z-index:20;display:none;align-items:center;justify-content:center;}
@@ -128,6 +130,8 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 .doll-slot .slot-lbl{position:absolute;bottom:1px;left:0;right:0;text-align:center;font-size:7px;color:var(--ink-dim);pointer-events:none;}
 .doll-slot svg,.inv-cell svg{width:82%;height:82%;pointer-events:none;}
 .doll-slot.drag-over,.inv-cell.drag-over{background:#2c2415;border-color:var(--ink);}
+/* one selection look shared by the pack and the body slots */
+.doll-slot.sel,.inv-cell.sel{border-color:#c9b37e;border-style:solid;}
 #inv-grid{display:grid;grid-template-columns:repeat(5,48px);grid-template-rows:repeat(4,48px);gap:4px;}
 .inv-cell{border:1px solid #3a3227;border-radius:5px;background:#0d0b08;position:relative;
   display:flex;align-items:center;justify-content:center;}
@@ -145,7 +149,11 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 .give-char .gc-fill{height:100%;}
 #drag-ghost{position:fixed;width:52px;height:52px;z-index:99;pointer-events:none;display:none;filter:drop-shadow(0 2px 6px #000);}
 #drag-ghost svg{width:100%;height:100%;}
-#item-tip{font-size:12px;color:var(--ink-dim);min-height:30px;margin-top:6px;max-width:340px;}
+/* fixed width so a long description wraps inside the panel instead of
+   stretching it — the panel must not change width as items are inspected */
+#item-tip,#spell-tip{font-size:12px;color:var(--ink-dim);margin-top:6px;overflow-wrap:break-word;}
+#item-tip{width:256px;min-height:52px;}  /* 256 = the pack grid: 5*48 + 4*4 gaps */
+#spell-tip{width:270px;min-height:46px;} /* 270 = #spell-list min-width */
 /* stats screen */
 .stat-lines{font-size:13px;line-height:1.55;}
 .stat-lines b{color:#e0cf9e;font-weight:normal;}
@@ -246,7 +254,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
     <div><div id="inv-grid"></div><div id="item-tip">Drag items between the pack, body slots and companions. Tap an item to inspect.</div></div>
     <div id="inv-party"></div>
   </div>
-  <div class="row"><button class="mbtn small" id="inv-drop">Drop selected</button><button class="mbtn small" id="inv-close">Close</button></div>
+  <div class="row"><button class="mbtn small" id="inv-use" disabled>Use</button><button class="mbtn small" id="inv-drop">Drop selected</button><button class="mbtn small" id="inv-close">Close</button></div>
 </div></div>
 
 <div class="ovl" id="ovl-stats"><div class="panel" style="min-width:330px">
@@ -258,6 +266,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 <div class="ovl" id="ovl-spells"><div class="panel">
   <h2 id="sp-title">Spells</h2>
   <div id="spell-list"></div>
+  <div id="spell-tip"></div>
   <button class="mbtn small" id="sp-close">Close</button>
 </div></div>
 
@@ -1729,14 +1738,14 @@ function noiseCanvas(base,accent,brick,mossC){ // seamless: used for floor and c
   }
   return cv;
 }
-function liquidCanvas(){ // seamless murky green sewage: smooth soft mottling, no hard patches
+function liquidCanvas(){ // seamless brown sludge: smooth soft mottling, no hard patches
   const {cv,ctx}=newCanvas(128);
-  ctx.fillStyle='#1a2c10';ctx.fillRect(0,0,128,128);
+  ctx.fillStyle='#241a0e';ctx.fillRect(0,0,128,128);
   // large soft clouds of lighter/darker green, painted with radial gradients so
   // the surface reads as continuous murk instead of a checkerboard of blobs
   const clouds=[];
   for(let i=0;i<46;i++)clouds.push({x:rnd(128),y:rnd(128),r:14+rnd(30),
-    c:Math.random()<0.55?'44,72,26':(Math.random()<0.5?'24,38,14':'56,88,34'),
+    c:Math.random()<0.55?'62,46,24':(Math.random()<0.5?'32,24,13':'82,64,34'),
     a:0.09+Math.random()*0.12});
   for(const cl of clouds){
     wrap9(ctx,()=>{
@@ -1750,13 +1759,13 @@ function liquidCanvas(){ // seamless murky green sewage: smooth soft mottling, n
   // faint drifting scum wisps, soft-edged and sparse
   for(let i=0;i<10;i++){
     const x=rnd(128),y=rnd(128),len=20+rnd(36),bow=(Math.random()-0.5)*10,a=0.05+Math.random()*0.06;
-    ctx.strokeStyle=`rgba(128,150,72,${a.toFixed(3)})`;
+    ctx.strokeStyle=`rgba(140,124,74,${a.toFixed(3)})`;
     ctx.lineWidth=2.5+Math.random()*3;ctx.lineCap='round';
     wrap9(ctx,()=>{ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x+bow,y+len/2,x,y+len);ctx.stroke();});
   }
   // barely-there fine grain so the surface isn't glass-smooth
   for(let i=0;i<500;i++){
-    ctx.fillStyle=Math.random()<0.5?'rgba(90,120,50,0.06)':'rgba(20,32,12,0.06)';
+    ctx.fillStyle=Math.random()<0.5?'rgba(112,90,50,0.06)':'rgba(26,19,10,0.06)';
     const x=rnd(128),y=rnd(128),r=1+rnd(2);
     wrap9(ctx,()=>{ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();});
   }
@@ -1804,34 +1813,34 @@ float lqFbm2(vec2 p){return 0.5*lqNoise(p)+0.25*lqNoise(p*2.03+vec2(17.0,9.2));}
 // short waves out with distance so they never alias into moire.
 float lqWave(vec2 p,vec2 f,float t,float det){
   float n=lqFbm2(p*1.2);
-  float v=lqFbm2(p*2.1+vec2(t*0.15,-t*0.11));
-  v+=det*0.15*sin(dot(p,f)*7.0-t*2.6+n*6.283);
-  v+=det*0.07*sin(dot(p,vec2(-f.y,f.x))*11.0+t*1.7);
+  float v=lqFbm2(p*2.1+vec2(t*0.045,-t*0.033));
+  v+=det*0.15*sin(dot(p,f)*7.0-t*0.8+n*6.283);
+  v+=det*0.07*sin(dot(p,vec2(-f.y,f.x))*11.0+t*0.55);
   return v;
 }
-vec2 lqDomain(vec2 uv,vec2 lp,float t){return (mix(uv*vec2(3.0,1.2),lp,uWorld)-uFlow*(t*8.0))*2.6;}
+vec2 lqDomain(vec2 uv,vec2 lp,float t){return (mix(uv*vec2(3.0,1.2),lp,uWorld)-uFlow*(t*2.2))*2.6;}
 vec2 lqDir(){return length(uFlow)>0.0001?normalize(uFlow):vec2(0.0,1.0);}`;
 const LIQ_FRAG_MAP=`{
   float t=uTime;
   vec2 p=lqDomain(vUv,vLiqPos,t);
   // domain warp: two fbm fields bend the sampling domain so the murk swirls
-  vec2 w=vec2(lqFbm(p*0.5+vec2(0.0,t*0.05)),lqFbm(p*0.5+vec2(5.2,1.3-t*0.04)));
+  vec2 w=vec2(lqFbm(p*0.5+vec2(0.0,t*0.016)),lqFbm(p*0.5+vec2(5.2,1.3-t*0.013)));
   float h=lqFbm(p+(w-0.5)*2.6);
   float d=lqFbm(p*0.43-(w-0.5)*1.8+vec2(3.7,8.1));
-  // deep water is nearly black; only the churned-up murk carries the green
-  vec3 deep=vec3(0.028,0.056,0.018);
-  vec3 mid =vec3(0.145,0.25,0.07);
+  // near-black in the deep, with churned-up silt carrying the sickly brown
+  vec3 deep=vec3(0.034,0.028,0.015);
+  vec3 mid =vec3(0.122,0.104,0.054);
   vec3 col=mix(deep,mid,smoothstep(0.15,0.95,h*0.55+d*0.55));
   // sparse pale scum ribbons where the swirled field crests
   float scum=smoothstep(0.72,0.92,h)*smoothstep(0.85,0.45,d);
-  col+=scum*vec3(0.07,0.11,0.035);
+  col+=scum*vec3(0.068,0.062,0.030);
   // banks: the channel shallows at its edges, showing the silted bed, and
   // scummy foam piles up against the stonework in a ragged line
   float side=dot(vUv,uEdge);
   float bank=(1.0-smoothstep(0.0,0.30,min(side,1.0-side)))*(uEdge.x+uEdge.y);
-  col=mix(col,vec3(0.075,0.085,0.040),bank*0.55);
-  float foam=bank*smoothstep(0.42,0.72,lqFbm(p*1.6+vec2(0.0,t*0.25)));
-  col=mix(col,vec3(0.20,0.23,0.13),foam*0.7);
+  col=mix(col,vec3(0.080,0.062,0.034),bank*0.55);
+  float foam=bank*smoothstep(0.42,0.72,lqFbm(p*1.6+vec2(0.0,t*0.08)));
+  col=mix(col,vec3(0.175,0.150,0.092),foam*0.7);
   diffuseColor.rgb*=col;
 }`;
 const LIQ_FRAG_NORMAL=`{
@@ -1851,10 +1860,10 @@ const LIQ_FRAG_NORMAL=`{
 const LIQ_FRAG_LIGHTS=`#include <lights_fragment_end>
 {
   float fres=pow(1.0-clamp(dot(normalize(vViewPosition),normal),0.0,1.0),5.0);
-  reflectedLight.directSpecular*=1.0+2.6*fres;
+  reflectedLight.directSpecular*=1.0+2.0*fres;
   reflectedLight.directDiffuse*=1.0-0.20*fres;
   reflectedLight.indirectDiffuse*=1.0-0.26*fres;
-  reflectedLight.directSpecular+=fres*vec3(0.062,0.072,0.045); // dim tunnel sheen
+  reflectedLight.directSpecular+=fres*vec3(0.060,0.052,0.036); // dim tunnel sheen
 }`;
 function shade(hex,f){ // lighten (f>0) or darken (f<0) a #rrggbb color
   const n=parseInt(hex.slice(1),16);
@@ -2304,8 +2313,17 @@ function buildLevel(L){
       if(nt===T_FLOOR||nt===T_DOOR_OPEN||nt===T_DOOR||nt===T_DOOR_LOCKED){ndx=dx;ndy=dy;break;}
     }
     const DEPTH=1.05,N=7,drop=DEPTH/N;
-    // dark shaft (inner faces) enclosing the pit, a touch deeper than the steps
-    const shaftMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,-0.5)),side:THREE.BackSide,shininess:2});
+    // shaft (inner faces) enclosing the pit, a touch deeper than the steps.
+    // the stairwell is cut through the same masonry as the rest of the level,
+    // so its walls are faced with the wall texture — using the variant this
+    // tile would have had, and scaled so the brick courses stand the same
+    // height as the walls above the floor
+    const shaftTex=wallMats[wallVariant(sxs,sys)].map.clone();
+    shaftTex.needsUpdate=true;
+    shaftTex.wrapS=shaftTex.wrapT=THREE.RepeatWrapping;
+    shaftTex.repeat.set(1,(DEPTH+0.06)/WALLH);
+    const shaftMat=new THREE.MeshPhongMaterial({map:shaftTex,bumpMap:shaftTex,bumpScale:0.02,
+      side:THREE.BackSide,specular:0x191309,shininess:5});
     const shaft=new THREE.Mesh(new THREE.BoxGeometry(0.995,DEPTH+0.06,0.995),shaftMat);
     shaft.position.set(cx,-(DEPTH+0.06)/2,cz);sg.add(shaft);
     // single-tread slabs step down toward local +Z (each only one drop tall, so
@@ -2335,9 +2353,10 @@ function buildLevel(L){
       tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
       R3.liquidFlows.push({tex}); // kept for disposal; motion lives in the shader
       // tight specular: the wave normals shatter the torch into moving glints,
-      // and a faint green emissive keeps the murk glowing in the dark
+      // over a barely-there warm emissive so the sludge reads in the dark
+      // without lighting up like something alive
       const mat=new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,bumpScale:0.02,
-        specular:0x2a3420,shininess:34,emissive:0x102208,emissiveIntensity:0.46});
+        specular:0x231e17,shininess:30,emissive:0x161007,emissiveIntensity:0.34});
       mat.onBeforeCompile=(sh)=>{
         sh.uniforms.uTime={value:0};
         sh.uniforms.uFlow={value:new THREE.Vector2(sx,sy)};
@@ -2355,10 +2374,10 @@ function buildLevel(L){
       };
       return mat;
     };
-    const poolMat=mkLiquid(0.012,0.009,true);        // lakes & puddles drift slowly
-    const riverMatZ=mkLiquid(0.005,0.06,true,1,0);   // rivers crawl along their channel
+    const poolMat=mkLiquid(0.012,0.009,true);        // lakes barely move at all
+    const riverMatZ=mkLiquid(0.005,0.06,true,1,0);   // rivers ooze along their channel
     const riverMatX=mkLiquid(0.06,0.005,true,0,1);
-    const fallMat=mkLiquid(0,-0.5,false);            // pipe spill races down mesh uvs
+    const fallMat=mkLiquid(0,-1.8,false);            // pipe spill still races down mesh uvs
     const bedMat=new THREE.MeshPhongMaterial({color:0x11150a,shininess:2});
     const m4b=new THREE.Matrix4();
     // lake pits: liquid surface sunk below floor level, ringed by a stone lip
@@ -2964,6 +2983,39 @@ function useHand(ch,slot){
   }
   doAttack(ch,slot,wDef,wIt,m,false);
 }
+// consumables can be used straight from the pack or a body slot, without first
+// moving them into a hand. it still costs hands, so it is no cheaper than
+// holding the thing: the holding hand if it is held, otherwise both, since
+// fishing something out of the pack takes a free hand to begin with
+function itemUsable(it){
+  if(!it)return false;
+  const k=ITEM_DEFS[it.base].kind;
+  return k==='potion'||k==='scroll'||k==='wand';
+}
+function useInventoryItem(ch,ref){
+  if(G.over)return false;
+  if(!canAct(ch)){UI.toast(ch.name+' cannot act.');return false;}
+  const it=ref.type==='grid'?ch.inventory[ref.idx]:ch.equip[ref.slot];
+  if(!itemUsable(it))return false;
+  const held=(ref.type==='equip'&&(ref.slot==='lhand'||ref.slot==='rhand'))?ref.slot:null;
+  // gate on cooldown exactly as using it from the hand would, so reaching into
+  // the pack can't be used to slip a potion past a swing that's still landing
+  if(held?handCd(ch,held)>0:(handCd(ch,'lhand')>0&&handCd(ch,'rhand')>0)){
+    UI.toast(ch.name+' has no hand free.');return false;
+  }
+  const def=ITEM_DEFS[it.base];
+  const consumeOne=()=>{
+    if((it.qty||1)>1)it.qty--;
+    else if(ref.type==='grid')ch.inventory[ref.idx]=null;
+    else ch.equip[ref.slot]=null;
+  };
+  if(def.kind==='potion'){
+    UI.pickAlly('Give '+itemName(it)+' to…',(target)=>{drinkPotion(ch,target,it,consumeOne,held);});
+    return true;
+  }
+  useSpellItem(ch,it,()=>{if(def.kind==='scroll')consumeOne();});
+  return true;
+}
 function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
   const dualWielding=(()=>{
     const l=weaponOf(ch,'lhand'),r=weaponOf(ch,'rhand');
@@ -3090,6 +3142,10 @@ function useSpellItem(ch,it,consume){
 function stripItemEverywhere(ch,it){
   for(const s in ch.equip)if(ch.equip[s]===it)ch.equip[s]=null;
   const i=ch.inventory.indexOf(it);if(i>=0)ch.inventory[i]=null;
+  // the item has just ceased to exist, so redraw whatever was showing it:
+  // the hand panels always, and the open pack if there is one
+  UI.refreshParty();
+  if(UI.refreshInv)UI.refreshInv();
 }
 /* ---------- spells ---------- */
 function monsterSave(m,type){
@@ -3330,6 +3386,23 @@ function updateMonsters(dt){
       m.moveCd=m.speed*slowMult;
       chaseStep(m);
     }
+  }
+  resolvePartyTileOverlap();
+}
+// the party's own tile is exclusively theirs: no monster may rest there. every
+// movement path already avoids stepping onto it (see stepOk/wanderStep), but
+// this sweep is the backstop that guarantees the invariant no matter how a
+// monster got there (a stale/legacy save, a future move source, etc.) — if
+// one is ever found sharing the party's tile it's bumped to a free neighbor
+function resolvePartyTileOverlap(){
+  for(const m of G.L.monsters){
+    if(m.hp<=0)continue;
+    if(m.x!==G.px||m.y!==G.py)continue;
+    const opts=DIRS.slice().sort(()=>Math.random()-0.5).filter(([dx,dy])=>{
+      const t=tileAt(m.x+dx,m.y+dy);
+      return (t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS)&&!monsterAt(m.x+dx,m.y+dy);
+    });
+    if(opts.length){const [dx,dy]=opts[0];moveMonster(m,m.x+dx,m.y+dy);}
   }
 }
 function wanderStep(m){
@@ -3784,6 +3857,7 @@ function deserializeGame(o){
   for(const s of L.secrets){if(L.grid[s.y*L.w+s.x]===T_SECRET_FOUND)revealSecret(L,s);}
   snapCamera();
   computeDistField();
+  resolvePartyTileOverlap();
   UI.refreshDepthTag();
   UI.buildPartyDom();
   UI.refreshParty();
@@ -3825,7 +3899,7 @@ function loop(now){
   }
   if(G.L){
     // throttle rendering to ~20fps when nothing moves: big battery win on phones
-    const busy=G.started&&!G.paused&&(R3.camAnim||R3.shake>0||G.fx.length>0||G.moveCd>0||
+    const busy=G.started&&!G.paused&&(R3.camAnim||R3.shake>0||G.fx.length>0||G.moveCd>0||R3.viewDrag||
       G.L.monsters.some(mm=>mm.awake&&mm.hp>0));
     if(!busy){idleSkip=(idleSkip+1)%3;if(idleSkip)return;}
     updateCamera(now);
@@ -4223,6 +4297,9 @@ const UI=(()=>{
     hdr.className='dim-note';
     hdr.textContent='Slots left — '+sum+' (rest to recover)';
     list.appendChild(hdr);
+    const tip=$('spell-tip');
+    const HINT='Tap and hold a spell to read what it does.';
+    tip.textContent=HINT;
     for(const key of known.sort((a,b)=>SPELLS[a].circle-SPELLS[b].circle)){
       const sp=SPELLS[key];
       const left=slots[sp.circle-1]-ch.slotsUsed[sp.circle-1];
@@ -4230,24 +4307,28 @@ const UI=(()=>{
       row.className='spell-row'+(left<=0?' nosl':'');
       row.innerHTML=`<span class="scircle">${sp.circle}</span><span class="sname">${sp.name}</span><span class="sslots">${Math.max(0,left)} left</span>`;
       row.title=sp.desc;
+      // hold to read: the description goes in the panel itself, so it can't end
+      // up behind the overlay, and the hold must not also cast the spell
+      let holdT=null,held=false;
+      row.addEventListener('pointerdown',()=>{
+        held=false;clearTimeout(holdT);
+        holdT=setTimeout(()=>{
+          held=true;
+          tip.innerHTML=`<b style="color:#e0cf9e">${sp.name}</b> · ${sp.circle}${ordSuffix(sp.circle)} circle<br>${sp.desc}`;
+        },450);
+      });
+      const endHold=()=>clearTimeout(holdT);
+      row.addEventListener('pointerup',endHold);
+      row.addEventListener('pointerleave',endHold);
+      row.addEventListener('pointercancel',endHold);
       row.addEventListener('click',()=>{
+        if(held){held=false;return;} // that press was to read, not to cast
         if(left<=0){toast('No slots of that circle left. Rest.');return;}
         hide('ovl-spells');
         castSpell(ch,key,{fromUI:true});
       });
       list.appendChild(row);
     }
-    const tip=document.createElement('div');
-    tip.className='dim-note';tip.style.marginTop='4px';
-    tip.textContent='Tap and hold a spell name to read what it does.';
-    // long-press to show desc
-    list.querySelectorAll('.spell-row').forEach(r=>{
-      let t;
-      r.addEventListener('pointerdown',()=>{t=setTimeout(()=>toast(r.title),450);});
-      r.addEventListener('pointerup',()=>clearTimeout(t));
-      r.addEventListener('pointerleave',()=>clearTimeout(t));
-    });
-    list.appendChild(tip);
     show('ovl-spells');
   }
   $('sp-close').addEventListener('click',()=>hide('ovl-spells'));
@@ -4271,6 +4352,7 @@ const UI=(()=>{
         const it=ch.equip[slot];
         if(it)cell.innerHTML=itemSVG(it);
         cell.innerHTML+=`<div class="slot-lbl">${lbl}</div>`;
+        if(it&&selInvChar==='equip'&&selInvIdx===slot)cell.classList.add('sel');
         attachDnD(cell,{type:'equip',slot});
       }else cell.style.visibility='hidden';
       doll.appendChild(cell);
@@ -4285,11 +4367,25 @@ const UI=(()=>{
         cell.innerHTML=itemSVG(it);
         if(it.qty>1)cell.innerHTML+=`<div class="qty">${it.qty}</div>`;
       }
-      if(selInvIdx===i&&selInvChar==='grid')cell.style.borderColor='#c9b37e';
+      if(it&&selInvIdx===i&&selInvChar==='grid')cell.classList.add('sel');
       attachDnD(cell,{type:'grid',idx:i});
       grid.appendChild(cell);
     });
+    updateUseBtn();
     renderInvParty();
+  }
+  // redraw the pack if it is on screen (an item may have been consumed under it)
+  function refreshInv(){
+    if(invChar&&$('ovl-inv').classList.contains('show'))renderInv();
+  }
+  function selRef(){
+    if(selInvIdx===null)return null;
+    return selInvChar==='grid'?{type:'grid',idx:selInvIdx}:{type:'equip',slot:selInvIdx};
+  }
+  // the Use button only lights up for things there is something to do with
+  function updateUseBtn(){
+    const ref=selRef();
+    $('inv-use').disabled=!(ref&&itemUsable(getItem(ref)));
   }
   let suppressCardClick=false;
   function renderInvParty(){
@@ -4426,10 +4522,7 @@ const UI=(()=>{
         if(it){
           selInvIdx=ref.type==='grid'?ref.idx:ref.slot;selInvChar=ref.type;
           $('item-tip').innerHTML=`<b style="color:#e0cf9e">${itemName(it)}</b><br>${itemDesc(it)}`;
-          renderInv();
-          if(ref.type==='grid'){
-            document.querySelectorAll('.inv-cell')[ref.idx].style.borderColor='#c9b37e';
-          }
+          renderInv(); // paints the selection on the pack cell or the body slot
         }
         dnd=null;
       }
@@ -4471,6 +4564,15 @@ const UI=(()=>{
       }
     }
     dnd=null;
+  });
+  $('inv-use').addEventListener('click',()=>{
+    const ref=selRef();
+    if(!ref||!itemUsable(getItem(ref)))return;
+    const ch=invChar;
+    // step out of the pack first: drinking or reading happens in the world, and
+    // a potion still has to ask who it is for
+    hide('ovl-inv');
+    if(useInventoryItem(ch,ref)){selInvIdx=null;selInvChar=null;refreshParty();saveGame();}
   });
   $('inv-drop').addEventListener('click',()=>{
     if(selInvIdx===null){toast('Tap an item first.');return;}
@@ -4589,7 +4691,7 @@ const UI=(()=>{
     refreshMenu();
   });
   return {buildPartyDom,refreshParty,tickCooldowns,charFlash,float,floatAtMonster,vignette,trapFlash,toast,
-    refreshDepthTag,pickAlly,paladinMenu,openSpells,spellFlash,openInventory,openStats,openMap,gameOver,show,hide,anyOverlayOpen};
+    refreshDepthTag,pickAlly,paladinMenu,openSpells,spellFlash,openInventory,openStats,openMap,gameOver,show,hide,anyOverlayOpen,refreshInv};
 })();
 /* ============================== INPUT ============================== */
 function bindPad(id,fn){
@@ -4638,7 +4740,9 @@ function initInput(){
   // tap in 3D view: pick up items / open doors / disarm found traps
   const cv=document.getElementById('view3d');
   const ray=new THREE.Raycaster(),ptr=new THREE.Vector2();
+  let vDrag=null,vDragged=false;
   cv.addEventListener('click',(e)=>{
+    if(vDragged){vDragged=false;return;} // that press was a look-around, not a tap
     if(!G.started||G.paused||G.over||!R3.levelGroup)return;
     const r=cv.getBoundingClientRect();
     ptr.x=((e.clientX-r.left)/r.width)*2-1;
@@ -4670,6 +4774,40 @@ function initInput(){
       if(u.kind==='monster')return; // attacks come from hands
     }
   });
+  // drag across the view to look around: the scene follows the finger, and on
+  // release the view swings to whichever grid direction it ended up nearest,
+  // so a drag past the halfway point turns the party and a short one springs back
+  const YAW_PER_PX=0.0075; // a quarter turn over roughly 210px of travel
+  cv.addEventListener('pointerdown',(e)=>{
+    if(!G.started||G.paused||G.over||!e.isPrimary)return;
+    R3.camAnim=null; // take the wheel from any turn still animating
+    vDrag={x:e.clientX,yaw:R3.camera.rotation.y,id:e.pointerId};
+    vDragged=false;
+    try{cv.setPointerCapture(e.pointerId);}catch(err){}
+  });
+  cv.addEventListener('pointermove',(e)=>{
+    if(!vDrag||e.pointerId!==vDrag.id)return;
+    const dx=e.clientX-vDrag.x;
+    if(!vDragged&&Math.abs(dx)<6)return; // a small wobble is still a tap
+    vDragged=true;R3.viewDrag=true;
+    R3.camera.rotation.set(0,vDrag.yaw+dx*YAW_PER_PX,0,'YXZ');
+  });
+  const endViewDrag=(e)=>{
+    if(!vDrag||(e&&e.pointerId!==vDrag.id))return;
+    try{cv.releasePointerCapture(vDrag.id);}catch(err){}
+    const dragged=vDragged;
+    vDrag=null;R3.viewDrag=false;
+    if(!dragged)return;
+    const q=Math.PI/2;
+    let f=Math.round(-R3.camera.rotation.y/q)%4;
+    if(f<0)f+=4;
+    const turned=f!==G.facing;
+    G.facing=f;
+    animCamera(160); // swing to the grid, whether that is a new heading or the old one
+    if(turned){G.moveCd=0.15;SFX.turn();afterPartyMove(true);}
+  };
+  cv.addEventListener('pointerup',endViewDrag);
+  cv.addEventListener('pointercancel',endViewDrag);
 }
 function pickupItem(i){
   const arr=G.L.items[i];
