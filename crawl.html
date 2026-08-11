@@ -1287,7 +1287,7 @@ function tryGen(depth,targetWalk,theme){
     const x=1+rnd(W-2),y=1+rnd(H-2),i=idx(x,y);
     if(g[i]!==T_FLOOR||dist[i]<6||traps[i]||(x===sx&&y===sy))continue;
     const kind=pick(['dart','spike','gas']);
-    traps[i]={kind,found:false,armed:true,dc:15+Math.floor(depth/2),
+    traps[i]={kind,found:false,armed:true,dc:12+Math.floor(depth/2),
       dmg:kind==='gas'?null:[Math.min(6,1+Math.floor(depth/3)),6],x,y};
     placedTraps++;
   }
