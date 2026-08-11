@@ -1490,6 +1490,11 @@ function searchBonus(ch){
   if(CLASSES[ch.cls].trapfind)s+=ch.level+3;
   return s;
 }
+// a non-specialist's alertness for noticing a trap: keener of wits or intuition
+function noticeBonus(ch){
+  const r=RACES[ch.race];
+  return (r.search||0)+(r.skill||0)+Math.max(abilMod(ch,'int'),abilMod(ch,'wis'));
+}
 function weaponOf(ch,slot){
   const it=ch.equip[slot];
   if(!it)return null;
@@ -2368,15 +2373,30 @@ function passiveSearch(){
       UI.toast('You notice a seam in the wall…');SFX.found();
     }
   }
-  // traps: rogue spots armed traps in current + ahead tiles
-  const spotter=G.party.find(ch=>!isDown(ch)&&CLASSES[ch.cls].trapfind);
-  if(spotter){
+  // traps: a rogue reliably scouts two tiles ahead (take 10); without one, the
+  // sharpest-eyed companion still gets a single notice roll on the tile just ahead
+  const trapAlive=G.party.filter(ch=>!isDown(ch));
+  const trapfinder=trapAlive.find(ch=>CLASSES[ch.cls].trapfind);
+  if(trapfinder){
     for(const c of [ {x:G.px,y:G.py}, aheadTile(1), aheadTile(2) ]){
       const i=c.y*L.w+c.x;
       const tr=L.traps[i];
-      if(tr&&tr.armed&&!tr.found&&10+searchBonus(spotter)>=tr.dc){
+      if(tr&&tr.armed&&!tr.found&&10+searchBonus(trapfinder)>=tr.dc){
         tr.found=true;addTrapDecal(L,tr);
-        UI.toast(spotter.name+' spots a trap!');SFX.found();
+        UI.toast(trapfinder.name+' spots a trap!');SFX.found();
+      }
+    }
+  }else if(trapAlive.length){
+    const eyes=trapAlive.reduce((a,b)=>noticeBonus(b)>noticeBonus(a)?b:a);
+    for(const c of [ aheadTile(1), {x:G.px,y:G.py} ]){
+      const i=c.y*L.w+c.x;
+      const tr=L.traps[i];
+      if(tr&&tr.armed&&!tr.found&&!tr.noticeTried){
+        tr.noticeTried=true; // one glance per trap, so persistence never guarantees it
+        if(d20()+noticeBonus(eyes)>=tr.dc){
+          tr.found=true;addTrapDecal(L,tr);
+          UI.toast(eyes.name+' notices something amiss underfoot!');SFX.found();
+        }
       }
     }
   }
