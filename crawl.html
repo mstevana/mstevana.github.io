@@ -505,12 +505,30 @@ const MONSTERS={
              caster:{dmg:[5,6,0],ranged:7,cd:6,fx:'#8ad0e0',elem:'cold'}},
   dragon:   {reach:true, name:'Young dragon',  cr:7,  hp:66, ac:19,atk:11,dmg:[1,8,4], xp:2100,speed:1.4, type:'dragon', spr:'dragon',
              caster:{dmg:[6,6,0],ranged:6,cd:7,fx:'#e08a3a',elem:'fire'}},
+  // the deep dead: the crypts past depth 10 had nothing of their own to field,
+  // and these double as the heavy end of a bestiary that ran dry around 20
+  mummy:    {name:'Mummy',         cr:5,  hp:44, ac:17,atk:8, dmg:[1,10,4],xp:1500,speed:2.2, type:'undead', spr:'mummy',
+             skeletal:true, disease:{dc:16,name:'Mummy rot'}},
+  wraith:   {name:'Wraith',        cr:6,  hp:38, ac:17,atk:8, dmg:[1,8,2], xp:1800,speed:1.0, type:'undead', spr:'wraith',
+             incorporeal:true, energyDrain:1},
+  barrowwight:{name:'Barrow-wight',cr:7,  hp:52, ac:18,atk:9, dmg:[1,8,4], xp:2100,speed:1.3, type:'undead', spr:'barrowwight',
+             energyDrain:1, paralysis:{dc:16,dur:5}},
+  bonecolossus:{reach:true, name:'Bone colossus',cr:9,hp:88,ac:18,atk:12,dmg:[2,8,6],xp:2700,speed:1.6, type:'undead', spr:'bonecolossus',
+             skeletal:true},
+  deathknight:{reach:true, name:'Death knight', cr:11,hp:76,ac:22,atk:15,dmg:[2,8,8],xp:3300,speed:1.4, type:'undead', spr:'deathknight',
+             energyDrain:1},
+  lich:     {reach:true, name:'Lich',          cr:13,hp:70, ac:21,atk:12,dmg:[1,10,5],xp:3900,speed:1.5, type:'undead', spr:'lich',
+             skeletal:true, energyDrain:1, paralysis:{dc:18,dur:5},
+             caster:{dmg:[7,6,0],ranged:7,cd:6,fx:'#8ae0b4',elem:'cold'}},
+  bonedrake:{reach:true, name:'Bone drake',    cr:14,hp:96, ac:20,atk:16,dmg:[2,8,7],xp:4200,speed:1.4, type:'undead', spr:'bonedrake',
+             skeletal:true, caster:{dmg:[8,6,0],ranged:7,cd:7,fx:'#b8e07a',elem:'acid'}},
 };
 // spawn table by depth: keys allowed at depth n if cr between depth/2-? use per-monster [minD,maxD]
 const SPAWN_DEPTH={
   rat:[1,3],kobold:[1,2],koboldsl:[1,3],goblin:[1,3],skeleton:[1,4],skelarcher:[2,5],zombie:[2,5],
   hobgoblin:[2,5],orc:[2,5],gobshaman:[3,6],spider:[3,7],ghoul:[3,7],gnoll:[3,7],bugbear:[4,8],
   ogre:[6,10],wight:[6,11],wightnec:[8,13],minotaur:[8,13],troll:[10,16],ogremage:[13,99],dragon:[15,99],
+  mummy:[10,20],wraith:[12,24],barrowwight:[13,26],bonecolossus:[16,32],deathknight:[20,99],lich:[22,99],bonedrake:[26,99],
 };
 /* Elite templates. The bestiary runs out around depth 20, so past that the
    descent keeps escalating by hardening ordinary monsters rather than by
@@ -1046,7 +1064,129 @@ const MONSTER_ART={
     fangsDown(49,19.5,8,4,1.8,'#e8dfc0')+fangsUp(50,24.5,7,3,1.7,'#e8dfc0')+`|/H|`+
     `<path d="M60 12 Q62 8 61 4 M62 14 Q65 12 65 9" stroke="#8a8a8a" stroke-width="0.9" opacity="0.35" fill="none"/>`+
     `<circle cx="58" cy="26" r="0.8" fill="#ff8c1e" opacity="0.8"/><circle cx="61" cy="17" r="0.7" fill="#ffb84a" opacity="0.7"/><circle cx="44" cy="10" r="0.6" fill="#ff8c1e" opacity="0.6"/>`}),
+/* ---------- the deep dead ---------- */
+  mummy:()=>({o:{hp:[32,26],ap:[44,32],lit:'#c9bb92',mid:'#6b5f42',eye:'#ffd27a',rough:[2.6,0.5],seed:51,
+      extra:`<linearGradient id="wrap" x1="0" y1="0" x2="1" y2="0.3"><stop offset="0%" stop-color="#b8a878"/><stop offset="100%" stop-color="#7d7050"/></linearGradient>`},
+    body:`<path d="M24 28 Q20 42 22 59 Q27 55 32 59 Q37 55 42 59 Q44 42 40 28 Z" fill="url(#wrap)" ${RIM}/>`+
+    `<path d="M22 33 Q32 36 42 33 M22 38 Q32 41 42 38 M22 43 Q32 46 42 43 M23 48 Q32 51 41 48 M23 53 Q32 56 41 53" stroke="#5a5038" stroke-width="1.1" fill="none" opacity="0.85"/>`+
+    `<path d="M27 30 Q26 38 28 45" stroke="#8f8260" stroke-width="1" fill="none" opacity="0.6"/>`+
+    `|H|<path d="M26 19 Q26 9 32 9 Q39 9 39 18 Q39 25 33 27 Q27 26 26 19 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M26 14 Q32 17 39 14 M26 19 Q32 22 39 19" stroke="#5a5038" stroke-width="1" fill="none" opacity="0.8"/>`+
+    `<path d="M28.5 22.5 L35.5 22.5" stroke="#241c10" stroke-width="1.1"/>`+
+    `<path d="M31 9 Q29 4 33 2 Q35 6 34 9 Z" fill="#8f8260" opacity="0.75"/>|/H|`+
+    `<path d="M24 31 Q14 34 11 43" stroke="#a4966e" stroke-width="3.2" fill="none" stroke-linecap="round"/>`+
+    `|A|<path d="M40 31 Q50 33 54 41" stroke="#a4966e" stroke-width="3.2" fill="none" stroke-linecap="round"/>`+
+    `<path d="M44 34 Q47 36 48 39" stroke="#5a5038" stroke-width="0.9" fill="none" opacity="0.7"/>|/A|`+
+    `<path d="M11 43 q-2 4 -1 7" stroke="#8f8260" stroke-width="1.6" fill="none" opacity="0.7"/>`,
+    sharp:`|H|`+gEye(29.4,17.5,1.5)+gEye(35.6,17.5,1.5)+`|/H|`+
+    // inside |A| so the claws travel with the hand they belong to
+    `|A|`+clawsAt(54,41,[40,60,80],4.2,'#cfc2a0')+`|/A|`}),
+
+  wraith:()=>({o:{hp:[32,24],ap:[46,32],lit:'#8fa6b8',mid:'#242e3a',eye:'#9ad8ff',rough:[2.2,0.4],seed:52,
+      extra:`<linearGradient id="wfade" x1="0" y1="0" x2="0" y2="1"><stop offset="42%" stop-color="#1a2028"/><stop offset="100%" stop-color="#1a2028" stop-opacity="0"/></linearGradient>`+
+        `<linearGradient id="wrob" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0%" stop-color="#3a4655"/><stop offset="100%" stop-color="#171d25"/></linearGradient>`},
+    body:`<path d="M20 30 Q14 44 16 62 Q24 55 32 62 Q40 55 48 62 Q50 44 44 30 Z" fill="url(#wfade)"/>`+
+    `<path d="M23 27 Q17 40 19 56 Q26 50 32 56 Q38 50 45 56 Q47 40 41 27 Z" fill="url(#wrob)" ${RIM}/>`+
+    `<path d="M26 32 Q25 44 27 54 M38 32 Q39 44 37 54 M32 30 Q32 44 32 55" stroke="#0f141a" stroke-width="1.1" fill="none" opacity="0.75"/>`+
+    `|H|<path d="M24 20 Q24 8 32 8 Q40 8 40 20 Q40 27 32 30 Q24 27 24 20 Z" fill="url(#wrob)" ${RIM}/>`+
+    `<path d="M27 18 Q27 12 32 11 Q37 12 37 18 Q37 24 32 26 Q27 24 27 18 Z" fill="#080b10"/>|/H|`+
+    `<path d="M22 33 Q12 36 8 46" stroke="#66788c" stroke-width="2.4" fill="none" stroke-linecap="round" opacity="0.85"/>`+
+    `|A|<path d="M42 33 Q52 36 56 45" stroke="#66788c" stroke-width="2.4" fill="none" stroke-linecap="round" opacity="0.85"/>|/A|`,
+    sharp:`|H|`+gEye(29.2,18.5,1.9)+gEye(34.8,18.5,1.9)+`|/H|`+
+    `|A|`+clawsAt(56,45,[30,55,80],5,'#a8c0d4')+`|/A|`+
+    clawsAt(8,46,[100,125,150],5,'#a8c0d4')}),
+
+  barrowwight:()=>({o:{hp:[33,26],ap:[45,33],lit:'#9db08a',mid:'#333d2c',eye:'#c8ff86',rough:[2,0.42],seed:53,
+      extra:`<linearGradient id="bfade" x1="0" y1="0" x2="0" y2="1"><stop offset="58%" stop-color="#181d14"/><stop offset="100%" stop-color="#181d14" stop-opacity="0"/></linearGradient>`},
+    body:`<path d="M22 26 Q18 41 20 60 Q26 55 32 61 Q38 55 44 60 Q46 41 42 26 Z" fill="url(#bfade)"/>`+
+    `<path d="M24 28 Q22 38 23 47 L41 47 Q42 38 40 28 Z" fill="url(#bg)" opacity="0.6"/>`+
+    `<path d="M24 33 L40 33 M24 39 L40 39" stroke="#2a3222" stroke-width="1.4" opacity="0.8"/>`+
+    `<path d="M27 47 L27 57 M37 47 L37 57" stroke="#6f7f60" stroke-width="2.4"/>`+
+    `|H|<path d="M26 20 Q26 10 33 10 Q40 11 40 19 Q40 26 34 28 Q28 27 26 20 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M29 24.5 L37 24.5" stroke="#101408" stroke-width="1.1"/>`+
+    `<path d="M30 24.5 L30 26 M32.5 24.5 L32.5 26.2 M35 24.5 L35 26" stroke="#c2d0b0" stroke-width="0.7"/>`+
+    `<path d="M25 13 L28 8 L31 12 L34 7 L37 12 L40 9 L41 15 Q33 12 25 15 Z" fill="#5c5030" stroke="#2a2414" stroke-width="0.9"/>`+
+    `<circle cx="33" cy="11.5" r="1.2" fill="#c8ff86" opacity="0.8"/>|/H|`+
+    `<path d="M23 31 Q14 34 11 42" stroke="#7d8f6c" stroke-width="2.8" fill="none" stroke-linecap="round"/>`+
+    `|A|<path d="M41 31 Q50 33 53 40" stroke="#7d8f6c" stroke-width="2.8" fill="none" stroke-linecap="round"/>`+
+    `<path d="M53 40 L60 28 L62 30 L56 42 Z" fill="#6b6250"/><path d="M55 34 L58 36" stroke="#3a3428" stroke-width="1.1"/>|/A|`,
+    sharp:`|H|`+gEye(29.5,17.5,1.8)+gEye(36.5,17.5,1.8)+`|/H|`+
+    clawsAt(11,42,[100,125,150],4.6,'#b4c4a0')}),
+
+  bonecolossus:()=>({o:{hp:[32,20],ap:[48,30],ad:-0.5,lit:'#d8cdae',mid:'#6f6753',eye:'#ff8a3a',rough:[1.9,0.36],seed:54},
+    body:`<path d="M18 26 Q10 44 14 62 L20 56 L24 62 L32 55 L40 62 L44 56 L50 62 Q54 44 46 26 Z" fill="#14120c" opacity="0.9"/>`+
+    `<path d="M20 30 Q30 34 44 30 M19 36 Q32 40 45 36 M20 42 Q32 46 44 42 M21 48 Q32 52 43 48" stroke="#c0b694" stroke-width="2.2" fill="none"/>`+
+    `<path d="M32 28 L32 52" stroke="#a89e7e" stroke-width="2.6"/>`+
+    `<path d="M12 30 Q6 44 10 58" stroke="#b8ae8c" stroke-width="3" fill="none"/>`+
+    `<path d="M24 55 L22 62 M40 55 L42 62" stroke="#c0b694" stroke-width="3.2"/>`+
+    `|H|<path d="M22 14 Q22 2 32 2 Q42 2 42 14 Q42 21 37 24 L37 28 L27 28 L27 24 Q22 21 22 14 Z" fill="url(#bg)" ${RIM}/>`+
+    `<ellipse cx="27.5" cy="13" rx="3.4" ry="4" fill="#0a0806"/><ellipse cx="36.5" cy="13" rx="3.4" ry="4" fill="#0a0806"/>`+
+    `<path d="M32 17 L30.4 21 L33.6 21 Z" fill="#0a0806"/>`+
+    `<path d="M27.5 25 L27.5 28 M30 25 L30 28.2 M32.5 25 L32.5 28.2 M35 25 L35 28 M37 25 L37 27.8" stroke="#0e0c08" stroke-width="0.9"/>|/H|`+
+    `|A|<path d="M46 30 Q56 34 58 44" stroke="#c0b694" stroke-width="3.4" fill="none" stroke-linecap="round"/>`+
+    `<path d="M58 44 L62 40 L63 45 L59 49 Z" fill="#9a9078"/>|/A|`,
+    sharp:`|H|`+gEye(27.5,13,2.1)+gEye(36.5,13,2.1)+`|/H|`+
+    clawsAt(10,58,[95,120,145],5,'#d4c9a8')}),
+
+  deathknight:()=>({o:{hp:[32,24],ap:[46,32],ad:-0.55,lit:'#7d8794',mid:'#232830',eye:'#ff4a4a',rough:[2,0.4],seed:55,
+      extra:glowGrad('dkg','#ff2a2a')+`<linearGradient id="plate" x1="0" y1="0" x2="0.5" y2="1"><stop offset="0%" stop-color="#5c6774"/><stop offset="100%" stop-color="#1a1e26"/></linearGradient>`},
+    body:`<path d="M20 30 Q16 46 18 60 Q26 55 32 61 Q38 55 46 60 Q48 46 44 30 Z" fill="url(#plate)" ${RIM}/>`+
+    `<path d="M22 36 L42 36 M21 43 L43 43 M22 50 L42 50" stroke="#12161c" stroke-width="1.5"/>`+
+    `<path d="M32 30 L32 58" stroke="#8e99a6" stroke-width="1.4" opacity="0.6"/>`+
+    `<path d="M26 30 Q24 24 20 22 L18 30 Z" fill="#4a5460"/><path d="M38 30 Q40 24 44 22 L46 30 Z" fill="#4a5460"/>`+
+    `<path d="M25 57 L24 62 M39 57 L40 62" stroke="#2c323a" stroke-width="3.2"/>`+
+    `|H|<path d="M25 18 Q25 8 32 8 Q39 8 39 18 Q39 25 32 28 Q25 25 25 18 Z" fill="url(#plate)" ${RIM}/>`+
+    `<path d="M25 19 L39 19" stroke="#0e1116" stroke-width="3.2"/>`+
+    `<path d="M32 8 L32 19" stroke="#8e99a6" stroke-width="1.2" opacity="0.7"/>`+
+    `<path d="M24 10 L21 3 L26 6 Z M40 10 L43 3 L38 6 Z" fill="#3a424c" stroke="#12161c" stroke-width="0.8"/>|/H|`+
+    `|A|<path d="M44 32 Q52 34 55 40" stroke="#5c6774" stroke-width="3.2" fill="none" stroke-linecap="round"/>`+
+    `<path d="M55 40 L59 12 L62 13 L58 41 Z" fill="#aab4c0" stroke="#4a5460" stroke-width="0.8"/>`+
+    `<path d="M52 39 L62 42" stroke="#3a424c" stroke-width="2.4"/>`+
+    `<path d="M59 12 L60.5 8 L62 13 Z" fill="#d4dde6"/>|/A|`,
+    sharp:`|H|`+gEye(29,20,1.9)+gEye(35,20,1.9)+`|/H|`+
+    `<circle cx="32" cy="44" r="3.2" fill="url(#dkg)" opacity="0.8"/>`}),
+
+  lich:()=>({o:{hp:[32,22],ap:[46,30],lit:'#b9c9b4',mid:'#2e3a34',eye:'#8ae0b4',rough:[2,0.38],seed:56,
+      extra:glowGrad('lg','#6fe0a8')+`<linearGradient id="robe" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0%" stop-color="#3e4a44"/><stop offset="100%" stop-color="#131a17"/></linearGradient>`},
+    body:`<path d="M20 30 Q14 46 16 62 Q24 56 32 62 Q40 56 48 62 Q50 46 44 30 Z" fill="url(#robe)" ${RIM}/>`+
+    `<path d="M26 32 Q25 46 27 58 M38 32 Q39 46 37 58" stroke="#0d1210" stroke-width="1.2" fill="none" opacity="0.8"/>`+
+    `<path d="M24 38 Q32 42 40 38" stroke="#6f8a7c" stroke-width="1.4" fill="none" opacity="0.7"/>`+
+    `<path d="M28 30 L28 24 L36 24 L36 30 Z" fill="#2a352f"/>`+
+    `|H|<path d="M25 16 Q25 6 32 6 Q39 6 39 16 Q39 21 36 23 L36 26 L28 26 L28 23 Q25 21 25 16 Z" fill="url(#bg)" ${RIM}/>`+
+    `<ellipse cx="28.8" cy="15" rx="2.6" ry="3.1" fill="#070a08"/><ellipse cx="35.2" cy="15" rx="2.6" ry="3.1" fill="#070a08"/>`+
+    `<path d="M32 18 L30.9 21 L33.1 21 Z" fill="#070a08"/>`+
+    `<path d="M28.6 23.4 L28.6 26 M30.6 23.4 L30.6 26.2 M32.6 23.4 L32.6 26.2 M34.6 23.4 L34.6 26" stroke="#0b100d" stroke-width="0.8"/>`+
+    `<path d="M24 8 L26 1 L29 5 L32 0 L35 5 L38 1 L40 8 Q32 5 24 8 Z" fill="#6b5a2c" stroke="#2e2712" stroke-width="0.9"/>`+
+    `<circle cx="32" cy="4" r="1.4" fill="#8ae0b4"/>|/H|`+
+    `<path d="M22 33 Q13 36 10 44" stroke="#9db09a" stroke-width="2.4" fill="none" stroke-linecap="round"/>`+
+    `|A|<path d="M42 33 Q50 35 53 42" stroke="#9db09a" stroke-width="2.4" fill="none" stroke-linecap="round"/>`+
+    `<path d="M56 6 L56 52" stroke="#5a4a30" stroke-width="2.6"/>`+
+    `<circle cx="56" cy="6" r="4.4" fill="url(#lg)"/><circle cx="56" cy="6" r="2" fill="#d8fff0"/>|/A|`,
+    sharp:`|H|`+gEye(28.8,15,2)+gEye(35.2,15,2)+`|/H|`+
+    clawsAt(10,44,[100,125,150],4.4,'#c4d4c0')}),
+
+  bonedrake:()=>({o:{hp:[46,24],ap:[34,30],lit:'#cfc4a2',mid:'#635c48',eye:'#b8e07a',rough:[2.2,0.42],seed:57,
+      extra:glowGrad('bdg','#a8e05a')+`<linearGradient id="bwing" x1="0" y1="1" x2="0.6" y2="0"><stop offset="0%" stop-color="#5e5744"/><stop offset="100%" stop-color="#201d16" stop-opacity="0.55"/></linearGradient>`},
+    body:`<path d="M22 34 Q8 26 4 8 Q14 16 18 14 Q20 20 24 20 Q24 28 26 32 Z" fill="url(#bwing)" stroke="#b8ae8c" stroke-opacity="0.5" stroke-width="1"/>`+
+    `<path d="M8 12 L22 32 M13 13 L24 28 M18 15 L25 24" stroke="#cfc4a2" stroke-width="1.3" opacity="0.9"/>`+
+    `|A|<path d="M34 30 Q30 20 34 10 Q38 16 42 16 Q40 24 42 30 Z" fill="url(#bwing)" stroke="#b8ae8c" stroke-opacity="0.5" stroke-width="1"/>`+
+    `<path d="M35 12 L36 28 M38 15 L38.5 28" stroke="#cfc4a2" stroke-width="1.3" opacity="0.9"/>|/A|`+
+    `<path d="M18 52 Q6 56 8 46 Q9 42 14 42" stroke="#a89e7e" stroke-width="2.6" fill="none" stroke-linecap="round"/>`+
+    `<path d="M20 40 Q22 32 30 32 Q42 30 48 38 Q52 44 50 50 Q48 58 38 58 L24 58 Q18 52 20 40 Z" fill="#15130d" opacity="0.85"/>`+
+    `<path d="M22 40 Q32 44 46 40 M21 46 Q32 50 48 46 M23 52 Q32 56 45 52" stroke="#c4b998" stroke-width="2" fill="none"/>`+
+    `<path d="M28 33 L30 57 M36 32 L37 57" stroke="#a89e7e" stroke-width="1.6" opacity="0.8"/>`+
+    `<path d="M42 36 Q46 28 46 20 L52 22 Q52 30 48 38 Z" fill="url(#bg)"/>`+
+    `<path d="M44 32 L41.5 30.5 M45.5 27 L43 25.5 M46 22 L43.5 21" stroke="#3a3428" stroke-width="1.3"/>`+
+    `|H|<path d="M44 14 Q44 8 50 8 Q57 8 60 14 Q56 15 54 15 L58 19 Q54 22 48 20 Q44 19 44 14 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M48 20 Q52 24 58 22 L56 25.5 Q50 26.5 47 22 Z" fill="#1c1a12"/>`+
+    `<path d="M46 12 L47 9 M50 10 L51 7 M54 11 L55 8" stroke="#b8ae8c" stroke-width="1.1"/>|/H|`+
+    `<path d="M26 57 L25 61 M36 57 L37 61" stroke="#8f866a" stroke-width="3"/>`,
+    sharp:`|H|`+gEye(52,13,1.7,{slit:1})+
+    `<circle cx="54" cy="21.5" r="3.6" fill="url(#bdg)"/>`+
+    fangsDown(49,19.5,8,4,1.8,'#e8dfc0')+fangsUp(50,24.5,7,3,1.7,'#e8dfc0')+`|/H|`+
+    `<circle cx="58" cy="26" r="0.8" fill="#a8e05a" opacity="0.8"/><circle cx="61" cy="17" r="0.7" fill="#c8ff86" opacity="0.7"/>`}),
 };
+
 // pose transforms pivoting at the feet (32,62): breathing, gait lean, coil, lunge.
 // the body scale is squash-and-stretch, so the head travels while the feet stay planted
 function poseXf(pose){
@@ -1602,7 +1742,16 @@ function tryGen(depth,targetWalk,theme){
   // depth keeps lesser creatures in the mix far down, so a deep floor is a
   // warband of mixed ranks rather than a row of identical giants.
   const sig=0.9+Math.min(1.4,depth*0.045);
-  const base=spawnPool(depth);
+  // A crypt fields its own dead. The bias is applied HERE and never inside
+  // spawnPool, because spawnPool also feeds rawBudget and poolCeiling and
+  // threatBudget memoises by depth alone — a theme-aware pool would make the
+  // budget depend on whichever theme asked for it first.
+  // Seven new undead are also the heavy end of the deep bestiary, so without a
+  // counter-weight every deep floor turns undead and the crypt stops being
+  // special. Elsewhere they are thinned to roughly half, which still leaves the
+  // deep floors far more varied than the dragon/ogre-mage monoculture they were.
+  const undeadBias=theme.name==='Crypt'?4:0.55;
+  const base=spawnPool(depth).map(([k,w])=>[k,w*(MONSTERS[k].type==='undead'?undeadBias:1)]);
   const weigh=(ek)=>base.map(([k,w])=>{
     const r=Math.log(threatOf(k,depth,ek)/share);
     return [k,w*Math.exp(-(r*r)/sig)];
@@ -1701,7 +1850,10 @@ function depthAtkBonus(depth){     // to-hit and damage creep, deliberately slow
 function monsterThreat(m){
   const dmg=m.dmg[0]*(m.dmg[1]+1)/2+m.dmg[2];
   const reach=1+(m.ranged?0.35:0)+(m.caster?0.45:0)+(m.reach?0.2:0);
-  return m.maxHp*(dmg+m.atk*0.8)*reach/12;
+  // half damage from mundane steel means it stands up longer than its hp say,
+  // but by this depth many parties carry something enchanted, so not double
+  const hp=m.maxHp*(m.incorporeal?1.5:1);
+  return hp*(dmg+m.atk*0.8)*reach/12;
 }
 // harden a monster into an elite: it keeps its shape and gains a trait
 function makeElite(m,key){
@@ -1720,7 +1872,7 @@ function makeElite(m,key){
 }
 function threatOf(key,depth,elite){ // the same score, without building the monster
   const d=MONSTERS[key],e=elite?ELITES[elite]:null;
-  const hp=Math.max(1,Math.round(d.hp*depthScale(depth)*(e?e.hp:1)));
+  const hp=Math.max(1,Math.round(d.hp*depthScale(depth)*(e?e.hp:1)))*(d.incorporeal?1.5:1);
   const dmg=d.dmg[0]*(d.dmg[1]+1)/2+d.dmg[2]+(e&&e.dmgBonus?e.dmgBonus:0);
   const reach=1+(d.ranged?0.35:0)+(d.caster?0.45:0)+((d.reach||(e&&e.reach))?0.2:0);
   return hp*(dmg+(d.atk+depthAtkBonus(depth)+(e?e.atk:0))*0.8)*reach/12;
@@ -1810,6 +1962,7 @@ function mkMonster(key,x,y,depth){
     xp:Math.round(XP_AWARD(def.cr)*(1+0.12*Math.max(0,depth-1))),
     speed:def.speed,type:def.type,ranged:def.ranged||0,caster:def.caster||null,
     reach:!!def.reach,slot:0, // slot 0-1 front rank of its tile, 2-3 rear rank
+    skeletal:!!def.skeletal,incorporeal:!!def.incorporeal,
     special:{disease:def.disease,poison:def.poison,paralysis:def.paralysis,energyDrain:def.energyDrain,regen:def.regen},
     atkCd:1.5+Math.random()*2,castCd:def.caster?def.caster.cd*(0.5+Math.random()):0,
     moveCd:Math.random(),held:0,slowed:0,sleep:false,shaken:0,stunned:0,awake:false,boss:false,
@@ -3092,7 +3245,8 @@ function addMonsterSprite(m){
   const frames={idle0:monsterFrameTex(sprKey,m.boss,'idle0',m.elite)};
   const mat=new THREE.SpriteMaterial({map:frames.idle0,transparent:true});
   const spr=new THREE.Sprite(mat);
-  const sc=m.boss?1.05:(['ogre','troll','minotaur','ogremage','dragon'].includes(m.key)?0.95:0.72);
+  const sc=m.boss?1.05:(['ogre','troll','minotaur','ogremage','dragon',
+    'bonecolossus','deathknight','bonedrake','lich'].includes(m.key)?0.95:0.72);
   spr.scale.set(sc,sc,1);
   spr.position.set(m.x+0.5,sc/2+0.02,m.y+0.5);
   spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss,elite:m.elite};
