@@ -2197,7 +2197,7 @@ const R3={ // renderer state
   scene:null,camera:null,renderer:null,torch:null,ambient:null,
   wallMesh:null,doorMeshes:{},secretMeshes:{},trapDecals:{},itemSprites:{},monsterSprites:{},
   stairsGroup:null,texCache:{},levelGroup:null,
-  camAnim:null,shake:0,liquidFlows:[],liquidShaders:[],candleFlames:[],
+  camAnim:null,shake:0,liquidFlows:[],liquidShaders:[],candleFlames:[],cryptGroups:[],
 };
 const TILE=1,WALLH=1.3,EYE=0.62;
 const TEXSS=2; // supersample factor: textures are drawn in 128-space but backed at 128*TEXSS px
@@ -2715,7 +2715,7 @@ function disposeLevel(){
   for(const f of R3.liquidFlows)f.tex.dispose();
   R3.liquidFlows=[];R3.liquidShaders=[];
   R3.doorMeshes={};R3.secretMeshes={};R3.trapDecals={};R3.itemSprites={};R3.monsterSprites={};R3.stairsGroup=null;
-  R3.candleFlames=[];
+  R3.candleFlames=[];R3.cryptGroups=[];
 }
 function buildLevel(L){
   disposeLevel();
@@ -3031,6 +3031,7 @@ function buildLevel(L){
     const stoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,0.02)),specular:0x15121a,shininess:6});
     const jambMat =new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,-0.24)),specular:0x120f16,shininess:5});
     const lidMat  =new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,0.12)),specular:0x1a1620,shininess:9});
+    const lidOpenMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,-0.10)),specular:0x141118,shininess:5});
     const ironMat =new THREE.MeshPhongMaterial({color:0x1b1a17,specular:0x39352c,shininess:16});
     const waxMat  =new THREE.MeshPhongMaterial({color:0xd9cfae,specular:0x2a2620,shininess:7});
     // unlit, so a recess stays a black hole even with a torch raking across it
@@ -3064,13 +3065,22 @@ function buildLevel(L){
       sh.closePath();
       return sh;
     };
-    const addCoffin=(g0,cy,s)=>{
+    // `slot` distinguishes the two coffins of a stacked pair so each is opened
+    // and remembered on its own
+    const addCoffin=(g0,cy,s,c,slot)=>{
+      const opened=c&&c.opened&&c.opened.indexOf(slot)>=0;
       const d=0.075*s;
       const geo=new THREE.ExtrudeGeometry(coffinShape(s),
         {depth:d,bevelEnabled:true,bevelThickness:0.012*s,bevelSize:0.012*s,bevelSegments:1});
-      const body=new THREE.Mesh(geo,lidMat);
-      body.position.set(0,cy,0.016);g0.add(body);
+      const body=new THREE.Mesh(geo,opened?lidOpenMat:lidMat);
+      // an opened coffin has its lid shoved aside and canted, so a looted nook
+      // reads as looted from across the room
+      if(opened){body.rotation.z=0.26;body.position.set(0.09*s,cy-0.05*s,0.016);}
+      else body.position.set(0,cy,0.016);
+      body.userData={kind:'coffin',x:c?c.x:0,y:c?c.y:0,ci:c?c.ci:-1,slot};
+      g0.add(body);
       const front=0.016+d+0.012*s;
+      if(opened)return; // a shoved-aside lid shows no carving, just the dark inside
       const face=new THREE.Mesh(new THREE.SphereGeometry(0.058*s,10,8),stoneMat);
       face.scale.set(1,1.3,0.5);
       face.position.set(0,cy+0.20*s,front);g0.add(face);
@@ -3092,10 +3102,10 @@ function buildLevel(L){
     const flames=[];
     const build={
       recess:(g0)=>addOpening(g0,0.60,0.46,0.66,0.07),
-      sarcophagus:(g0)=>{addOpening(g0,0.56,0.62,0.90,0.09);addCoffin(g0,0.56,1);},
-      stacked:(g0)=>{ // two burials, one above the other
-        addOpening(g0,0.36,0.54,0.50,0.08);addCoffin(g0,0.36,0.78);
-        addOpening(g0,0.94,0.54,0.50,0.08);addCoffin(g0,0.94,0.78);
+      sarcophagus:(g0,c)=>{addOpening(g0,0.56,0.62,0.90,0.09);addCoffin(g0,0.56,1,c,0);},
+      stacked:(g0,c)=>{ // two burials, one above the other
+        addOpening(g0,0.36,0.54,0.50,0.08);addCoffin(g0,0.36,0.78,c,0);
+        addOpening(g0,0.94,0.54,0.50,0.08);addCoffin(g0,0.94,0.78,c,1);
       },
       tombs:(g0)=>{ // a 3x3 grid of plaques set into the stone
         const cw=0.235,ch=0.285,gx=0.028,gy=0.030;
@@ -3145,13 +3155,22 @@ function buildLevel(L){
         flames.push({fl,halo});
       },
     };
-    for(const c of L.crypts){
-      const g0=new THREE.Group();
-      (build[c.kind]||build.recess)(g0);
-      g0.rotation.y=Math.atan2(-c.dx,-c.dy);   // local +Z out of the wall into the room
-      g0.position.set(c.x+0.5+c.dx*0.5,0,c.y+0.5+c.dy*0.5);
+    // each feature keeps its builder so a single one can be rebuilt in place when
+    // its coffin is opened, rather than tearing down and re-raising the level
+    R3.cryptGroups=[];
+    L.crypts.forEach((c,ci)=>{
+      c.ci=ci;
+      const make=()=>{
+        const g0=new THREE.Group();
+        (build[c.kind]||build.recess)(g0,c);
+        g0.rotation.y=Math.atan2(-c.dx,-c.dy); // local +Z out of the wall into the room
+        g0.position.set(c.x+0.5+c.dx*0.5,0,c.y+0.5+c.dy*0.5);
+        return g0;
+      };
+      const g0=make();
       grp.add(g0);
-    }
+      R3.cryptGroups[ci]={group:g0,make};
+    });
     // only the nearest few candles carry a real light: the flames all flicker,
     // but a point light apiece would cost more than the look is worth
     const lit=L.crypts.filter(c=>c.kind==='candle').slice(0,4);
@@ -3275,6 +3294,15 @@ function addTrapDecal(L,tr){
   mesh.renderOrder=3;
   mesh.userData={kind:'trap',x:tr.x,y:tr.y};
   R3.levelGroup.add(mesh);R3.trapDecals[i]=mesh;
+}
+// swap one crypt feature for a freshly built copy, so an opened coffin shows it
+function refreshCryptFeature(ci){
+  const e=R3.cryptGroups&&R3.cryptGroups[ci];
+  if(!e)return;
+  R3.levelGroup.remove(e.group);
+  e.group.traverse(o=>{if(o.geometry)o.geometry.dispose();});
+  e.group=e.make();
+  R3.levelGroup.add(e.group);
 }
 function revealSecret(L,sec){
   const i=sec.y*L.w+sec.x;
@@ -4675,6 +4703,60 @@ function resolveRest(fed,rests){
   UI.refreshParty();
   saveGame();
 }
+/* ---------- crypt coffins ---------- */
+// Prising a lid off is loud. Anything asleep nearby hears it — the same
+// consequence a restless camp has, and the reason to clear a room first.
+function coffinNoise(x,y,r){
+  let drawn=false;
+  for(const m of G.L.monsters){
+    if(m.hp<=0||m.awake||m.guard)continue;
+    if(Math.abs(m.x-x)+Math.abs(m.y-y)<=r){m.awake=true;drawn=true;}
+  }
+  return drawn;
+}
+// Most hold nothing but dust. A quarter hold what someone was buried with, and
+// a fifth hold an occupant who objects to being disturbed.
+function openCoffin(ci,slot){
+  const L=G.L;
+  if(!L.crypts||!L.crypts[ci])return;
+  const c=L.crypts[ci];
+  if(Math.abs(c.x-G.px)+Math.abs(c.y-G.py)>1){UI.toast('Too far to reach the lid.');return;}
+  c.opened=c.opened||[];
+  if(c.opened.indexOf(slot)>=0){UI.toast('Already opened — only dust and bone.');return;}
+  c.opened.push(slot);
+  SFX.secret();
+  refreshCryptFeature(ci);
+  const roll=Math.random();
+  if(roll<0.20){
+    // the occupant is still in residence, and drawn from what this floor holds
+    const pool=spawnPool(G.depth).map(([k,w])=>[k,w*(MONSTERS[k].type==='undead'?8:0.25)]);
+    const spot=freeSlotAt(c.x,c.y,null)>=0?{x:c.x,y:c.y}
+      :DIRS.map(([dx,dy])=>({x:c.x+dx,y:c.y+dy}))
+           .find(p=>walkableTile(tileAt(p.x,p.y))&&freeSlotAt(p.x,p.y,null)>=0);
+    if(spot){
+      const m=mkMonster(pickWeighted(pool),spot.x,spot.y,G.depth);
+      if(Math.random()<eliteChance(G.depth))makeElite(m,pick(ELITE_KEYS));
+      m.slot=Math.max(0,freeSlotAt(spot.x,spot.y,null));
+      m.awake=true;
+      L.monsters.push(m);addMonsterSprite(m);
+      UI.toast('The lid grinds back — '+m.name+' rises from the coffin!');
+      SFX.growl(0);
+    }else UI.toast('Something stirs inside, but there is no room for it to rise.');
+  }else if(roll<0.45){
+    const it=randLoot(G.depth+(Math.random()<0.25?2:0),Math.random()<0.25,true,true);
+    const i=c.y*L.w+c.x;
+    (L.items[i]=L.items[i]||[]).push(it);
+    refreshItemSprite(L,i);
+    UI.toast('Grave goods, laid out with the dead: '+itemName(it)+'.');
+  }else{
+    UI.toast(pick(['Nothing but dust and a smell of old air.',
+      'Bones, collapsed and undisturbed. Nothing worth taking.',
+      'Empty. Whatever lay here was taken long ago.',
+      'A shroud, rotted to threads. Nothing beneath it.']));
+  }
+  if(coffinNoise(c.x,c.y,6))setTimeout(()=>UI.toast('The grinding stone has been heard…'),900);
+  saveGame();
+}
 // camp on a floor a third time and something comes looking for you
 function summonHuntingPack(){
   const L=G.L;
@@ -5706,6 +5788,7 @@ function initInput(){
         return;
       }
       if(u.kind==='trap'){disarmAttempt(u.x,u.y);return;}
+      if(u.kind==='coffin'){openCoffin(u.ci,u.slot);return;}
       if(u.kind==='monster')return; // attacks come from hands
     }
   });
