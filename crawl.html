@@ -329,8 +329,8 @@ const CLASSES={
              note:'Lay on Hands heal pool, Smite Evil (per rest), CHA to saves.', prio:['str','cha','con','wis','dex','int']},
   rogue:    {name:'Rogue',    hd:6,  bab:'three', fort:0,ref:1,will:0, startWeapon:'shortsword', sneak:true, trapfind:true,
              note:'Sneak attack vs distracted foes. Finds and disarms traps, spots secret doors.', prio:['dex','str','con','int','wis','cha']},
-  cleric:   {name:'Cleric',   hd:8,  bab:'three', fort:1,ref:0,will:1, startWeapon:'mace', caster:'divine',
-             note:'Divine spells (WIS): healing, blessings, holy fire.', prio:['wis','con','str','cha','dex','int']},
+  cleric:   {name:'Cleric',   hd:8,  bab:'three', fort:1,ref:0,will:1, startWeapon:'mace', caster:'divine', turn:true,
+             note:'Divine spells (WIS): healing, blessings, holy fire. Turn Undead (per rest).', prio:['wis','con','str','cha','dex','int']},
   wizard:   {name:'Wizard',   hd:4,  bab:'half',  fort:0,ref:0,will:1, startWeapon:'staff', caster:'arcane',
              note:'Arcane spells (INT): missiles, fire, frost, time itself.', prio:['int','dex','con','wis','cha','str']},
 };
@@ -342,18 +342,18 @@ function saveOf(good,lvl){return good?2+Math.floor(lvl/2):Math.floor(lvl/3);}
 /* ---------- items ---------- */
 // kind: weapon|armor|helmet|boots|shield|amulet|ring|potion|scroll|wand|key|ammoNone
 const WEAPONS={
-  shortsword:{name:'Short sword', dmg:[1,6], crit:[19,2], hands:1, light:true, spr:'shortsword'},
-  longsword: {name:'Long sword',  dmg:[1,8], crit:[19,2], hands:1, spr:'longsword'},
-  mace:      {name:'Mace',        dmg:[1,8], crit:[20,2], hands:1, spr:'mace'},
-  warhammer: {name:'Warhammer',   dmg:[1,8], crit:[20,3], hands:1, spr:'warhammer'},
-  staff:     {name:'Quarterstaff',dmg:[1,6], crit:[20,2], hands:2, spr:'staff'},
-  greatsword:{name:'Two-handed sword', dmg:[2,6], crit:[19,2], hands:2, spr:'greatsword'},
-  sledge:    {name:'Sledgehammer',dmg:[1,10],crit:[20,2], hands:2, spr:'sledge'},
-  spear:     {name:'Spear',       dmg:[1,8], crit:[20,3], hands:2, reach:true, spr:'spear'},
-  shortbow:  {name:'Short bow',   dmg:[1,6], crit:[20,3], hands:2, ranged:6, spr:'shortbow'},
-  longbow:   {name:'Long bow',    dmg:[1,8], crit:[20,3], hands:2, ranged:8, spr:'longbow'},
-  crossbow:  {name:'Light crossbow',dmg:[1,8],crit:[19,2],hands:2, ranged:7, spr:'crossbow'},
-  sling:     {name:'Sling',       dmg:[1,4], crit:[20,2], hands:1, ranged:5, spr:'sling'},
+  shortsword:{name:'Short sword', dmg:[1,6], crit:[19,2], hands:1, light:true, dtype:'p', spr:'shortsword'},
+  longsword: {name:'Long sword',  dmg:[1,8], crit:[19,2], hands:1, dtype:'s', spr:'longsword'},
+  mace:      {name:'Mace',        dmg:[1,8], crit:[20,2], hands:1, dtype:'b', spr:'mace'},
+  warhammer: {name:'Warhammer',   dmg:[1,8], crit:[20,3], hands:1, dtype:'b', spr:'warhammer'},
+  staff:     {name:'Quarterstaff',dmg:[1,6], crit:[20,2], hands:2, dtype:'b', spr:'staff'},
+  greatsword:{name:'Two-handed sword', dmg:[2,6], crit:[19,2], hands:2, dtype:'s', spr:'greatsword'},
+  sledge:    {name:'Sledgehammer',dmg:[1,10],crit:[20,2], hands:2, dtype:'b', spr:'sledge'},
+  spear:     {name:'Spear',       dmg:[1,8], crit:[20,3], hands:2, reach:true, dtype:'p', spr:'spear'},
+  shortbow:  {name:'Short bow',   dmg:[1,6], crit:[20,3], hands:2, ranged:6, dtype:'p', spr:'shortbow'},
+  longbow:   {name:'Long bow',    dmg:[1,8], crit:[20,3], hands:2, ranged:8, dtype:'p', spr:'longbow'},
+  crossbow:  {name:'Light crossbow',dmg:[1,8],crit:[19,2],hands:2, ranged:7, dtype:'p', spr:'crossbow'},
+  sling:     {name:'Sling',       dmg:[1,4], crit:[20,2], hands:1, ranged:5, dtype:'b', spr:'sling'},
 };
 const ARMORS={ // slot:armor
   clothes:  {name:'Clothes',      ac:0, maxDex:99, slot:'armor', spr:'clothes'},
@@ -1381,7 +1381,7 @@ function itemDesc(it){
     if(def.reach)s+=' Reach: strikes from the back row.';
     if(def.hands===2)s+=' Two-handed.';
     if(it.bonus)s+=` +${it.bonus} to attack and damage.`;
-    return s+affixDesc(it);
+    return s+dtypeNote(def)+affixDesc(it);
   }
   if(def.kind==='shield')return `Shield: +${def.ac+it.bonus} AC (off hand).`+affixDesc(it);
   if(['armor','helmet','boots'].includes(def.kind)){
@@ -2021,7 +2021,7 @@ function mkCharacter(name,race,cls,scores){
     inventory:new Array(20).fill(null),
     equip:{armor:mkItem('clothes'),helmet:null,boots:null,amulet:null,ring1:null,ring2:null,lhand:null,rhand:null},
     slotsUsed:[0,0,0,0,0],
-    layPool:0,smiteUsed:false,rageUsed:false,rageUntil:0,
+    layPool:0,smiteUsed:false,rageUsed:false,rageUntil:0,turnUsed:false,
     cdL:0,cdR:0, // per-hand attack cooldowns (seconds) — dual wielders alternate hands
   };
   ch.equip.rhand=mkItem(CLASSES[cls].startWeapon);
@@ -2080,7 +2080,7 @@ function recalcHp(ch,full){
 function resetDaily(ch){
   const c=CLASSES[ch.cls];
   ch.slotsUsed=[0,0,0,0,0];
-  ch.smiteUsed=false;ch.rageUsed=false;ch.rageUntil=0;
+  ch.smiteUsed=false;ch.rageUsed=false;ch.rageUntil=0;ch.turnUsed=false;
   if(c.layon)ch.layPool=Math.max(0,mod(ch.abil.cha))*ch.level||0;
 }
 function charSlots(ch){return slotsFor(ch.cls,ch.level,ch.abil[casterAbil(ch)]-ch.abilDmg[casterAbil(ch)]);}
@@ -2162,6 +2162,30 @@ function damageRoll(ch,wDef,wIt,crit){
   const mult=crit?wDef.crit[1]:1;
   for(let i=0;i<mult;i++)total+=roll(wDef.dmg[0],wDef.dmg[1],dm);
   return Math.max(1,total);
+}
+/* ---------- how a weapon fares against undead flesh, or the lack of it ---------- */
+// Anything magical touches an incorporeal thing fully: an enchantment or an
+// affix is enough. Ordinary steel passes half through.
+function weaponIsMagic(wIt){return !!(wIt&&((wIt.bonus||0)>0||wIt.affix));}
+// A skeleton is a frame with nothing to pierce: arrows and points rattle
+// through it, while a hammer breaks it apart. Incorporeal foes take half from
+// mundane weapons — halved, never immune, so a party without an enchanted
+// blade is in trouble rather than helpless.
+function undeadDamageMult(m,wDef,wIt){
+  let mult=1;
+  if(!m)return mult;
+  if(m.skeletal&&wDef){
+    if(wDef.dtype==='b')mult*=1.5;
+    else if(wDef.dtype==='p')mult*=0.5;
+  }
+  if(m.incorporeal&&!weaponIsMagic(wIt))mult*=0.5;
+  return mult;
+}
+// a one-line note for the item panel, so the rule is discoverable from the gear
+function dtypeNote(def){
+  if(def.dtype==='b')return ' Bludgeoning: ×1.5 against skeletal undead.';
+  if(def.dtype==='p')return ' Piercing: ×0.5 against skeletal undead.';
+  return '';
 }
 // two one-handed melee weapons, one in each hand — the same test doAttack makes
 function isDualWielding(ch){
@@ -3995,6 +4019,13 @@ function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
     if(!hit){UI.floatAtMonster(m,'miss','#9a9da2');SFX.whiff();return;}
     if(sneaked)UI.floatAtMonster(m,'sneak!','#d8b040');
     SFX.hit();
+    // bone turns a point aside and shatters under a hammer; an incorporeal
+    // thing is barely there at all unless the steel is enchanted
+    const mult=undeadDamageMult(m,wDef,wIt);
+    if(mult!==1){
+      dmg=Math.max(1,Math.round(dmg*mult));
+      UI.floatAtMonster(m,mult>1?'shatters!':'barely bites',mult>1?'#e8c840':'#9a9da2');
+    }
     // a vampiric weapon drinks what it actually landed, not the overkill
     const landed=Math.min(dmg,Math.max(0,m.hp));
     damageMonster(m,dmg,ch,crit);
@@ -4249,6 +4280,9 @@ function ordSuffix(n){return n===1?'st':n===2?'nd':n===3?'rd':'th';}
 /* ---------- class abilities ---------- */
 function useClassAbility(ch){
   const c=CLASSES[ch.cls];
+  // a cleric has two things to offer now, so it opens a choice rather than
+  // going straight to the spell list the way the wizard does
+  if(c.turn){UI.clericMenu(ch);return;}
   if(c.caster){UI.openSpells(ch);return;}
   if(c.rage){
     if(isRaging(ch)){UI.toast(ch.name+' is already raging.');return;}
@@ -4328,6 +4362,13 @@ function updateMonsters(dt){
       m.bossCd=(m.bossCd===undefined?6:m.bossCd)-dt;
       if(m.bossCd<=0){m.bossCd=11+Math.random()*4;bossSignature(m);}
     }
+    // a turned undead will not close or strike; it puts distance between itself
+    // and the holy symbol until its rout runs out
+    if(m.fleeUntil&&m.fleeUntil>G.time){
+      m.moveCd-=dt;
+      if(m.moveCd<=0){m.moveCd=m.speed*slowMult;fleeStep(m);}
+      continue;
+    }
     const adjacent=Math.abs(m.x-G.px)+Math.abs(m.y-G.py)===1;
     // only the front rank of a tile can bring a weapon to bear; those behind
     // need reach — a polearm, or simply being big enough to strike over them
@@ -4395,6 +4436,20 @@ function wanderStep(m){
     const [dx,dy]=pick(opts);
     moveMonster(m,m.x+dx,m.y+dy);
   }
+}
+// the reverse of a chase: walk up the distance field rather than down it
+function fleeStep(m){
+  const L=G.L,df=G.distField;
+  if(!df)return;
+  const here=df[m.y*L.w+m.x];
+  let best=null,bd=here;
+  for(const [dx,dy] of DIRS.slice().sort(()=>Math.random()-0.5)){
+    const nx=m.x+dx,ny=m.y+dy;
+    if(!stepOk(m,nx,ny))continue;
+    const dd=df[ny*L.w+nx];
+    if(dd>bd){bd=dd;best=[nx,ny];}
+  }
+  if(best)moveMonster(m,best[0],best[1]);
 }
 function chaseStep(m){
   const L=G.L,df=G.distField;
@@ -4818,6 +4873,48 @@ function resolveRest(fed,rests){
   if(rests>=3)summonHuntingPack();
   UI.refreshParty();
   saveGame();
+}
+/* ---------- turn undead ---------- */
+// A cleric's signature, once per rest. Every undead within six tiles rolls
+// against the cleric's level and Charisma: the weakest are destroyed outright,
+// the rest are routed — shaken and driven off for a while. The strong ignore it.
+function turnUndeadPower(ch){return ch.level+Math.max(0,mod(ch.abil.cha-ch.abilDmg.cha));}
+function turnUndead(ch){
+  if(!CLASSES[ch.cls].turn){UI.toast(ch.name+' has no power over the dead.');return false;}
+  if(ch.turnUsed){UI.toast('Already channelled. Rest to recover.');return false;}
+  if(!canAct(ch))return false;
+  ch.turnUsed=true;
+  armBoth(ch,1.6);
+  SFX.cast(0);
+  UI.float(ch,'TURN','#ffe9a8');
+  const power=turnUndeadPower(ch);
+  let destroyed=0,routed=0,resisted=0;
+  for(const m of G.L.monsters.slice()){
+    if(m.hp<=0)continue;
+    if(MONSTERS[m.key].type!=='undead')continue;
+    if(Math.abs(m.x-G.px)+Math.abs(m.y-G.py)>6)continue;
+    if(!losClear(m.x,m.y,G.px,G.py)&&Math.abs(m.x-G.px)+Math.abs(m.y-G.py)>2)continue;
+    const hd=Math.max(1,Math.round(MONSTERS[m.key].cr));
+    // a ceiling on what a channel can touch at all: something far above the
+    // cleric's power is unmoved however the die falls, so a lich is not routed
+    // by a middling priest on a lucky roll
+    if(hd>power*0.75){resisted++;UI.floatAtMonster(m,'unmoved','#7a7d81');continue;}
+    const check=d20()+power;
+    if(check>=hd*2+12&&hd*2<=power){          // crumbles outright
+      UI.floatAtMonster(m,'destroyed!','#ffe9a8');
+      killMonster(m,ch);destroyed++;
+    }else if(check>=hd+12){                    // routed: shaken and driven off
+      m.shaken=Math.max(m.shaken||0,12);
+      m.fleeUntil=G.time+10;
+      m.awake=true;
+      UI.floatAtMonster(m,'turned','#ffd27a');routed++;
+    }else resisted++;
+  }
+  if(!destroyed&&!routed&&!resisted)UI.toast(ch.name+' channels, but nothing dead is near.');
+  else UI.toast(ch.name+' channels holy power — '+destroyed+' destroyed, '+routed+' turned'+
+    (resisted?', '+resisted+' unmoved':'')+'.');
+  UI.refreshParty();
+  return true;
 }
 /* ---------- crypt coffins ---------- */
 // Prising a lid off is loud. Anything asleep nearby hears it — the same
@@ -5434,6 +5531,25 @@ const UI=(()=>{
     list.appendChild(sm);
     show('ovl-target');
   }
+  // the cleric picks between the spell list and channelling
+  function clericMenu(ch){
+    $('tg-title').textContent=ch.name+' — divine power';
+    const list=$('tg-list');
+    list.innerHTML='';
+    const sp=document.createElement('button');
+    sp.className='mbtn';
+    sp.textContent='Spells';
+    sp.addEventListener('click',()=>{hide('ovl-target');openSpells(ch);});
+    list.appendChild(sp);
+    const tu=document.createElement('button');
+    tu.className='mbtn';
+    tu.textContent=ch.turnUsed?'Turn Undead (spent — rest to recover)'
+      :`Turn Undead (rout or destroy the dead nearby, power ${turnUndeadPower(ch)})`;
+    tu.disabled=ch.turnUsed||!canAct(ch);
+    tu.addEventListener('click',()=>{hide('ovl-target');turnUndead(ch);});
+    list.appendChild(tu);
+    show('ovl-target');
+  }
   /* spells */
   function openSpells(ch){
     $('sp-title').textContent=ch.name+' — spells';
@@ -5849,7 +5965,7 @@ const UI=(()=>{
     refreshMenu();
   });
   return {buildPartyDom,refreshParty,tickCooldowns,charFlash,float,floatAtMonster,vignette,trapFlash,toast,
-    refreshDepthTag,pickAlly,paladinMenu,openSpells,spellFlash,openInventory,openStats,openMap,gameOver,show,hide,anyOverlayOpen,refreshInv};
+    refreshDepthTag,pickAlly,paladinMenu,clericMenu,openSpells,spellFlash,openInventory,openStats,openMap,gameOver,show,hide,anyOverlayOpen,refreshInv};
 })();
 /* ============================== INPUT ============================== */
 function bindPad(id,fn){
