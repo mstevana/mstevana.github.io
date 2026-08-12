@@ -3305,7 +3305,7 @@ function applySpellToAlly(caster,t,sp,cl){
     recalcHp(t,false);
     UI.toast(t.name+' feels vigour return.');
   }
-  if(sp.restoreLevels&&t.negLevels>0){t.negLevels=0;recalcHp(t,false);UI.toast('Lost life-force floods back into '+t.name+'.');}
+  if(sp.restoreLevels&&t.negLevels>0){t.negLevels=0;removeCond(t,'drained');recalcHp(t,false);UI.toast('Lost life-force floods back into '+t.name+'.');}
   if(sp.buff){
     const b=Object.assign({},sp.buff);
     b.tag=b.tag||sp.name;
@@ -3573,7 +3573,6 @@ function monsterSpecials(m,ch){
     if(d20()+sv<14){
       ch.negLevels+=sp.energyDrain;
       recalcHp(ch,false);
-      addCond(ch,{kind:'drained'});
       UI.float(ch,'drained!','#b48ae0');
       UI.toast('Cold darkness drains '+ch.name+"'s life-force!");
     }
@@ -3817,7 +3816,7 @@ function tryRest(){
       if(ch.dead)continue;
       for(const a of ABILITIES)ch.abilDmg[a]=0;
       recalcHp(ch,true);
-      ch.stable=true;ch.buffs=[];ch.conditions=ch.conditions.filter(c=>c.kind==='drained');
+      ch.stable=true;ch.buffs=[];ch.conditions=[]; // negLevels is not a condition: it survives rest
       resetDaily(ch);
     }
     // camping twice on the same spot draws the level's attention
@@ -3897,6 +3896,9 @@ function serializeGame(){
 function deserializeGame(o){
   G.depth=o.depth;G.px=o.px;G.py=o.py;G.facing=o.facing;G.time=o.time||0;
   G.party=o.party;
+  // saves written before drain became purely negLevels can carry a stale
+  // 'drained' condition that nothing clears; drop it on the way in
+  for(const ch of G.party)if(ch.conditions)ch.conditions=ch.conditions.filter(c=>c.kind!=='drained');
   const lv=o.level;
   const traps={};for(const t of lv.traps)traps[t.y*lv.w+t.x]=t;
   const items={};for(const [i,arr] of lv.items)items[i]=arr;
