@@ -3917,8 +3917,11 @@ function chaseStep(m){
   if(!df)return;
   if(m.guard){
     const gd=Math.abs(m.x-m.guard.x)+Math.abs(m.y-m.guard.y);
-    const pd=Math.abs(G.px-m.guard.x)+Math.abs(G.py-m.guard.y);
-    if(pd>m.guard.r+2&&gd>0){ // return to post
+    // how far the quarry is from ME, not from my post: a guard leashes on losing
+    // the party, not on the party wandering away from the stairs it watches
+    const pdMe=Math.abs(m.x-G.px)+Math.abs(m.y-G.py);
+    const lost=pdMe>m.guard.r+4&&!losClear(m.x,m.y,G.px,G.py);
+    if(lost&&gd>0){ // quarry lost — slink back to post rather than chase across the level
       // step toward guard point
       let best=null,bd=1e9;
       for(const [dx,dy] of DIRS){
