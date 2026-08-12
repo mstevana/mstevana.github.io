@@ -1435,16 +1435,25 @@ function tryGen(depth,targetWalk,theme){
   for(const s of secrets){ // secret pocket loot
     dropAt(s.pocket.x,s.pocket.y,randLoot(depth+2,true));
   }
-  // 10. monsters
+  // 10. monsters — filled to the floor's threat budget rather than a flat count,
+  // so difficulty is a curve we author instead of one that falls out of the bands
   const monsters=[];
   const isBossLevel=depth%5===0;
-  const pool=Object.keys(SPAWN_DEPTH).filter(k=>depth>=SPAWN_DEPTH[k][0]&&depth<=SPAWN_DEPTH[k][1]);
-  const nMon=Math.min(26,9+depth*2);
-  let mTries=400;
+  // How many bodies is fixed by depth; the budget then decides how heavy each
+  // of them should be, by favouring pool members whose threat sits near the
+  // per-monster share. So a tight budget fills a floor with lesser creatures
+  // rather than leaving it empty, and a generous one sends the big ones.
+  const nMon=Math.round(targetCount(depth))+rnd(3)-1;
+  const share=threatBudget(depth)/Math.max(1,nMon);
+  const pool=spawnPool(depth).map(([k,w])=>{
+    const r=Math.log(threatOf(k,depth)/share);
+    return [k,w*Math.exp(-(r*r)/0.9)]; // a soft preference, so variety survives
+  });
+  let mTries=700;
   while(monsters.length<nMon&&mTries-->0){
     const p=randFloor(8,(x,y,i)=>!monsters.some(m=>m.x===x&&m.y===y)&&!inLocked(x,y));
     if(!p)break;
-    monsters.push(mkMonster(pick(pool),p.x,p.y,depth));
+    monsters.push(mkMonster(pickWeighted(pool),p.x,p.y,depth));
   }
   if(isBossLevel){
     let bossDef=BOSSES[0];
@@ -1483,13 +1492,97 @@ function tryGen(depth,targetWalk,theme){
   return {w:W,h:H,grid:g,start,stairs,traps,items,monsters,secrets,theme,depth,
     explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes};
 }
+/* ---------- difficulty curve ----------
+   Depth, not party level, drives everything. One documented scalar grows every
+   monster, and one budget says how much threat a floor is allowed to hold, so
+   the curve is authored here rather than emerging from spawn-band accidents.
+   Tuned so a party that clears as it goes is overwhelmed around depth 30-40. */
+function depthScale(depth){        // hp multiplier: +7% a floor, compounding slowly
+  return 1+0.07*Math.max(0,depth-1);
+}
+function depthAtkBonus(depth){     // to-hit and damage creep, deliberately slower
+  return Math.floor(Math.max(0,depth-1)/2.5);
+}
+// what one monster is worth as a threat: staying power times what it deals out
+function monsterThreat(m){
+  const dmg=m.dmg[0]*(m.dmg[1]+1)/2+m.dmg[2];
+  const reach=1+(m.ranged?0.35:0)+(m.caster?0.45:0)+(m.reach?0.2:0);
+  return m.maxHp*(dmg+m.atk*0.8)*reach/12;
+}
+function threatOf(key,depth){ // the same score, without building the monster
+  const d=MONSTERS[key];
+  const hp=Math.max(1,Math.round(d.hp*depthScale(depth)));
+  const dmg=d.dmg[0]*(d.dmg[1]+1)/2+d.dmg[2];
+  const reach=1+(d.ranged?0.35:0)+(d.caster?0.45:0)+(d.reach?0.2:0);
+  return hp*(dmg+(d.atk+depthAtkBonus(depth))*0.8)*reach/12;
+}
+// how many bodies a floor should hold, before strength is considered
+function targetCount(depth){return Math.min(30,11+depth*0.7);}
+// A floor's threat budget is stated relative to what its own pool contains, so
+// a floor of ogres holds fewer of them rather than three lonely giants. Total
+// threat still climbs steeply, because both the average monster and the body
+// count grow with depth. The first three floors are held down on purpose.
+function rawBudget(depth){
+  const pool=spawnPool(depth);
+  let tw=0,ts=0;
+  for(const [k,w] of pool){tw+=w;ts+=w*threatOf(k,depth);}
+  const avg=ts/Math.max(1e-6,tw);
+  const early=depth<=3?[0.5,0.68,0.85][depth-1]:1;
+  return avg*targetCount(depth)*early;
+}
+// The raw figure lurches when a heavy monster's band opens against a small
+// pool, so the curve is held to a band: every floor is harder than the last,
+// and none more than half again as hard. That is the guarantee the whole
+// progression rests on.
+const BUDGET_MIN_STEP=1.11, BUDGET_MAX_STEP=1.45;
+const _budgetMemo={};
+function threatBudget(depth){
+  if(depth<1)return 0;
+  if(_budgetMemo[depth]!==undefined)return _budgetMemo[depth];
+  let v;
+  if(depth===1)v=rawBudget(1);
+  else{
+    const prev=threatBudget(depth-1);
+    v=Math.max(prev*BUDGET_MIN_STEP,Math.min(prev*BUDGET_MAX_STEP,rawBudget(depth)));
+  }
+  return _budgetMemo[depth]=v;
+}
+// A monster fades in and out of its band rather than switching on at full
+// strength: weight peaks mid-band and tapers to the edges, which is what
+// removes the old cliffs where a heavy monster's band opened or closed.
+// Past the deepest band the toughest few stay, so the descent never runs dry.
+function spawnPool(depth){
+  const out=[];
+  for(const k in SPAWN_DEPTH){
+    const [lo,hi]=SPAWN_DEPTH[k];
+    if(depth<lo-1)continue;
+    let w;
+    if(depth>hi){ // aged out: lingers briefly, then only as a rare veteran
+      w=Math.max(0.05,0.5-(depth-hi)*0.12);
+    }else{
+      const span=Math.max(1,hi-lo);
+      const t=(depth-lo)/span;                 // 0 at debut, 1 at the last floor
+      w=0.35+0.65*Math.sin(Math.PI*Math.max(0,Math.min(1,t)));
+      if(depth<lo)w=0.18;                      // a scout one floor early
+    }
+    if(w>0)out.push([k,w]);
+  }
+  if(!out.length)out.push(['dragon',1]);
+  return out;
+}
+function pickWeighted(pairs){
+  let t=0;for(const p of pairs)t+=p[1];
+  let r=Math.random()*t;
+  for(const p of pairs){r-=p[1];if(r<=0)return p[0];}
+  return pairs[pairs.length-1][0];
+}
 function mkMonster(key,x,y,depth){
   const def=MONSTERS[key];
-  // slight scaling: deep monsters of low CR get a nudge
-  const over=Math.max(0,depth-((SPAWN_DEPTH[key]||[1,99])[0]+2));
-  const hp=def.hp+Math.floor(over*def.hp*0.15);
-  return {key,name:def.name,x,y,hp,maxHp:hp,ac:def.ac,atk:def.atk+Math.floor(over/3),dmg:def.dmg,
-    xp:XP_AWARD(def.cr)+over*15,speed:def.speed,type:def.type,ranged:def.ranged||0,caster:def.caster||null,
+  const hp=Math.max(1,Math.round(def.hp*depthScale(depth)));
+  const ab=depthAtkBonus(depth);
+  return {key,name:def.name,x,y,hp,maxHp:hp,ac:def.ac+Math.floor(ab/2),atk:def.atk+ab,dmg:def.dmg,
+    xp:Math.round(XP_AWARD(def.cr)*(1+0.12*Math.max(0,depth-1))),
+    speed:def.speed,type:def.type,ranged:def.ranged||0,caster:def.caster||null,
     reach:!!def.reach,slot:0, // slot 0-1 front rank of its tile, 2-3 rear rank
     special:{disease:def.disease,poison:def.poison,paralysis:def.paralysis,energyDrain:def.energyDrain,regen:def.regen},
     atkCd:1.5+Math.random()*2,castCd:def.caster?def.caster.cd*(0.5+Math.random()):0,
