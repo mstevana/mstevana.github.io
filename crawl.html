@@ -371,6 +371,7 @@ const TRINKETS={
   ringprot: {name:'Ring of protection', slot:'ring', spr:'ring'},
   amuletnat:{name:'Amulet of natural armor', slot:'amulet', spr:'amulet'},
 };
+const RATION={name:'Trail rations', spr:'ration'};
 const POTIONS={
   pot_clw:{name:'Potion of cure light wounds', heal:[1,8,1], spr:'potion', tint:'#a33'},
   pot_cmw:{name:'Potion of cure moderate wounds', heal:[2,8,3], spr:'potion', tint:'#d55'},
@@ -515,6 +516,7 @@ const SPAWN_DEPTH={
    descent keeps escalating by hardening ordinary monsters rather than by
    inventing new ones. A template renames and tints the creature and adds one
    trait, so a Blackfang gnoll reads as its own thing at a glance. */
+const TILE_CAP=4; // monsters to a tile: two ranks of two, as the party stands
 const ELITES={
   scarred:  {name:'Scarred',      hp:1.45,atk:2,ac:1,tint:'#c08a4a'},
   brute:    {name:'Hulking',      hp:1.9, atk:2,ac:0,tint:'#c8703a',dmgBonus:2},
@@ -550,6 +552,14 @@ function svgWrap(inner,glow){ // 64x64 item sprite
   return `<svg xmlns="${SVGNS}" viewBox="0 0 64 64">${g}<g stroke="#0d0b08" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">${inner}</g></svg>`;
 }
 const ITEM_ART={
+  // a cloth-wrapped bundle of hard bread and dried meat, tied with cord
+  ration:()=>`<path d="M16 26 Q32 18 48 26 L46 50 Q32 57 18 50 Z" fill="#8a7146"/>`+
+    `<path d="M16 26 Q32 18 48 26 L47 31 Q32 24 17 31 Z" fill="#a08a58"/>`+
+    `<path d="M18 50 Q32 57 46 50 L45 53 Q32 60 19 53 Z" fill="#6a5636"/>`+
+    `<path d="M32 21 L32 58" stroke="#4a3a22" stroke-width="2.4"/>`+
+    `<path d="M18 34 Q32 28 46 34" stroke="#4a3a22" stroke-width="2.2" fill="none"/>`+
+    `<path d="M27 20 Q32 12 37 20 Q32 17 27 20 Z" fill="#5a4830"/>`+
+    `<circle cx="24" cy="42" r="2.4" fill="#6b5330"/><circle cx="40" cy="44" r="2" fill="#6b5330"/>`,
   shortsword:()=>`<path d="M32 8 L36 14 L36 40 L32 46 L28 40 L28 14 Z" fill="#8f9296"/><path d="M32 10 L32 44" stroke="#c8cace" stroke-width="1.2"/><rect x="22" y="40" width="20" height="5" rx="2" fill="#5a4a2a"/><rect x="29" y="45" width="6" height="12" fill="#3c2f1c"/><circle cx="32" cy="58" r="3.4" fill="#7a6335"/>`,
   longsword:()=>`<path d="M32 3 L36 9 L36 42 L32 48 L28 42 L28 9 Z" fill="#9a9da2"/><path d="M32 5 L32 46" stroke="#d0d2d6" stroke-width="1.2"/><rect x="20" y="42" width="24" height="5" rx="2" fill="#4a3a20"/><rect x="29" y="47" width="6" height="11" fill="#33281a"/><circle cx="32" cy="60" r="3.2" fill="#8a7343"/>`,
   greatsword:()=>`<path d="M32 1 L38 8 L37 40 L32 47 L27 40 L26 8 Z" fill="#8b8e93"/><path d="M32 3 L32 45" stroke="#c4c6ca" stroke-width="1.4"/><rect x="17" y="41" width="30" height="6" rx="2" fill="#4a3a20"/><rect x="29" y="47" width="6" height="13" fill="#2e2416"/><circle cx="32" cy="61" r="3" fill="#8a7343"/>`,
@@ -1132,6 +1142,7 @@ for(const k in POTIONS)ITEM_DEFS[k]={kind:'potion',...POTIONS[k]};
 ITEM_DEFS.scroll={kind:'scroll',name:'Scroll',spr:'scroll'};
 ITEM_DEFS.wand={kind:'wand',name:'Wand',spr:'wand'};
 ITEM_DEFS.key={kind:'key',name:'Iron key',spr:'key'};
+ITEM_DEFS.ration={kind:'ration',...RATION};
 
 function mkItem(base,opts){return Object.assign({base,bonus:0,qty:1,id:Math.floor(Math.random()*1e9)},opts||{});}
 function itemName(it){
@@ -1147,6 +1158,7 @@ function itemName(it){
 function stackKey(it){
   const def=ITEM_DEFS[it.base];
   if(def.kind==='potion')return 'p_'+it.base;
+  if(def.kind==='ration')return 'ration';
   if(def.kind==='scroll')return 's_'+it.spell;
   return null;
 }
@@ -1174,6 +1186,7 @@ function itemDesc(it){
   }
   if(def.kind==='scroll')return `Single use: casts ${SPELLS[it.spell].name}. ${SPELLS[it.spell].desc} ${it.spell==='raisedead'?'Anyone may beseech it.':'Casters only.'}`;
   if(def.kind==='wand')return `${it.charges} charges: casts ${SPELLS[it.spell].name}. ${SPELLS[it.spell].desc} Casters only.`;
+  if(def.kind==='ration')return 'Food for one camp. Resting without it leaves the party half-rested and restless.';
   if(def.kind==='key')return 'Opens a locked door somewhere on this level.';
   return '';
 }
@@ -1190,6 +1203,7 @@ function randLoot(depth,rich,noPotion){
   // weight toward wands, trinkets and higher bonuses; `noPotion` drops the potion band
   const W=[
     ['potion', noPotion?0:(rich?6:22)],
+    ['ration', rich?4:12],
     ['weapon', rich?18:22],
     ['armor',  rich?16:20],
     ['scroll', 14],
@@ -1200,6 +1214,7 @@ function randLoot(depth,rich,noPotion){
   let r=Math.random()*tot,kind=W[W.length-1][0];
   for(const e of W){if(r<e[1]){kind=e[0];break;}r-=e[1];}
   const gbon=()=>bonusForDepth(depth)+(rich?1:0);
+  if(kind==='ration')return mkItem('ration',{qty:1+rnd(2)});
   if(kind==='potion'){
     const p=depth<4?'pot_clw':depth<8?pick(['pot_clw','pot_cmw','pot_antitoxin']):pick(['pot_cmw','pot_csw','pot_antitoxin','pot_remedy']);
     return mkItem(p);
@@ -1482,16 +1497,25 @@ function tryGen(depth,targetWalk,theme){
   });
   const plainPool=weigh(null);
   const elitePools={};for(const ek of ELITE_KEYS)elitePools[ek]=weigh(ek);
+  // Deeper floors post their monsters in packs rather than singly, so the
+  // party meets full ranks holding a corridor instead of a queue of stragglers.
+  const packChance=Math.min(0.55,Math.max(0,(depth-4)*0.03));
+  const spawnOne=(x,y,slot)=>{
+    // decide rank first, so the elite share is the figure we intend rather
+    // than a by-product of elites being the heaviest thing on the shelf
+    const ek=Math.random()<ec?pick(ELITE_KEYS):null;
+    const m=mkMonster(pickWeighted(ek?elitePools[ek]:plainPool),x,y,depth);
+    if(ek)makeElite(m,ek);
+    m.slot=slot;
+    monsters.push(m);
+  };
   let mTries=900;
   while(monsters.length<nMon&&mTries-->0){
     const p=randFloor(8,(x,y,i)=>!monsters.some(m=>m.x===x&&m.y===y)&&!inLocked(x,y));
     if(!p)break;
-    // decide rank first, so the elite share is the figure we intend rather
-    // than a by-product of elites being the heaviest thing on the shelf
-    const ek=Math.random()<ec?pick(ELITE_KEYS):null;
-    const m=mkMonster(pickWeighted(ek?elitePools[ek]:plainPool),p.x,p.y,depth);
-    if(ek)makeElite(m,ek);
-    monsters.push(m);
+    const room=Math.min(TILE_CAP,nMon-monsters.length);
+    const packed=Math.random()<packChance?1+rnd(Math.max(1,room)):1;
+    for(let s=0;s<packed;s++)spawnOne(p.x,p.y,s);
   }
   if(isBossLevel){
     let bossDef=BOSSES[0];
@@ -1678,6 +1702,15 @@ function autoAssign(cls,rolls){
   const scores=new Array(6);
   prio.forEach((a,i)=>{scores[ABILITIES.indexOf(a)]=sorted[i];});
   return scores;
+}
+// the party sets out provisioned; food is a resource from the first floor
+function provisionParty(party){
+  for(const ch of party)
+    for(const it of ch.inventory)if(it&&it.base==='ration')return party; // already fed
+  const carrier=party[0];
+  const i=carrier.inventory.indexOf(null);
+  if(i>=0)carrier.inventory[i]=mkItem('ration',{qty:3});
+  return party;
 }
 function mkAutoParty(){
   const names=[];
@@ -2842,7 +2875,6 @@ function aheadTile(n){const [dx,dy]=DIRS[G.facing];return {x:G.px+dx*(n||1),y:G.
 /* Monsters pack a tile the same way the party does: four to a tile, two in the
    front rank and two behind. Only the front rank can swing at the party (unless
    a monster has reach), but the rear rank can still shoot and cast over them. */
-const TILE_CAP=4;
 function monstersOn(x,y){return G.L.monsters.filter(m=>m.hp>0&&m.x===x&&m.y===y);}
 // the front-most occupant: what the party's blades meet, and what blocks a step
 function monsterAt(x,y){
@@ -3334,6 +3366,11 @@ function monsterLoot(depth){
     return mkItem(depth<4?'pot_clw':depth<8?pick(['pot_clw','pot_cmw']):pick(['pot_cmw','pot_csw']));
   }
   if(r<pHeal+pScroll)return mkItem('scroll',{spell:pick(SCROLLABLE())});
+  // an empty larder pulls food out of the dungeon the way an empty potion belt
+  // pulls healing. Taken from the gear share, so the healing and scroll bands
+  // above keep the rates they were tuned to.
+  const foodNeed=clamp(1-countRations()/3,0,1);
+  if(Math.random()<0.10+0.32*foodNeed)return mkItem('ration',{qty:1+rnd(2)});
   return randLoot(depth,false,true); // gear only — potions come from the adaptive band above
 }
 function killMonster(m,byChar){
@@ -3995,46 +4032,110 @@ function updateParty(dt){
   }
 }
 /* ---------- rest & descend ---------- */
+// find and spend one ration from anywhere in the party
+function takeRation(){
+  for(const ch of G.party){
+    if(ch.dead)continue;
+    for(let i=0;i<ch.inventory.length;i++){
+      const it=ch.inventory[i];
+      if(it&&it.base==='ration'){
+        if((it.qty||1)>1)it.qty--;else ch.inventory[i]=null;
+        return true;
+      }
+    }
+    for(const sl of ['lhand','rhand']){
+      const it=ch.equip[sl];
+      if(it&&it.base==='ration'){
+        if((it.qty||1)>1)it.qty--;else ch.equip[sl]=null;
+        return true;
+      }
+    }
+  }
+  return false;
+}
+function countRations(){
+  let n=0;
+  for(const ch of G.party){
+    if(ch.dead)continue;
+    for(const it of [...ch.inventory,ch.equip.lhand,ch.equip.rhand])
+      if(it&&it.base==='ration')n+=(it.qty||1);
+  }
+  return n;
+}
 function tryRest(){
   if(G.paused||G.over)return;
   const near=G.L.monsters.some(m=>m.hp>0&&m.awake&&G.distField&&G.distField[m.y*G.L.w+m.x]>=0&&G.distField[m.y*G.L.w+m.x]<=8);
   if(near){UI.toast('Too dangerous — enemies are near!');SFX.bump();return;}
-  // fade to black, sleep in the dark, fade back in
+  // a camp needs food. Without it the party still sleeps, but wakes hungry,
+  // half-rested and with nothing memorised — never hard-stuck, always poorer.
+  const fed=takeRation();
+  // rests are counted per floor now, so stepping one tile aside no longer
+  // dodges the consequence of camping over and over in the same dungeon
+  G.L.restsHere=(G.L.restsHere||0)+1;
+  const rests=G.L.restsHere;
   G.paused=true;G.resting=true;
   const fade=document.getElementById('fade');
   fade.style.pointerEvents='auto';
   fade.style.opacity=1;
   SFX.rest();
   setTimeout(()=>{
-    for(const ch of G.party){
-      if(ch.dead)continue;
-      for(const a of ABILITIES)ch.abilDmg[a]=0;
-      recalcHp(ch,true);
-      ch.stable=true;ch.buffs=[];ch.conditions=[]; // negLevels is not a condition: it survives rest
-      resetDaily(ch);
-    }
-    // camping twice on the same spot draws the level's attention
-    const ri=G.py*G.L.w+G.px;
-    G.L.restCount=G.L.restCount||{};
-    G.L.restCount[ri]=(G.L.restCount[ri]||0)+1;
-    if(G.L.restCount[ri]>=2){
-      let drawn=false;
-      for(const m of G.L.monsters){
-        const md=G.distField?G.distField[m.y*G.L.w+m.x]:-1;
-        if(m.hp>0&&!m.awake&&!m.guard&&md>=0&&md<=15){m.awake=true;drawn=true;}
-      }
-      if(drawn)setTimeout(()=>UI.toast('The lingering camp has drawn attention…'),2100);
-    }
-    UI.refreshParty();
-    saveGame();
+    resolveRest(fed,rests);
     setTimeout(()=>{
       fade.style.opacity=0;
       fade.style.pointerEvents='none';
       G.resting=false;
       G.paused=UI.anyOverlayOpen();
-      UI.toast('The party wakes whole. Spells restored.');
+      UI.toast(fed?'The party wakes whole. Spells restored.'
+                  :'A cold camp without food — the party wakes hungry and half-rested.');
     },1800);
   },950);
+}
+// what the party actually gets out of a night's sleep, split out of the fade
+// timers so it can be reasoned about (and tested) on its own
+function resolveRest(fed,rests){
+  for(const ch of G.party){
+    if(ch.dead)continue;
+    for(const a of ABILITIES)ch.abilDmg[a]=0;
+    if(fed)recalcHp(ch,true);
+    else{
+      recalcHp(ch,false);
+      ch.hp=Math.max(ch.hp,Math.min(ch.maxHp,Math.round(ch.maxHp*0.4)));
+    }
+    ch.stable=true;ch.buffs=[];ch.conditions=[]; // negLevels is not a condition: it survives rest
+    if(fed)resetDaily(ch); else {ch.smiteUsed=false;ch.rageUsed=false;ch.rageUntil=0;}
+  }
+  // a hungry camp is a restless one, and a floor slept on too often is noticed
+  const noisy=!fed||rests>=2;
+  if(noisy){
+    let drawn=false;
+    for(const m of G.L.monsters){
+      const md=G.distField?G.distField[m.y*G.L.w+m.x]:-1;
+      if(m.hp>0&&!m.awake&&!m.guard&&md>=0&&md<=15){m.awake=true;drawn=true;}
+    }
+    if(drawn)setTimeout(()=>UI.toast('The restless camp has drawn attention…'),2100);
+  }
+  if(rests>=3)summonHuntingPack();
+  UI.refreshParty();
+  saveGame();
+}
+// camp on a floor a third time and something comes looking for you
+function summonHuntingPack(){
+  const L=G.L;
+  const spots=[];
+  for(let y=1;y<L.h-1;y++)for(let x=1;x<L.w-1;x++){
+    const d=G.distField?G.distField[y*L.w+x]:-1;
+    if(L.grid[y*L.w+x]===T_FLOOR&&d>=6&&d<=14&&freeSlotAt(x,y,null)>=0)spots.push([x,y]);
+  }
+  if(!spots.length)return;
+  const [hx,hy]=pick(spots);
+  const n=2+rnd(2);
+  for(let i=0;i<n&&i<TILE_CAP;i++){
+    const m=mkMonster(pickWeighted(spawnPool(G.depth)),hx,hy,G.depth);
+    if(Math.random()<eliteChance(G.depth))makeElite(m,pick(ELITE_KEYS));
+    m.slot=i;m.awake=true;
+    L.monsters.push(m);addMonsterSprite(m);
+  }
+  setTimeout(()=>UI.toast('Something has followed the smell of your camp…'),2400);
 }
 function descend(){
   G.depth++;
@@ -4082,7 +4183,7 @@ function serializeGame(){
       start:L.start,stairs:L.stairs,themeIdx:THEMES.indexOf(L.theme),depth:L.depth,
       traps:Object.values(L.traps),items:Object.keys(L.items).map(i=>[+i,L.items[i]]),
       monsters:L.monsters.map(m=>{const c=Object.assign({},m);delete c._sc;delete c._regenT;delete c.dot;return c;}),
-      secrets:L.secrets,lockedRoom:L.lockedRoom,restCount:L.restCount||{},
+      secrets:L.secrets,lockedRoom:L.lockedRoom,restCount:L.restCount||{},restsHere:L.restsHere||0,
       rivers:L.rivers||[],pipes:L.pipes||[],
     },
   };
@@ -4100,7 +4201,7 @@ function deserializeGame(o){
     w:lv.w,h:lv.h,grid:b64ToU8(lv.grid),explored:b64ToU8(lv.explored),
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
     traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
-    restCount:lv.restCount||{},rivers:lv.rivers||[],pipes:lv.pipes||[],
+    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],
   };
   clearFx();
   G.L=L;G.over=false;
@@ -5266,7 +5367,7 @@ function initCreation(){
 }
 function newGame(party){
   localStorage.removeItem('crawl_save');
-  G.party=party;G.depth=1;G.over=false;G.time=0;G.started=true;
+  G.party=provisionParty(party);G.depth=1;G.over=false;G.time=0;G.started=true;
   UI.buildPartyDom();
   startLevel(genLevel(1));
   G.paused=UI.anyOverlayOpen();
