@@ -3349,12 +3349,43 @@ function checkPartyWipe(){
   }
 }
 function applyPoison(ch,p){
-  const dmg=roll(p.dice[0],p.dice[1]);
-  ch.abilDmg[p.abil]=Math.min(ch.abil[p.abil]-1,ch.abilDmg[p.abil]+dmg);
-  addCond(ch,{kind:'poison',abil:p.abil});
+  const rolled=roll(p.dice[0],p.dice[1]);
+  const before=ch.abilDmg[p.abil];
+  // an ability can never be driven below 1, so the amount that actually sticks
+  // may be less than the roll
+  ch.abilDmg[p.abil]=Math.min(ch.abil[p.abil]-1,before+rolled);
+  const applied=ch.abilDmg[p.abil]-before;
+  // one poison badge per character, but it remembers every ability it has
+  // drained and by how much, so a second bite on a different stat is recorded
+  // and a cure gives back exactly what the poison took
+  let ex=ch.conditions.find(c=>c.kind==='poison');
+  if(!ex){ex={kind:'poison',drain:{}};ch.conditions.push(ex);}
+  else if(!ex.drain)ex.drain={}; // legacy save: had only an `abil` field
+  ex.drain[p.abil]=(ex.drain[p.abil]||0)+applied;
   UI.float(ch,'poison!','#7fd17f');
-  UI.toast(ch.name+' is poisoned! ('+ABIL_LBL[p.abil]+' −'+dmg+')');
+  UI.toast(ch.name+' is poisoned! ('+ABIL_LBL[p.abil]+' −'+applied+')');
   if(p.abil==='con')recalcHp(ch,false);
+}
+// curing poison restores the ability damage the poison itself dealt — no more
+// (disease's own CON drain, or another source, is left alone) and no less
+function curePoison(ch){
+  const ex=ch.conditions.find(c=>c.kind==='poison');
+  if(ex&&ex.drain){
+    let touchedCon=false;
+    for(const a in ex.drain){
+      ch.abilDmg[a]=Math.max(0,ch.abilDmg[a]-ex.drain[a]);
+      if(a==='con')touchedCon=true;
+    }
+    if(touchedCon)recalcHp(ch,false);
+  }
+  removeCond(ch,'poison');
+}
+// a single place that both the potion and the spell cure paths route through,
+// so poison's stat-restore and paralysis's paired 'hold' stay in one spot
+function cureCond(ch,kind){
+  if(kind==='poison'){curePoison(ch);return;}
+  removeCond(ch,kind);
+  if(kind==='paralysis')removeCond(ch,'hold');
 }
 /* ---------- party attacks & item use ---------- */
 // per-hand cooldowns: one-handed attacks arm only their hand; two-handed
@@ -3576,7 +3607,7 @@ function drinkPotion(giver,target,it,consume,slot){
   consume();
   if(def.heal){healChar(target,roll(def.heal[0],def.heal[1],def.heal[2]));target.stable=true;}
   if(def.cures){
-    for(const c of def.cures){removeCond(target,c);removeCond(target,c==='paralysis'?'hold':c);}
+    for(const c of def.cures)cureCond(target,c);
     UI.toast(target.name+' feels cleansed.');
   }
   SFX.drink();
@@ -3707,7 +3738,7 @@ function applySpellToAlly(caster,t,sp,cl){
   }
   if(t.dead){UI.toast(t.name+' is dead. Only Raise Dead can help.');return false;}
   if(sp.healFn){healChar(t,sp.healFn(cl));}
-  if(sp.cures)for(const c of sp.cures){removeCond(t,c);if(c==='paralysis')removeCond(t,'hold');}
+  if(sp.cures)for(const c of sp.cures)cureCond(t,c);
   if(sp.restoreAbility){
     let left=sp.restoreAbility===99?999:roll(1,4);
     for(const a of ABILITIES){const heal=Math.min(left,t.abilDmg[a]);t.abilDmg[a]-=heal;left-=heal;}
