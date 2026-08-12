@@ -1665,8 +1665,26 @@ function tryGen(depth,targetWalk,theme){
       pipes.push({x,y,dx,dy});
     }
   }
+  // crypts: the walls are given over to the dead — burial nooks, tomb plaques
+  // set into the stone, and candles somebody still comes down here to light
+  let crypts=[];
+  if(theme.name==='Crypt'){
+    const KINDS=['sarcophagus','tombs','stacked','candle','recess'];
+    const nCrypt=9+rnd(7);
+    let cTries=400;
+    while(crypts.length<nCrypt&&cTries-->0){
+      const x=1+rnd(W-2),y=1+rnd(H-2);
+      if(g[idx(x,y)]!==T_FLOOR)continue;
+      // a plain wall only: never a secret door, a real door, or the stairs
+      const wd=DIRS.filter(([dx,dy])=>g[idx(x+dx,y+dy)]===T_WALL);
+      if(!wd.length)continue;
+      if(crypts.some(c=>Math.abs(c.x-x)+Math.abs(c.y-y)<2))continue;
+      const [dx,dy]=pick(wd);
+      crypts.push({x,y,dx,dy,kind:pick(KINDS)});
+    }
+  }
   return {w:W,h:H,grid:g,start,stairs,traps,items,monsters,secrets,theme,depth,
-    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes};
+    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts};
 }
 /* ---------- difficulty curve ----------
    Depth, not party level, drives everything. One documented scalar grows every
@@ -2026,7 +2044,7 @@ const R3={ // renderer state
   scene:null,camera:null,renderer:null,torch:null,ambient:null,
   wallMesh:null,doorMeshes:{},secretMeshes:{},trapDecals:{},itemSprites:{},monsterSprites:{},
   stairsGroup:null,texCache:{},levelGroup:null,
-  camAnim:null,shake:0,liquidFlows:[],liquidShaders:[],
+  camAnim:null,shake:0,liquidFlows:[],liquidShaders:[],candleFlames:[],
 };
 const TILE=1,WALLH=1.3,EYE=0.62;
 const TEXSS=2; // supersample factor: textures are drawn in 128-space but backed at 128*TEXSS px
@@ -2544,6 +2562,7 @@ function disposeLevel(){
   for(const f of R3.liquidFlows)f.tex.dispose();
   R3.liquidFlows=[];R3.liquidShaders=[];
   R3.doorMeshes={};R3.secretMeshes={};R3.trapDecals={};R3.itemSprites={};R3.monsterSprites={};R3.stairsGroup=null;
+  R3.candleFlames=[];
 }
 function buildLevel(L){
   disposeLevel();
@@ -2852,6 +2871,145 @@ function buildLevel(L){
       }
     }
   }
+  // crypt: the walls are given over to the dead. Every feature is built in a
+  // local frame where +X runs along the wall, +Y is up and +Z points out into
+  // the room, then turned to face the tile it was placed against.
+  if(th.name==='Crypt'&&L.crypts&&L.crypts.length){
+    const stoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,0.02)),specular:0x15121a,shininess:6});
+    const jambMat =new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,-0.24)),specular:0x120f16,shininess:5});
+    const lidMat  =new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,0.12)),specular:0x1a1620,shininess:9});
+    const ironMat =new THREE.MeshPhongMaterial({color:0x1b1a17,specular:0x39352c,shininess:16});
+    const waxMat  =new THREE.MeshPhongMaterial({color:0xd9cfae,specular:0x2a2620,shininess:7});
+    // unlit, so a recess stays a black hole even with a torch raking across it
+    const voidMat =new THREE.MeshBasicMaterial({color:0x050407});
+    const flameMat=new THREE.MeshBasicMaterial({color:0xffd27a});
+    const haloMat =new THREE.MeshBasicMaterial({color:0xffae3a,transparent:true,opacity:0.28});
+    // an opening: a dark panel with a stone surround standing a little proud,
+    // so torchlight rakes the jambs and the mouth reads as depth
+    const addOpening=(g0,cy,w,h,d)=>{
+      const v=new THREE.Mesh(new THREE.PlaneGeometry(w,h),voidMat);
+      v.position.set(0,cy,0.012);g0.add(v);
+      const t=0.055;
+      const bar=(gw,gh,gd,px,py,pz)=>{
+        const m=new THREE.Mesh(new THREE.BoxGeometry(gw,gh,gd),jambMat);
+        m.position.set(px,py,pz);g0.add(m);
+      };
+      bar(t,h+t*2,d,-w/2-t/2,cy,d/2);            // left jamb
+      bar(t,h+t*2,d, w/2+t/2,cy,d/2);            // right jamb
+      bar(w+t*2,t,d,0,cy+h/2+t/2,d/2);           // lintel
+      bar(w+t*2,t,d*1.5,0,cy-h/2-t/2,d*0.75);    // sill, a deeper ledge to catch light
+    };
+    // an anthropoid coffin: narrow at the head, broad at the shoulders, tapering
+    const coffinShape=(s)=>{
+      const sh=new THREE.Shape();
+      sh.moveTo(-0.10*s, 0.31*s);
+      sh.lineTo( 0.10*s, 0.31*s);
+      sh.lineTo( 0.19*s, 0.17*s);
+      sh.lineTo( 0.115*s,-0.31*s);
+      sh.lineTo(-0.115*s,-0.31*s);
+      sh.lineTo(-0.19*s, 0.17*s);
+      sh.closePath();
+      return sh;
+    };
+    const addCoffin=(g0,cy,s)=>{
+      const d=0.075*s;
+      const geo=new THREE.ExtrudeGeometry(coffinShape(s),
+        {depth:d,bevelEnabled:true,bevelThickness:0.012*s,bevelSize:0.012*s,bevelSegments:1});
+      const body=new THREE.Mesh(geo,lidMat);
+      body.position.set(0,cy,0.016);g0.add(body);
+      const front=0.016+d+0.012*s;
+      const face=new THREE.Mesh(new THREE.SphereGeometry(0.058*s,10,8),stoneMat);
+      face.scale.set(1,1.3,0.5);
+      face.position.set(0,cy+0.20*s,front);g0.add(face);
+      for(const k of [-1,1]){ // hands folded across the chest
+        const arm=new THREE.Mesh(new THREE.BoxGeometry(0.17*s,0.036*s,0.022*s),stoneMat);
+        arm.rotation.z=k*0.52;
+        arm.position.set(0,cy+0.035*s,front);g0.add(arm);
+      }
+    };
+    // a headstone tablet: square shoulders with a round top
+    const tombShape=(w,h)=>{
+      const r=w/2,sp=Math.max(0.02,h-r);
+      const sh=new THREE.Shape();
+      sh.moveTo(-r,0);sh.lineTo(-r,sp);
+      sh.absarc(0,sp,r,Math.PI,0,true);
+      sh.lineTo(r,0);sh.closePath();
+      return sh;
+    };
+    const flames=[];
+    const build={
+      recess:(g0)=>addOpening(g0,0.60,0.46,0.66,0.07),
+      sarcophagus:(g0)=>{addOpening(g0,0.56,0.62,0.90,0.09);addCoffin(g0,0.56,1);},
+      stacked:(g0)=>{ // two burials, one above the other
+        addOpening(g0,0.36,0.54,0.50,0.08);addCoffin(g0,0.36,0.78);
+        addOpening(g0,0.94,0.54,0.50,0.08);addCoffin(g0,0.94,0.78);
+      },
+      tombs:(g0)=>{ // a 3x3 grid of plaques set into the stone
+        const cw=0.235,ch=0.285,gx=0.028,gy=0.030;
+        const totW=3*cw+2*gx,totH=3*ch+2*gy,cy=0.64;
+        const back=new THREE.Mesh(new THREE.PlaneGeometry(totW+0.07,totH+0.07),voidMat);
+        back.position.set(0,cy,0.010);g0.add(back);
+        const t=0.05,d=0.05,ow=totW+0.07,oh=totH+0.07;
+        const bar=(gw,gh,px,py)=>{
+          const m=new THREE.Mesh(new THREE.BoxGeometry(gw,gh,d),jambMat);
+          m.position.set(px,py,d/2);g0.add(m);
+        };
+        bar(t,oh+t*2,-ow/2-t/2,cy);bar(t,oh+t*2,ow/2+t/2,cy);
+        bar(ow+t*2,t,0,cy+oh/2+t/2);bar(ow+t*2,t,0,cy-oh/2-t/2);
+        const geo=new THREE.ExtrudeGeometry(tombShape(cw*0.84,ch*0.82),
+          {depth:0.032,bevelEnabled:true,bevelThickness:0.008,bevelSize:0.008,bevelSegments:1});
+        for(let r=0;r<3;r++)for(let c=0;c<3;c++){
+          const px=-totW/2+cw/2+c*(cw+gx);
+          const py=cy+totH/2-ch-r*(ch+gy)+0.026;
+          const st=new THREE.Mesh(geo,stoneMat);
+          st.position.set(px,py,0.012);g0.add(st);
+          for(let k=0;k<2;k++){ // two scratched lines standing in for a name
+            const ln=new THREE.Mesh(new THREE.BoxGeometry(cw*0.40,0.011,0.012),jambMat);
+            ln.position.set(px,py+ch*0.34-k*0.048,0.058);g0.add(ln);
+          }
+        }
+      },
+      candle:(g0)=>{ // iron support bolted to the stone, standing proud of it
+        const y=0.92,z=0.185;
+        const plate=new THREE.Mesh(new THREE.BoxGeometry(0.095,0.15,0.028),ironMat);
+        plate.position.set(0,y-0.055,0.014);g0.add(plate);
+        const arm=new THREE.Mesh(new THREE.CylinderGeometry(0.016,0.016,0.20,8),ironMat);
+        arm.rotation.x=Math.PI/2;arm.position.set(0,y,0.10);g0.add(arm);
+        const curl=new THREE.Mesh(new THREE.TorusGeometry(0.055,0.012,6,14,Math.PI*1.15),ironMat);
+        curl.rotation.y=Math.PI/2;curl.position.set(0,y-0.072,0.112);g0.add(curl);
+        const cup=new THREE.Mesh(new THREE.CylinderGeometry(0.052,0.038,0.045,10,1,true),ironMat);
+        cup.position.set(0,y+0.018,z);g0.add(cup);
+        const pan=new THREE.Mesh(new THREE.CircleGeometry(0.05,10),ironMat);
+        pan.rotation.x=-Math.PI/2;pan.position.set(0,y+0.004,z);g0.add(pan);
+        const wax=new THREE.Mesh(new THREE.CylinderGeometry(0.031,0.034,0.15,10),waxMat);
+        wax.position.set(0,y+0.113,z);g0.add(wax);
+        const fl=new THREE.Mesh(new THREE.ConeGeometry(0.021,0.060,8),flameMat);
+        fl.position.set(0,y+0.218,z);g0.add(fl);
+        // its own material: the flicker writes opacity per flame, and a shared
+        // one would make every candle in the level gutter in lockstep
+        const halo=new THREE.Mesh(new THREE.SphereGeometry(0.036,8,6),haloMat.clone());
+        halo.position.set(0,y+0.208,z);g0.add(halo);
+        flames.push({fl,halo});
+      },
+    };
+    for(const c of L.crypts){
+      const g0=new THREE.Group();
+      (build[c.kind]||build.recess)(g0);
+      g0.rotation.y=Math.atan2(-c.dx,-c.dy);   // local +Z out of the wall into the room
+      g0.position.set(c.x+0.5+c.dx*0.5,0,c.y+0.5+c.dy*0.5);
+      grp.add(g0);
+    }
+    // only the nearest few candles carry a real light: the flames all flicker,
+    // but a point light apiece would cost more than the look is worth
+    const lit=L.crypts.filter(c=>c.kind==='candle').slice(0,4);
+    for(const c of lit){
+      const l=new THREE.PointLight(0xffb066,0.55,2.4,2);
+      l.position.set(c.x+0.5+c.dx*0.5-c.dx*0.30,1.17,c.y+0.5+c.dy*0.5-c.dy*0.30);
+      grp.add(l);
+      flames.push({light:l});
+    }
+    R3.candleFlames=flames;
+  }
   // items on floor
   for(const i in L.items)refreshItemSprite(L,+i);
   // monsters
@@ -3018,6 +3176,14 @@ function updateCamera(now){
   const flicker=Math.sin(now/90)*0.08+Math.sin(now/37)*0.05+Math.random()*0.06;
   R3.torch.intensity=R3.torchBase*(1+flicker);
   R3.torchFill.intensity=0.9*(1+flicker*0.6);
+  // crypt candles guttering, each on its own phase so they don't pulse together
+  for(let i=0;i<R3.candleFlames.length;i++){
+    const c=R3.candleFlames[i],ph=i*1.7;
+    const f=Math.sin(now/140+ph)*0.16+Math.sin(now/53+ph)*0.09+Math.random()*0.08;
+    if(c.light)c.light.intensity=0.55*(1+f);
+    if(c.fl)c.fl.scale.set(1+f*0.12,1+f*0.3,1+f*0.12);
+    if(c.halo)c.halo.material.opacity=0.28*(1+f*0.5);
+  }
   // sewer liquid animates in its shader; feed it the clock
   for(const s of R3.liquidShaders)s.uniforms.uTime.value=now*0.001;
 }
@@ -4421,7 +4587,7 @@ function serializeGame(){
       traps:Object.values(L.traps),items:Object.keys(L.items).map(i=>[+i,L.items[i]]),
       monsters:L.monsters.map(m=>{const c=Object.assign({},m);delete c._sc;delete c._regenT;delete c.dot;return c;}),
       secrets:L.secrets,lockedRoom:L.lockedRoom,restCount:L.restCount||{},restsHere:L.restsHere||0,
-      rivers:L.rivers||[],pipes:L.pipes||[],
+      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],
     },
   };
 }
@@ -4438,7 +4604,7 @@ function deserializeGame(o){
     w:lv.w,h:lv.h,grid:b64ToU8(lv.grid),explored:b64ToU8(lv.explored),
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
     traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
-    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],
+    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],
   };
   clearFx();
   G.L=L;G.over=false;

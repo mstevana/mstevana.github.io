@@ -146,11 +146,29 @@ inserting in the middle of `THEMES` re-skins existing saves. Append.
 
 A theme is colours plus `roomBias` (how room-heavy vs maze-heavy the
 generator is). Anything beyond colour is special-cased by **name**, and
-`Sewers` is the only one with real machinery: bigger starting dimensions,
-lake pits in large rooms, rivers down corridor middles, wall pipes,
-culvert arches where a river meets a wall, and grate doors. Search for
-`theme.name==='Sewers'` to find every hook before adding a second such
-theme.
+two themes carry real machinery:
+
+- **`Sewers`** — bigger starting dimensions, lake pits in large rooms,
+  rivers down corridor middles, wall pipes, culvert arches where a river
+  meets a wall, and grate doors.
+- **`Crypt`** — wall furniture in `L.crypts`: burial nooks with an
+  anthropoid sarcophagus, a stacked pair of them, a 3×3 grid of inscribed
+  tomb plaques, a candle on an iron bracket, and an empty recess.
+
+Search for `theme.name==='Sewers'` and `th.name==='Crypt'` to find every
+hook before adding a third such theme. Both write an array onto the level
+(`rivers`/`pipes`, `crypts`) in `tryGen` and read it back in `buildLevel`;
+anything you add that way must also be carried through `serializeGame` and
+`loadGame`, or a reloaded floor comes back stripped of it.
+
+Wall features are built in a local frame — +X along the wall, +Y up, +Z
+out into the room — and then turned with
+`group.rotation.y=Math.atan2(-dx,-dy)` to face the tile they were placed
+against. Note that a wall tile is a solid box, so nothing can genuinely be
+cut into it: a "recess" is an unlit black panel drawn on the wall face
+with a surround standing proud of it. That is the same trick the sewer
+culvert arches use, and it is why recessed contents sit slightly forward
+of the wall plane rather than behind it.
 
 Depth-gated content that is not theme-driven and will need extending if
 the dungeon grows:
