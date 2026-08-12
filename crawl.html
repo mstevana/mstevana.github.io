@@ -656,8 +656,12 @@ const UI_ICONS={
   back:`<svg viewBox="0 0 32 32"><path d="M16 28 L4 12 L12 12 L12 4 L20 4 L20 12 L28 12 Z" fill="currentColor"/></svg>`,
   sleft:`<svg viewBox="0 0 32 32"><path d="M4 16 L20 4 L20 12 L28 12 L28 20 L20 20 L20 28 Z" fill="currentColor"/></svg>`,
   sright:`<svg viewBox="0 0 32 32"><path d="M28 16 L12 4 L12 12 L4 12 L4 20 L12 20 L12 28 Z" fill="currentColor"/></svg>`,
-  rleft:`<svg viewBox="0 0 32 32"><path d="M16 6 A 10 10 0 1 0 26 16" fill="none" stroke="currentColor" stroke-width="4"/><path d="M16 0 L16 12 L8 6 Z" fill="currentColor"/></svg>`,
-  rright:`<svg viewBox="0 0 32 32"><path d="M16 6 A 10 10 0 1 1 6 16" fill="none" stroke="currentColor" stroke-width="4"/><path d="M16 0 L16 12 L24 6 Z" fill="currentColor"/></svg>`,
+  // a curved arrow reads its rotation from the arc it sweeps, not the arrowhead:
+  // the counterclockwise (left-turn) glyph must sweep up the right and over the
+  // top, and the clockwise (right-turn) glyph up the left. These were reversed,
+  // so each button carried the other's turn.
+  rleft:`<svg viewBox="0 0 32 32"><path d="M16 6 A 10 10 0 1 1 6 16" fill="none" stroke="currentColor" stroke-width="4"/><path d="M16 0 L16 12 L24 6 Z" fill="currentColor"/></svg>`,
+  rright:`<svg viewBox="0 0 32 32"><path d="M16 6 A 10 10 0 1 0 26 16" fill="none" stroke="currentColor" stroke-width="4"/><path d="M16 0 L16 12 L8 6 Z" fill="currentColor"/></svg>`,
   bag:`<svg viewBox="0 0 32 32"><path d="M10 10 Q10 4 16 4 Q22 4 22 10" fill="none" stroke="currentColor" stroke-width="3"/><path d="M6 10 L26 10 L28 28 L4 28 Z" fill="currentColor"/></svg>`,
   chart:`<svg viewBox="0 0 32 32"><rect x="4" y="18" width="6" height="10" fill="currentColor"/><rect x="13" y="10" width="6" height="18" fill="currentColor"/><rect x="22" y="4" width="6" height="24" fill="currentColor"/></svg>`,
   book:`<svg viewBox="0 0 32 32"><path d="M4 6 Q10 3 16 6 L16 28 Q10 25 4 28 Z" fill="currentColor"/><path d="M28 6 Q22 3 16 6 L16 28 Q22 25 28 28 Z" fill="currentColor" opacity=".7"/></svg>`,
@@ -1289,12 +1293,14 @@ function rollAffix(depth,rich,pool){
   if(Math.random()>=affixChance(depth,rich))return undefined;
   return pick(pool);
 }
-function randLoot(depth,rich,noPotion){
+function randLoot(depth,rich,noPotion,noRation){
   // weighted loot categories; `rich` (locked rooms, bosses, secret pockets) shifts
-  // weight toward wands, trinkets and higher bonuses; `noPotion` drops the potion band
+  // weight toward wands, trinkets and higher bonuses. `noPotion` drops the potion
+  // band and `noRation` the food band — both used when monsterLoot has already
+  // rolled those on its own adaptive schedule and is only after gear here
   const W=[
     ['potion', noPotion?0:(rich?6:22)],
-    ['ration', rich?4:12],
+    ['ration', noRation?0:(rich?4:12)],
     ['weapon', rich?18:22],
     ['armor',  rich?16:20],
     ['scroll', 14],
@@ -1936,15 +1942,42 @@ function attackBonus(ch,wDef,wIt,offhand){
   }
   return b;
 }
-function damageRoll(ch,wDef,wIt,crit){
+// the flat modifier a swing adds to each damage die: STR (1.5× two-handed, none
+// for a bow but full for a sling), the weapon's own plus, and any buff bonus
+function damageMod(ch,wDef,wIt){
   const strM=abilMod(ch,'str');
   let dm=wDef.ranged?(wDef.spr==='sling'?strM:0):(wDef.hands===2?Math.floor(strM*1.5):strM);
   dm+=(wIt?wIt.bonus:0);
   for(const bf of ch.buffs)if(bf.dmg)dm+=bf.dmg;
+  return dm;
+}
+function damageRoll(ch,wDef,wIt,crit){
+  const dm=damageMod(ch,wDef,wIt);
   let total=0;
   const mult=crit?wDef.crit[1]:1;
   for(let i=0;i<mult;i++)total+=roll(wDef.dmg[0],wDef.dmg[1],dm);
   return Math.max(1,total);
+}
+// two one-handed melee weapons, one in each hand — the same test doAttack makes
+function isDualWielding(ch){
+  const l=weaponOf(ch,'lhand'),r=weaponOf(ch,'rhand');
+  return !!(l&&r&&l.def.hands===1&&r.def.hands===1&&!l.def.ranged&&!r.def.ranged);
+}
+// every hand that will actually swing, with the numbers it will swing at — the
+// offhand penalty (−2 for a two-weapon class, −4 otherwise) is folded into atk,
+// so the stats screen can render straight from this and never drift from combat
+function attackProfile(ch){
+  const dual=isDualWielding(ch);
+  const hands=[];
+  for(const slot of ['rhand','lhand']){
+    const w=weaponOf(ch,slot);
+    if(!w)continue;
+    const offhand=dual?(slot==='lhand'):undefined;
+    hands.push({slot,it:w.it,def:w.def,offhand:!!offhand,
+      atk:attackBonus(ch,w.def,w.it,offhand),
+      dmgMod:damageMod(ch,w.def,w.it)});
+  }
+  return {dual,hands};
 }
 function attackCooldown(ch,wDef){
   const bab=babOf(ch.cls,ch.level);
@@ -2922,7 +2955,12 @@ function addTrapDecal(L,tr){
   ctx.beginPath();ctx.moveTo(32,14);ctx.lineTo(46,44);ctx.lineTo(18,44);ctx.closePath();ctx.stroke();
   const mesh=new THREE.Mesh(new THREE.PlaneGeometry(0.7,0.7),
     new THREE.MeshBasicMaterial({map:texFromCanvas(cv),transparent:true,opacity:0.85}));
-  mesh.rotation.x=-Math.PI/2;mesh.position.set(tr.x+0.5,0.02,tr.y+0.5);
+  // sit above the floor and, in sewers, above the corridor river surface (which
+  // tops out around y=0.022) so a spotted trap is never swallowed by the sewage.
+  // renderOrder biases the transparent sort so the marker draws after the liquid;
+  // depth testing stays on, so it's still occluded by walls as it should be.
+  mesh.rotation.x=-Math.PI/2;mesh.position.set(tr.x+0.5,0.05,tr.y+0.5);
+  mesh.renderOrder=3;
   mesh.userData={kind:'trap',x:tr.x,y:tr.y};
   R3.levelGroup.add(mesh);R3.trapDecals[i]=mesh;
 }
@@ -3322,12 +3360,43 @@ function checkPartyWipe(){
   }
 }
 function applyPoison(ch,p){
-  const dmg=roll(p.dice[0],p.dice[1]);
-  ch.abilDmg[p.abil]=Math.min(ch.abil[p.abil]-1,ch.abilDmg[p.abil]+dmg);
-  addCond(ch,{kind:'poison',abil:p.abil});
+  const rolled=roll(p.dice[0],p.dice[1]);
+  const before=ch.abilDmg[p.abil];
+  // an ability can never be driven below 1, so the amount that actually sticks
+  // may be less than the roll
+  ch.abilDmg[p.abil]=Math.min(ch.abil[p.abil]-1,before+rolled);
+  const applied=ch.abilDmg[p.abil]-before;
+  // one poison badge per character, but it remembers every ability it has
+  // drained and by how much, so a second bite on a different stat is recorded
+  // and a cure gives back exactly what the poison took
+  let ex=ch.conditions.find(c=>c.kind==='poison');
+  if(!ex){ex={kind:'poison',drain:{}};ch.conditions.push(ex);}
+  else if(!ex.drain)ex.drain={}; // legacy save: had only an `abil` field
+  ex.drain[p.abil]=(ex.drain[p.abil]||0)+applied;
   UI.float(ch,'poison!','#7fd17f');
-  UI.toast(ch.name+' is poisoned! ('+ABIL_LBL[p.abil]+' −'+dmg+')');
+  UI.toast(ch.name+' is poisoned! ('+ABIL_LBL[p.abil]+' −'+applied+')');
   if(p.abil==='con')recalcHp(ch,false);
+}
+// curing poison restores the ability damage the poison itself dealt — no more
+// (disease's own CON drain, or another source, is left alone) and no less
+function curePoison(ch){
+  const ex=ch.conditions.find(c=>c.kind==='poison');
+  if(ex&&ex.drain){
+    let touchedCon=false;
+    for(const a in ex.drain){
+      ch.abilDmg[a]=Math.max(0,ch.abilDmg[a]-ex.drain[a]);
+      if(a==='con')touchedCon=true;
+    }
+    if(touchedCon)recalcHp(ch,false);
+  }
+  removeCond(ch,'poison');
+}
+// a single place that both the potion and the spell cure paths route through,
+// so poison's stat-restore and paralysis's paired 'hold' stay in one spot
+function cureCond(ch,kind){
+  if(kind==='poison'){curePoison(ch);return;}
+  removeCond(ch,kind);
+  if(kind==='paralysis')removeCond(ch,'hold');
 }
 /* ---------- party attacks & item use ---------- */
 // per-hand cooldowns: one-handed attacks arm only their hand; two-handed
@@ -3429,10 +3498,7 @@ function useInventoryItem(ch,ref){
   return true;
 }
 function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
-  const dualWielding=(()=>{
-    const l=weaponOf(ch,'lhand'),r=weaponOf(ch,'rhand');
-    return l&&r&&l.def.hands===1&&r.def.hands===1&&!l.def.ranged&&!r.def.ranged;
-  })();
+  const dualWielding=isDualWielding(ch);
   const offhand=dualWielding&&slot==='lhand'?true:(dualWielding?false:undefined);
   let atkB=attackBonus(ch,wDef,wIt,dualWielding?offhand:undefined);
   if(m.sleep||m.held)atkB+=4;
@@ -3512,6 +3578,17 @@ function monsterLoot(depth){
   // so a drained party has a small chance of turning up the one cure there is
   if(hasCaster&&G.party.some(c=>!c.dead&&c.negLevels>0)&&Math.random()<0.09)
     return mkItem('scroll',{spell:'restoration'});
+  // a poisoned party turns up its antidote more often — the same needs-aware
+  // faucet as healing, but for the cure that clears it. Fires even at full hp,
+  // so a healthy-but-envenomed party still finds relief rather than waiting on
+  // the hp-scaled heal band below to happen to roll a cure
+  if(G.party.some(c=>!c.dead&&hasCond(c,'poison'))&&Math.random()<0.15)
+    return mkItem('pot_antitoxin');
+  // likewise the Vial of Remedies for the afflictions it clears: disease clings
+  // for floors until it's cured or saved off, and paralysis can recur, so the
+  // one potion that lifts both surfaces more readily while either is on someone
+  if(G.party.some(c=>!c.dead&&(hasCond(c,'disease')||hasCond(c,'paralysis')))&&Math.random()<0.15)
+    return mkItem('pot_remedy');
   const pHeal=0.12+0.38*healNeed;    // 12%..50%
   const pScroll=0.06+0.24*scrollNeed;// 6%..30%
   const r=Math.random();
@@ -3525,7 +3602,9 @@ function monsterLoot(depth){
   // above keep the rates they were tuned to.
   const foodNeed=clamp(1-countRations()/3,0,1);
   if(Math.random()<0.10+0.32*foodNeed)return mkItem('ration',{qty:1+rnd(2)});
-  return randLoot(depth,false,true); // gear only — potions come from the adaptive band above
+  // gear only — potions and rations are both handled by their own adaptive rolls
+  // above, so suppress them here rather than let the table double up the food rate
+  return randLoot(depth,false,true,true);
 }
 function killMonster(m,byChar){
   m.hp=0;
@@ -3552,7 +3631,7 @@ function drinkPotion(giver,target,it,consume,slot){
   consume();
   if(def.heal){healChar(target,roll(def.heal[0],def.heal[1],def.heal[2]));target.stable=true;}
   if(def.cures){
-    for(const c of def.cures){removeCond(target,c);removeCond(target,c==='paralysis'?'hold':c);}
+    for(const c of def.cures)cureCond(target,c);
     UI.toast(target.name+' feels cleansed.');
   }
   SFX.drink();
@@ -3683,7 +3762,7 @@ function applySpellToAlly(caster,t,sp,cl){
   }
   if(t.dead){UI.toast(t.name+' is dead. Only Raise Dead can help.');return false;}
   if(sp.healFn){healChar(t,sp.healFn(cl));}
-  if(sp.cures)for(const c of sp.cures){removeCond(t,c);if(c==='paralysis')removeCond(t,'hold');}
+  if(sp.cures)for(const c of sp.cures)cureCond(t,c);
   if(sp.restoreAbility){
     let left=sp.restoreAbility===99?999:roll(1,4);
     for(const a of ABILITIES){const heal=Math.min(left,t.abilDmg[a]);t.abilDmg[a]-=heal;left-=heal;}
@@ -3858,8 +3937,11 @@ function chaseStep(m){
   if(!df)return;
   if(m.guard){
     const gd=Math.abs(m.x-m.guard.x)+Math.abs(m.y-m.guard.y);
-    const pd=Math.abs(G.px-m.guard.x)+Math.abs(G.py-m.guard.y);
-    if(pd>m.guard.r+2&&gd>0){ // return to post
+    // how far the quarry is from ME, not from my post: a guard leashes on losing
+    // the party, not on the party wandering away from the stairs it watches
+    const pdMe=Math.abs(m.x-G.px)+Math.abs(m.y-G.py);
+    const lost=pdMe>m.guard.r+4&&!losClear(m.x,m.y,G.px,G.py);
+    if(lost&&gd>0){ // quarry lost — slink back to post rather than chase across the level
       // step toward guard point
       let best=null,bd=1e9;
       for(const [dx,dy] of DIRS){
@@ -5116,12 +5198,21 @@ const UI=(()=>{
   function openStats(ch){
     $('st-title').textContent=ch.name;
     const s=charSaves(ch);
-    const rw=weaponOf(ch,'rhand');
     const need=XP_FOR_LEVEL(ch.level+1),base=XP_FOR_LEVEL(ch.level);
     const prog=clamp((ch.xp-base)/Math.max(1,need-base),0,1);
     const slots=charSlots(ch);
+    // a dual-wielding character swings both hands, each at its own penalty, so
+    // show every hand that actually attacks with the numbers combat will use
+    const prof=attackProfile(ch);
     let atkLine='';
-    if(rw)atkLine=`<b>Attack</b> ${fmtMod(attackBonus(ch,rw.def,rw.it))} with ${itemName(rw.it)} (${rw.def.dmg[0]}d${rw.def.dmg[1]}${fmtMod(abilMod(ch,'str')+(rw.it.bonus||0))})<br>`;
+    for(const h of prof.hands){
+      const dice=`${h.def.dmg[0]}d${h.def.dmg[1]}${fmtMod(h.dmgMod)}`;
+      const af=h.it.affix&&AFFIXES[h.it.affix];
+      const rider=af&&af.dice?` + ${af.dice[0]}d${af.dice[1]} ${ELEMENTS[af.elem].name}`:'';
+      const lead=prof.dual?`<b>${h.offhand?'Off hand':'Main hand'}</b>`:'<b>Attack</b>';
+      atkLine+=`${lead} ${fmtMod(h.atk)} with ${itemName(h.it)} (${dice}${rider})<br>`;
+    }
+    if(prof.dual)atkLine=`<span class="dim-note">Two-weapon fighting${CLASSES[ch.cls].twf?'':' — untrained (−4)'}</span><br>`+atkLine;
     const abils=ABILITIES.map(a=>{
       const cur=ch.abil[a]-ch.abilDmg[a]+((a==='str'||a==='con')&&isRaging(ch)?4:0);
       const dmgd=ch.abilDmg[a]>0?` <span style="color:#a05545">(−${ch.abilDmg[a]})</span>`:'';
