@@ -2435,6 +2435,52 @@ function buildLevel(L){
       addStrips(xCells,1,0.44,bedMat,0.012);
       addStrips(zCells,0.34,1,riverMatZ,0.018);
       addStrips(xCells,1,0.34,riverMatX,0.022);
+      // where a channel runs into stone the sewage has to be coming from
+      // somewhere: set a low arch into the wall over it, a dark culvert mouth
+      const arches=[];
+      for(const i of L.rivers){
+        const x=i%L.w,y=Math.floor(i/L.w);
+        const zc=rset.has(i-L.w)||rset.has(i+L.w);
+        const xc=rset.has(i-1)||rset.has(i+1);
+        const runsZ=zc||!xc,runsX=xc; // which way the strip was laid at this tile
+        for(const [dx,dy] of DIRS){
+          if((dx&&!runsX)||(dy&&!runsZ))continue; // only where the channel itself ends
+          const t=L.grid[(y+dy)*L.w+(x+dx)];
+          if(t!==T_WALL&&t!==T_SECRET)continue;
+          arches.push([x,y,dx,dy]);
+        }
+      }
+      if(arches.length){
+        const AW=0.46,AH=0.33; // wide and low: a culvert, not a doorway
+        const archShape=(w,h)=>{
+          const r=w/2,sp=Math.max(0.03,h-r);
+          const sh=new THREE.Shape();
+          sh.moveTo(-r,0);sh.lineTo(-r,sp);
+          sh.absarc(0,sp,r,Math.PI,0,true);
+          sh.lineTo(r,0);sh.closePath();
+          return sh;
+        };
+        const rimShape=archShape(AW+0.11,AH+0.055);
+        rimShape.holes.push(new THREE.Path(archShape(AW,AH).getPoints(28)));
+        const mouthGeo=new THREE.ShapeGeometry(archShape(AW,AH));
+        const rimGeo=new THREE.ShapeGeometry(rimShape);
+        // unlit black, so the opening stays a hole even with a torch on it
+        const mouthMat=new THREE.MeshBasicMaterial({color:0x05060a});
+        const rimMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,-0.3)),
+          specular:0x14110b,shininess:4});
+        const mouthInst=new THREE.InstancedMesh(mouthGeo,mouthMat,arches.length);
+        const rimInst=new THREE.InstancedMesh(rimGeo,rimMat,arches.length);
+        const q=new THREE.Quaternion(),v=new THREE.Vector3(),one=new THREE.Vector3(1,1,1);
+        arches.forEach(([x,y,dx,dy],i)=>{
+          q.setFromAxisAngle(new THREE.Vector3(0,1,0),Math.atan2(-dx,-dy)); // face the channel
+          const bx=x+0.5+dx*0.5,bz=y+0.5+dy*0.5; // the wall face itself
+          v.set(bx-dx*0.014,0,bz-dy*0.014);
+          mouthInst.setMatrixAt(i,new THREE.Matrix4().compose(v,q,one));
+          v.set(bx-dx*0.022,0,bz-dy*0.022);
+          rimInst.setMatrixAt(i,new THREE.Matrix4().compose(v,q,one));
+        });
+        grp.add(mouthInst);grp.add(rimInst);
+      }
     }
     // wall pipes: a rusted spout jutting from the wall, liquid spilling down
     // the wall face into a puddle on the floor
