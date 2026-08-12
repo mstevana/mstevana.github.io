@@ -1936,15 +1936,42 @@ function attackBonus(ch,wDef,wIt,offhand){
   }
   return b;
 }
-function damageRoll(ch,wDef,wIt,crit){
+// the flat modifier a swing adds to each damage die: STR (1.5× two-handed, none
+// for a bow but full for a sling), the weapon's own plus, and any buff bonus
+function damageMod(ch,wDef,wIt){
   const strM=abilMod(ch,'str');
   let dm=wDef.ranged?(wDef.spr==='sling'?strM:0):(wDef.hands===2?Math.floor(strM*1.5):strM);
   dm+=(wIt?wIt.bonus:0);
   for(const bf of ch.buffs)if(bf.dmg)dm+=bf.dmg;
+  return dm;
+}
+function damageRoll(ch,wDef,wIt,crit){
+  const dm=damageMod(ch,wDef,wIt);
   let total=0;
   const mult=crit?wDef.crit[1]:1;
   for(let i=0;i<mult;i++)total+=roll(wDef.dmg[0],wDef.dmg[1],dm);
   return Math.max(1,total);
+}
+// two one-handed melee weapons, one in each hand — the same test doAttack makes
+function isDualWielding(ch){
+  const l=weaponOf(ch,'lhand'),r=weaponOf(ch,'rhand');
+  return !!(l&&r&&l.def.hands===1&&r.def.hands===1&&!l.def.ranged&&!r.def.ranged);
+}
+// every hand that will actually swing, with the numbers it will swing at — the
+// offhand penalty (−2 for a two-weapon class, −4 otherwise) is folded into atk,
+// so the stats screen can render straight from this and never drift from combat
+function attackProfile(ch){
+  const dual=isDualWielding(ch);
+  const hands=[];
+  for(const slot of ['rhand','lhand']){
+    const w=weaponOf(ch,slot);
+    if(!w)continue;
+    const offhand=dual?(slot==='lhand'):undefined;
+    hands.push({slot,it:w.it,def:w.def,offhand:!!offhand,
+      atk:attackBonus(ch,w.def,w.it,offhand),
+      dmgMod:damageMod(ch,w.def,w.it)});
+  }
+  return {dual,hands};
 }
 function attackCooldown(ch,wDef){
   const bab=babOf(ch.cls,ch.level);
@@ -3429,10 +3456,7 @@ function useInventoryItem(ch,ref){
   return true;
 }
 function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
-  const dualWielding=(()=>{
-    const l=weaponOf(ch,'lhand'),r=weaponOf(ch,'rhand');
-    return l&&r&&l.def.hands===1&&r.def.hands===1&&!l.def.ranged&&!r.def.ranged;
-  })();
+  const dualWielding=isDualWielding(ch);
   const offhand=dualWielding&&slot==='lhand'?true:(dualWielding?false:undefined);
   let atkB=attackBonus(ch,wDef,wIt,dualWielding?offhand:undefined);
   if(m.sleep||m.held)atkB+=4;
@@ -5116,12 +5140,21 @@ const UI=(()=>{
   function openStats(ch){
     $('st-title').textContent=ch.name;
     const s=charSaves(ch);
-    const rw=weaponOf(ch,'rhand');
     const need=XP_FOR_LEVEL(ch.level+1),base=XP_FOR_LEVEL(ch.level);
     const prog=clamp((ch.xp-base)/Math.max(1,need-base),0,1);
     const slots=charSlots(ch);
+    // a dual-wielding character swings both hands, each at its own penalty, so
+    // show every hand that actually attacks with the numbers combat will use
+    const prof=attackProfile(ch);
     let atkLine='';
-    if(rw)atkLine=`<b>Attack</b> ${fmtMod(attackBonus(ch,rw.def,rw.it))} with ${itemName(rw.it)} (${rw.def.dmg[0]}d${rw.def.dmg[1]}${fmtMod(abilMod(ch,'str')+(rw.it.bonus||0))})<br>`;
+    for(const h of prof.hands){
+      const dice=`${h.def.dmg[0]}d${h.def.dmg[1]}${fmtMod(h.dmgMod)}`;
+      const af=h.it.affix&&AFFIXES[h.it.affix];
+      const rider=af&&af.dice?` + ${af.dice[0]}d${af.dice[1]} ${ELEMENTS[af.elem].name}`:'';
+      const lead=prof.dual?`<b>${h.offhand?'Off hand':'Main hand'}</b>`:'<b>Attack</b>';
+      atkLine+=`${lead} ${fmtMod(h.atk)} with ${itemName(h.it)} (${dice}${rider})<br>`;
+    }
+    if(prof.dual)atkLine=`<span class="dim-note">Two-weapon fighting${CLASSES[ch.cls].twf?'':' — untrained (−4)'}</span><br>`+atkLine;
     const abils=ABILITIES.map(a=>{
       const cur=ch.abil[a]-ch.abilDmg[a]+((a==='str'||a==='con')&&isRaging(ch)?4:0);
       const dmgd=ch.abilDmg[a]>0?` <span style="color:#a05545">(−${ch.abilDmg[a]})</span>`:'';
