@@ -1189,7 +1189,12 @@ function randLoot(depth,rich,noPotion){
       ['medarmor','heavyarmor','hhelm','hboots','hshield'];
     return mkItem(pick(pool),{bonus:gbon()});
   }
-  if(kind==='scroll')return mkItem('scroll',{spell:pick(SCROLLABLE())});
+  if(kind==='scroll'){
+    // Restoration sits far above the usual scroll grade — it is the only thing
+    // that lifts negative levels — so it turns up rarely, and mostly in hoards
+    if(Math.random()<(rich?0.10:0.035))return mkItem('scroll',{spell:'restoration'});
+    return mkItem('scroll',{spell:pick(SCROLLABLE())});
+  }
   if(kind==='wand')return mkItem('wand',{spell:pick(WANDABLE),charges:roll(2,6,3)});
   // trinket: ring of protection or amulet of natural armor
   return mkItem(Math.random()<0.5?'ringprot':'amuletnat',{bonus:Math.max(1,gbon())});
@@ -3123,6 +3128,10 @@ function monsterLoot(depth){
   // a fallen comrade can be brought back: small chance of a revival scroll
   if(G.party.some(c=>c.dead)&&Math.random()<0.08)
     return mkItem('scroll',{spell:'raisedead'});
+  // negative levels cannot be rested off, and no cleric lifts them before 9th,
+  // so a drained party has a small chance of turning up the one cure there is
+  if(hasCaster&&G.party.some(c=>!c.dead&&c.negLevels>0)&&Math.random()<0.09)
+    return mkItem('scroll',{spell:'restoration'});
   const pHeal=0.12+0.38*healNeed;    // 12%..50%
   const pScroll=0.06+0.24*scrollNeed;// 6%..30%
   const r=Math.random();
