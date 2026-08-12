@@ -2953,7 +2953,12 @@ function addTrapDecal(L,tr){
   ctx.beginPath();ctx.moveTo(32,14);ctx.lineTo(46,44);ctx.lineTo(18,44);ctx.closePath();ctx.stroke();
   const mesh=new THREE.Mesh(new THREE.PlaneGeometry(0.7,0.7),
     new THREE.MeshBasicMaterial({map:texFromCanvas(cv),transparent:true,opacity:0.85}));
-  mesh.rotation.x=-Math.PI/2;mesh.position.set(tr.x+0.5,0.02,tr.y+0.5);
+  // sit above the floor and, in sewers, above the corridor river surface (which
+  // tops out around y=0.022) so a spotted trap is never swallowed by the sewage.
+  // renderOrder biases the transparent sort so the marker draws after the liquid;
+  // depth testing stays on, so it's still occluded by walls as it should be.
+  mesh.rotation.x=-Math.PI/2;mesh.position.set(tr.x+0.5,0.05,tr.y+0.5);
+  mesh.renderOrder=3;
   mesh.userData={kind:'trap',x:tr.x,y:tr.y};
   R3.levelGroup.add(mesh);R3.trapDecals[i]=mesh;
 }
