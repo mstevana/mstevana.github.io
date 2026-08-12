@@ -487,7 +487,7 @@ const MONSTERS={
   hobgoblin:{name:'Hobgoblin',     cr:1/2,hp:6,  ac:16,atk:2, dmg:[1,8,1], xp:150, speed:1.4, type:'humanoid', spr:'hobgoblin'},
   orc:      {name:'Orc',           cr:1/2,hp:5,  ac:13,atk:4, dmg:[1,8,3], xp:150, speed:1.3, type:'humanoid', spr:'orc'},
   gobshaman:{name:'Goblin shaman', cr:1,  hp:9,  ac:14,atk:1, dmg:[1,4,0], xp:300, speed:1.5, type:'humanoid', spr:'gobshaman',
-             caster:{dmg:[2,4,1],ranged:6,cd:4.5,fx:'#7fd17f'}},
+             caster:{dmg:[2,4,1],ranged:6,cd:4.5,fx:'#7fd17f',elem:'acid'}},
   spider:   {name:'Giant spider',  cr:1,  hp:11, ac:14,atk:4, dmg:[1,6,0], xp:300, speed:1.1, type:'vermin', spr:'spider',
              poison:{dc:12,abil:'str',dice:[1,4]}},
   ghoul:    {name:'Ghoul',         cr:1,  hp:13, ac:14,atk:3, dmg:[1,6,1], xp:300, speed:1.2, type:'undead', spr:'ghoul',
@@ -502,9 +502,9 @@ const MONSTERS={
   minotaur: {reach:true, name:'Minotaur',      cr:4,  hp:39, ac:14,atk:9, dmg:[3,6,4], xp:1200,speed:1.4, type:'giant', spr:'minotaur'},
   troll:    {reach:true, name:'Troll',         cr:5,  hp:63, ac:16,atk:9, dmg:[1,6,6], xp:1500,speed:1.4, type:'giant', spr:'troll', regen:3},
   ogremage: {reach:true, name:'Ogre mage',     cr:8,  hp:37, ac:18,atk:7, dmg:[2,6,7], xp:2400,speed:1.5, type:'giant', spr:'ogremage',
-             caster:{dmg:[5,6,0],ranged:7,cd:6,fx:'#8ad0e0'}},
+             caster:{dmg:[5,6,0],ranged:7,cd:6,fx:'#8ad0e0',elem:'cold'}},
   dragon:   {reach:true, name:'Young dragon',  cr:7,  hp:66, ac:19,atk:11,dmg:[1,8,4], xp:2100,speed:1.4, type:'dragon', spr:'dragon',
-             caster:{dmg:[6,6,0],ranged:6,cd:7,fx:'#e08a3a'}},
+             caster:{dmg:[6,6,0],ranged:6,cd:7,fx:'#e08a3a',elem:'fire'}},
 };
 // spawn table by depth: keys allowed at depth n if cr between depth/2-? use per-monster [minD,maxD]
 const SPAWN_DEPTH={
@@ -528,6 +528,35 @@ const ELITES={
 const ELITE_KEYS=Object.keys(ELITES);
 // none before depth 8, then rising to roughly a third of a floor by depth 30
 function eliteChance(depth){return depth<8?0:Math.min(0.35,(depth-7)*0.016);}
+/* ---------- energy types and gear affixes ---------- */
+const ELEMENTS={
+  fire: {name:'fire',     col:'#e07a30'},
+  cold: {name:'cold',     col:'#7fc4e0'},
+  shock:{name:'lightning',col:'#e0d060'},
+  acid: {name:'acid',     col:'#7fd17f'},
+};
+// affixes are the second axis on deep gear: past the twenties a bigger plus
+// stops feeling like a find, so the deep floors start handing out properties
+// instead. One affix per item, never stacked.
+const AFFIXES={
+  flaming:  {name:'Flaming',    on:'weapon',elem:'fire', dice:[1,6]},
+  frost:    {name:'Frost',      on:'weapon',elem:'cold', dice:[1,6]},
+  shocking: {name:'Shocking',   on:'weapon',elem:'shock',dice:[1,6]},
+  corrosive:{name:'Corrosive',  on:'weapon',elem:'acid', dice:[1,6]},
+  vampiric: {name:'Vampiric',   on:'weapon',leech:0.34},
+  emberward:{name:'Ember-warded',on:'armor',resist:'fire', amount:5},
+  rimeward: {name:'Rime-warded', on:'armor',resist:'cold', amount:5},
+  stormward:{name:'Storm-warded',on:'armor',resist:'shock',amount:5},
+  acidward: {name:'Acid-warded', on:'armor',resist:'acid', amount:5},
+};
+const WEAPON_AFFIXES=Object.keys(AFFIXES).filter(k=>AFFIXES[k].on==='weapon');
+const ARMOR_AFFIXES=Object.keys(AFFIXES).filter(k=>AFFIXES[k].on==='armor');
+// affixed gear turns up on the same schedule as the +4/+5 ladder — deep, and
+// overwhelmingly in hoards and on the piles bosses sit on
+function affixChance(depth,rich){
+  if(depth<20)return 0;
+  return Math.min(0.45,(depth-19)*0.03)*(rich?1:0.2);
+}
 const BOSSES=[ // every 5th level: pick by depth
   {minD:5, base:'bugbear', name:'Grukk the Skullkeeper'},
   {minD:10,base:'wight',   name:'The Bonelord'},
@@ -592,7 +621,13 @@ const ITEM_ART={
 function itemSVG(it){
   const def=ITEM_DEFS[it.base];
   let glow=null;
-  if(it.bonus>=3)glow='#b48ae0'; else if(it.bonus===2)glow='#7aa0c0'; else if(it.bonus===1)glow='#7fd17f';
+  if(it.bonus>=4)glow='#e8c840'; else if(it.bonus===3)glow='#b48ae0'; else if(it.bonus===2)glow='#7aa0c0'; else if(it.bonus===1)glow='#7fd17f';
+  // an affixed piece takes its glow from the energy it carries, so a warded
+  // helm reads as different from an ordinary +2 at a glance
+  if(it.affix&&AFFIXES[it.affix]){
+    const a=AFFIXES[it.affix];
+    glow=a.leech?'#c04a6a':ELEMENTS[a.elem||a.resist].col;
+  }
   const artFn=ITEM_ART[def.spr]||ITEM_ART.potion;
   return svgWrap(artFn(def.tint),glow);
 }
@@ -1150,7 +1185,11 @@ function itemName(it){
   let n;
   if(it.base==='scroll')n='Scroll of '+SPELLS[it.spell].name;
   else if(it.base==='wand')n='Wand of '+SPELLS[it.spell].name+' ('+it.charges+')';
-  else{n=def.name;if(it.bonus)n+=' +'+it.bonus;}
+  else{
+    n=def.name;
+    if(it.affix&&AFFIXES[it.affix])n=AFFIXES[it.affix].name+' '+n[0].toLowerCase()+n.slice(1);
+    if(it.bonus)n+=' +'+it.bonus;
+  }
   if((it.qty||1)>1)n+=' ×'+it.qty;
   return n;
 }
@@ -1162,6 +1201,15 @@ function stackKey(it){
   if(def.kind==='scroll')return 's_'+it.spell;
   return null;
 }
+// one line describing whatever property an affix hangs on the item
+function affixDesc(it){
+  const a=it.affix&&AFFIXES[it.affix];
+  if(!a)return '';
+  if(a.dice)return ` ${a.name}: +${a.dice[0]}d${a.dice[1]} ${ELEMENTS[a.elem].name} damage on every hit.`;
+  if(a.leech)return ` ${a.name}: drinks ${Math.round(a.leech*100)}% of the damage it deals back as healing.`;
+  if(a.resist)return ` ${a.name}: ${ELEMENTS[a.resist].name} resistance ${a.amount} (subtracted from each ${ELEMENTS[a.resist].name} hit).`;
+  return '';
+}
 function itemDesc(it){
   const def=ITEM_DEFS[it.base];
   if(def.kind==='weapon'){
@@ -1170,16 +1218,16 @@ function itemDesc(it){
     if(def.reach)s+=' Reach: strikes from the back row.';
     if(def.hands===2)s+=' Two-handed.';
     if(it.bonus)s+=` +${it.bonus} to attack and damage.`;
-    return s;
+    return s+affixDesc(it);
   }
-  if(def.kind==='shield')return `Shield: +${def.ac+it.bonus} AC (off hand).`;
+  if(def.kind==='shield')return `Shield: +${def.ac+it.bonus} AC (off hand).`+affixDesc(it);
   if(['armor','helmet','boots'].includes(def.kind)){
     let s=`${def.kind[0].toUpperCase()+def.kind.slice(1)}: +${def.ac+it.bonus} AC.`;
     if(def.maxDex<9)s+=` Max DEX bonus ${def.maxDex}.`;
-    return s;
+    return s+affixDesc(it);
   }
-  if(def.kind==='ring')return `Ring: +${it.bonus||1} deflection AC.`;
-  if(def.kind==='amulet')return `Amulet: +${it.bonus||1} natural armor AC.`;
+  if(def.kind==='ring')return `Ring: +${it.bonus||1} deflection AC.`+affixDesc(it);
+  if(def.kind==='amulet')return `Amulet: +${it.bonus||1} natural armor AC.`+affixDesc(it);
   if(def.kind==='potion'){
     if(def.heal)return `Drink: heals ${def.heal[0]}d${def.heal[1]}+${def.heal[2]}. Also stops bleeding.`;
     return `Drink: cures ${def.cures.join(', ')}.`;
@@ -1194,9 +1242,22 @@ const MELEE_KEYS=['shortsword','longsword','mace','warhammer','staff','greatswor
 const RANGED_KEYS=['shortbow','longbow','crossbow','sling'];
 const SCROLLABLE=()=>Object.keys(SPELLS).filter(k=>SPELLS[k].circle<=3);
 const WANDABLE=['magicmissile','burninghands','scorchingray','clw','cmw','searinglight','acidarrow'];
-function bonusForDepth(depth){
+// The enhancement ladder. Ordinary gear still tops out at +3 — that ceiling is
+// what made the deep floors feel flat, so past depth 20 the hoards and boss
+// piles can go further. It stays a find, not a floor: at depth 20 barely one
+// rich drop in a hundred is +4, and +5 waits until the high twenties.
+function bonusForDepth(depth,rich){
   const r=Math.random(), c=depth/10;
-  if(r<c*0.15)return 3; if(r<c*0.4)return 2; if(r<c*0.9)return 1; return 0;
+  let b = r<c*0.15?3 : r<c*0.4?2 : r<c*0.9?1 : 0;
+  if(rich&&b<3)b++; // hoards skew up, but no longer reach +4 by arithmetic alone
+  if(b<3||!rich||depth<20)return b;
+  if(Math.random()>=Math.min(0.18,(depth-19)*0.012))return 3;
+  return (depth>=28&&Math.random()<0.25)?5:4;
+}
+// affixed gear rolls on the same schedule, independent of the plus
+function rollAffix(depth,rich,pool){
+  if(Math.random()>=affixChance(depth,rich))return undefined;
+  return pick(pool);
 }
 function randLoot(depth,rich,noPotion){
   // weighted loot categories; `rich` (locked rooms, bosses, secret pockets) shifts
@@ -1213,7 +1274,7 @@ function randLoot(depth,rich,noPotion){
   let tot=0;for(const e of W)tot+=e[1];
   let r=Math.random()*tot,kind=W[W.length-1][0];
   for(const e of W){if(r<e[1]){kind=e[0];break;}r-=e[1];}
-  const gbon=()=>bonusForDepth(depth)+(rich?1:0);
+  const gbon=()=>bonusForDepth(depth,rich);
   if(kind==='ration')return mkItem('ration',{qty:1+rnd(2)});
   if(kind==='potion'){
     const p=depth<4?'pot_clw':depth<8?pick(['pot_clw','pot_cmw','pot_antitoxin']):pick(['pot_cmw','pot_csw','pot_antitoxin','pot_remedy']);
@@ -1221,13 +1282,13 @@ function randLoot(depth,rich,noPotion){
   }
   if(kind==='weapon'){
     const w=Math.random()<0.75?pick(MELEE_KEYS):pick(RANGED_KEYS);
-    return mkItem(w,{bonus:gbon()});
+    return mkItem(w,{bonus:gbon(),affix:rollAffix(depth,rich,WEAPON_AFFIXES)});
   }
   if(kind==='armor'){
     const pool=depth<3?['lightarmor','lhelm','lboots','lshield']:
       depth<7?['lightarmor','medarmor','lhelm','hhelm','lboots','hboots','lshield','hshield']:
       ['medarmor','heavyarmor','hhelm','hboots','hshield'];
-    return mkItem(pick(pool),{bonus:gbon()});
+    return mkItem(pick(pool),{bonus:gbon(),affix:rollAffix(depth,rich,ARMOR_AFFIXES)});
   }
   if(kind==='scroll'){
     // Restoration sits far above the usual scroll grade — it is the only thing
@@ -1237,7 +1298,8 @@ function randLoot(depth,rich,noPotion){
   }
   if(kind==='wand')return mkItem('wand',{spell:pick(WANDABLE),charges:roll(2,6,3)});
   // trinket: ring of protection or amulet of natural armor
-  return mkItem(Math.random()<0.5?'ringprot':'amuletnat',{bonus:Math.max(1,gbon())});
+  return mkItem(Math.random()<0.5?'ringprot':'amuletnat',
+    {bonus:Math.max(1,gbon()),affix:rollAffix(depth,rich,ARMOR_AFFIXES)});
 }
 
 /* ============================== DUNGEON GENERATION ============================== */
@@ -1344,6 +1406,20 @@ function tryGen(depth,targetWalk,theme){
       for(const [dx,dy] of DIRS)if(g[idx(x+dx,y+dy)])exits++;
       if(exits===1&&Math.random()<0.4)g[idx(x,y)]=T_WALL;
     }
+  }
+  // trimming a dead end can strand a door that was properly framed a moment
+  // ago: a door with one open side opens onto solid rock, so wall it up, and
+  // demote any that lost their frame
+  for(const [x,y] of doorCells){
+    if(g[idx(x,y)]!==T_DOOR)continue;
+    let open=0;
+    for(const [dx,dy] of DIRS)if(g[idx(x+dx,y+dy)])open++;
+    if(open<2){g[idx(x,y)]=T_WALL;continue;}
+    const passX=g[idx(x-1,y)]!==T_WALL&&g[idx(x+1,y)]!==T_WALL;
+    const framed=passX
+      ?(g[idx(x,y-1)]===T_WALL&&g[idx(x,y+1)]===T_WALL)
+      :(g[idx(x-1,y)]===T_WALL&&g[idx(x+1,y)]===T_WALL);
+    if(!framed)g[idx(x,y)]=T_FLOOR;
   }
   // 4b. sewers: large rooms get an unwalkable lake pit in the middle,
   // always leaving a 1-tile walkable ring around it
@@ -3131,8 +3207,28 @@ function disarmAttempt(x,y){
   }else UI.toast(doer.name+' cannot find the catch. (Try again)');
 }
 /* ---------- damage to party ---------- */
-function hurtChar(ch,dmg,source){
+// warded gear soaks a flat amount out of every hit of its element — worn on any
+// slot, and several pieces of the same ward add up
+function charResist(ch,elem){
+  if(!elem)return 0;
+  let r=0;
+  for(const sl in ch.equip){
+    const it=ch.equip[sl];
+    if(!it||!it.affix)continue;
+    const a=AFFIXES[it.affix];
+    if(a&&a.resist===elem)r+=a.amount;
+  }
+  return r;
+}
+function hurtChar(ch,dmg,source,elem){
   if(ch.dead)return;
+  if(elem){
+    const res=charResist(ch,elem);
+    if(res>0){
+      dmg-=res;
+      if(dmg<=0){UI.float(ch,'resist','#9db4d6');return;}
+    }
+  }
   // stoneskin
   for(const b of ch.buffs){
     if(b.dr&&b.pool>0){const absorbed=Math.min(dmg,b.dr,b.pool);dmg-=absorbed;b.pool-=absorbed;}
@@ -3309,13 +3405,22 @@ function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
     }
     if(ch._smiting){dmg+=ch.level;ch._smiting=false;}
   }
+  // affixed weapons: the energy rider is rolled once with the swing, and is not
+  // multiplied by a crit — it burns the same whether or not the blade found a seam
+  const af=wIt&&wIt.affix?AFFIXES[wIt.affix]:null;
+  const elemDmg=(hit&&af&&af.dice)?roll(af.dice[0],af.dice[1]):0;
+  if(elemDmg)dmg+=elemDmg;
   const deliver=()=>{
     if(m.hp<=0||!G.L.monsters.includes(m))return;
     m.awake=true;
     if(!hit){UI.floatAtMonster(m,'miss','#9a9da2');SFX.whiff();return;}
     if(sneaked)UI.floatAtMonster(m,'sneak!','#d8b040');
     SFX.hit();
+    // a vampiric weapon drinks what it actually landed, not the overkill
+    const landed=Math.min(dmg,Math.max(0,m.hp));
     damageMonster(m,dmg,ch,crit);
+    if(elemDmg)UI.floatAtMonster(m,'+'+elemDmg+' '+ELEMENTS[af.elem].name,ELEMENTS[af.elem].col);
+    if(af&&af.leech&&landed>0)healChar(ch,Math.max(1,Math.round(landed*af.leech)));
   };
   if(isRangedShot){
     SFX.arrow();
@@ -3849,8 +3954,9 @@ function fireSpellOrb(m){
       const dmg=roll(m.caster.dmg[0],m.caster.dmg[1],m.caster.dmg[2]);
       const sv=charSaves(ch).ref+saveBonusVs(ch,'spell');
       const dc=12+Math.floor(MONSTERS[m.key].cr);
-      if(d20()+sv>=dc)hurtChar(ch,Math.floor(dmg/2),m.name);
-      else hurtChar(ch,dmg,m.name);
+      const el=m.caster.elem;
+      if(d20()+sv>=dc)hurtChar(ch,Math.floor(dmg/2),m.name,el);
+      else hurtChar(ch,dmg,m.name,el);
     }});
 }
 function monsterCast(m){
