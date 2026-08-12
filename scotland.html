@@ -1295,6 +1295,21 @@ let filterQuery = '';
 // added to the user's path (points and route/railway stops), keyed by a stable id.
 const pathLocById = {};
 let selectedPath = [];      // ordered array of pathLocById keys
+const pathMarkerById = {};  // pathId -> the numbered marker drawn for it, while on the path
+
+// Opens a location's popup, wherever it can currently be anchored. A location's own
+// marker is often NOT on the map — its category toggled off, or the name filter
+// excluding it — and Leaflet's openPopup() is a silent no-op in that case. Stops on the
+// path always have their numbered marker on the map, so prefer that; otherwise fall back
+// to a popup anchored at the coordinates.
+function openLocationPopup(loc){
+  if (!loc) return;
+  const pathMarker = pathMarkerById[loc.id];
+  if (pathMarker && map.hasLayer(pathMarker)) { pathMarker.openPopup(); return; }
+  if (map.hasLayer(loc.marker)) { loc.marker.openPopup(); return; }
+  const content = loc.marker.getPopup().getContent();
+  map.openPopup(typeof content === 'function' ? content() : content, [loc.lat, loc.lng]);
+}
 
 // Up to two stops the user has long-pressed to mark, so the column can show the
 // partial distance across that stretch. Deliberately transient: never encoded into
@@ -1580,13 +1595,13 @@ document.addEventListener('click', e => {
   if (addBtn) {
     const id = addBtn.dataset.pathId;
     addToPath(id);
-    pathLocById[id].marker.openPopup();
+    openLocationPopup(pathLocById[id]);
     return;
   }
   const removeBtn = e.target.closest('.remove-path-btn');
   if (removeBtn) {
     const id = removeBtn.dataset.pathId;
-    if (removeFromPath(id)) pathLocById[id].marker.openPopup();
+    if (removeFromPath(id)) openLocationPopup(pathLocById[id]);
   }
 });
 
@@ -1753,7 +1768,7 @@ function renderSidebar(){
         row.addEventListener('click', () => {
           ensureMapTabVisible();
           map.setView([poi.lat, poi.lng], 11);
-          st.entries[id].marker.openPopup();
+          openLocationPopup(pathLocById[id]);
         });
         section.appendChild(row);
       });
@@ -1822,7 +1837,7 @@ function renderPathColumn(){
         if (id === suppressClickForId && Date.now() < suppressRowClickUntil) return;
         ensureMapTabVisible();
         map.setView([loc.lat, loc.lng], 12);
-        loc.marker.openPopup();
+        openLocationPopup(loc);
       });
       row.querySelector('.path-trash-btn').addEventListener('click', () => removeFromPath(id));
       attachRowDrag(row, id, list);
@@ -2048,6 +2063,7 @@ const pathMarkersLayer = L.layerGroup().addTo(map);
 function updatePathLine(){
   if (pathLine) { map.removeLayer(pathLine); pathLine = null; }
   pathMarkersLayer.clearLayers();
+  Object.keys(pathMarkerById).forEach(id => delete pathMarkerById[id]); // markers just destroyed
   const locs = selectedPath.map(id => pathLocById[id]).filter(Boolean);
   const requestId = ++pathRequestId; // lets a stale road-geometry fetch detect it's been superseded
 
@@ -2082,10 +2098,13 @@ function updatePathLine(){
   }
   locs.forEach((l, i) => {
     const numberMarker = L.marker([l.lat, l.lng], { icon: lineIcon('#2E86FF', 18, String(i+1), false), zIndexOffset: 900 });
-    // The number pin sits on top of the location's own marker — clicking it opens that
-    // marker's normal popup (add/remove button included) rather than needing its own.
-    numberMarker.on('click', () => l.marker.openPopup());
+    // Carry the location's own popup rather than delegating to its marker: that marker
+    // is off the map whenever its category is toggled off or the name filter excludes
+    // it, and openPopup() on an off-map marker silently does nothing. The number pin is
+    // always on the map, so binding here keeps path stops clickable in every case.
+    numberMarker.bindPopup(l.marker.getPopup().getContent());
     numberMarker.addTo(pathMarkersLayer);
+    pathMarkerById[l.id] = numberMarker;
   });
 }
 
