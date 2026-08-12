@@ -1293,12 +1293,14 @@ function rollAffix(depth,rich,pool){
   if(Math.random()>=affixChance(depth,rich))return undefined;
   return pick(pool);
 }
-function randLoot(depth,rich,noPotion){
+function randLoot(depth,rich,noPotion,noRation){
   // weighted loot categories; `rich` (locked rooms, bosses, secret pockets) shifts
-  // weight toward wands, trinkets and higher bonuses; `noPotion` drops the potion band
+  // weight toward wands, trinkets and higher bonuses. `noPotion` drops the potion
+  // band and `noRation` the food band — both used when monsterLoot has already
+  // rolled those on its own adaptive schedule and is only after gear here
   const W=[
     ['potion', noPotion?0:(rich?6:22)],
-    ['ration', rich?4:12],
+    ['ration', noRation?0:(rich?4:12)],
     ['weapon', rich?18:22],
     ['armor',  rich?16:20],
     ['scroll', 14],
@@ -3589,7 +3591,9 @@ function monsterLoot(depth){
   // above keep the rates they were tuned to.
   const foodNeed=clamp(1-countRations()/3,0,1);
   if(Math.random()<0.10+0.32*foodNeed)return mkItem('ration',{qty:1+rnd(2)});
-  return randLoot(depth,false,true); // gear only — potions come from the adaptive band above
+  // gear only — potions and rations are both handled by their own adaptive rolls
+  // above, so suppress them here rather than let the table double up the food rate
+  return randLoot(depth,false,true,true);
 }
 function killMonster(m,byChar){
   m.hp=0;
