@@ -1719,7 +1719,20 @@ function rawBudget(depth){
 // pool, so the curve is held to a band: every floor is harder than the last,
 // and none more than half again as hard. That is the guarantee the whole
 // progression rests on.
-const BUDGET_MIN_STEP=1.11, BUDGET_MAX_STEP=1.45;
+const BUDGET_MIN_STEP=1.11, BUDGET_MAX_STEP=1.45, BUDGET_TAIL_STEP=1.01;
+// What a floor could field if every slot on it held the heaviest thing the
+// depth allows. The budget must not sprint past this: an unreachable target
+// makes every share-match resolve to the single biggest creature, and the deep
+// floors turn into the same two monsters on repeat.
+function poolCeiling(depth){
+  const elites=eliteChance(depth)>0;
+  let best=0;
+  for(const [k] of spawnPool(depth)){
+    best=Math.max(best,threatOf(k,depth,null));
+    if(elites)for(const ek of ELITE_KEYS)best=Math.max(best,threatOf(k,depth,ek));
+  }
+  return best*targetCount(depth);
+}
 const _budgetMemo={};
 function threatBudget(depth){
   if(depth<1)return 0;
@@ -1728,7 +1741,11 @@ function threatBudget(depth){
   if(depth===1)v=rawBudget(1);
   else{
     const prev=threatBudget(depth-1);
-    v=Math.max(prev*BUDGET_MIN_STEP,Math.min(prev*BUDGET_MAX_STEP,rawBudget(depth)));
+    const want=Math.max(prev*BUDGET_MIN_STEP,Math.min(prev*BUDGET_MAX_STEP,rawBudget(depth)));
+    // past the point where the bestiary can follow, the budget tracks the
+    // ceiling instead — still rising every floor, but only as fast as the
+    // monsters on it actually get heavier
+    v=Math.max(prev*BUDGET_TAIL_STEP,Math.min(want,poolCeiling(depth)));
   }
   return _budgetMemo[depth]=v;
 }
