@@ -19,8 +19,6 @@
     --viewpoint:#2E7D5B;
     --mark-fill:#F7E9A8;
     --mark-line:#C9A227;
-    --mark-fill-alt:#EFE3BC;
-    --mark-line-alt:#A8862B;
   }
   *{box-sizing:border-box;}
   html,body{height:100%;margin:0;}
@@ -339,21 +337,20 @@
   .path-leg-icon{ color:#2E86FF; }
 
   /* Segment brackets: absolutely positioned in the gutter the list opens up on the
-     left once anything is marked, each spanning its segment's first→last row.
-     Consecutive segments share a boundary stop, so they alternate between two lanes
-     to sit side by side on that shared row rather than overlapping. */
+     left once anything is marked. Each spans the vertical midpoints of its first and
+     last row, so consecutive segments meet exactly on the boundary stop they share
+     rather than overlapping — one lane is enough. */
   .path-list{ position:relative; }
-  .path-list.has-bracket{ padding-left:21px; }
+  .path-list.has-bracket{ padding-left:13px; }
   .path-bracket{
     position:absolute;
+    left:0;
     width:7px;
     border:1.5px solid var(--mark-line);
     border-right:none;
     border-radius:4px 0 0 4px;
     pointer-events:none;
   }
-  .path-bracket[data-lane="0"]{ left:0; }
-  .path-bracket[data-lane="1"]{ left:8px; border-color:var(--mark-line-alt); }
   .path-span{
     margin:-1px 0 6px 22px;
     padding:5px 8px;
@@ -364,7 +361,6 @@
     font-size:10.5px;
     color:rgba(27,29,27,0.7);
   }
-  .path-span[data-lane="1"]{ background:var(--mark-fill-alt); border-color:var(--mark-line-alt); }
   .path-span b{ color:var(--ink); font-weight:600; }
 
   .path-total{
@@ -1777,7 +1773,7 @@ function renderPathColumn(){
   } else {
     const segments = pathSegments();
     // Each segment's readout hangs under the stop that ends it.
-    const segmentEndingAt = new Map(segments.map((seg, k) => [seg.to, { seg, k }]));
+    const segmentEndingAt = new Map(segments.map(seg => [seg.to, seg]));
     const list = document.createElement('div');
     list.className = 'path-list' + (segments.length ? ' has-bracket' : '');
     selectedPath.forEach((id, i) => {
@@ -1803,18 +1799,14 @@ function renderPathColumn(){
       attachRowLongPress(row, id);
       list.appendChild(row);
       const ending = segmentEndingAt.get(i);
-      if (ending) list.appendChild(buildSegmentSpanEl(ending.seg, ending.k));
+      if (ending) list.appendChild(buildSegmentSpanEl(ending));
       if (i < selectedPath.length - 1) list.appendChild(buildLegEl(i));
     });
-    // Consecutive segments share a boundary stop, so their brackets would overlap on
-    // that row — alternating lanes keeps neighbours side by side instead of on top
-    // of each other, and shows the shared stop belonging to both.
-    segments.forEach((seg, k) => {
+    segments.forEach(seg => {
       const bracket = document.createElement('div');
       bracket.className = 'path-bracket';
       bracket.dataset.from = seg.from;
       bracket.dataset.to = seg.to;
-      bracket.dataset.lane = k % 2;
       list.appendChild(bracket);
     });
     pathColEl.appendChild(list);
@@ -1826,20 +1818,23 @@ function renderPathColumn(){
   pathColEl.appendChild(buildPathCodeEl());
 }
 
-// Sizes each bracket to span its segment's first→last row. Kept separate from render so
-// it can re-run when the column becomes visible (mobile tab switch) or the layout
-// reflows — offset measurements are all zero while the column is display:none.
+// Sizes each bracket to run between the vertical midpoints of its segment's first and
+// last row, so a shared boundary stop is exactly where one bracket ends and the next
+// begins. Kept separate from render so it can re-run when the column becomes visible
+// (mobile tab switch) or the layout reflows — offset measurements are all zero while
+// the column is display:none.
 function updateSegmentBrackets(){
   const list = pathColEl.querySelector('.path-list');
   if (!list) return;
   const rows = Array.from(list.querySelectorAll('.path-row'));
+  const middleOf = row => row.offsetTop + row.offsetHeight / 2;
   list.querySelectorAll('.path-bracket').forEach(bracket => {
     const first = rows[+bracket.dataset.from];
     const last = rows[+bracket.dataset.to];
     if (!first || !last) { bracket.style.display = 'none'; return; }
     bracket.style.display = '';
-    bracket.style.top = first.offsetTop + 'px';
-    bracket.style.height = (last.offsetTop + last.offsetHeight - first.offsetTop) + 'px';
+    bracket.style.top = middleOf(first) + 'px';
+    bracket.style.height = (middleOf(last) - middleOf(first)) + 'px';
   });
 }
 
@@ -1918,10 +1913,9 @@ function buildLegEl(i){
 }
 
 // Distance/time across one segment, shown under the stop that ends it.
-function buildSegmentSpanEl(seg, laneIndex){
+function buildSegmentSpanEl(seg){
   const el = document.createElement('div');
   el.className = 'path-span';
-  el.dataset.lane = laneIndex % 2;
   const label = `Stops ${seg.from + 1}–${seg.to + 1}`;
   const totals = segmentTotals(seg);
   if (pathLegsState === 'pending') el.textContent = `${label} · calculating…`;
