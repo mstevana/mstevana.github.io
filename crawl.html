@@ -656,8 +656,12 @@ const UI_ICONS={
   back:`<svg viewBox="0 0 32 32"><path d="M16 28 L4 12 L12 12 L12 4 L20 4 L20 12 L28 12 Z" fill="currentColor"/></svg>`,
   sleft:`<svg viewBox="0 0 32 32"><path d="M4 16 L20 4 L20 12 L28 12 L28 20 L20 20 L20 28 Z" fill="currentColor"/></svg>`,
   sright:`<svg viewBox="0 0 32 32"><path d="M28 16 L12 4 L12 12 L4 12 L4 20 L12 20 L12 28 Z" fill="currentColor"/></svg>`,
-  rleft:`<svg viewBox="0 0 32 32"><path d="M16 6 A 10 10 0 1 0 26 16" fill="none" stroke="currentColor" stroke-width="4"/><path d="M16 0 L16 12 L8 6 Z" fill="currentColor"/></svg>`,
-  rright:`<svg viewBox="0 0 32 32"><path d="M16 6 A 10 10 0 1 1 6 16" fill="none" stroke="currentColor" stroke-width="4"/><path d="M16 0 L16 12 L24 6 Z" fill="currentColor"/></svg>`,
+  // a curved arrow reads its rotation from the arc it sweeps, not the arrowhead:
+  // the counterclockwise (left-turn) glyph must sweep up the right and over the
+  // top, and the clockwise (right-turn) glyph up the left. These were reversed,
+  // so each button carried the other's turn.
+  rleft:`<svg viewBox="0 0 32 32"><path d="M16 6 A 10 10 0 1 1 6 16" fill="none" stroke="currentColor" stroke-width="4"/><path d="M16 0 L16 12 L24 6 Z" fill="currentColor"/></svg>`,
+  rright:`<svg viewBox="0 0 32 32"><path d="M16 6 A 10 10 0 1 0 26 16" fill="none" stroke="currentColor" stroke-width="4"/><path d="M16 0 L16 12 L8 6 Z" fill="currentColor"/></svg>`,
   bag:`<svg viewBox="0 0 32 32"><path d="M10 10 Q10 4 16 4 Q22 4 22 10" fill="none" stroke="currentColor" stroke-width="3"/><path d="M6 10 L26 10 L28 28 L4 28 Z" fill="currentColor"/></svg>`,
   chart:`<svg viewBox="0 0 32 32"><rect x="4" y="18" width="6" height="10" fill="currentColor"/><rect x="13" y="10" width="6" height="18" fill="currentColor"/><rect x="22" y="4" width="6" height="24" fill="currentColor"/></svg>`,
   book:`<svg viewBox="0 0 32 32"><path d="M4 6 Q10 3 16 6 L16 28 Q10 25 4 28 Z" fill="currentColor"/><path d="M28 6 Q22 3 16 6 L16 28 Q22 25 28 28 Z" fill="currentColor" opacity=".7"/></svg>`,
