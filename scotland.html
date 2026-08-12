@@ -1427,6 +1427,7 @@ function decodePathCode(raw){
 }
 
 const PATH_STORAGE_KEY = 'scotlandPathCode';
+const MARKS_STORAGE_KEY = 'scotlandPathMarks';
 
 // Reads the last locally-saved path code, if any. Wrapped in try/catch since localStorage
 // can throw (private browsing, storage disabled by policy, etc.) — a missing saved path
@@ -1448,6 +1449,32 @@ function persistPath(){
     if (code) localStorage.setItem(PATH_STORAGE_KEY, code);
     else localStorage.removeItem(PATH_STORAGE_KEY);
   } catch (e) { /* private browsing / storage disabled — URL sync above still works */ }
+
+  persistMarks(); // marks are stored against the path code, so they follow it
+}
+
+// Marks are saved locally only — never in the path code or the URL, so sharing a path
+// doesn't carry your marks along. They're stamped with the code of the path they belong
+// to, so they're only restored onto that same path.
+function persistMarks(){
+  try {
+    if (markedIds.length && selectedPath.length) {
+      localStorage.setItem(MARKS_STORAGE_KEY,
+        JSON.stringify({ code: encodePathCode(selectedPath), ids: markedIds }));
+    } else {
+      localStorage.removeItem(MARKS_STORAGE_KEY);
+    }
+  } catch (e) { /* private browsing / storage disabled — marks just won't persist */ }
+}
+
+// Restores marks only onto the path they were saved against, dropping any whose stop
+// is no longer in it.
+function loadStoredMarks(pathCode){
+  try {
+    const saved = JSON.parse(localStorage.getItem(MARKS_STORAGE_KEY) || 'null');
+    if (!saved || saved.code !== pathCode || !Array.isArray(saved.ids)) return [];
+    return saved.ids.filter(id => selectedPath.includes(id));
+  } catch (e) { return []; }
 }
 
 /* ============ PATH (selected locations) ============ */
@@ -1479,6 +1506,7 @@ function toggleMark(id){
   if (at >= 0) markedIds.splice(at, 1);
   else markedIds.push(id);
   renderPathColumn();
+  persistMarks();
 }
 
 // Marked stops divide the path into consecutive segments. The first and last stop
@@ -2225,7 +2253,12 @@ wireColumnToggle(document.getElementById('pathToggle'), 'path-collapsed', 'Colla
 const initialPathCode = new URLSearchParams(window.location.search).get('path') || loadStoredPathCode();
 if (initialPathCode) {
   const result = decodePathCode(initialPathCode);
-  if (result.ok) selectedPath = result.ids;
+  if (result.ok) {
+    selectedPath = result.ids;
+    // Re-encode rather than reusing the input: decoding tolerates case and stray
+    // characters, so this is the canonical form the marks were stamped with.
+    markedIds = loadStoredMarks(encodePathCode(selectedPath));
+  }
 }
 
 applyResponsiveLayout(mq);
