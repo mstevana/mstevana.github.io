@@ -341,27 +341,31 @@
      last row, so consecutive segments meet exactly on the boundary stop they share
      rather than overlapping — one lane is enough. */
   .path-list{ position:relative; }
-  .path-list.has-bracket{ padding-left:13px; }
+  .path-list.has-bracket{ padding-left:52px; }
   .path-bracket{
     position:absolute;
-    left:0;
+    left:45px;
     width:7px;
     border:1.5px solid var(--mark-line);
     border-right:none;
     border-radius:4px 0 0 4px;
     pointer-events:none;
   }
+  /* Segment readout, in the gutter to the left of its bracket and centred on it.
+     Values stack so the gutter stays narrow. */
   .path-span{
-    margin:-1px 0 6px 22px;
-    padding:5px 8px;
-    border-radius:6px;
-    background:var(--mark-fill);
-    border:1px solid var(--mark-line);
+    position:absolute;
+    left:0;
+    width:41px;
+    text-align:right;
     font-family:'IBM Plex Mono', monospace;
-    font-size:10.5px;
-    color:rgba(27,29,27,0.7);
+    font-size:10px;
+    line-height:1.35;
+    color:rgba(27,29,27,0.6);
+    pointer-events:none;
   }
-  .path-span b{ color:var(--ink); font-weight:600; }
+  .path-span b{ display:block; color:var(--ink); font-weight:600; }
+  .path-span span{ display:block; }
 
   .path-total{
     margin-top:8px;
@@ -1772,8 +1776,6 @@ function renderPathColumn(){
     pathColEl.appendChild(note);
   } else {
     const segments = pathSegments();
-    // Each segment's readout hangs under the stop that ends it.
-    const segmentEndingAt = new Map(segments.map(seg => [seg.to, seg]));
     const list = document.createElement('div');
     list.className = 'path-list' + (segments.length ? ' has-bracket' : '');
     selectedPath.forEach((id, i) => {
@@ -1798,16 +1800,17 @@ function renderPathColumn(){
       attachRowDrag(row, id, list);
       attachRowLongPress(row, id);
       list.appendChild(row);
-      const ending = segmentEndingAt.get(i);
-      if (ending) list.appendChild(buildSegmentSpanEl(ending));
       if (i < selectedPath.length - 1) list.appendChild(buildLegEl(i));
     });
-    segments.forEach(seg => {
+    // Bracket and its readout both live in the left gutter, out of the row flow.
+    segments.forEach((seg, k) => {
       const bracket = document.createElement('div');
       bracket.className = 'path-bracket';
+      bracket.dataset.seg = k;
       bracket.dataset.from = seg.from;
       bracket.dataset.to = seg.to;
       list.appendChild(bracket);
+      list.appendChild(buildSegmentSpanEl(seg, k));
     });
     pathColEl.appendChild(list);
     updateSegmentBrackets();
@@ -1831,10 +1834,20 @@ function updateSegmentBrackets(){
   list.querySelectorAll('.path-bracket').forEach(bracket => {
     const first = rows[+bracket.dataset.from];
     const last = rows[+bracket.dataset.to];
-    if (!first || !last) { bracket.style.display = 'none'; return; }
+    const label = list.querySelector(`.path-span[data-seg="${bracket.dataset.seg}"]`);
+    if (!first || !last) {
+      bracket.style.display = 'none';
+      if (label) label.style.display = 'none';
+      return;
+    }
+    const top = middleOf(first), bottom = middleOf(last);
     bracket.style.display = '';
-    bracket.style.top = middleOf(first) + 'px';
-    bracket.style.height = (middleOf(last) - middleOf(first)) + 'px';
+    bracket.style.top = top + 'px';
+    bracket.style.height = (bottom - top) + 'px';
+    if (label) {
+      label.style.display = '';
+      label.style.top = ((top + bottom) / 2 - label.offsetHeight / 2) + 'px';
+    }
   });
 }
 
@@ -1912,17 +1925,27 @@ function buildLegEl(i){
   return el;
 }
 
-// Distance/time across one segment, shown under the stop that ends it.
-function buildSegmentSpanEl(seg){
+// Tight variants for the gutter label, where horizontal room is the scarce resource:
+// "171km" / "2h15" rather than "171 km" / "2h 15min".
+function formatKmTight(km){ return (km < 10 ? km.toFixed(1) : Math.round(km)) + 'km'; }
+function formatDriveTight(hours){
+  const totalMin = Math.round(hours * 60);
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  if (!h) return m + 'min';
+  return m ? h + 'h' + String(m).padStart(2, '0') : h + 'h';
+}
+
+// A segment's distance/time, stacked on two lines so the gutter stays narrow.
+// Positioned against its bracket by updateSegmentBrackets().
+function buildSegmentSpanEl(seg, index){
   const el = document.createElement('div');
   el.className = 'path-span';
-  const label = `Stops ${seg.from + 1}–${seg.to + 1}`;
+  el.dataset.seg = index;
   const totals = segmentTotals(seg);
-  if (pathLegsState === 'pending') el.textContent = `${label} · calculating…`;
-  else if (!totals) el.textContent = `${label} · distance unavailable`;
+  if (pathLegsState === 'pending') el.innerHTML = '<b>…</b>';
+  else if (!totals) el.innerHTML = '<b>n/a</b>';
   else {
-    el.innerHTML = `${label} · <b>${formatKm(totals.km)}</b> · `
-      + `<b>${formatDriveHours(totals.hours)}</b> drive`;
+    el.innerHTML = `<b>${formatKmTight(totals.km)}</b><span>${formatDriveTight(totals.hours)}</span>`;
   }
   return el;
 }
