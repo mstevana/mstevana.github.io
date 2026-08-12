@@ -491,18 +491,18 @@ const MONSTERS={
              poison:{dc:12,abil:'str',dice:[1,4]}},
   ghoul:    {name:'Ghoul',         cr:1,  hp:13, ac:14,atk:3, dmg:[1,6,1], xp:300, speed:1.2, type:'undead', spr:'ghoul',
              paralysis:{dc:12,dur:6}},
-  gnoll:    {name:'Gnoll',         cr:1,  hp:11, ac:15,atk:3, dmg:[1,8,2], xp:300, speed:1.3, type:'humanoid', spr:'gnoll'},
+  gnoll:    {reach:true, name:'Gnoll',         cr:1,  hp:11, ac:15,atk:3, dmg:[1,8,2], xp:300, speed:1.3, type:'humanoid', spr:'gnoll'},
   bugbear:  {name:'Bugbear',       cr:2,  hp:16, ac:17,atk:5, dmg:[1,8,2], xp:600, speed:1.3, type:'humanoid', spr:'bugbear'},
-  ogre:     {name:'Ogre',          cr:3,  hp:29, ac:16,atk:8, dmg:[2,8,7], xp:900, speed:1.6, type:'giant', spr:'ogre'},
+  ogre:     {reach:true, name:'Ogre',          cr:3,  hp:29, ac:16,atk:8, dmg:[2,8,7], xp:900, speed:1.6, type:'giant', spr:'ogre'},
   wight:    {name:'Wight',         cr:3,  hp:26, ac:15,atk:4, dmg:[1,4,1], xp:900, speed:1.4, type:'undead', spr:'wight',
              energyDrain:1},
   wightnec: {name:'Wight necromancer',cr:4,hp:30,ac:15,atk:4, dmg:[1,4,1], xp:1200,speed:1.5, type:'undead', spr:'wightnec',
              energyDrain:1, caster:{dmg:[3,6,0],ranged:6,cd:5,fx:'#b48ae0'}},
-  minotaur: {name:'Minotaur',      cr:4,  hp:39, ac:14,atk:9, dmg:[3,6,4], xp:1200,speed:1.4, type:'giant', spr:'minotaur'},
-  troll:    {name:'Troll',         cr:5,  hp:63, ac:16,atk:9, dmg:[1,6,6], xp:1500,speed:1.4, type:'giant', spr:'troll', regen:3},
-  ogremage: {name:'Ogre mage',     cr:8,  hp:37, ac:18,atk:7, dmg:[2,6,7], xp:2400,speed:1.5, type:'giant', spr:'ogremage',
+  minotaur: {reach:true, name:'Minotaur',      cr:4,  hp:39, ac:14,atk:9, dmg:[3,6,4], xp:1200,speed:1.4, type:'giant', spr:'minotaur'},
+  troll:    {reach:true, name:'Troll',         cr:5,  hp:63, ac:16,atk:9, dmg:[1,6,6], xp:1500,speed:1.4, type:'giant', spr:'troll', regen:3},
+  ogremage: {reach:true, name:'Ogre mage',     cr:8,  hp:37, ac:18,atk:7, dmg:[2,6,7], xp:2400,speed:1.5, type:'giant', spr:'ogremage',
              caster:{dmg:[5,6,0],ranged:7,cd:6,fx:'#8ad0e0'}},
-  dragon:   {name:'Young dragon',  cr:7,  hp:66, ac:19,atk:11,dmg:[1,8,4], xp:2100,speed:1.4, type:'dragon', spr:'dragon',
+  dragon:   {reach:true, name:'Young dragon',  cr:7,  hp:66, ac:19,atk:11,dmg:[1,8,4], xp:2100,speed:1.4, type:'dragon', spr:'dragon',
              caster:{dmg:[6,6,0],ranged:6,cd:7,fx:'#e08a3a'}},
 };
 // spawn table by depth: keys allowed at depth n if cr between depth/2-? use per-monster [minD,maxD]
@@ -1189,7 +1189,12 @@ function randLoot(depth,rich,noPotion){
       ['medarmor','heavyarmor','hhelm','hboots','hshield'];
     return mkItem(pick(pool),{bonus:gbon()});
   }
-  if(kind==='scroll')return mkItem('scroll',{spell:pick(SCROLLABLE())});
+  if(kind==='scroll'){
+    // Restoration sits far above the usual scroll grade — it is the only thing
+    // that lifts negative levels — so it turns up rarely, and mostly in hoards
+    if(Math.random()<(rich?0.10:0.035))return mkItem('scroll',{spell:'restoration'});
+    return mkItem('scroll',{spell:pick(SCROLLABLE())});
+  }
   if(kind==='wand')return mkItem('wand',{spell:pick(WANDABLE),charges:roll(2,6,3)});
   // trinket: ring of protection or amulet of natural armor
   return mkItem(Math.random()<0.5?'ringprot':'amuletnat',{bonus:Math.max(1,gbon())});
@@ -1484,7 +1489,8 @@ function mkMonster(key,x,y,depth){
   const over=Math.max(0,depth-((SPAWN_DEPTH[key]||[1,99])[0]+2));
   const hp=def.hp+Math.floor(over*def.hp*0.15);
   return {key,name:def.name,x,y,hp,maxHp:hp,ac:def.ac,atk:def.atk+Math.floor(over/3),dmg:def.dmg,
-    xp:(XP_AWARD(def.cr)+over*15)*2,speed:def.speed,type:def.type,ranged:def.ranged||0,caster:def.caster||null,
+    xp:XP_AWARD(def.cr)+over*15,speed:def.speed,type:def.type,ranged:def.ranged||0,caster:def.caster||null,
+    reach:!!def.reach,slot:0, // slot 0-1 front rank of its tile, 2-3 rear rank
     special:{disease:def.disease,poison:def.poison,paralysis:def.paralysis,energyDrain:def.energyDrain,regen:def.regen},
     atkCd:1.5+Math.random()*2,castCd:def.caster?def.caster.cd*(0.5+Math.random()):0,
     moveCd:Math.random(),held:0,slowed:0,sleep:false,shaken:0,stunned:0,awake:false,boss:false,
@@ -2291,7 +2297,10 @@ function buildLevel(L){
     // the door hinges on a side jamb: a pivot group sits on one vertical edge
     // of the frame and the slab is its child, so rotating the pivot around Y
     // swings the door 90 degrees to the side like a real door
-    const geo=new THREE.BoxGeometry(passageX?0.22:TILE,WALLH,passageX?TILE:0.22);
+    // a plank, not a block: at tile scale 0.22 read as a foot and a half of
+    // timber, which looked like a wall segment rather than a door
+    const DOORTH=0.07;
+    const geo=new THREE.BoxGeometry(passageX?DOORTH:TILE,WALLH,passageX?TILE:DOORTH);
     const mesh=new THREE.Mesh(geo,t===T_DOOR_LOCKED?doorMatLocked:doorMatBase);
     const pv=new THREE.Group();
     if(passageX){pv.position.set(x+0.5,WALLH/2,y);mesh.position.set(0,0,0.5);}
@@ -2636,7 +2645,39 @@ const G={
 function tileAt(x,y){if(x<0||y<0||x>=G.L.w||y>=G.L.h)return T_WALL;return G.L.grid[y*G.L.w+x];}
 function setTile(x,y,t){G.L.grid[y*G.L.w+x]=t;}
 function aheadTile(n){const [dx,dy]=DIRS[G.facing];return {x:G.px+dx*(n||1),y:G.py+dy*(n||1)};}
-function monsterAt(x,y){return G.L.monsters.find(m=>m.x===x&&m.y===y&&m.hp>0);}
+/* Monsters pack a tile the same way the party does: four to a tile, two in the
+   front rank and two behind. Only the front rank can swing at the party (unless
+   a monster has reach), but the rear rank can still shoot and cast over them. */
+const TILE_CAP=4;
+function monstersOn(x,y){return G.L.monsters.filter(m=>m.hp>0&&m.x===x&&m.y===y);}
+// the front-most occupant: what the party's blades meet, and what blocks a step
+function monsterAt(x,y){
+  let best=null;
+  for(const m of G.L.monsters){
+    if(m.hp>0&&m.x===x&&m.y===y&&(!best||m.slot<best.slot))best=m;
+  }
+  return best;
+}
+function freeSlotAt(x,y,except){
+  const used=new Set();
+  for(const m of G.L.monsters)if(m.hp>0&&m!==except&&m.x===x&&m.y===y)used.add(m.slot);
+  for(let s=0;s<TILE_CAP;s++)if(!used.has(s))return s;
+  return -1;
+}
+// close the ranks: whoever is left shuffles forward so the front is never empty
+// while somebody stands behind it, and no two share a slot
+function packRanks(x,y){
+  const occ=monstersOn(x,y).sort((a,b)=>a.slot-b.slot);
+  occ.forEach((m,i)=>{m.slot=i;});
+}
+function packAllRanks(){
+  const seen=new Set();
+  for(const m of G.L.monsters){
+    const k=m.y*G.L.w+m.x;
+    if(seen.has(k))continue;
+    seen.add(k);packRanks(m.x,m.y);
+  }
+}
 function computeDistField(){
   const L=G.L,df=new Int16Array(L.w*L.h).fill(-1);
   const q=[[G.px,G.py]];df[G.py*L.w+G.px]=0;let qi=0;
@@ -3087,6 +3128,10 @@ function monsterLoot(depth){
   // a fallen comrade can be brought back: small chance of a revival scroll
   if(G.party.some(c=>c.dead)&&Math.random()<0.08)
     return mkItem('scroll',{spell:'raisedead'});
+  // negative levels cannot be rested off, and no cleric lifts them before 9th,
+  // so a drained party has a small chance of turning up the one cure there is
+  if(hasCaster&&G.party.some(c=>!c.dead&&c.negLevels>0)&&Math.random()<0.09)
+    return mkItem('scroll',{spell:'restoration'});
   const pHeal=0.12+0.38*healNeed;    // 12%..50%
   const pScroll=0.06+0.24*scrollNeed;// 6%..30%
   const r=Math.random();
@@ -3101,6 +3146,7 @@ function killMonster(m,byChar){
   m.hp=0;
   removeMonsterSprite(m);
   G.L.monsters=G.L.monsters.filter(x=>x!==m);
+  packRanks(m.x,m.y); // the rank behind steps into the gap
   SFX.kill();
   const alive=G.party.filter(ch=>!ch.dead);
   const share=Math.max(1,Math.floor(m.xp/Math.max(1,alive.length)));
@@ -3259,7 +3305,7 @@ function applySpellToAlly(caster,t,sp,cl){
     recalcHp(t,false);
     UI.toast(t.name+' feels vigour return.');
   }
-  if(sp.restoreLevels&&t.negLevels>0){t.negLevels=0;recalcHp(t,false);UI.toast('Lost life-force floods back into '+t.name+'.');}
+  if(sp.restoreLevels&&t.negLevels>0){t.negLevels=0;removeCond(t,'drained');recalcHp(t,false);UI.toast('Lost life-force floods back into '+t.name+'.');}
   if(sp.buff){
     const b=Object.assign({},sp.buff);
     b.tag=b.tag||sp.name;
@@ -3355,9 +3401,12 @@ function updateMonsters(dt){
       if(m.bossCd<=0){m.bossCd=11+Math.random()*4;bossSignature(m);}
     }
     const adjacent=Math.abs(m.x-G.px)+Math.abs(m.y-G.py)===1;
-    // ranged / caster action
+    // only the front rank of a tile can bring a weapon to bear; those behind
+    // need reach — a polearm, or simply being big enough to strike over them
+    const canReachParty=adjacent&&(m.slot<2||m.reach);
+    // ranged / caster action — also how the rear rank fights, point blank
     const rangedR=m.ranged||(m.caster?m.caster.ranged:0);
-    if(!adjacent&&rangedR&&losClear(m.x,m.y,G.px,G.py)){
+    if(!canReachParty&&rangedR&&losClear(m.x,m.y,G.px,G.py)){
       const dist=Math.abs(m.x-G.px)+Math.abs(m.y-G.py);
       if(dist<=rangedR){
         if(m.caster){
@@ -3372,7 +3421,7 @@ function updateMonsters(dt){
         continue;
       }
     }
-    if(adjacent){
+    if(canReachParty){
       m.atkCd-=dt*(1/slowMult);
       if(m.atkCd<=0){
         m.atkCd=(2.2+Math.random()*1.2)*slowMult;
@@ -3380,6 +3429,9 @@ function updateMonsters(dt){
       }
       continue;
     }
+    // penned in behind the front rank with nothing to throw: hold the tile and
+    // wait for a gap rather than shuffling uselessly around the party
+    if(adjacent)continue;
     // chase
     m.moveCd-=dt;
     if(m.moveCd<=0){
@@ -3400,7 +3452,7 @@ function resolvePartyTileOverlap(){
     if(m.x!==G.px||m.y!==G.py)continue;
     const opts=DIRS.slice().sort(()=>Math.random()-0.5).filter(([dx,dy])=>{
       const t=tileAt(m.x+dx,m.y+dy);
-      return (t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS)&&!monsterAt(m.x+dx,m.y+dy);
+      return (t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS)&&freeSlotAt(m.x+dx,m.y+dy,m)>=0;
     });
     if(opts.length){const [dx,dy]=opts[0];moveMonster(m,m.x+dx,m.y+dy);}
   }
@@ -3409,7 +3461,7 @@ function wanderStep(m){
   if(m.guard)return;
   const opts=DIRS.filter(([dx,dy])=>{
     const t=tileAt(m.x+dx,m.y+dy);
-    return (t===T_FLOOR||t===T_DOOR_OPEN)&&!monsterAt(m.x+dx,m.y+dy)&&!(m.x+dx===G.px&&m.y+dy===G.py);
+    return (t===T_FLOOR||t===T_DOOR_OPEN)&&freeSlotAt(m.x+dx,m.y+dy,m)>=0&&!(m.x+dx===G.px&&m.y+dy===G.py);
   });
   if(opts.length&&Math.random()<0.6){
     const [dx,dy]=pick(opts);
@@ -3450,14 +3502,18 @@ function chaseStep(m){
 function stepOk(m,nx,ny){
   const t=tileAt(nx,ny);
   if(!(t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS))return false;
-  if(monsterAt(nx,ny))return false;
+  if(freeSlotAt(nx,ny,m)<0)return false; // the tile is packed four deep
   if(nx===G.px&&ny===G.py)return false;
   return true;
 }
 function moveMonster(m,nx,ny){
+  const ox=m.x,oy=m.y;
   m.x=nx;m.y=ny;
-  const s=R3.monsterSprites[m.id];
-  if(s){s.userData.tx=nx+0.5;s.userData.tz=ny+0.5;s.userData.walkUntil=performance.now()+650;}
+  const s=freeSlotAt(nx,ny,m);
+  m.slot=s<0?TILE_CAP-1:s;
+  if(ox!==nx||oy!==ny)packRanks(ox,oy); // those left behind close up
+  const spr=R3.monsterSprites[m.id];
+  if(spr)spr.userData.walkUntil=performance.now()+650;
 }
 function pickMeleeTarget(){
   const front=G.party.slice(0,2).filter(ch=>!isDown(ch));
@@ -3517,7 +3573,6 @@ function monsterSpecials(m,ch){
     if(d20()+sv<14){
       ch.negLevels+=sp.energyDrain;
       recalcHp(ch,false);
-      addCond(ch,{kind:'drained'});
       UI.float(ch,'drained!','#b48ae0');
       UI.toast('Cold darkness drains '+ch.name+"'s life-force!");
     }
@@ -3761,7 +3816,7 @@ function tryRest(){
       if(ch.dead)continue;
       for(const a of ABILITIES)ch.abilDmg[a]=0;
       recalcHp(ch,true);
-      ch.stable=true;ch.buffs=[];ch.conditions=ch.conditions.filter(c=>c.kind==='drained');
+      ch.stable=true;ch.buffs=[];ch.conditions=[]; // negLevels is not a condition: it survives rest
       resetDaily(ch);
     }
     // camping twice on the same spot draws the level's attention
@@ -3808,6 +3863,7 @@ function startLevel(L){
   // face an open direction
   for(let f=0;f<4;f++){const [dx,dy]=DIRS[f];if(walkableTile(tileAt(L.start.x+dx,L.start.y+dy))){G.facing=f;break;}}
   buildLevel(L);
+  packAllRanks(); // generated or loaded monsters may share a tile: seat them
   snapCamera();
   computeDistField();
   markExplored();
@@ -3840,6 +3896,9 @@ function serializeGame(){
 function deserializeGame(o){
   G.depth=o.depth;G.px=o.px;G.py=o.py;G.facing=o.facing;G.time=o.time||0;
   G.party=o.party;
+  // saves written before drain became purely negLevels can carry a stale
+  // 'drained' condition that nothing clears; drop it on the way in
+  for(const ch of G.party)if(ch.conditions)ch.conditions=ch.conditions.filter(c=>c.kind!=='drained');
   const lv=o.level;
   const traps={};for(const t of lv.traps)traps[t.y*lv.w+t.x]=t;
   const items={};for(const [i,arr] of lv.items)items[i]=arr;
@@ -3856,6 +3915,7 @@ function deserializeGame(o){
   for(const i in traps){const tr=traps[i];if(tr.found&&tr.armed)addTrapDecal(L,tr);}
   for(const s of L.secrets){if(L.grid[s.y*L.w+s.x]===T_SECRET_FOUND)revealSecret(L,s);}
   snapCamera();
+  packAllRanks();
   computeDistField();
   resolvePartyTileOverlap();
   UI.refreshDepthTag();
@@ -3907,11 +3967,25 @@ function loop(now){
     R3.renderer.render(R3.scene,R3.camera);
   }
 }
+// the formation squares up to the party, so the rank that can actually fight is
+// the one drawn nearest — quantised to an axis so it doesn't slide about
+function rankOffset(m){
+  if(monstersOn(m.x,m.y).length<=1)return {x:0,z:0};
+  const dx=G.px-m.x,dz=G.py-m.y;
+  let fx=0,fz=0;
+  if(Math.abs(dx)>=Math.abs(dz))fx=Math.sign(dx)||1;else fz=Math.sign(dz)||1;
+  const depth=m.slot<2?0.17:-0.17, lat=(m.slot%2)?0.24:-0.24;
+  return {x:fx*depth+(-fz)*lat, z:fz*depth+fx*lat};
+}
 function updateSprites(now){
   for(const m of G.L.monsters){
     const s=R3.monsterSprites[m.id];
     if(!s)continue;
     const ud=s.userData;
+    // where in its tile this monster stands: a lone monster holds the centre,
+    // a packed tile forms up two abreast with the front rank nearest the party
+    const off=rankOffset(m);
+    ud.tx=m.x+0.5+off.x;ud.tz=m.y+0.5+off.z;
     // smooth movement
     if(ud.tx!==undefined){
       s.position.x+=(ud.tx-s.position.x)*0.15;
