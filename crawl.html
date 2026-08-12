@@ -1814,6 +1814,40 @@ function tryGen(depth,targetWalk,theme){
       pipes.push({x,y,dx,dy});
     }
   }
+  // the ossuary: one chamber a floor given over wholly to the dead, its walls
+  // stacked with bone and a raised bier in the middle carrying the one burial
+  // worth robbing — and the thing that has been keeping watch over it
+  let ossuary=null;
+  if(theme.name==='Crypt'){
+    // needs a room big enough that a blocked centre still leaves a ring to walk
+    const cand=rooms.slice(1).filter(r=>r.w>=3&&r.h>=3&&!(lockedRoom&&r.x===lockedRoom.x&&r.y===lockedRoom.y));
+    if(cand.length){
+      const r=pick(cand);
+      const bx=r.x+(r.w>>1), by=r.y+(r.h>>1);
+      // the stairs must not be swallowed by the bier
+      if(!(bx===sx&&by===sy)){
+        ossuary={x:r.x,y:r.y,w:r.w,h:r.h,bx,by,opened:false};
+        // the bier blocks like a sewer lake does: not a wall, but not walkable.
+        // A single tile at the centre of a 3x3-or-larger room cannot cut the
+        // level in two, so this is safe after the connectivity check.
+        g[idx(bx,by)]=T_PIT;
+        delete items[idx(bx,by)];
+        delete traps[idx(bx,by)];
+        for(let i=monsters.length-1;i>=0;i--)if(monsters[i].x===bx&&monsters[i].y===by)monsters.splice(i,1);
+        // its keeper, stood beside the bier and already awake to the intrusion
+        const spots=DIRS.map(([dx,dy])=>[bx+dx,by+dy]).filter(([x,y])=>g[idx(x,y)]===T_FLOOR);
+        if(spots.length){
+          const [gx,gy]=pick(spots);
+          const undeadPool=spawnPool(depth).filter(([k])=>MONSTERS[k].type==='undead');
+          const key=undeadPool.length?pickWeighted(undeadPool):'skeleton';
+          const guard=mkMonster(key,gx,gy,depth);
+          makeElite(guard,pick(ELITE_KEYS)); // a keeper is always something more
+          guard.slot=0;guard.ossuary=true;
+          monsters.push(guard);
+        }
+      }
+    }
+  }
   // crypts: the walls are given over to the dead — burial nooks, tomb plaques
   // set into the stone, and candles somebody still comes down here to light
   let crypts=[];
@@ -1833,7 +1867,7 @@ function tryGen(depth,targetWalk,theme){
     }
   }
   return {w:W,h:H,grid:g,start,stairs,traps,items,monsters,secrets,theme,depth,
-    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts};
+    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary};
 }
 /* ---------- difficulty curve ----------
    Depth, not party level, drives everything. One documented scalar grows every
@@ -3171,6 +3205,88 @@ function buildLevel(L){
       grp.add(g0);
       R3.cryptGroups[ci]={group:g0,make};
     });
+    // the ossuary: a chamber given over wholly to the dead. Its walls are
+    // stacked with bone and its middle carries a raised bier.
+    if(L.ossuary){
+      const os=L.ossuary;
+      const boneMat =new THREE.MeshPhongMaterial({color:0xbfb492,specular:0x2a2620,shininess:8});
+      const skullMat=new THREE.MeshPhongMaterial({color:0xd2c7a6,specular:0x2e2a22,shininess:11});
+      const boneGeo =new THREE.CylinderGeometry(0.026,0.026,0.30,6);
+      const skullGeo=new THREE.SphereGeometry(0.052,8,6);
+      // wall faces around the room, minus any already carrying wall furniture
+      const taken=new Set((L.crypts||[]).map(c=>c.x+','+c.y+','+c.dx+','+c.dy));
+      for(let y=os.y;y<os.y+os.h;y++)for(let x=os.x;x<os.x+os.w;x++){
+        if(L.grid[y*L.w+x]!==T_FLOOR)continue;
+        for(const [dx,dy] of DIRS){
+          if(L.grid[(y+dy)*L.w+(x+dx)]!==T_WALL)continue;
+          if(taken.has(x+','+y+','+dx+','+dy))continue;
+          const g0=new THREE.Group();
+          // Deterministic jitter, seeded on the tile: openBier rebuilds the level,
+          // and a Math.random() here would visibly reshuffle every wall of bone.
+          let seed=(x*73856093)^(y*19349663)^((dx+2)*83492791)^((dy+2)*2971215073);
+          const jit=()=>{seed=(seed*1664525+1013904223)&0x7fffffff;return seed/0x7fffffff;};
+          // courses of long bones laid end-on, skulls set among them
+          for(let r=0;r<4;r++){
+            const yy=0.16+r*0.28;
+            for(let k=-1;k<=1;k++){
+              const b=new THREE.Mesh(boneGeo,boneMat);
+              // stacked by hand centuries ago, not racked: let each lie a little askew
+              b.rotation.z=Math.PI/2+(jit()-0.5)*0.22;
+              b.rotation.y=(jit()-0.5)*0.3;
+              b.position.set(k*0.30+(jit()-0.5)*0.06,yy+(jit()-0.5)*0.05,0.05+jit()*0.03);
+              b.scale.set(1,0.8+jit()*0.45,1);
+              g0.add(b);
+            }
+            if(r%2===0){
+              const sx=(r===0?-0.18:0.20)+(jit()-0.5)*0.12;
+              const sy=yy+0.13+(jit()-0.5)*0.03;
+              const sk=new THREE.Mesh(skullGeo,skullMat);
+              sk.scale.set(1,1.15,0.85);
+              sk.rotation.z=(jit()-0.5)*0.5;
+              sk.position.set(sx,sy,0.075);
+              g0.add(sk);
+              for(const ox of [-0.021,0.021]){ // sockets, enough to read at this size
+                const e=new THREE.Mesh(new THREE.SphereGeometry(0.016,6,5),voidMat);
+                e.position.set(sx+ox,sy+0.015,0.118);
+                g0.add(e);
+              }
+            }
+          }
+          g0.rotation.y=Math.atan2(-dx,-dy);
+          g0.position.set(x+0.5+dx*0.5,0,y+0.5+dy*0.5);
+          grp.add(g0);
+        }
+      }
+      // the bier itself: two stone steps carrying a sarcophagus laid flat
+      const bg=new THREE.Group();
+      const step=(w,h,d,yy)=>{
+        const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),jambMat);
+        m.position.set(0,yy,0);bg.add(m);
+      };
+      step(0.98,0.12,0.98,0.06);
+      step(0.80,0.16,0.80,0.20);
+      const lidGeo=new THREE.ExtrudeGeometry(coffinShape(1.15),
+        {depth:0.17,bevelEnabled:true,bevelThickness:0.016,bevelSize:0.016,bevelSegments:1});
+      const lid=new THREE.Mesh(lidGeo,os.opened?lidOpenMat:lidMat);
+      lid.rotation.x=Math.PI/2;                              // lay the coffin flat, lid upward
+      if(os.opened){lid.rotation.z=0.3;lid.position.set(0.12,0.28,0.06);}
+      else lid.position.set(0,0.28,0);
+      lid.userData={kind:'bier',x:os.bx,y:os.by};
+      bg.add(lid);
+      if(!os.opened){ // a carved effigy on the lid, as on the wall coffins
+        const face=new THREE.Mesh(new THREE.SphereGeometry(0.075,10,8),stoneMat);
+        face.scale.set(1,0.55,1.3);
+        face.position.set(0,0.46,-0.23);bg.add(face);
+        for(const k of [-1,1]){
+          const arm=new THREE.Mesh(new THREE.BoxGeometry(0.20,0.026,0.045),stoneMat);
+          arm.rotation.y=k*0.5;
+          arm.position.set(0,0.45,-0.02);bg.add(arm);
+        }
+      }
+      bg.position.set(os.bx+0.5,0,os.by+0.5);
+      grp.add(bg);
+      R3.bierGroup={group:bg};
+    }
     // only the nearest few candles carry a real light: the flames all flicker,
     // but a point light apiece would cost more than the look is worth
     const lit=L.crypts.filter(c=>c.kind==='candle').slice(0,4);
@@ -4757,6 +4873,31 @@ function openCoffin(ci,slot){
   if(coffinNoise(c.x,c.y,6))setTimeout(()=>UI.toast('The grinding stone has been heard…'),900);
   saveGame();
 }
+// the bier at the heart of an ossuary: the one burial on the floor worth
+// robbing, and the reason its keeper is stood beside it
+function openBier(){
+  const L=G.L,os=L.ossuary;
+  if(!os)return;
+  if(Math.abs(os.bx-G.px)+Math.abs(os.by-G.py)>1){UI.toast('Too far to reach the bier.');return;}
+  if(os.opened){UI.toast('The bier stands open and empty.');return;}
+  os.opened=true;
+  SFX.secret();
+  buildLevel(L); // the bier is one mesh among many; rebuild so its lid shifts
+  // a hoard, not grave goods: this is what the floor was guarding
+  const i=os.by*L.w+os.bx;
+  const spill=[];
+  for(let k=0;k<2+rnd(2);k++)spill.push(randLoot(G.depth+2,true,true,true));
+  // the bier tile is unwalkable, so the pile goes to a neighbour the party can reach
+  const near=DIRS.map(([dx,dy])=>({x:os.bx+dx,y:os.by+dy}))
+    .filter(p=>walkableTile(tileAt(p.x,p.y)));
+  const drop=near.length?near[0]:{x:G.px,y:G.py};
+  const di=drop.y*L.w+drop.x;
+  (L.items[di]=L.items[di]||[]).push(...spill);
+  refreshItemSprite(L,di);
+  UI.toast('The bier gives up its hoard: '+spill.map(itemName).join(', ')+'.');
+  if(coffinNoise(os.bx,os.by,8))setTimeout(()=>UI.toast('The whole chamber has heard it…'),900);
+  saveGame();
+}
 // camp on a floor a third time and something comes looking for you
 function summonHuntingPack(){
   const L=G.L;
@@ -4823,7 +4964,7 @@ function serializeGame(){
       traps:Object.values(L.traps),items:Object.keys(L.items).map(i=>[+i,L.items[i]]),
       monsters:L.monsters.map(m=>{const c=Object.assign({},m);delete c._sc;delete c._regenT;delete c.dot;return c;}),
       secrets:L.secrets,lockedRoom:L.lockedRoom,restCount:L.restCount||{},restsHere:L.restsHere||0,
-      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],
+      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,
     },
   };
 }
@@ -4840,7 +4981,7 @@ function deserializeGame(o){
     w:lv.w,h:lv.h,grid:b64ToU8(lv.grid),explored:b64ToU8(lv.explored),
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
     traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
-    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],
+    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,
   };
   clearFx();
   G.L=L;G.over=false;
@@ -5789,6 +5930,7 @@ function initInput(){
       }
       if(u.kind==='trap'){disarmAttempt(u.x,u.y);return;}
       if(u.kind==='coffin'){openCoffin(u.ci,u.slot);return;}
+      if(u.kind==='bier'){openBier();return;}
       if(u.kind==='monster')return; // attacks come from hands
     }
   });
