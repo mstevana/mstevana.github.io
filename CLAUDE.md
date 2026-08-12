@@ -44,9 +44,10 @@ the repo, so treat the committed file as authoritative.
 
 There is no test suite in the repo either. Sessions have built throwaway
 node harnesses that stub `window`/`document`/`THREE`, load the pure-logic
-part of the file, and assert on it (the T1–T22 series referenced in the
+part of the file, and assert on it (the T1–T33 series referenced in the
 git log). If you make a behavioural change, expect to rebuild a harness
-rather than find one.
+rather than find one — and note that the numbering only ever grows, so the
+git log is the index of what each one covers.
 
 ## The difficulty curve is authored, not emergent
 
