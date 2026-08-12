@@ -3584,6 +3584,11 @@ function monsterLoot(depth){
   // the hp-scaled heal band below to happen to roll a cure
   if(G.party.some(c=>!c.dead&&hasCond(c,'poison'))&&Math.random()<0.15)
     return mkItem('pot_antitoxin');
+  // likewise the Vial of Remedies for the afflictions it clears: disease clings
+  // for floors until it's cured or saved off, and paralysis can recur, so the
+  // one potion that lifts both surfaces more readily while either is on someone
+  if(G.party.some(c=>!c.dead&&(hasCond(c,'disease')||hasCond(c,'paralysis')))&&Math.random()<0.15)
+    return mkItem('pot_remedy');
   const pHeal=0.12+0.38*healNeed;    // 12%..50%
   const pScroll=0.06+0.24*scrollNeed;// 6%..30%
   const r=Math.random();
