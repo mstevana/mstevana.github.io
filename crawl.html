@@ -565,6 +565,25 @@ const BOSSES=[ // every 5th level: pick by depth
   {minD:25,base:'ogremage',name:'Sinshara of the Veil'},
   {minD:30,base:'dragon',  name:'Vermilax the Patient'},
 ];
+// Past Vermilax the named bosses run out, and every fifth floor was handing you
+// the same dragon forever. The list starts over instead, each pass through it
+// harder than the last and titled so you can see which circle you are on.
+const BOSS_RANKS=['Warlord','Tyrant','Devourer','Sovereign','Archfiend','Herald'];
+const BOSS_CIRCLES=['of the Sunken Circle','of the Black Cycle','of the Last Gate','Beyond Counting'];
+function bossFor(depth){
+  const lastNamed=BOSSES[BOSSES.length-1].minD;
+  if(depth<=lastNamed){
+    let b=BOSSES[0];
+    for(const c of BOSSES)if(depth>=c.minD)b=c;
+    return {base:b.base,name:b.name,cycle:0};
+  }
+  // boss floors come every fifth level, so one pass through the list is 30 floors
+  const n=Math.floor((depth-lastNamed)/5)-1;
+  const i=((n%BOSSES.length)+BOSSES.length)%BOSSES.length;
+  const cycle=1+Math.floor(n/BOSSES.length);
+  const base=BOSSES[i].base;
+  return {base,name:MONSTERS[base].name+' '+BOSS_RANKS[i]+' '+BOSS_CIRCLES[(cycle-1)%BOSS_CIRCLES.length],cycle};
+}
 const THEMES=[
   {name:'Dungeon', wall:'#4a443a', wall2:'#2e2a22', floor:'#39342b', ceil:'#211d17', fog:0x0a0906, moss:'#39412c', roomBias:.45},
   {name:'Sewers',  wall:'#3a4438', wall2:'#232b21', floor:'#2e352c', ceil:'#181d16', fog:0x070a06, moss:'#4a5a35', roomBias:.25},
@@ -1254,6 +1273,17 @@ function bonusForDepth(depth,rich){
   if(Math.random()>=Math.min(0.18,(depth-19)*0.012))return 3;
   return (depth>=28&&Math.random()<0.25)?5:4;
 }
+// Traps used to stop growing at 6d6 around depth 15, so by the twenties they
+// were furniture. They keep climbing now, but on a shallower slope than the
+// early floors: a deep trap should cost a character a monster's round of
+// damage, not end the run outright.
+function trapDice(depth){
+  return Math.min(6,1+Math.floor(depth/3))+Math.max(0,Math.floor((depth-15)/5));
+}
+// The difficulty of spotting one keeps climbing too, but stops just short of a
+// maxed rogue's take-10: finding traps is the rogue's job and should stay
+// theirs at any depth. Past that point it is the damage that keeps growing.
+function trapDC(depth){return 12+Math.min(22,Math.floor(depth/2));}
 // affixed gear rolls on the same schedule, independent of the plus
 function rollAffix(depth,rich,pool){
   if(Math.random()>=affixChance(depth,rich))return undefined;
@@ -1499,8 +1529,8 @@ function tryGen(depth,targetWalk,theme){
     const x=1+rnd(W-2),y=1+rnd(H-2),i=idx(x,y);
     if(g[i]!==T_FLOOR||dist[i]<6||traps[i]||(x===sx&&y===sy))continue;
     const kind=pick(['dart','spike','gas']);
-    traps[i]={kind,found:false,armed:true,dc:12+Math.floor(depth/2),
-      dmg:kind==='gas'?null:[Math.min(6,1+Math.floor(depth/3)),6],x,y};
+    traps[i]={kind,found:false,armed:true,dc:trapDC(depth),
+      dmg:kind==='gas'?null:[trapDice(depth),6],x,y};
     placedTraps++;
   }
   // 9. items
@@ -1594,15 +1624,17 @@ function tryGen(depth,targetWalk,theme){
     for(let s=0;s<packed;s++)spawnOne(p.x,p.y,s);
   }
   if(isBossLevel){
-    let bossDef=BOSSES[0];
-    for(const b of BOSSES)if(depth>=b.minD)bossDef=b;
+    const bossDef=bossFor(depth);
     // place boss adjacent to stairs
     let bx=sx,by=sy;
     for(const [dx,dy] of DIRS){if(g[idx(sx+dx,sy+dy)]===T_FLOOR){bx=sx+dx;by=sy+dy;break;}}
     const bm=mkMonster(bossDef.base,bx,by,depth);
-    bm.boss=true; bm.name=bossDef.name;
-    bm.maxHp=Math.round(bm.maxHp*2.5)+depth*4; bm.hp=bm.maxHp;
-    bm.atk+=2; bm.ac+=2; bm.xp*=3;
+    // a boss from a repeat cycle also wears an elite's mantle — the deep floors
+    // have nothing new to introduce, so they sharpen what is already there
+    if(bossDef.cycle>0)makeElite(bm,ELITE_KEYS[(bossDef.cycle+depth)%ELITE_KEYS.length]);
+    bm.boss=true; bm.name=bossDef.name; bm.cycle=bossDef.cycle;
+    bm.maxHp=Math.round(bm.maxHp*(2.5+0.6*bossDef.cycle))+depth*4; bm.hp=bm.maxHp;
+    bm.atk+=2+2*bossDef.cycle; bm.ac+=2+bossDef.cycle; bm.xp*=3;
     bm.guard={x:sx,y:sy,r:3};
     monsters.push(bm);
   }
