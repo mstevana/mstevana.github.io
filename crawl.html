@@ -3578,6 +3578,12 @@ function monsterLoot(depth){
   // so a drained party has a small chance of turning up the one cure there is
   if(hasCaster&&G.party.some(c=>!c.dead&&c.negLevels>0)&&Math.random()<0.09)
     return mkItem('scroll',{spell:'restoration'});
+  // a poisoned party turns up its antidote more often — the same needs-aware
+  // faucet as healing, but for the cure that clears it. Fires even at full hp,
+  // so a healthy-but-envenomed party still finds relief rather than waiting on
+  // the hp-scaled heal band below to happen to roll a cure
+  if(G.party.some(c=>!c.dead&&hasCond(c,'poison'))&&Math.random()<0.15)
+    return mkItem('pot_antitoxin');
   const pHeal=0.12+0.38*healNeed;    // 12%..50%
   const pScroll=0.06+0.24*scrollNeed;// 6%..30%
   const r=Math.random();
