@@ -567,6 +567,16 @@ const AFFIXES={
   stormward:{name:'Storm-warded',on:'armor',resist:'shock',amount:5},
   acidward: {name:'Acid-warded', on:'armor',resist:'acid', amount:5},
 };
+// epitaphs: a name, what they were, and how long they have lain here. Read off
+// a tomb plaque, generated from the plaque's own position so it never changes.
+const EPI_NAMES=['Aldric','Maeve','Orrin','Sable','Corwin','Elspeth','Garrick','Rowan',
+  'Thessaly','Bram','Isolde','Halvard','Nesta','Ulric','Ferrin','Marisol','Dain','Ysolde'];
+const EPI_STYLES=['of the Ninth Watch','Stonewright','the Unmourned','Keybearer','the Lesser',
+  'of Ash Hollow','Bellringer','the Quiet','Gravewarden','of the Broken Oath','Lampwright','the Patient'];
+const EPI_LINES=['Laid down willingly.','He asked not to be woken.','She kept the lower gate.',
+  'Interred without rites.','The debt is paid.','Do not open. Do not open. Do not open.',
+  'Rest, and let rest.','Died as the lamps went out.','Nothing was left to bury but this.',
+  'Remembered by no one living.','The seal held.','Went down and did not come up.'];
 const WEAPON_AFFIXES=Object.keys(AFFIXES).filter(k=>AFFIXES[k].on==='weapon');
 const ARMOR_AFFIXES=Object.keys(AFFIXES).filter(k=>AFFIXES[k].on==='armor');
 // affixed gear turns up on the same schedule as the +4/+5 ladder — deep, and
@@ -3165,7 +3175,7 @@ function buildLevel(L){
         addOpening(g0,0.36,0.54,0.50,0.08);addCoffin(g0,0.36,0.78,c,0);
         addOpening(g0,0.94,0.54,0.50,0.08);addCoffin(g0,0.94,0.78,c,1);
       },
-      tombs:(g0)=>{ // a 3x3 grid of plaques set into the stone
+      tombs:(g0,c)=>{ // a 3x3 grid of plaques set into the stone
         const cw=0.235,ch=0.285,gx=0.028,gy=0.030;
         const totW=3*cw+2*gx,totH=3*ch+2*gy,cy=0.64;
         const back=new THREE.Mesh(new THREE.PlaneGeometry(totW+0.07,totH+0.07),voidMat);
@@ -3179,11 +3189,13 @@ function buildLevel(L){
         bar(ow+t*2,t,0,cy+oh/2+t/2);bar(ow+t*2,t,0,cy-oh/2-t/2);
         const geo=new THREE.ExtrudeGeometry(tombShape(cw*0.84,ch*0.82),
           {depth:0.032,bevelEnabled:true,bevelThickness:0.008,bevelSize:0.008,bevelSegments:1});
-        for(let r=0;r<3;r++)for(let c=0;c<3;c++){
-          const px=-totW/2+cw/2+c*(cw+gx);
+        for(let r=0;r<3;r++)for(let c2=0;c2<3;c2++){
+          const px=-totW/2+cw/2+c2*(cw+gx);
           const py=cy+totH/2-ch-r*(ch+gy)+0.026;
           const st=new THREE.Mesh(geo,stoneMat);
-          st.position.set(px,py,0.012);g0.add(st);
+          st.position.set(px,py,0.012);
+          st.userData={kind:'plaque',x:c?c.x:0,y:c?c.y:0,n:r*3+c2};
+          g0.add(st);
           for(let k=0;k<2;k++){ // two scratched lines standing in for a name
             const ln=new THREE.Mesh(new THREE.BoxGeometry(cw*0.40,0.011,0.012),jambMat);
             ln.position.set(px,py+ch*0.34-k*0.048,0.058);g0.add(ln);
@@ -3229,13 +3241,68 @@ function buildLevel(L){
       grp.add(g0);
       R3.cryptGroups[ci]={group:g0,make};
     });
+    // floor and ceiling dressing — bones underfoot, cracked grave slabs set
+    // into the floor, cobwebs in the corners. All purely cosmetic and flat to
+    // the ground: a room-heavy theme would path badly with real obstacles, and
+    // the generator's connectivity guarantees assume floor is floor.
+    {
+      const litter=new THREE.Group();
+      const boneMat2=new THREE.MeshPhongMaterial({color:0x5f5947,specular:0x0c0a07,shininess:2});
+      const slabMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.floor,0.16)),
+        specular:0x141018,shininess:5});
+      const webMat=new THREE.MeshBasicMaterial({color:0x9aa0a6,transparent:true,opacity:0.13,
+        side:THREE.DoubleSide,depthWrite:false});
+      const boneG=new THREE.CylinderGeometry(0.018,0.018,0.17,5);
+      const skullG=new THREE.SphereGeometry(0.045,7,6);
+      for(let y=1;y<L.h-1;y++)for(let x=1;x<L.w-1;x++){
+        if(L.grid[y*L.w+x]!==T_FLOOR)continue;
+        // one deterministic draw per tile, so nothing shuffles on a rebuild
+        let hsh=((x*374761393)^(y*668265263))>>>0;
+        const rr=()=>{hsh=(hsh*1664525+1013904223)>>>0;return hsh/4294967296;};
+        const roll=rr();
+        if(roll<0.07){ // a grave slab set flush into the floor
+          const w=0.62+rr()*0.2,d=0.78+rr()*0.16;
+          const sl=new THREE.Mesh(new THREE.BoxGeometry(w,0.02,d),slabMat);
+          sl.position.set(x+0.5+(rr()-0.5)*0.12,0.011,y+0.5+(rr()-0.5)*0.12);
+          sl.rotation.y=(rr()-0.5)*0.25;
+          litter.add(sl);
+          for(let k=0;k<2;k++){ // a crack across it
+            const cr=new THREE.Mesh(new THREE.BoxGeometry(w*0.9,0.006,0.014),boneMat2);
+            cr.material=webMat;
+            cr.position.set(x+0.5,0.023,y+0.5+(k?0.12:-0.14));
+            cr.rotation.y=(rr()-0.5)*0.7;
+            litter.add(cr);
+          }
+        }else if(roll<0.15){ // scattered bone
+          const n=2+Math.floor(rr()*3);
+          for(let k=0;k<n;k++){
+            const b=new THREE.Mesh(boneG,boneMat2);
+            b.rotation.set(Math.PI/2,0,rr()*Math.PI);
+            b.position.set(x+0.2+rr()*0.6,0.022,y+0.2+rr()*0.6);
+            litter.add(b);
+          }
+          if(rr()<0.4){
+            const sk=new THREE.Mesh(skullG,boneMat2);
+            sk.scale.set(1,0.8,1.1);
+            sk.position.set(x+0.3+rr()*0.4,0.04,y+0.3+rr()*0.4);
+            litter.add(sk);
+          }
+        }else if(roll<0.19){ // a cobweb strung across a high corner
+          const w=new THREE.Mesh(new THREE.PlaneGeometry(0.55,0.55),webMat);
+          w.position.set(x+0.5,WALLH-0.3,y+0.5);
+          w.rotation.set(-Math.PI/3,rr()*Math.PI,0);
+          litter.add(w);
+        }
+      }
+      grp.add(litter);
+    }
     // the ossuary: a chamber given over wholly to the dead. Its walls are
     // stacked with bone and its middle carries a raised bier.
     if(L.ossuary){
       const os=L.ossuary;
-      const boneMat =new THREE.MeshPhongMaterial({color:0xbfb492,specular:0x2a2620,shininess:8});
-      const skullMat=new THREE.MeshPhongMaterial({color:0xd2c7a6,specular:0x2e2a22,shininess:11});
-      const boneGeo =new THREE.CylinderGeometry(0.026,0.026,0.30,6);
+      const boneMat =new THREE.MeshPhongMaterial({color:0x6b6450,specular:0x0e0c08,shininess:2});
+      const skullMat=new THREE.MeshPhongMaterial({color:0x7d7560,specular:0x100e0a,shininess:3});
+      const boneGeo =new THREE.CylinderGeometry(0.024,0.024,0.26,6);
       const skullGeo=new THREE.SphereGeometry(0.052,8,6);
       // wall faces around the room, minus any already carrying wall furniture
       const taken=new Set((L.crypts||[]).map(c=>c.x+','+c.y+','+c.dx+','+c.dy));
@@ -4916,6 +4983,22 @@ function turnUndead(ch){
   UI.refreshParty();
   return true;
 }
+/* ---------- crypt inscriptions ---------- */
+// Deterministic in the plaque's own coordinates, so the same stone always
+// carries the same name however often the level is rebuilt or reloaded.
+function epitaphAt(x,y,n){
+  let h=((x*73856093)^(y*19349663)^((n+1)*83492791))>>>0;
+  const nxt=()=>{h=(h*1664525+1013904223)>>>0;return h/4294967296;};
+  const name=EPI_NAMES[Math.floor(nxt()*EPI_NAMES.length)];
+  const style=EPI_STYLES[Math.floor(nxt()*EPI_STYLES.length)];
+  const years=40+Math.floor(nxt()*900);
+  const line=nxt()<0.45?' '+EPI_LINES[Math.floor(nxt()*EPI_LINES.length)]:'';
+  return name+' '+style+', dead these '+years+' years.'+line;
+}
+function readEpitaph(x,y,n){
+  if(Math.abs(x-G.px)+Math.abs(y-G.py)>1){UI.toast('Too far to read the inscription.');return;}
+  UI.toast(epitaphAt(x,y,n));
+}
 /* ---------- crypt coffins ---------- */
 // Prising a lid off is loud. Anything asleep nearby hears it — the same
 // consequence a restless camp has, and the reason to clear a room first.
@@ -6047,6 +6130,7 @@ function initInput(){
       if(u.kind==='trap'){disarmAttempt(u.x,u.y);return;}
       if(u.kind==='coffin'){openCoffin(u.ci,u.slot);return;}
       if(u.kind==='bier'){openBier();return;}
+      if(u.kind==='plaque'){readEpitaph(u.x,u.y,u.n);return;}
       if(u.kind==='monster')return; // attacks come from hands
     }
   });
