@@ -511,6 +511,21 @@ const SPAWN_DEPTH={
   hobgoblin:[2,5],orc:[2,5],gobshaman:[3,6],spider:[3,7],ghoul:[3,7],gnoll:[3,7],bugbear:[4,8],
   ogre:[6,10],wight:[6,11],wightnec:[8,13],minotaur:[8,13],troll:[10,16],ogremage:[13,99],dragon:[15,99],
 };
+/* Elite templates. The bestiary runs out around depth 20, so past that the
+   descent keeps escalating by hardening ordinary monsters rather than by
+   inventing new ones. A template renames and tints the creature and adds one
+   trait, so a Blackfang gnoll reads as its own thing at a glance. */
+const ELITES={
+  scarred:  {name:'Scarred',      hp:1.45,atk:2,ac:1,tint:'#c08a4a'},
+  brute:    {name:'Hulking',      hp:1.9, atk:2,ac:0,tint:'#c8703a',dmgBonus:2},
+  plague:   {name:'Plague-touched',hp:1.3,atk:1,ac:0,tint:'#8ac04a',poison:{dc:14,dmg:[1,4]}},
+  blackfang:{name:'Blackfang',    hp:1.25,atk:3,ac:2,tint:'#9a6ad0',speed:0.8},
+  hollow:   {name:'Hollow',       hp:1.35,atk:1,ac:1,tint:'#7fd1c0',regen:2},
+  ashen:    {name:'Ashen',        hp:1.3, atk:2,ac:1,tint:'#e0803a',reach:true},
+};
+const ELITE_KEYS=Object.keys(ELITES);
+// none before depth 8, then rising to roughly a third of a floor by depth 30
+function eliteChance(depth){return depth<8?0:Math.min(0.35,(depth-7)*0.016);}
 const BOSSES=[ // every 5th level: pick by depth
   {minD:5, base:'bugbear', name:'Grukk the Skullkeeper'},
   {minD:10,base:'wight',   name:'The Bonelord'},
@@ -1019,7 +1034,7 @@ function splitLayers(s){
   out[mode]+=s.slice(last);
   return out;
 }
-function monsterSVG(key,boss,pose){
+function monsterSVG(key,boss,pose,tint){
   const a=(MONSTER_ART[key]||MONSTER_ART.goblin)();
   const o=a.o;
   const defs='<defs>'+bodyGrad('bg',o.lit,o.mid)+glowGrad('eg',o.eye)+
@@ -1047,7 +1062,17 @@ function monsterSVG(key,boss,pose){
   const parts=layer(B.base,S.base,'')
     +layer(B.head,S.head,headXf(pose,hp))
     +layer(B.arm,S.arm,armXf(pose,ap,o));
-  return `<svg xmlns="${SVGNS}" viewBox="0 0 64 64">${defs}${ground}<g${xf?` transform="${xf}"`:''}>${flare}${parts}${crown}</g></svg>`;
+  // an elite wears its template as a recolouring of the whole creature plus a
+  // faint aura, so it is recognisable as a harder thing across a dark room.
+  // 'color' blending swaps the hue but keeps the modelling underneath, which
+  // an overlay wash could not do on creatures already this dark.
+  const wash=tint?`<rect x="0" y="0" width="64" height="64" fill="${tint}" opacity="0.62" style="mix-blend-mode:color"/>`:'';
+  const body=`<g${xf?` transform="${xf}"`:''}>${flare}${parts}${crown}</g>`;
+  const aura=tint?`<ellipse cx="32" cy="33" rx="27" ry="29" fill="${tint}" opacity="0.13"/>`:'';
+  const inner=tint
+    ?`${aura}<g><defs><mask id="em"><rect x="0" y="0" width="64" height="64" fill="#000"/><g fill="#fff">${body}</g></mask></defs>${body}<g mask="url(#em)">${wash}</g></g>`
+    :body;
+  return `<svg xmlns="${SVGNS}" viewBox="0 0 64 64">${defs}${ground}${inner}</svg>`;
 }
 /* ---------- trap flash drawings (shown for an instant when a trap fires) ---------- */
 // one spear thrust up from the floor (steel leaf-blade on a wooden shaft, bloodied)
@@ -1445,15 +1470,28 @@ function tryGen(depth,targetWalk,theme){
   // rather than leaving it empty, and a generous one sends the big ones.
   const nMon=Math.round(targetCount(depth))+rnd(3)-1;
   const share=threatBudget(depth)/Math.max(1,nMon);
-  const pool=spawnPool(depth).map(([k,w])=>{
-    const r=Math.log(threatOf(k,depth)/share);
-    return [k,w*Math.exp(-(r*r)/0.9)]; // a soft preference, so variety survives
+  const ec=eliteChance(depth);
+  // How closely a floor sticks to its per-monster share. Loosening it with
+  // depth keeps lesser creatures in the mix far down, so a deep floor is a
+  // warband of mixed ranks rather than a row of identical giants.
+  const sig=0.9+Math.min(1.4,depth*0.045);
+  const base=spawnPool(depth);
+  const weigh=(ek)=>base.map(([k,w])=>{
+    const r=Math.log(threatOf(k,depth,ek)/share);
+    return [k,w*Math.exp(-(r*r)/sig)];
   });
-  let mTries=700;
+  const plainPool=weigh(null);
+  const elitePools={};for(const ek of ELITE_KEYS)elitePools[ek]=weigh(ek);
+  let mTries=900;
   while(monsters.length<nMon&&mTries-->0){
     const p=randFloor(8,(x,y,i)=>!monsters.some(m=>m.x===x&&m.y===y)&&!inLocked(x,y));
     if(!p)break;
-    monsters.push(mkMonster(pickWeighted(pool),p.x,p.y,depth));
+    // decide rank first, so the elite share is the figure we intend rather
+    // than a by-product of elites being the heaviest thing on the shelf
+    const ek=Math.random()<ec?pick(ELITE_KEYS):null;
+    const m=mkMonster(pickWeighted(ek?elitePools[ek]:plainPool),p.x,p.y,depth);
+    if(ek)makeElite(m,ek);
+    monsters.push(m);
   }
   if(isBossLevel){
     let bossDef=BOSSES[0];
@@ -1509,12 +1547,27 @@ function monsterThreat(m){
   const reach=1+(m.ranged?0.35:0)+(m.caster?0.45:0)+(m.reach?0.2:0);
   return m.maxHp*(dmg+m.atk*0.8)*reach/12;
 }
-function threatOf(key,depth){ // the same score, without building the monster
-  const d=MONSTERS[key];
-  const hp=Math.max(1,Math.round(d.hp*depthScale(depth)));
-  const dmg=d.dmg[0]*(d.dmg[1]+1)/2+d.dmg[2];
-  const reach=1+(d.ranged?0.35:0)+(d.caster?0.45:0)+(d.reach?0.2:0);
-  return hp*(dmg+(d.atk+depthAtkBonus(depth))*0.8)*reach/12;
+// harden a monster into an elite: it keeps its shape and gains a trait
+function makeElite(m,key){
+  const e=ELITES[key];
+  m.elite=key;
+  m.name=e.name+' '+m.name.toLowerCase();
+  m.maxHp=Math.max(1,Math.round(m.maxHp*e.hp));m.hp=m.maxHp;
+  m.atk+=e.atk;m.ac+=e.ac;
+  if(e.dmgBonus)m.dmg=[m.dmg[0],m.dmg[1],m.dmg[2]+e.dmgBonus];
+  if(e.speed)m.speed*=e.speed;
+  if(e.reach)m.reach=true;
+  if(e.poison)m.special.poison=e.poison;
+  if(e.regen)m.special.regen=(m.special.regen||0)+e.regen;
+  m.xp=Math.round(m.xp*1.6);
+  return m;
+}
+function threatOf(key,depth,elite){ // the same score, without building the monster
+  const d=MONSTERS[key],e=elite?ELITES[elite]:null;
+  const hp=Math.max(1,Math.round(d.hp*depthScale(depth)*(e?e.hp:1)));
+  const dmg=d.dmg[0]*(d.dmg[1]+1)/2+d.dmg[2]+(e&&e.dmgBonus?e.dmgBonus:0);
+  const reach=1+(d.ranged?0.35:0)+(d.caster?0.45:0)+((d.reach||(e&&e.reach))?0.2:0);
+  return hp*(dmg+(d.atk+depthAtkBonus(depth)+(e?e.atk:0))*0.8)*reach/12;
 }
 // how many bodies a floor should hold, before strength is considered
 function targetCount(depth){return Math.min(30,11+depth*0.7);}
@@ -2678,20 +2731,22 @@ function refreshItemSprite(L,i){
 }
 function itemTexKey(it){return 'it_'+it.base+'_'+it.bonus+'_'+(it.tint||'')+'_'+(ITEM_DEFS[it.base].tint||'');}
 // single source of truth for monster frame textures (cache key + raster options)
-function monsterFrameTex(sprKey,boss,pose){
-  return svgToTexture(monsterSVG(sprKey,boss,pose),'mon_'+sprKey+(boss?'_b':'')+'_'+pose,{size:384,mipmap:true});
+function monsterFrameTex(sprKey,boss,pose,elite){
+  const tint=elite&&ELITES[elite]?ELITES[elite].tint:null;
+  return svgToTexture(monsterSVG(sprKey,boss,pose,tint),
+    'mon_'+sprKey+(boss?'_b':'')+(elite?'_'+elite:'')+'_'+pose,{size:384,mipmap:true});
 }
 function addMonsterSprite(m){
   const sprKey=MONSTERS[m.key].spr;
   // only the resting frame up front; walk/windup/strike rasterize lazily on first
   // use (the global texture cache still shares frames across same-type monsters)
-  const frames={idle0:monsterFrameTex(sprKey,m.boss,'idle0')};
+  const frames={idle0:monsterFrameTex(sprKey,m.boss,'idle0',m.elite)};
   const mat=new THREE.SpriteMaterial({map:frames.idle0,transparent:true});
   const spr=new THREE.Sprite(mat);
   const sc=m.boss?1.05:(['ogre','troll','minotaur','ogremage','dragon'].includes(m.key)?0.95:0.72);
   spr.scale.set(sc,sc,1);
   spr.position.set(m.x+0.5,sc/2+0.02,m.y+0.5);
-  spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss};
+  spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss,elite:m.elite};
   R3.levelGroup.add(spr);R3.monsterSprites[m.id]=spr;
   m._sc=sc;
 }
@@ -4144,7 +4199,7 @@ function updateSprites(now){
     if(ud.curFrame!==frame&&ud.frames){
       // frames are generated lazily on first use; keep the old frame until loaded
       let t=ud.frames[frame];
-      if(!t){t=monsterFrameTex(ud.sprKey,ud.boss,frame);ud.frames[frame]=t;}
+      if(!t){t=monsterFrameTex(ud.sprKey,ud.boss,frame,ud.elite);ud.frames[frame]=t;}
       if(t.__ready!==false){ud.curFrame=frame;s.material.map=t;}
     }
     // idle bob + strike lunge toward the party
