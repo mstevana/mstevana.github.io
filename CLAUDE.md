@@ -108,8 +108,9 @@ half 25–35** when the curve was authored; after the crypt work (seven new
 heavy undead filling the deep bands, plus the undead damage rules) it
 reads **median 26, middle half 22–29**. After the cave work (nine cave
 creatures, the ambushers, the cave spawn bias) it reads **median 27,
-middle half 24–30**. That is below the intended 30–40 band and has not
-been retuned — a deliberate decision to measure first.
+middle half 24–30**; moving boss floors to every third level took it to
+**median 28, middle half 26–30**. That is still below the intended 30–40
+band and has not been retuned — a deliberate decision to measure first.
 
 Neither content pass is the cause, and both were checked the same way:
 removing coffin and ossuary fights from the simulation leaves the median
@@ -238,11 +239,36 @@ of the wall plane rather than behind it.
 Depth-gated content that is not theme-driven and will need extending if
 the dungeon grows:
 
-- **`BOSSES`** — one entry per named boss with a `minD`. Every fifth
-  floor is a boss floor. Past the last named entry `bossFor` cycles the
-  list, each pass harder and titled by its circle, and cycled bosses also
-  wear an elite mantle. Adding a named boss extends the run before
-  cycling starts.
+- **`BOSSES`** — one entry per named boss with a `minD`. **Every third
+  floor from depth 6 is a boss floor**, which is also the last floor of a
+  theme block (`THEMES[floor((depth−1)/3)]`), so a boss caps the theme you
+  have been walking through instead of landing in the middle of the next
+  one. `minD` therefore steps by 3, one named boss per boss floor, and
+  three places must agree: `isBossLevel` in `tryGen`, the `/3` in
+  `bossFor`'s cycle arithmetic, and the ⚔ in `refreshDepthTag`.
+
+  The first theme block is exempt. On floor 3 the party is still level 1 —
+  32 hit points between four of them, a 3-hp wizard — against a boss
+  carrying 2.5× hp and **+2 AC**, which at that attack bonus is unhittable
+  rather than hard. A simulated descent walled there at 99%.
+
+  Past the last named entry `bossFor` cycles the list, each pass harder
+  and titled by its circle, and cycled bosses also wear an elite mantle.
+  Adding a named boss extends the run before cycling starts.
+
+  A cycled boss's **hit points come from `BOSS_BASE_HP`, the list's own
+  mean, not from the creature the cycle named.** A bugbear base is a
+  quarter of a dragon's, so raw base hp handed you a boss a third of the
+  one three floors above, and the sawtooth repeated on every pass. Named
+  bosses keep their own creature's hp — they are hand-placed for their
+  depth, and Sinshara is a caster whose danger is her spells.
+
+  That split is why T21 measures the two arcs on different things: the
+  named arc on `monsterThreat` (which credits spells, reach and riders,
+  so Sinshara's low hp is not a regression) and the cycled arc on `maxHp`.
+  A cycled boss's *damage* is still whatever creature the list named, so
+  its threat still steps down at the named→cycled handover — that is the
+  list starting over, and it is by design.
 - **`trapDice` / `trapDC`** — damage keeps climbing with depth; the spot
   DC deliberately stops just short of a maxed rogue's take-10, so finding
   traps stays the rogue's job at any depth. Do not let the DC past that.
@@ -282,7 +308,7 @@ removes an ordinary spawn** from `monsters` so the floor keeps the head
 count and the threat `targetCount`/`threatBudget` gave it — the ambush
 changes a floor's shape, not its difficulty. The trade explicitly skips
 `boss` and `ossuary` monsters; popping the last-pushed monster instead
-eats the boss on every fifth floor. Which creature a lurker is comes from
+eats the boss on every third floor. Which creature a lurker is comes from
 the same log-space Gaussian against the floor's per-monster share that a
 standing spawn uses, so a deep floor does not ambush the party with a
 piercer.

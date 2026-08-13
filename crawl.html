@@ -609,17 +609,31 @@ function affixChance(depth,rich){
   if(depth<20)return 0;
   return Math.min(0.45,(depth-19)*0.03)*(rich?1:0.2);
 }
-const BOSSES=[ // every 5th level: pick by depth
-  {minD:5, base:'bugbear', name:'Grukk the Skullkeeper'},
-  {minD:10,base:'wight',   name:'The Bonelord'},
-  {minD:15,base:'minotaur',name:'Gorehorn, King Below'},
-  {minD:20,base:'troll',   name:'Ubbroth the Unrotting'},
-  {minD:25,base:'ogremage',name:'Sinshara of the Veil'},
-  {minD:30,base:'dragon',  name:'Vermilax the Patient'},
+// Boss floors are every third level, which is also the length of a theme block
+// (THEMES[floor((depth-1)/3)]), so a boss always caps the theme you have been
+// walking through rather than landing in the middle of the next one. One named
+// boss per boss floor: minD therefore steps by 3, not by 5.
+// The first theme block is exempt. On floor 3 the party is still level 1 -- 32
+// hit points between four of them -- against a boss carrying 2.5x hp and +2 AC,
+// which at that level is unhittable rather than hard. Bosses start at 6.
+const BOSSES=[ // every 3rd level from 6: pick by depth
+  {minD:6, base:'bugbear', name:'Grukk the Skullkeeper'},
+  {minD:9, base:'wight',   name:'The Bonelord'},
+  {minD:12,base:'minotaur',name:'Gorehorn, King Below'},
+  {minD:15,base:'troll',   name:'Ubbroth the Unrotting'},
+  {minD:18,base:'ogremage',name:'Sinshara of the Veil'},
+  {minD:21,base:'dragon',  name:'Vermilax the Patient'},
 ];
-// Past Vermilax the named bosses run out, and every fifth floor was handing you
+// Past Vermilax the named bosses run out, and every boss floor was handing you
 // the same dragon forever. The list starts over instead, each pass through it
 // harder than the last and titled so you can see which circle you are on.
+// A boss's hit points are a property of the floor, not of whichever creature the
+// cycle happened to name. A bugbear base is a quarter of a dragon's, so raw base
+// hp made the boss on floor 21 weaker than the one on floor 18, and the same
+// sawtooth repeated on every pass. The creature still decides how the fight goes
+// -- its damage, its reach, whether it casts -- but its weight class comes from
+// the depth. Taken from the list so adding a named boss keeps it honest.
+const BOSS_BASE_HP=BOSSES.reduce((a,b)=>a+MONSTERS[b.base].hp,0)/BOSSES.length;
 const BOSS_RANKS=['Warlord','Tyrant','Devourer','Sovereign','Archfiend','Herald'];
 const BOSS_CIRCLES=['of the Sunken Circle','of the Black Cycle','of the Last Gate','Beyond Counting'];
 function bossFor(depth){
@@ -629,8 +643,8 @@ function bossFor(depth){
     for(const c of BOSSES)if(depth>=c.minD)b=c;
     return {base:b.base,name:b.name,cycle:0};
   }
-  // boss floors come every fifth level, so one pass through the list is 30 floors
-  const n=Math.floor((depth-lastNamed)/5)-1;
+  // boss floors come every third level, so one pass through the list is 18 floors
+  const n=Math.floor((depth-lastNamed)/3)-1;
   const i=((n%BOSSES.length)+BOSSES.length)%BOSSES.length;
   const cycle=1+Math.floor(n/BOSSES.length);
   const base=BOSSES[i].base;
@@ -1869,7 +1883,7 @@ function tryGen(depth,targetWalk,theme){
   // 10. monsters — filled to the floor's threat budget rather than a flat count,
   // so difficulty is a curve we author instead of one that falls out of the bands
   const monsters=[];
-  const isBossLevel=depth%5===0;
+  const isBossLevel=depth%3===0&&depth>=6;   // last floor of every theme block but the first
   // How many bodies is fixed by depth; the budget then decides how heavy each
   // of them should be, by favouring pool members whose threat sits near the
   // per-monster share. So a tight budget fills a floor with lesser creatures
@@ -1932,7 +1946,13 @@ function tryGen(depth,targetWalk,theme){
     // have nothing new to introduce, so they sharpen what is already there
     if(bossDef.cycle>0)makeElite(bm,ELITE_KEYS[(bossDef.cycle+depth)%ELITE_KEYS.length]);
     bm.boss=true; bm.name=bossDef.name; bm.cycle=bossDef.cycle;
-    bm.maxHp=Math.round(bm.maxHp*(2.5+0.6*bossDef.cycle))+depth*4; bm.hp=bm.maxHp;
+    // Named bosses keep their own creature's hit points: they are hand-picked for
+    // the depth they sit at, and Sinshara is a caster whose danger is in her
+    // spells rather than her bulk. Cycled bosses march blindly through the list,
+    // so a bugbear pass handed you a boss a third of the dragon three floors up;
+    // those take the list's mean instead.
+    const bossBase=bossDef.cycle>0?BOSS_BASE_HP*depthScale(depth):bm.maxHp;
+    bm.maxHp=Math.round(bossBase*(2.5+0.6*bossDef.cycle))+depth*4; bm.hp=bm.maxHp;
     bm.atk+=2+2*bossDef.cycle; bm.ac+=2+bossDef.cycle; bm.xp*=3;
     bm.guard={x:sx,y:sy,r:3};
     monsters.push(bm);
@@ -6252,7 +6272,7 @@ const UI=(()=>{
     toastTimer=setTimeout(()=>{t.style.opacity=0;},2200);
   }
   function refreshDepthTag(){
-    $('depth-tag').textContent='Depth '+G.depth+' · '+G.L.theme.name+(G.depth%5===0?' ⚔':'');
+    $('depth-tag').textContent='Depth '+G.depth+' · '+G.L.theme.name+(G.depth%3===0&&G.depth>=6?' ⚔':'');
   }
   /* ---------- overlays ---------- */
   function anyOverlayOpen(){return [...document.querySelectorAll('.ovl')].some(o=>o.classList.contains('show')&&o.id!=='ovl-rotate');}
