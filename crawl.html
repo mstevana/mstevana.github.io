@@ -1987,6 +1987,33 @@ function tryGen(depth,targetWalk,theme){
       }
     }
   }
+  // lurkers: a cave's ambushers wait as scenery rather than standing about.
+  // Each one placed removes an ordinary monster from the floor, so a cave
+  // carries the same total threat as any floor at its depth — the ambush
+  // changes the shape of a floor, not its difficulty.
+  let lurkers=[];
+  if(theme.name==='Caves'){
+    const pool=Object.keys(SPAWN_DEPTH).filter(k=>MONSTERS[k].lurk&&depth>=SPAWN_DEPTH[k][0]-1&&depth<=SPAWN_DEPTH[k][1]);
+    if(pool.length){
+      // the bodies a lurker may replace: never the boss, never a bier's keeper
+      const spare=()=>{for(let mi=monsters.length-1;mi>=0;mi--)if(!monsters[mi].boss&&!monsters[mi].ossuary)return mi;return -1;};
+      const want=Math.min(3+rnd(3),Math.max(0,monsters.length-4));
+      let lTries=300;
+      while(lurkers.length<want&&lTries-->0){
+        const x=1+rnd(W-2),y=1+rnd(H-2);
+        if(g[idx(x,y)]!==T_FLOOR)continue;
+        if(x===sx&&y===sy)continue;                       // never on the stairs
+        if(dist[idx(x,y)]<5)continue;                     // nor in the party's lap at the start
+        if(lurkers.some(l=>Math.abs(l.x-x)+Math.abs(l.y-y)<4))continue;
+        if(monsters.some(m=>m.x===x&&m.y===y))continue;
+        const mi=spare();
+        if(mi<0)break;                                    // nothing left that may be traded away
+        const key=pickWeighted(pool.map(k=>[k,1]));
+        lurkers.push({x,y,key,dc:trapDC(depth),found:false,sprung:false,noticeTried:false});
+        monsters.splice(mi,1);                            // budget-neutral: one fewer ordinary spawn
+      }
+    }
+  }
   // crypts: the walls are given over to the dead — burial nooks, tomb plaques
   // set into the stone, and candles somebody still comes down here to light
   let crypts=[];
@@ -2006,7 +2033,7 @@ function tryGen(depth,targetWalk,theme){
     }
   }
   return {w:W,h:H,grid:g,start,stairs,traps,items,monsters,secrets,theme,depth,
-    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary};
+    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,lurkers};
 }
 /* ---------- difficulty curve ----------
    Depth, not party level, drives everything. One documented scalar grows every
@@ -2396,7 +2423,7 @@ const R3={ // renderer state
   scene:null,camera:null,renderer:null,torch:null,ambient:null,
   wallMesh:null,doorMeshes:{},secretMeshes:{},trapDecals:{},itemSprites:{},monsterSprites:{},
   stairsGroup:null,texCache:{},levelGroup:null,
-  camAnim:null,shake:0,liquidFlows:[],liquidShaders:[],candleFlames:[],cryptGroups:[],
+  camAnim:null,shake:0,liquidFlows:[],liquidShaders:[],candleFlames:[],cryptGroups:[],lurkerMeshes:{},
 };
 const TILE=1,WALLH=1.3,EYE=0.62;
 const TEXSS=2; // supersample factor: textures are drawn in 128-space but backed at 128*TEXSS px
@@ -3115,7 +3142,7 @@ function disposeLevel(){
   for(const f of R3.liquidFlows)f.tex.dispose();
   R3.liquidFlows=[];R3.liquidShaders=[];
   R3.doorMeshes={};R3.secretMeshes={};R3.trapDecals={};R3.itemSprites={};R3.monsterSprites={};R3.stairsGroup=null;
-  R3.candleFlames=[];R3.cryptGroups=[];
+  R3.candleFlames=[];R3.cryptGroups=[];R3.lurkerMeshes={};
 }
 function buildLevel(L){
   disposeLevel();
@@ -3801,10 +3828,89 @@ function buildLevel(L){
       grp.add(grp2);
     }
   }
+  // caves: the ambushers, wearing rock. Built here rather than as monster
+  // sprites so nothing about them reads as a creature until they move.
+  if(L.lurkers)for(let li=0;li<L.lurkers.length;li++)addLurkerMesh(L.lurkers[li],li,th);
   // items on floor
   for(const i in L.items)refreshItemSprite(L,+i);
   // monsters
   for(const m of L.monsters)addMonsterSprite(m);
+}
+/* ---------- cave ambushers ---------- */
+// A lurker is scenery until it isn't. Each kind wears the formation it hides
+// among: the piercer a hanging spike, the cave fisher a wet knot of ceiling
+// growth, the roper a floor column. Seeded from its own tile so a rebuild
+// (opening a bier, reloading a save) puts the same rock back.
+function addLurkerMesh(l,li,theme){
+  if(l.sprung||!R3.levelGroup)return;
+  const th=theme||G.L.theme;
+  let seed=((l.x*374761393)^(l.y*668265263)^0x5f3a7c)>>>0;
+  const rr=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+  // pitched at the shadowed rock rather than the lit face: a formation that
+  // catches the eye is not an ambush. The tell is meant to be the rogue's.
+  const tint=(hex,k)=>new THREE.Color(hex).multiplyScalar(k);
+  const rock=new THREE.MeshPhongMaterial({color:tint(th.wall,0.80+rr()*0.14),specular:0x120d07,shininess:4,flatShading:true});
+  const dark=new THREE.MeshPhongMaterial({color:tint(th.wall2,0.90+rr()*0.16),specular:0x120d07,shininess:4,flatShading:true});
+  // nothing underground is turned on a lathe: shove the vertices about a little
+  const roughen=(geo,amt)=>{
+    const p=geo.attributes.position;
+    for(let i=0;i<p.count;i++){
+      const x=p.getX(i),y=p.getY(i),z=p.getZ(i),r=Math.hypot(x,z);
+      if(r<1e-4)continue;                            // leave the tip and the axis alone
+      const k=1+(rr()-0.5)*amt;
+      p.setX(i,x*k);p.setZ(i,z*k);p.setY(i,y+(rr()-0.5)*amt*0.10);
+    }
+    geo.computeVertexNormals();
+    return geo;
+  };
+  const g0=new THREE.Group();
+  const spike=(len,rad,mat)=>{                      // hangs point-down from the roof
+    const m=new THREE.Mesh(roughen(new THREE.ConeGeometry(rad,len,6,1),0.34),mat);
+    m.rotation.z=Math.PI;                            // cone apex points down
+    return m;
+  };
+  if(l.key==='roper'){
+    const h=0.86+rr()*0.30;
+    const col=new THREE.Mesh(roughen(new THREE.CylinderGeometry(0.10+rr()*0.03,0.20+rr()*0.05,h,8,4),0.24),rock);
+    col.position.y=h/2;g0.add(col);
+    const cap=new THREE.Mesh(roughen(new THREE.ConeGeometry(0.11,0.22,8,1),0.30),rock);
+    cap.position.y=h+0.10;g0.add(cap);
+    for(let k=0;k<2;k++){                            // lesser stumps at its foot
+      const sh=0.14+rr()*0.18;
+      const s=new THREE.Mesh(roughen(new THREE.ConeGeometry(0.06+rr()*0.03,sh,6,1),0.34),dark);
+      const a=rr()*6.28,d=0.20+rr()*0.12;
+      s.position.set(Math.cos(a)*d,sh/2,Math.sin(a)*d);g0.add(s);
+    }
+  }else if(l.key==='cavefisher'){
+    const knot=new THREE.Mesh(new THREE.DodecahedronGeometry(0.18+rr()*0.05,0),rock);
+    knot.scale.set(1.05,0.70,1.05);knot.rotation.set(rr()*3,rr()*3,rr()*3);
+    knot.position.y=WALLH-0.09;g0.add(knot);         // wedged hard into the roof
+    for(let k=0;k<3;k++){                            // drips beneath it
+      const dl=0.16+rr()*0.22;
+      const s=spike(dl,0.030+rr()*0.018,dark);
+      s.position.set((rr()-0.5)*0.34,WALLH-0.18-dl/2,(rr()-0.5)*0.34);g0.add(s);
+    }
+  }else{                                             // piercer, and anything new
+    const len=0.44+rr()*0.26;
+    const s=spike(len,0.095+rr()*0.035,rock);
+    s.position.set((rr()-0.5)*0.16,WALLH-len/2,(rr()-0.5)*0.16);g0.add(s);
+    for(let k=0;k<2;k++){                            // honest stalactites for company
+      const sl=0.18+rr()*0.24;
+      const s2=spike(sl,0.045+rr()*0.030,dark);
+      const a=rr()*6.28,d=0.24+rr()*0.12;
+      s2.position.set(Math.cos(a)*d,WALLH-sl/2,Math.sin(a)*d);g0.add(s2);
+    }
+  }
+  g0.position.set(l.x+0.5,0,l.y+0.5);
+  R3.levelGroup.add(g0);
+  R3.lurkerMeshes[li]=g0;
+}
+function removeLurkerMesh(li){
+  const g0=R3.lurkerMeshes[li];
+  if(!g0)return;
+  R3.levelGroup.remove(g0);
+  g0.traverse(o=>{if(o.geometry)o.geometry.dispose();});
+  delete R3.lurkerMeshes[li];
 }
 function doorCanvas(th,locked){
   const {cv,ctx}=newCanvas(128);
@@ -4109,7 +4215,8 @@ function tryRotate(dir){ // +1 right, -1 left
 function afterPartyMove(rotOnly){
   markExplored();
   if(!rotOnly){computeDistField();stepOnTile();}
-  passiveSearch();
+  passiveSearch();   // the scan comes first: seeing it at two tiles beats meeting it at one
+  checkLurkers();
   UI.refreshDepthTag();
 }
 function openDoorAt(x,y){
@@ -4202,6 +4309,38 @@ function passiveSearch(){
       }
     }
   }
+  // cave ambushers: scanned on exactly the same terms as a trap, because they
+  // are the same problem — a thing that has not moved yet, on a tile you are
+  // about to walk past. Spotting one pays no XP; not being ambushed is the pay.
+  if(L.lurkers&&L.lurkers.length){
+    const seen=[];
+    if(trapfinder){
+      for(const c of [ {x:G.px,y:G.py}, aheadTile(1), aheadTile(2) ]){
+        const li=lurkerIndexAt(c.x,c.y);
+        if(li>=0&&10+searchBonus(trapfinder)>=L.lurkers[li].dc)seen.push([li,trapfinder]);
+      }
+    }else if(trapAlive.length){
+      const eyes=trapAlive.reduce((a,b)=>noticeBonus(b)>noticeBonus(a)?b:a);
+      for(const c of [ aheadTile(1), {x:G.px,y:G.py} ]){
+        const li=lurkerIndexAt(c.x,c.y);
+        if(li<0)continue;
+        const l=L.lurkers[li];
+        if(l.noticeTried)continue;
+        l.noticeTried=true;   // one glance apiece, so pacing back and forth never guarantees it
+        if(d20()+noticeBonus(eyes)>=l.dc)seen.push([li,eyes]);
+      }
+    }
+    for(const [li,who] of seen)revealLurker(li,true,who);
+  }
+}
+function lurkerIndexAt(x,y){
+  const L=G.L;
+  if(!L.lurkers)return -1;
+  for(let i=0;i<L.lurkers.length;i++){
+    const l=L.lurkers[i];
+    if(!l.sprung&&l.x===x&&l.y===y)return i;
+  }
+  return -1;
 }
 function triggerTrap(tr){
   tr.armed=false;
@@ -5431,6 +5570,47 @@ function readEpitaph(x,y,n){
   if(Math.abs(x-G.px)+Math.abs(y-G.py)>1){UI.toast('Too far to read the inscription.');return;}
   UI.toast(epitaphAt(x,y,n));
 }
+/* ---------- cave ambushers ---------- */
+// A lurker is a monster the level has not built yet. Spotting one and being
+// jumped by one end the same way — a real, awake creature on that tile — but a
+// party that saw it coming sets itself instead of eating the first blow.
+function revealLurker(li,spotted,who){
+  const L=G.L;
+  const l=L.lurkers&&L.lurkers[li];
+  if(!l||l.sprung)return null;
+  const onTile=p=>walkableTile(tileAt(p.x,p.y))&&!(G.px===p.x&&G.py===p.y)&&freeSlotAt(p.x,p.y,null)>=0;
+  const home={x:l.x,y:l.y};
+  const spot=onTile(home)?home
+    :DIRS.map(([dx,dy])=>({x:l.x+dx,y:l.y+dy})).find(onTile);
+  if(!spot)return null;                    // nowhere to unfold: the rock keeps it a moment longer
+  l.sprung=true;l.found=true;
+  removeLurkerMesh(li);
+  const m=mkMonster(l.key,spot.x,spot.y,G.depth);
+  if(Math.random()<eliteChance(G.depth))makeElite(m,pick(ELITE_KEYS));
+  m.slot=Math.max(0,freeSlotAt(spot.x,spot.y,null));
+  m.awake=true;
+  if(spotted){
+    UI.toast(who.name+' catches it: that is no rock — '+m.name+'!');
+    SFX.found();
+  }else{
+    m.atkCd=0.15;                          // an ambush lands before the party can brace
+    R3.shake=Math.max(R3.shake,0.5);
+    UI.toast('The rock comes apart — '+m.name+' was waiting!');
+    SFX.growl(0);
+  }
+  L.monsters.push(m);addMonsterSprite(m);
+  saveGame();
+  return m;
+}
+function checkLurkers(){
+  const L=G.L;
+  if(!L.lurkers)return;
+  for(let li=0;li<L.lurkers.length;li++){
+    const l=L.lurkers[li];
+    if(l.sprung)continue;
+    if(Math.abs(l.x-G.px)+Math.abs(l.y-G.py)<=1)revealLurker(li,false,null);
+  }
+}
 /* ---------- crypt coffins ---------- */
 // Prising a lid off is loud. Anything asleep nearby hears it — the same
 // consequence a restless camp has, and the reason to clear a room first.
@@ -5576,7 +5756,7 @@ function serializeGame(){
       traps:Object.values(L.traps),items:Object.keys(L.items).map(i=>[+i,L.items[i]]),
       monsters:L.monsters.map(m=>{const c=Object.assign({},m);delete c._sc;delete c._regenT;delete c.dot;return c;}),
       secrets:L.secrets,lockedRoom:L.lockedRoom,restCount:L.restCount||{},restsHere:L.restsHere||0,
-      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,
+      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,lurkers:L.lurkers||[],
     },
   };
 }
@@ -5593,7 +5773,7 @@ function deserializeGame(o){
     w:lv.w,h:lv.h,grid:b64ToU8(lv.grid),explored:b64ToU8(lv.explored),
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
     traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
-    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,
+    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,lurkers:lv.lurkers||[],
   };
   clearFx();
   G.L=L;G.over=false;
