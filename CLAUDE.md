@@ -106,11 +106,15 @@ scratch harness — auto-party, geared from plausible drops, fighting every
 pack until it wipes) is the tool. It read **median death depth 31, middle
 half 25–35** when the curve was authored; after the crypt work (seven new
 heavy undead filling the deep bands, plus the undead damage rules) it
-reads **median 26, middle half 22–29**. That is below the intended 30–40
-band and has not been retuned — a deliberate decision to measure first.
-The extra crypt encounters are *not* the cause: removing coffin and
-ossuary fights from the simulation leaves the median unchanged, so the
-movement is the bestiary and the damage rules.
+reads **median 26, middle half 22–29**. After the cave work (nine cave
+creatures, the ambushers, the cave spawn bias) it reads **median 27,
+middle half 24–30**. That is below the intended 30–40 band and has not
+been retuned — a deliberate decision to measure first.
+
+Neither content pass is the cause, and both were checked the same way:
+removing coffin and ossuary fights from the simulation leaves the median
+unchanged, and so does skipping every ambush or flattening the cave bias
+to 1. The movement is the bestiary and the undead damage rules.
 
 ## Adding a monster
 
@@ -152,6 +156,21 @@ Whether a creature counts as undead for the crypt spawn bias, for
 Turn Undead and for the antitoxin-style loot faucets is `type:'undead'` —
 there is no separate list to update.
 
+Cave creatures take two flags of their own. `cave:true` is the whole of
+what the cave spawn bias reads — like `type:'undead'`, there is no list
+elsewhere. `lurk:true` additionally makes the creature eligible to be
+placed as an **ambusher** rather than a standing spawn (see below); only
+give it to something whose idiom is waiting still, and give it a matching
+formation in `addLurkerMesh` or it will hide inside a piercer's
+stalactite.
+
+Two special-attack flags were added with them and are read by
+`monsterSpecials`: `gaze:{dc,dur}` (a Will save or the `stunned`
+condition) and `hold:{dc,dur}` (a Reflex save or the `hold` condition).
+Both conditions stop a character acting in `canAct` and cost 4 AC in
+`charAC` — a condition that is not read by both is a badge that blocks
+nothing.
+
 `ELITES` templates apply on top of any creature, so a new monster
 automatically gets six variants. Check the ones that add `reach` or
 `poison` still make sense on it.
@@ -179,7 +198,10 @@ three themes carry real machinery:
   is `caveFloorCanvas` on a **merged** mesh whose uvs come from world
   position. The other themes keep the instanced per-tile plane, which shows
   the whole texture on every tile — fine for flagstones, but it restarts the
-  pattern at each tile edge and prints a grid onto bare ground.
+  pattern at each tile edge and prints a grid onto bare ground. Caves also
+  carry a ×4 spawn bias on `cave:true` creatures (×0.55 elsewhere) applied
+  **at placement only**, exactly like the crypt's, and an array of
+  **ambushers** in `L.lurkers`.
 - **`Crypt`** — the most machinery of the three. Wall furniture in
   `L.crypts` (burial nooks with an anthropoid sarcophagus, a stacked pair,
   a 3×3 grid of inscribed tomb plaques, a candle on an iron bracket, an
@@ -190,10 +212,11 @@ three themes carry real machinery:
 
 Search for `theme.name==='Sewers'`, `th.name==='Crypt'` and `th.name==='Caves'`
 (plus the `cave` flag in `buildLevel`) to find every hook before adding a
-fourth such theme. Both write an array onto the level
-(`rivers`/`pipes`, `crypts`) in `tryGen` and read it back in `buildLevel`;
-anything you add that way must also be carried through `serializeGame` and
-`loadGame`, or a reloaded floor comes back stripped of it.
+fourth such theme. Each writes an array onto the level (`rivers`/`pipes`,
+`crypts`/`ossuary`, `lurkers`) in `tryGen` and reads it back in
+`buildLevel`; anything you add that way must also be carried through
+`serializeGame` and `loadGame`, or a reloaded floor comes back stripped
+of it.
 
 Wall features are built in a local frame — +X along the wall, +Y up, +Z
 out into the room — and then turned to face the tile they were placed
@@ -250,11 +273,54 @@ scenery built with `Math.random()` would visibly reshuffle the moment the
 bier is opened. The bone stacking and the floor dressing are both seeded
 from their own tile coordinates for exactly this reason.
 
+## Cave ambushes
+
+A creature with `lurk:true` can be placed as an **ambusher** instead of a
+standing spawn: an entry in `L.lurkers` that the level renders as rock,
+not as a monster. Three to five go on a cave floor, and **each one
+removes an ordinary spawn** from `monsters` so the floor keeps the head
+count and the threat `targetCount`/`threatBudget` gave it — the ambush
+changes a floor's shape, not its difficulty. The trade explicitly skips
+`boss` and `ossuary` monsters; popping the last-pushed monster instead
+eats the boss on every fifth floor. Which creature a lurker is comes from
+the same log-space Gaussian against the floor's per-monster share that a
+standing spawn uses, so a deep floor does not ambush the party with a
+piercer.
+
+The lifecycle has exactly two ends, both in `revealLurker`, and both
+finish with a real awake monster where the rock was:
+
+- **Spotted** — `passiveSearch` scans lurkers on precisely a trap's
+  terms: a rogue takes 10 on `searchBonus` over `{party tile, ahead 1,
+  ahead 2}`, everyone else gets **one** `noticeBonus` glance apiece
+  (`l.noticeTried`) over `{ahead 1, party tile}`. Spotting pays **no XP**
+  — the reward is not being ambushed, and paying for it would invite
+  scanning every wall.
+- **Sprung** — `checkLurkers` fires on Manhattan distance ≤ 1. The
+  monster gets `atkCd:0.15` so it lands a blow before the party braces.
+
+Both are called from `afterPartyMove`, **scan first**: the party can only
+reach distance 1 by passing through distance 2, so a rogue always gets its
+look before the thing is on top of them.
+
+Scenery is `addLurkerMesh` / `removeLurkerMesh` in the engine, registered
+in `R3.lurkerMeshes` by lurker index and cleared in `disposeLevel`. Each
+kind wears its own formation, seeded from its own tile coordinates for the
+same reason the crypt's dressing is (`openBier` rebuilds the level), and
+pitched at the *shadowed* rock — a formation that catches the eye is not an
+ambush, and the tell is meant to be the rogue's. A new `lurk` creature
+without a branch in there hides inside a piercer's stalactite.
+
+`lurkers` must be carried through `serializeGame` and `loadGame` like
+everything else a theme writes onto the level.
+
 ## Known rough edge
 
 The bestiary is no longer as thin at depth — the seven deep undead took
 depth 40 from roughly 90% dragons and ogre mages to thirteen creature
-kinds. What remains is that undead are now about half of every deep floor
-whatever the theme, because they are most of what exists down there; a
-non-crypt bias of 0.55 keeps crypts distinct, but more *living* heavies
-would be the better fix.
+kinds, and the nine cave creatures widened the mid-depths further. What
+remains is that both rosters leak: a non-theme bias of 0.55 keeps crypts
+and caves distinct, but a deep dungeon floor still runs roughly a third
+undead, and depth 13–15 dungeon floors run about half cave roster. That
+is one problem seen from two sides — there is not enough *ordinary* meat
+in the middle and deep bands, and more of it is the real fix.
