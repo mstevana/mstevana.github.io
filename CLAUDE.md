@@ -165,12 +165,18 @@ inserting in the middle of `THEMES` re-skins existing saves. Append.
 
 A theme is colours plus `roomBias` (how room-heavy vs maze-heavy the
 generator is). Anything beyond colour is special-cased by **name**, and
-two themes carry real machinery:
+three themes carry real machinery:
 
 - **`Sewers`** — bigger starting dimensions, lake pits in large rooms,
   rivers down corridor middles, wall pipes, culvert arches where a river
   meets a wall, and grate doors.
-- **`Crypt`** — the most machinery of the two. Wall furniture in
+- **`Caves`** — its own wall generator instead of the brickwork. `caveBaseCanvas`
+  evaluates a periodic value-noise fBm per pixel for packed earth, and
+  `caveWallCanvas` draws stones (half angular fragments, half worn) and
+  cracks over it — **twelve** variants rather than six, so `wallVariant`
+  and the material array take the count as a parameter. Caves also carry
+  sparse emissive gem meshes, seeded from tile coordinates.
+- **`Crypt`** — the most machinery of the three. Wall furniture in
   `L.crypts` (burial nooks with an anthropoid sarcophagus, a stacked pair,
   a 3×3 grid of inscribed tomb plaques, a candle on an iron bracket, an
   empty recess); an ossuary chamber in `L.ossuary` with bone-stacked walls
@@ -178,16 +184,25 @@ two themes carry real machinery:
   bias applied **at placement only** (see the curve section — putting it
   in `spawnPool` would taint `threatBudget`'s depth-keyed memo).
 
-Search for `theme.name==='Sewers'` and `th.name==='Crypt'` to find every
-hook before adding a third such theme. Both write an array onto the level
+Search for `theme.name==='Sewers'`, `th.name==='Crypt'` and `th.name==='Caves'`
+(plus the `cave` flag in `buildLevel`) to find every hook before adding a
+fourth such theme. Both write an array onto the level
 (`rivers`/`pipes`, `crypts`) in `tryGen` and read it back in `buildLevel`;
 anything you add that way must also be carried through `serializeGame` and
 `loadGame`, or a reloaded floor comes back stripped of it.
 
 Wall features are built in a local frame — +X along the wall, +Y up, +Z
-out into the room — and then turned with
-`group.rotation.y=Math.atan2(-dx,-dy)` to face the tile they were placed
-against. Note that a wall tile is a solid box, so nothing can genuinely be
+out into the room — and then turned to face the tile they were placed
+against. **The sign depends on which way the scan ran**: crypt furniture
+stores `dx,dy` as floor→wall and turns by `Math.atan2(-dx,-dy)`, while the
+cave gem scan runs wall→floor and so turns by `Math.atan2(dx,dy)`. Getting
+it backwards rotates the feature 180° and buries it inside the rock, where
+it is invisible rather than obviously broken.
+
+Any texture that must tile has to be periodic: the cave noise wraps its
+lattice at `PER`, and everything drawn on top is stamped at x−128, x and
+x+128 by the `wrapX` helper. The base is shared by every variant so two
+adjacent tiles match texel-for-texel at their join. Note that a wall tile is a solid box, so nothing can genuinely be
 cut into it: a "recess" is an unlit black panel drawn on the wall face
 with a surround standing proud of it. That is the same trick the sewer
 culvert arches use, and it is why recessed contents sit slightly forward

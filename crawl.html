@@ -2584,6 +2584,150 @@ function baseWallCanvas(th,grid){
   }
   return cv;
 }
+/* ---------- cave walls: dug, not built ----------
+   A cave face has no courses and no mortar, so it gets its own generator
+   rather than a recolour of the brickwork. The earth is a fractal noise field
+   evaluated per pixel and made periodic at 128 so tiles still join invisibly;
+   the stones half-buried in it are drawn on top, and are what differs between
+   variants. One noise pass serves every variant — both because the shared base
+   is what guarantees the join, and because a pass per variant would cost
+   twelve times as much at level build. */
+// periodic value noise: lattice coordinates wrap at `per`, so the field tiles
+function caveHash(ix,iy,seed){
+  let h=(ix*374761393)^(iy*668265263)^(seed*1442695040);
+  h=(h^(h>>>13))*1274126177;
+  return ((h^(h>>>16))>>>0)/4294967296;
+}
+function caveNoise(x,y,per,seed){
+  const ix=Math.floor(x),iy=Math.floor(y),fx=x-ix,fy=y-iy;
+  const w=(t)=>t*t*(3-2*t);                       // smoothstep
+  const m=(v)=>((v%per)+per)%per;
+  const a=caveHash(m(ix),m(iy),seed),      b=caveHash(m(ix+1),m(iy),seed),
+        c=caveHash(m(ix),m(iy+1),seed),    d=caveHash(m(ix+1),m(iy+1),seed);
+  const u=w(fx),v=w(fy);
+  return a*(1-u)*(1-v)+b*u*(1-v)+c*(1-u)*v+d*u*v;
+}
+function caveFbm(x,y,per,seed){
+  let sum=0,amp=0.5,f=1;
+  for(let o=0;o<4;o++){sum+=amp*caveNoise(x*f,y*f,per*f,seed+o*17);amp*=0.5;f*=2;}
+  return sum;
+}
+// the shared earth: packed clay and grit, lumpy but unstructured
+function caveBaseCanvas(th){
+  const S=128*TEXSS;
+  const cv=document.createElement('canvas');cv.width=cv.height=S;
+  const ctx=cv.getContext('2d');
+  const img=ctx.createImageData(S,S);
+  const px=img.data;
+  const base=parseInt(shade(th.wall,0).slice(4,-1).split(',').map(n=>(+n).toString(16).padStart(2,'0')).join(''),16);
+  const br=(base>>16)&255,bg=(base>>8)&255,bb=base&255;
+  const PER=4; // few lattice cells: big lumps and hollows rather than sandpaper
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){
+    const u=x/S*PER,v=y/S*PER;
+    // domain warp breaks up any residual axis alignment in the lattice
+    const wx=caveFbm(u+5.2,v+1.3,PER,101),wy=caveFbm(u+9.7,v+7.1,PER,211);
+    const broad=caveNoise(u*0.5,v*0.5,Math.max(1,PER>>1),59); // the wall's big swells
+    let n=caveFbm(u+wx*1.6,v+wy*1.6,PER,7);
+    const grit=caveNoise(u*11,v*11,PER*11,313);   // fine tooth, kept subordinate
+    n=n*0.62+broad*0.28+grit*0.10;
+    // widen the range so the bump/displacement map has something to bite on
+    let t=clamp((n-0.30)*2.4,-0.62,0.72);
+    const i=(y*S+x)*4;
+    px[i]  =clamp(Math.round(br*(1+t)),0,255);
+    px[i+1]=clamp(Math.round(bg*(1+t)),0,255);
+    px[i+2]=clamp(Math.round(bb*(1+t*0.92)),0,255); // earth warms slightly as it lights
+    px[i+3]=255;
+  }
+  ctx.putImageData(img,0,0);
+  return cv;
+}
+// one variant: stones half-buried in the earth, plus the cracks between them
+function caveWallCanvas(th,variant,baseCv){
+  const {cv,ctx}=newCanvas(128);
+  const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
+  ctx.drawImage(baseCv,0,0,128,128);
+  // stones: an irregular body, a lit crown where the torch would catch it, and
+  // a shadow pooled under the lip where it meets the earth
+  // an angular fragment: few vertices, straight edges, deliberately lopsided
+  const shard=(cx,cy,r)=>{
+    const n=5+rnd(3),pts=[];
+    let a=Math.random()*Math.PI*2;
+    for(let i=0;i<n;i++){
+      a+=(Math.PI*2/n)*(0.55+Math.random()*0.9);
+      const rr=r*(0.55+Math.random()*0.6);
+      pts.push([cx+Math.cos(a)*rr,cy+Math.sin(a)*rr*0.85]);
+    }
+    return pts;
+  };
+  const nStones=6+((variant*3)%5);
+  for(let i=0;i<nStones;i++){
+    const cx=rnd(128),cy=rnd(128),r=4+rnd(9);
+    const angular=Math.random()<0.5;
+    const body=angular?shard(cx,cy,r):genBlob(cx,cy,r,0.5);
+    const lift=0.22+Math.random()*0.26;           // how far it stands out of the earth
+    wrapX(()=>{
+      // the earth banked up against its lower edge, drawn first so the stone
+      // sits in a shallow depression rather than on top of a line
+      ctx.save();
+      pathBlob(ctx,body);ctx.clip();
+      ctx.fillStyle=shadeA(th.wall,-0.5,0.55);
+      ctx.fillRect(cx-r*1.6,cy-r*1.6,r*3.2,r*3.2);
+      ctx.restore();
+      // the stone itself: lit from the upper left, falling away to its underside.
+      // A fragment takes a straight light gradient so its faces read flat and
+      // meet at an edge; a worn stone takes a radial one and reads rounded.
+      pathBlob(ctx,body);
+      const g=angular
+        ?ctx.createLinearGradient(cx-r*0.8,cy-r*0.8,cx+r*0.7,cy+r*0.9)
+        :ctx.createRadialGradient(cx-r*0.38,cy-r*0.45,r*0.12,cx,cy,r*1.12);
+      // every stop stays lighter than the earth around it: brightness is also
+      // the displacement channel, so a dark rim would sink the stone's edge and
+      // read as a crater rather than a lump sitting proud
+      g.addColorStop(0,shade(th.wall,lift+0.38));
+      g.addColorStop(0.6,shade(th.wall,lift+0.06));
+      g.addColorStop(1,shade(th.wall,lift-0.14));
+      ctx.fillStyle=g;ctx.fill();
+      // a shadow pooled where it meets the earth below
+      ctx.save();
+      pathBlob(ctx,body);ctx.clip();
+      const sg=ctx.createLinearGradient(0,cy,0,cy+r*1.1);
+      sg.addColorStop(0,'rgba(0,0,0,0)');sg.addColorStop(1,'rgba(0,0,0,0.34)');
+      ctx.fillStyle=sg;ctx.fillRect(cx-r*1.4,cy+r*0.25,r*2.8,r*1.2);
+      ctx.restore();
+    });
+  }
+  // grit and small chips scattered between the stones
+  for(let i=0;i<70;i++){
+    const x=rnd(128),y=rnd(128),r=0.6+Math.random()*1.6;
+    const lit=Math.random()<0.45;
+    wrapX(()=>{
+      ctx.fillStyle=lit?shadeA(th.wall,0.3,0.5):shadeA(th.wall,-0.6,0.45);
+      ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+    });
+  }
+  // cracks: dark hairlines that wander rather than following any grid
+  for(let i=0;i<2+((variant*5)%3);i++){
+    let x=rnd(128),y=rnd(128);
+    const pts=[[x,y]];
+    let a=Math.random()*Math.PI*2;
+    for(let k=0;k<8+rnd(7);k++){a+=(Math.random()-0.5)*1.1;x+=Math.cos(a)*4;y+=Math.sin(a)*4;pts.push([x,y]);}
+    wrapX(()=>{
+      ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=0.6+Math.random()*1.1;
+      ctx.beginPath();pts.forEach(([qx,qy],k)=>k?ctx.lineTo(qx,qy):ctx.moveTo(qx,qy));ctx.stroke();
+    });
+  }
+  if(th.moss){ // damp growth gathering in the hollows
+    for(let i=0;i<3;i++){
+      const x=rnd(128),y=rnd(128),r=5+rnd(9);
+      wrapX(()=>{
+        const g=ctx.createRadialGradient(x,y,0.5,x,y,r);
+        g.addColorStop(0,shadeA(th.moss,0,0.16));g.addColorStop(1,shadeA(th.moss,0,0));
+        ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+      });
+    }
+  }
+  return cv;
+}
 function wallCanvas(th,variant,grid,baseCv){
   const {cv,ctx}=newCanvas(128);
   const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
@@ -2693,7 +2837,7 @@ function wallCanvas(th,variant,grid,baseCv){
   ctx.fillStyle=gr;ctx.fillRect(0,0,128,128);
   return cv;
 }
-function wallVariant(x,y){return (((x*73856093)^(y*19349663))>>>0)%6;}
+function wallVariant(x,y,n){return (((x*73856093)^(y*19349663))>>>0)%(n||6);}
 function svgToTexture(svg,cacheKey,opt){
   opt=opt||{};
   if(cacheKey&&R3.texCache[cacheKey])return R3.texCache[cacheKey];
@@ -2794,13 +2938,18 @@ function buildLevel(L){
   // walls: phong with the color map doubling as bump + displacement source
   // (mortar and stains are dark = recessed, brick faces light = proud)
   const wallMats=[];
-  const grid=brickGrid(th); // shared brick skeleton so all variants align tile-to-tile
-  const baseWall=baseWallCanvas(th,grid); // shared brick+grime base under every variant
-  for(let v=0;v<6;v++){
-    const tex=texFromCanvas(wallCanvas(th,v,grid,baseWall));
+  // a cave is dug, not built: its walls get twelve variants of broken earth over
+  // one shared noise base, and deeper relief than a flat brick face wants
+  const cave=th.name==='Caves';
+  const NVAR=cave?12:6;
+  const grid=cave?null:brickGrid(th);       // shared brick skeleton, masonry themes only
+  const baseWall=cave?caveBaseCanvas(th)    // shared earth, so tiles still join invisibly
+                     :baseWallCanvas(th,grid);
+  for(let v=0;v<NVAR;v++){
+    const tex=texFromCanvas(cave?caveWallCanvas(th,v,baseWall):wallCanvas(th,v,grid,baseWall));
     tex.wrapS=tex.wrapT=THREE.RepeatWrapping; // displacement samples can wrap at face edges
-    wallMats.push(new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,bumpScale:0.02,
-      displacementMap:tex,displacementScale:0.05,specular:0x191309,shininess:5}));
+    wallMats.push(new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,bumpScale:cave?0.05:0.02,
+      displacementMap:tex,displacementScale:cave?0.10:0.05,specular:0x191309,shininess:cave?3:5}));
   }
   const floorTex=texFromCanvas(noiseCanvas(th.floor,th.wall2,false,th.moss));
   const ceilTex=texFromCanvas(noiseCanvas(th.ceil,'#000',false,null));
@@ -2829,7 +2978,7 @@ function buildLevel(L){
   // walls: instanced per texture variant. secret walls & doors get their own meshes.
   // subdivided so the displacement map can push vertices for coarse unevenness
   const wallGeo=new THREE.BoxGeometry(TILE,WALLH,TILE,4,4,4);
-  const cellsByV=[[],[],[],[],[],[]];
+  const cellsByV=[];for(let v=0;v<NVAR;v++)cellsByV.push([]);
   for(let y=0;y<L.h;y++)for(let x=0;x<L.w;x++){
     const t=L.grid[y*L.w+x];
     if(t!==T_WALL&&t!==T_SECRET)continue;
@@ -2843,14 +2992,14 @@ function buildLevel(L){
     }
     if(!touch)continue;
     if(t===T_SECRET){
-      const m=new THREE.Mesh(wallGeo,wallMats[wallVariant(x,y)].clone());
+      const m=new THREE.Mesh(wallGeo,wallMats[wallVariant(x,y,NVAR)].clone());
       m.position.set(x+0.5,WALLH/2,y+0.5);
       m.userData={kind:'secret',x,y};
       grp.add(m);R3.secretMeshes[y*L.w+x]=m;
-    }else cellsByV[wallVariant(x,y)].push([x,y]);
+    }else cellsByV[wallVariant(x,y,NVAR)].push([x,y]);
   }
   const m4=new THREE.Matrix4();
-  for(let v=0;v<6;v++){
+  for(let v=0;v<NVAR;v++){
     const cells=cellsByV[v];
     if(!cells.length)continue;
     const inst=new THREE.InstancedMesh(wallGeo,wallMats[v],cells.length);
@@ -3388,6 +3537,52 @@ function buildLevel(L){
       flames.push({light:l});
     }
     R3.candleFlames=flames;
+  }
+  // caves: a seam of crystal here and there, caught in the torchlight. Real
+  // geometry rather than paint, because a gem drawn into a variant texture would
+  // appear on every one of the ~29 tiles sharing it — wallpaper, not a find.
+  // Seeded from tile coordinates so a rebuild puts them back where they were.
+  if(th.name==='Caves'){
+    const GEMS=[{c:0x9a5ce0,e:0x6b3fa0},{c:0x3ec8a0,e:0x2b8b70},
+                {c:0xe04a6a,e:0x9c344a},{c:0x4a9ae0,e:0x346b9c},{c:0xe0c04a,e:0x9c8634}];
+    const faces=[];
+    for(let y=1;y<L.h-1;y++)for(let x=1;x<L.w-1;x++){
+      if(L.grid[y*L.w+x]!==T_WALL)continue;
+      for(const [dx,dy] of DIRS){
+        const t=L.grid[(y+dy)*L.w+(x+dx)];
+        if(t!==T_FLOOR&&t!==T_DOOR_OPEN&&t!==T_STAIRS)continue; // must face somewhere you can stand
+        let h=((x*83492791)^(y*29996224)^((dx+2)*15485863)^((dy+2)*32452843))>>>0;
+        h=(h^(h>>>13))*1274126177>>>0;
+        if((h>>>8)/16777216>0.015)continue;                     // ~7 sites a floor, no more
+        faces.push({x,y,dx,dy,h});
+      }
+    }
+    for(const f of faces){
+      let seed=f.h;
+      const rr=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+      const g=GEMS[Math.floor(rr()*GEMS.length)];
+      const grp2=new THREE.Group();
+      const n=1+Math.floor(rr()*3);                              // a small cluster
+      for(let k=0;k<n;k++){
+        const s=0.036+rr()*0.038;
+        const gem=new THREE.Mesh(new THREE.OctahedronGeometry(s,0),
+          new THREE.MeshPhongMaterial({color:g.c,emissive:g.e,specular:0xffffff,shininess:90}));
+        gem.rotation.set(rr()*3,rr()*3,rr()*3);
+        gem.position.set((rr()-0.5)*0.34,0.30+rr()*0.62,0.018+rr()*0.012);
+        grp2.add(gem);
+        // the wet rock immediately around it picks up the colour
+        const halo=new THREE.Mesh(new THREE.CircleGeometry(s*2.6,10),
+          new THREE.MeshBasicMaterial({color:g.c,transparent:true,opacity:0.10,depthWrite:false}));
+        halo.position.set(gem.position.x,gem.position.y,0.012);
+        grp2.add(halo);
+      }
+      // NB the crypt features store dx,dy as floor->wall and so turn by
+      // atan2(-dx,-dy); here the scan runs wall->floor, so the sign flips.
+      // Getting this wrong buries the gems inside the rock.
+      grp2.rotation.y=Math.atan2(f.dx,f.dy);
+      grp2.position.set(f.x+0.5+f.dx*0.5,0,f.y+0.5+f.dy*0.5);
+      grp.add(grp2);
+    }
   }
   // items on floor
   for(const i in L.items)refreshItemSprite(L,+i);
