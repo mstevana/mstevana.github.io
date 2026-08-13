@@ -354,6 +354,45 @@ against a surface it shares no colour with.
 `lurkers` must be carried through `serializeGame` and `loadGame` like
 everything else a theme writes onto the level.
 
+## The wizard's spellbook
+
+The wizard is the only prepared caster, and `preparesSpells(ch)` is the
+single test for it — a cleric still knows their whole divine list and
+spends slots from it in the moment. Three fields carry the wizard:
+
+- **`ch.book`** — the spells written down. Starts as `WIZ_START_BOOK`,
+  grows by one `studyPick` per level (highest circle they can reach, so a
+  bad run with scrolls can never leave them mute), and by scribing.
+- **`ch.memo`** — the loadout chosen at the last camp. It persists, so a
+  player who does not want to fiddle just rests and gets the same again.
+- **`ch.prepared`** — what is left of that loadout. `spendPrepared`
+  removes one copy per casting; `resetDaily` refills it from `memo`.
+
+Because only a **fed** camp calls `resetDaily`, a cold camp leaves a
+wizard holding whatever they had left — the same rule the other classes
+already followed, and the reason the ration matters to them most.
+
+`ensureBook(ch)` is both the constructor and the migration: a wizard from
+a save written before any of this arrives with no `book` at all, and gets
+one sized to their level plus a filled loadout rather than an empty spell
+screen. It is called from `mkCharacter` and from `deserializeGame`.
+
+Two exemptions worth not "fixing":
+
+- **Items ignore the book entirely.** `castSpell` skips the preparation
+  gate when `opts.item` is set, because a scroll or a wand carries its own
+  magic. This is the same branch that skips the slot check.
+- **`scribeScroll` refuses divine spells, anything above
+  `maxCircle(ch.level)`, and duplicates** — and consumes the scroll on
+  success, so finding one is a choice between a casting now and the spell
+  for the rest of the run.
+
+Memorising is wired into `tryRest`, not into the spell screen: `tryRest`
+walks every living preparer through `UI.openMemo` and only then calls
+`doRest`. `G._preparing` guards the re-entry. Putting it anywhere else
+would let a player re-prepare between fights, which is the decision the
+whole system exists to make.
+
 ## Hands and their timers
 
 `ch.cdL` / `ch.cdR` are two independent cooldowns, and which one a use arms

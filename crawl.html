@@ -69,6 +69,17 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
   border:1px solid var(--btn-line);color:var(--ink);display:flex;align-items:center;justify-content:center;font-size:20px;z-index:5;}
 .topbtn:active{background:#3a2f1d;}
 #b-map{left:8px;} #b-log{left:58px;} #b-rest{left:108px;} #b-mute{left:158px;} #b-menu{left:208px;}
+#memo-body{height:min(48vh,300px);overflow-y:auto;text-align:left;background:#0d0b07;
+  border:1px solid var(--btn-line);border-radius:6px;padding:6px 8px;margin-bottom:8px;font-size:12px;}
+#memo-body .mcirc{color:#e0cf9e;font-weight:bold;margin:6px 0 3px;border-bottom:1px solid #241d13;padding-bottom:2px;}
+#memo-body .mcirc .full{color:#8a7f66;font-weight:normal;float:right;}
+#memo-body .mrow{display:flex;align-items:center;gap:6px;padding:3px 2px;}
+#memo-body .mname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#memo-body .mcount{width:34px;text-align:center;color:var(--ink);}
+#memo-body .mbtn2{width:26px;height:24px;border-radius:5px;background:var(--btn);border:1px solid var(--btn-line);
+  color:var(--ink);font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;}
+#memo-body .mbtn2:disabled{opacity:.35;}
+#memo-body .none{color:var(--ink-dim);padding:6px 2px;}
 #log-list{height:min(52vh,300px);overflow-y:auto;text-align:left;background:#0d0b07;border:1px solid var(--btn-line);
   border-radius:6px;padding:6px 8px;margin-bottom:8px;font-size:12px;line-height:1.35;}
 #log-list .le{padding:3px 0;border-bottom:1px solid #191510;}
@@ -265,7 +276,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
     <div><div id="inv-grid"></div><div id="item-tip">Drag items between the pack, body slots and companions. Tap an item to inspect.</div></div>
     <div id="inv-party"></div>
   </div>
-  <div class="row"><button class="mbtn small" id="inv-use" disabled>Use</button><button class="mbtn small" id="inv-drop">Drop selected</button><button class="mbtn small" id="inv-close">Close</button></div>
+  <div class="row"><button class="mbtn small" id="inv-use" disabled>Use</button><button class="mbtn small" id="inv-learn" disabled>Learn</button><button class="mbtn small" id="inv-drop">Drop selected</button><button class="mbtn small" id="inv-close">Close</button></div>
 </div></div>
 
 <div class="ovl" id="ovl-stats"><div class="panel" style="min-width:330px">
@@ -279,6 +290,17 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   <div id="spell-list"></div>
   <div id="spell-tip"></div>
   <button class="mbtn small" id="sp-close">Close</button>
+</div></div>
+
+<div class="ovl" id="ovl-memo"><div class="panel" style="width:min(620px,94vw)">
+  <h2 id="memo-title">Memorise</h2>
+  <div class="dim-note" id="memo-sub"></div>
+  <div id="memo-body"></div>
+  <div class="row">
+    <button class="mbtn small" id="memo-clear">Clear all</button>
+    <button class="mbtn small" id="memo-auto">Fill</button>
+    <button class="mbtn small" id="memo-done">Done</button>
+  </div>
 </div></div>
 
 <div class="ovl" id="ovl-log"><div class="panel" style="width:min(620px,94vw)">
@@ -515,10 +537,32 @@ function slotsFor(cls,lvl,abilityScore){
   for(let c=1;c<=5;c++){ if(base[c-1]>0 && m>=c) base[c-1]+= (1+Math.floor((m-c)/4)); }
   return base;
 }
+// The highest circle a caster of this level can command at all.
+function maxCircle(lvl){return lvl>=9?5:lvl>=7?4:lvl>=5?3:lvl>=3?2:1;}
 function spellsKnown(cls,lvl){
   const list=CLASSES[cls].caster; if(!list)return [];
-  const maxC=lvl>=9?5:lvl>=7?4:lvl>=5?3:lvl>=3?2:1;
+  const maxC=maxCircle(lvl);
   return Object.keys(SPELLS).filter(k=>SPELLS[k].list===list&&SPELLS[k].circle<=maxC);
+}
+/* ---------- the wizard's book ---------- */
+// A cleric is granted their whole list and picks freely in the moment; a wizard
+// commands only what is written in their book, and only what they sat down and
+// memorised before sleeping. `preparesSpells` is the single test for which of
+// the two a character is, so a future prepared caster only has to answer here.
+function preparesSpells(ch){return ch&&ch.cls==='wizard';}
+// What a wizard begins with: the attack they will lean on, the armour that
+// keeps them alive, and one trick. Everything else is found or studied.
+const WIZ_START_BOOK=['magicmissile','magearmor','sleep'];
+// Levelling is its own slow study. One new spell of the best circle they can
+// now reach, so a wizard is never left holding a useless book by bad luck with
+// scrolls -- but the interesting spells are still out in the dungeon.
+function studyPick(book,lvl){
+  const want=maxCircle(lvl);
+  for(let c=want;c>=1;c--){
+    const pool=Object.keys(SPELLS).filter(k=>SPELLS[k].list==='arcane'&&SPELLS[k].circle===c&&book.indexOf(k)<0);
+    if(pool.length)return pick(pool);
+  }
+  return null;
 }
 
 /* ---------- monsters ---------- */
@@ -2267,9 +2311,13 @@ function mkCharacter(name,race,cls,scores){
     inventory:new Array(20).fill(null),
     equip:{armor:mkItem('clothes'),helmet:null,boots:null,amulet:null,ring1:null,ring2:null,lhand:null,rhand:null},
     slotsUsed:[0,0,0,0,0],
+    book:[],                       // wizards only: the spells written down
+    memo:[[],[],[],[],[]],         // the loadout chosen at the last camp
+    prepared:[[],[],[],[],[]],     // what is left of it, spent as they cast
     layPool:0,smiteUsed:false,rageUsed:false,rageUntil:0,turnUsed:false,
     cdL:0,cdR:0, // per-hand attack cooldowns (seconds) — dual wielders alternate hands
   };
+  ensureBook(ch);
   ch.equip.rhand=mkItem(CLASSES[cls].startWeapon);
   if(cls==='cleric'||cls==='paladin')ch.inventory[0]=mkItem('pot_clw');
   if(cls==='wizard')ch.inventory[0]=mkItem('scroll',{spell:'magicmissile'});
@@ -2326,8 +2374,68 @@ function recalcHp(ch,full){
 function resetDaily(ch){
   const c=CLASSES[ch.cls];
   ch.slotsUsed=[0,0,0,0,0];
+  // a wizard wakes holding exactly what they sat down and memorised, no more
+  if(preparesSpells(ch))ch.prepared=trimMemo(ch).map(a=>a.slice());
   ch.smiteUsed=false;ch.rageUsed=false;ch.rageUntil=0;ch.turnUsed=false;
   if(c.layon)ch.layPool=Math.max(0,mod(ch.abil.cha))*ch.level||0;
+}
+/* ---------- the wizard's book and what is memorised from it ---------- */
+// Also the migration path: a wizard from a save written before any of this
+// existed arrives with no book at all, and must not wake up mute.
+function ensureBook(ch){
+  if(!preparesSpells(ch))return ch;
+  if(!Array.isArray(ch.book))ch.book=[];
+  if(!ch.book.length){
+    ch.book=WIZ_START_BOOK.filter(k=>SPELLS[k]).slice();
+    // one study pick per level already earned, so a mid-run wizard is whole
+    for(let l=2;l<=ch.level;l++){const k=studyPick(ch.book,l);if(k)ch.book.push(k);}
+  }
+  const blank=()=>[[],[],[],[],[]];
+  if(!Array.isArray(ch.memo)||ch.memo.length!==5)ch.memo=blank();
+  if(!Array.isArray(ch.prepared)||ch.prepared.length!==5)ch.prepared=blank();
+  if(!ch.memo.some(a=>a.length)){autoMemo(ch);ch.prepared=ch.memo.map(a=>a.slice());}
+  return ch;
+}
+function learnSpell(ch,key){
+  if(!preparesSpells(ch)||!SPELLS[key])return false;
+  if(SPELLS[key].list!=='arcane')return false;          // a wizard cannot read divine magic
+  if(SPELLS[key].circle>maxCircle(ch.level))return false; // too far above them to make sense of
+  if(ch.book.indexOf(key)>=0)return false;
+  ch.book.push(key);
+  return true;
+}
+// The book filtered to what this wizard could actually memorise today.
+function bookAt(ch,circle){
+  return ch.book.filter(k=>SPELLS[k]&&SPELLS[k].circle===circle);
+}
+// A loadout can outlive the slots that held it -- ability damage and negative
+// levels both shrink the table -- so trim before it is ever handed out.
+function trimMemo(ch){
+  const slots=charSlots(ch);
+  return ch.memo.map((a,i)=>a.filter(k=>ch.book.indexOf(k)>=0).slice(0,slots[i]));
+}
+function memoCount(ch){return ch.memo.reduce((n,a)=>n+a.length,0);}
+// Fill every slot with something sensible: used for a fresh wizard and for one
+// arriving from an older save, so nobody is ever handed an empty spell screen.
+function autoMemo(ch){
+  const slots=charSlots(ch);
+  ch.memo=[[],[],[],[],[]];
+  for(let c=1;c<=5;c++){
+    const pool=bookAt(ch,c);
+    if(!pool.length)continue;
+    for(let i=0;i<slots[c-1];i++)ch.memo[c-1].push(pool[i%pool.length]);
+  }
+  return ch.memo;
+}
+function preparedCount(ch,key){
+  const sp=SPELLS[key];if(!sp||!ch.prepared)return 0;
+  return ch.prepared[sp.circle-1].filter(k=>k===key).length;
+}
+function spendPrepared(ch,key){
+  const sp=SPELLS[key];if(!sp)return false;
+  const row=ch.prepared[sp.circle-1],i=row.indexOf(key);
+  if(i<0)return false;
+  row.splice(i,1);return true;
 }
 function charSlots(ch){return slotsFor(ch.cls,ch.level,ch.abil[casterAbil(ch)]-ch.abilDmg[casterAbil(ch)]);}
 function dexACBonus(ch){
@@ -2489,6 +2597,10 @@ function grantXp(ch,amount){
     const gain=hpGainAt(ch.cls,ch.level,conM);
     ch.maxHp+=gain;ch.hp=Math.max(ch.hp,0)+gain;
     if(CLASSES[ch.cls].layon)ch.layPool+=Math.max(0,mod(ch.abil.cha));
+    if(preparesSpells(ch)){
+      const learned=studyPick(ch.book,ch.level);
+      if(learned){ch.book.push(learned);UI.toast(`${ch.name} works out ${SPELLS[learned].name} and writes it down.`);}
+    }
     UI.toast(`${ch.name} is now level ${ch.level}!`);
     UI.float(ch,'LEVEL UP','#e0cf9e');
     SFX.levelup();
@@ -4960,6 +5072,28 @@ function useSpellItem(ch,it,consume,slot){
     else consume();
   }});
 }
+// Copying a scroll into the book destroys it: the ink is the spell. A wizard
+// therefore chooses between one casting now and the spell for the rest of the
+// run, which is the whole point of finding one.
+function scribeScroll(ch,it,consume){
+  if(!preparesSpells(ch)){UI.toast(ch.name+' keeps no spellbook.');return false;}
+  const sp=SPELLS[it.spell];
+  if(!sp){UI.toast('There is nothing legible on it.');return false;}
+  if(sp.list!=='arcane'){UI.toast(sp.name+' is divine magic — '+ch.name+' cannot copy it.');return false;}
+  if(sp.circle>maxCircle(ch.level)){
+    UI.toast(sp.name+' is beyond '+ch.name+' for now — it needs the '+sp.circle+ordSuffix(sp.circle)+' circle.');
+    return false;
+  }
+  if(ch.book.indexOf(it.spell)>=0){UI.toast(sp.name+' is already in the book.');return false;}
+  learnSpell(ch,it.spell);
+  consume();
+  SFX.secret();
+  UI.toast(ch.name+' copies '+sp.name+' into their spellbook. The scroll is spent.');
+  logAdd('msg',ch.name+' learns '+sp.name+' from a scroll.');
+  UI.refreshParty();
+  if(UI.refreshInv)UI.refreshInv();
+  return true;
+}
 function stripItemEverywhere(ch,it){
   for(const s in ch.equip)if(ch.equip[s]===it)ch.equip[s]=null;
   const i=ch.inventory.indexOf(it);if(i>=0)ch.inventory[i]=null;
@@ -4981,9 +5115,16 @@ function castSpell(ch,key,opts){
   if(!canAct(ch)){UI.toast(ch.name+' cannot act.');return false;}
   if(anyHandCd(ch)>0&&!opts.item){UI.toast(ch.name+' is still recovering.');return false;}
   if(!opts.item){
-    const slots=charSlots(ch);
-    const c=sp.circle;
-    if(ch.slotsUsed[c-1]>=slots[c-1]){UI.toast('No '+c+ordSuffix(c)+'-circle slots left. Rest to recover.');return false;}
+    // A wizard casts what they memorised and nothing else; a cleric draws on
+    // their whole list against the slots of the circle.
+    if(preparesSpells(ch)){
+      if(ch.book.indexOf(key)<0){UI.toast(ch.name+' has never learned '+sp.name+'.');return false;}
+      if(preparedCount(ch,key)<1){UI.toast(ch.name+' has not memorised '+sp.name+' today. Camp to prepare it.');return false;}
+    }else{
+      const slots=charSlots(ch);
+      const c=sp.circle;
+      if(ch.slotsUsed[c-1]>=slots[c-1]){UI.toast('No '+c+ordSuffix(c)+'-circle slots left. Rest to recover.');return false;}
+    }
   }
   const dc=10+sp.circle+abilMod(ch,casterAbil(ch));
   // resolve target(s)
@@ -4998,7 +5139,11 @@ function castSpell(ch,key,opts){
     }
   }
   const commit=()=>{
-    if(!opts.item)ch.slotsUsed[sp.circle-1]++;
+    // the memorised copy is gone the moment it is spoken; a cleric spends a slot
+    if(!opts.item){
+      if(preparesSpells(ch))spendPrepared(ch,key);
+      else ch.slotsUsed[sp.circle-1]++;
+    }
     if(opts.onCast)opts.onCast();
     // An item is worked with the hand that holds it, so a second wand in the
     // other hand keeps its own timer — exactly as a second sword does. Same rule
@@ -5712,6 +5857,22 @@ function tryRest(){
   if(G.paused||G.over)return;
   const near=G.L.monsters.some(m=>m.hp>0&&m.awake&&G.distField&&G.distField[m.y*G.L.w+m.x]>=0&&G.distField[m.y*G.L.w+m.x]<=8);
   if(near){UI.toast('Too dangerous — enemies are near!');SFX.bump();return;}
+  // Memorising is the last thing done before sleeping, so the loadout the
+  // wizard wakes with is the one they just chose. Each preparer in turn, then
+  // the camp itself. A cold camp still asks: they simply wake with it unfilled.
+  const toPrepare=G.party.filter(ch=>!isDown(ch)&&preparesSpells(ch));
+  if(toPrepare.length&&!G._preparing){
+    G._preparing=true;
+    const step=(i)=>{
+      if(i>=toPrepare.length){G._preparing=false;doRest();return;}
+      UI.openMemo(toPrepare[i],()=>step(i+1));
+    };
+    step(0);
+    return;
+  }
+  doRest();
+}
+function doRest(){
   // a camp needs food. Without it the party still sleeps, but wakes hungry,
   // half-rested and with nothing memorised — never hard-stuck, always poorer.
   const fed=takeRation();
@@ -6018,6 +6179,9 @@ function deserializeGame(o){
   // saves written before drain became purely negLevels can carry a stale
   // 'drained' condition that nothing clears; drop it on the way in
   for(const ch of G.party)if(ch.conditions)ch.conditions=ch.conditions.filter(c=>c.kind!=='drained');
+  // a wizard saved before the spellbook existed arrives with none: give them the
+  // book their level has earned and a filled loadout, rather than a mute caster
+  for(const ch of G.party)ensureBook(ch);
   const lv=o.level;
   const traps={};for(const t of lv.traps)traps[t.y*lv.w+t.x]=t;
   const items={};for(const [i,arr] of lv.items)items[i]=arr;
@@ -6325,7 +6489,9 @@ const UI=(()=>{
       if(CLASSES[ch.cls].caster){
         const ab=div.querySelector('[data-act=ability]');
         const slots=charSlots(ch);
-        const left=slots.reduce((s,n,ci)=>s+Math.max(0,n-ch.slotsUsed[ci]),0);
+        const left=preparesSpells(ch)
+          ? (ch.prepared||[]).reduce((s,a)=>s+a.length,0)     // what is still memorised
+          : slots.reduce((s,n,ci)=>s+Math.max(0,n-ch.slotsUsed[ci]),0);
         let badge=ab.querySelector('.slotbadge');
         if(!badge){badge=document.createElement('span');badge.className='slotbadge';ab.appendChild(badge);}
         badge.textContent=left;
@@ -6431,6 +6597,73 @@ const UI=(()=>{
       (e.detail?'<div class="ld">'+esc(e.detail)+'</div>':'')+'</div>').join('');
     box.scrollTop=box.scrollHeight;   // newest at the bottom, like a running tally
   }
+  /* ---------- memorising, at camp ---------- */
+  // The wizard sets their loadout here and it holds until the next camp. What
+  // is shown is the book, one block per circle, with the slots for that circle
+  // as the budget. Rebuilt on every change: the whole panel is a dozen rows.
+  let memoCh=null,memoThen=null;
+  function renderMemo(){
+    const ch=memoCh;if(!ch)return;
+    const slots=charSlots(ch);
+    $('memo-title').textContent=ch.name+' — memorise';
+    $('memo-sub').textContent='Chosen now, carried until the next camp. Only what is memorised can be cast.';
+    const body=$('memo-body');
+    body.innerHTML='';
+    let anything=false;
+    for(let c=1;c<=5;c++){
+      if(slots[c-1]<=0)continue;
+      const pool=bookAt(ch,c);
+      const used=ch.memo[c-1].length;
+      const head=document.createElement('div');
+      head.className='mcirc';
+      head.innerHTML=c+ordSuffix(c)+' circle<span class="full">'+used+' / '+slots[c-1]+'</span>';
+      body.appendChild(head);
+      if(!pool.length){
+        const n=document.createElement('div');n.className='none';
+        n.textContent='Nothing of this circle in the book yet.';
+        body.appendChild(n);continue;
+      }
+      anything=true;
+      for(const key of pool){
+        const sp=SPELLS[key];
+        const n=ch.memo[c-1].filter(k=>k===key).length;
+        const row=document.createElement('div');
+        row.className='mrow';
+        row.innerHTML='<button class="mbtn2" data-d="-1">−</button>'+
+          '<span class="mcount">'+n+'</span>'+
+          '<button class="mbtn2" data-d="1">+</button>'+
+          '<span class="mname">'+sp.name+'</span>';
+        row.title=sp.desc;
+        const [minus,plus]=row.querySelectorAll('.mbtn2');
+        minus.disabled=n<=0;
+        plus.disabled=used>=slots[c-1];
+        minus.addEventListener('click',()=>{
+          const i=ch.memo[c-1].indexOf(key);
+          if(i>=0)ch.memo[c-1].splice(i,1);
+          renderMemo();
+        });
+        plus.addEventListener('click',()=>{
+          if(ch.memo[c-1].length<slots[c-1])ch.memo[c-1].push(key);
+          renderMemo();
+        });
+        body.appendChild(row);
+      }
+    }
+    if(!anything&&!body.children.length){
+      body.innerHTML='<div class="none">'+ch.name+' has no spells they can prepare.</div>';
+    }
+  }
+  // `then` is how the rest flow waits for the loadout before it sleeps
+  function openMemo(ch,then){
+    memoCh=ensureBook(ch);memoThen=then||null;
+    ch.memo=trimMemo(ch);
+    renderMemo();show('ovl-memo');
+  }
+  function closeMemo(){
+    const then=memoThen;memoThen=null;memoCh=null;
+    hide('ovl-memo');
+    if(then)then();
+  }
   function openLog(){
     renderLog();show('ovl-log');
     // and again once the panel is on screen: a hidden element has no scrollHeight
@@ -6520,18 +6753,37 @@ const UI=(()=>{
     const list=$('spell-list');
     list.innerHTML='';
     const slots=charSlots(ch);
-    const known=spellsKnown(ch.cls,ch.level);
-    const sum=slots.map((n,i)=>n>0?`${i+1}${ordSuffix(i+1)} ${Math.max(0,n-ch.slotsUsed[i])}/${n}`:null).filter(Boolean).join(' · ');
+    // A wizard sees what they memorised and nothing else; a cleric sees the
+    // whole list against the slots of each circle. `rows` is what gets drawn.
+    const prep=preparesSpells(ch);
+    let rows,sum;
+    if(prep){
+      ensureBook(ch);
+      const seen=[];
+      for(let c=1;c<=5;c++)for(const k of ch.prepared[c-1])if(seen.indexOf(k)<0)seen.push(k);
+      rows=seen.map(k=>({key:k,left:preparedCount(ch,k)}));
+      sum=ch.prepared.map((a,i)=>slots[i]>0?`${i+1}${ordSuffix(i+1)} ${a.length}/${slots[i]}`:null)
+        .filter(Boolean).join(' · ');
+    }else{
+      rows=spellsKnown(ch.cls,ch.level).map(k=>({key:k,left:slots[SPELLS[k].circle-1]-ch.slotsUsed[SPELLS[k].circle-1]}));
+      sum=slots.map((n,i)=>n>0?`${i+1}${ordSuffix(i+1)} ${Math.max(0,n-ch.slotsUsed[i])}/${n}`:null).filter(Boolean).join(' · ');
+    }
     const hdr=document.createElement('div');
     hdr.className='dim-note';
-    hdr.textContent='Slots left — '+sum+' (rest to recover)';
+    hdr.textContent=(prep?'Memorised — ':'Slots left — ')+(sum||'nothing')+' (camp to prepare)';
     list.appendChild(hdr);
+    if(prep&&!rows.length){
+      const none=document.createElement('div');
+      none.className='dim-note';
+      none.style.padding='8px 2px';
+      none.textContent=ch.name+' has nothing memorised. Camp to prepare spells from their book.';
+      list.appendChild(none);
+    }
     const tip=$('spell-tip');
     const HINT='Tap and hold a spell to read what it does.';
     tip.textContent=HINT;
-    for(const key of known.sort((a,b)=>SPELLS[a].circle-SPELLS[b].circle)){
+    for(const {key,left} of rows.sort((a,b)=>SPELLS[a.key].circle-SPELLS[b.key].circle)){
       const sp=SPELLS[key];
-      const left=slots[sp.circle-1]-ch.slotsUsed[sp.circle-1];
       const row=document.createElement('div');
       row.className='spell-row'+(left<=0?' nosl':'');
       row.innerHTML=`<span class="scircle">${sp.circle}</span><span class="sname">${sp.name}</span><span class="sslots">${Math.max(0,left)} left</span>`;
@@ -6615,6 +6867,13 @@ const UI=(()=>{
   function updateUseBtn(){
     const ref=selRef();
     $('inv-use').disabled=!(ref&&itemUsable(getItem(ref)));
+    // Learn only shows its teeth for a wizard holding an arcane scroll they can
+    // actually read and have not already copied
+    const li=ref&&getItem(ref);
+    $('inv-learn').disabled=!(li&&li.base==='scroll'&&preparesSpells(invChar)&&
+      SPELLS[li.spell]&&SPELLS[li.spell].list==='arcane'&&
+      SPELLS[li.spell].circle<=maxCircle(invChar.level)&&
+      invChar.book.indexOf(li.spell)<0);
   }
   let suppressCardClick=false;
   function renderInvParty(){
@@ -6794,6 +7053,18 @@ const UI=(()=>{
     }
     dnd=null;
   });
+  $('inv-learn').addEventListener('click',()=>{
+    const ref=selRef();if(!ref)return;
+    const it=getItem(ref);
+    if(!it||it.base!=='scroll')return;
+    const ch=invChar;
+    const consume=()=>{
+      if((it.qty||1)>1)it.qty--;
+      else if(ref.type==='grid')ch.inventory[ref.idx]=null;
+      else ch.equip[ref.slot]=null;
+    };
+    if(scribeScroll(ch,it,consume)){renderInv();saveGame();}
+  });
   $('inv-use').addEventListener('click',()=>{
     const ref=selRef();
     if(!ref||!itemUsable(getItem(ref)))return;
@@ -6851,7 +7122,13 @@ const UI=(()=>{
       : '';
     let extra='';
     const c=CLASSES[ch.cls];
-    if(c.caster)extra+=`<b>Spell slots</b> ${slots.map((n,i)=>`${i+1}:${Math.max(0,n-ch.slotsUsed[i])}/${n}`).filter((_,i)=>slots[i]>0).join(' ')}<br>`;
+    if(c.caster&&preparesSpells(ch)){
+      const per=ch.prepared.map((a,i)=>slots[i]>0?`${i+1}:${a.length}/${slots[i]}`:null).filter(Boolean).join(' ');
+      extra+=`<b>Memorised</b> ${per||'nothing'} <span class="dim-note">(camp to prepare)</span><br>`;
+      extra+=`<b>Spellbook</b> ${ch.book.length} spell${ch.book.length===1?'':'s'} — `+
+        `${ch.book.map(k=>SPELLS[k].name).sort().join(', ')||'empty'}<br>`;
+    }
+    else if(c.caster)extra+=`<b>Spell slots</b> ${slots.map((n,i)=>`${i+1}:${Math.max(0,n-ch.slotsUsed[i])}/${n}`).filter((_,i)=>slots[i]>0).join(' ')}<br>`;
     if(c.rage)extra+=`<b>Rage</b> ${ch.rageUsed?'spent (rest to recover)':'ready'}<br>`;
     if(c.layon)extra+=`<b>Lay on Hands</b> ${ch.layPool} hp pool · <b>Smite</b> ${ch.smiteUsed?'spent':'ready'}<br>`;
     if(c.sneak)extra+=`<b>Sneak attack</b> +${Math.floor((ch.level+1)/2)}d6 vs distracted foes<br>`;
@@ -6924,6 +7201,9 @@ const UI=(()=>{
     show('ovl-map');
   }
   $('map-close').addEventListener('click',()=>hide('ovl-map'));
+  $('memo-done').addEventListener('click',closeMemo);
+  $('memo-clear').addEventListener('click',()=>{if(memoCh){memoCh.memo=[[],[],[],[],[]];renderMemo();}});
+  $('memo-auto').addEventListener('click',()=>{if(memoCh){autoMemo(memoCh);renderMemo();}});
   $('log-close').addEventListener('click',()=>hide('ovl-log'));
   $('log-clear').addEventListener('click',()=>{GLOG.length=0;renderLog();});
   /* ---------- game over ---------- */
@@ -6939,7 +7219,7 @@ const UI=(()=>{
     refreshMenu();
   });
   return {buildPartyDom,refreshParty,tickCooldowns,charFlash,float,floatAtMonster,vignette,trapFlash,toast,
-    refreshDepthTag,pickAlly,paladinMenu,clericMenu,openSpells,spellFlash,openInventory,openStats,openMap,openLog,gameOver,show,hide,anyOverlayOpen,refreshInv};
+    refreshDepthTag,pickAlly,paladinMenu,clericMenu,openSpells,spellFlash,openInventory,openStats,openMap,openLog,openMemo,gameOver,show,hide,anyOverlayOpen,refreshInv};
 })();
 /* ============================== INPUT ============================== */
 function bindPad(id,fn){
