@@ -4729,7 +4729,7 @@ function useHand(ch,slot){
   const def=it?ITEM_DEFS[it.base]:null;
   const consumeOne=()=>{if((it.qty||1)>1)it.qty--;else ch.equip[slot]=null;};
   if(it&&def.kind==='potion'){UI.pickAlly('Give '+itemName(it)+' to…',(target)=>{drinkPotion(ch,target,it,consumeOne,slot);});return;}
-  if(it&&(def.kind==='scroll'||def.kind==='wand')){useSpellItem(ch,it,()=>{if(def.kind==='scroll')consumeOne();});return;}
+  if(it&&(def.kind==='scroll'||def.kind==='wand')){useSpellItem(ch,it,()=>{if(def.kind==='scroll')consumeOne();},slot);return;}
   if(it&&def.kind==='shield'){UI.toast('A shield guards; it does not strike.');return;}
   // weapon or unarmed
   let wDef=def&&def.kind==='weapon'?def:{name:'Fist',dmg:[1,3],crit:[20,2],hands:1,light:true,unarmed:true};
@@ -4784,7 +4784,7 @@ function useInventoryItem(ch,ref){
     UI.pickAlly('Give '+itemName(it)+' to…',(target)=>{drinkPotion(ch,target,it,consumeOne,held);});
     return true;
   }
-  useSpellItem(ch,it,()=>{if(def.kind==='scroll')consumeOne();});
+  useSpellItem(ch,it,()=>{if(def.kind==='scroll')consumeOne();},held);
   return true;
 }
 /* ---------- log entries for the things that resolve on a die ---------- */
@@ -4957,11 +4957,11 @@ function drinkPotion(giver,target,it,consume,slot){
   else armBoth(giver,1.2);
   UI.refreshParty();
 }
-function useSpellItem(ch,it,consume){
+function useSpellItem(ch,it,consume,slot){
   // a Raise Dead scroll answers anyone's plea — the only caster may be the corpse
   if(!CLASSES[ch.cls].caster&&it.spell!=='raisedead'){UI.toast('Only casters can use scrolls and wands.');return;}
   const sp=SPELLS[it.spell];
-  castSpell(ch,it.spell,{item:true,onCast:()=>{
+  castSpell(ch,it.spell,{item:true,slot,onCast:()=>{
     if(it.base==='wand'){it.charges--;if(it.charges<=0){stripItemEverywhere(ch,it);UI.toast('The wand crumbles to dust.');}}
     else consume();
   }});
@@ -5006,7 +5006,12 @@ function castSpell(ch,key,opts){
   const commit=()=>{
     if(!opts.item)ch.slotsUsed[sp.circle-1]++;
     if(opts.onCast)opts.onCast();
-    armBoth(ch,1.8); // casting occupies both hands
+    // An item is worked with the hand that holds it, so a second wand in the
+    // other hand keeps its own timer — exactly as a second sword does. Same rule
+    // the potion path already follows, and it never shortens a longer cooldown.
+    // A memorised spell still takes both: that is gestures and components.
+    if(opts.item&&opts.slot)armHand(ch,opts.slot,Math.max(handCd(ch,opts.slot),1.8));
+    else armBoth(ch,1.8);
     SFX.cast();
     UI.spellFlash(sp);
   };

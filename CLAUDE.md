@@ -354,6 +354,31 @@ against a surface it shares no colour with.
 `lurkers` must be carried through `serializeGame` and `loadGame` like
 everything else a theme writes onto the level.
 
+## Hands and their timers
+
+`ch.cdL` / `ch.cdR` are two independent cooldowns, and which one a use arms
+is decided by **where the thing was held**, not by what it is:
+
+- `armHand(ch,slot,v)` — a one-handed weapon, a potion, a wand, a scroll.
+  Anything worked from a hand occupies that hand alone, so a second wand in
+  the other hand keeps its own timer exactly as a second sword does.
+- `armBoth(ch,v)` — a two-handed weapon, and a **memorised** spell, which
+  is gestures and components rather than an object.
+
+Both item paths (`useHand` and the pack) thread their hand slot through, and
+fall back to `armBoth` when there isn't one — an item used from the pack has
+no hand to charge. `Math.max(handCd(...),v)` everywhere, so arming a hand
+can never *shorten* a longer timer already on it.
+
+The gates match: `useHand` checks `handCd(ch,slot)`, a two-hander and a
+memorised spell check `anyHandCd(ch)`. `castSpell` deliberately skips its
+`anyHandCd` gate for items, because the caller has already checked the one
+hand that matters.
+
+Note the tick is `if(ch.cdL>0)ch.cdL-=dt`, so a timer undershoots slightly
+negative on its last frame and stops there. Harmless — every gate tests
+`>0` — but don't read a negative as a bug.
+
 ## Left and right
 
 Both sides of a fight pair up by position: a character on the left of the
