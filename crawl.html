@@ -522,6 +522,28 @@ const MONSTERS={
              caster:{dmg:[7,6,0],ranged:7,cd:6,fx:'#8ae0b4',elem:'cold'}},
   bonedrake:{reach:true, name:'Bone drake',    cr:14,hp:96, ac:20,atk:16,dmg:[2,8,7],xp:4200,speed:1.4, type:'undead', spr:'bonedrake',
              skeletal:true, caster:{dmg:[8,6,0],ranged:7,cd:7,fx:'#b8e07a',elem:'acid'}},
+  // the caves: things that live in the rock rather than things buried in it.
+  // `cave:true` is what the placement bias keys off, since these span vermin,
+  // beast, aberration, humanoid and giant rather than sharing one type.
+  // `lurk:true` marks the three that are placed as scenery and spring an ambush.
+  piercer:  {name:'Piercer',       cr:3,  hp:22, ac:15,atk:6, dmg:[3,6,2], xp:900, speed:2.6, type:'vermin', spr:'piercer',
+             cave:true, lurk:true},
+  cavefisher:{name:'Cave fisher',  cr:5,  hp:38, ac:17,atk:8, dmg:[1,10,4],xp:1500,speed:1.8, type:'vermin', spr:'cavefisher',
+             cave:true, lurk:true, ranged:5},
+  roper:    {reach:true, name:'Roper',cr:11,hp:80,ac:20,atk:13,dmg:[2,8,6],xp:3300,speed:2.2, type:'aberration', spr:'roper',
+             cave:true, lurk:true, hold:{dc:17,dur:4}},
+  cavebear: {name:'Cave bear',     cr:3,  hp:28, ac:15,atk:7, dmg:[1,10,3],xp:900, speed:1.3, type:'beast', spr:'cavebear',
+             cave:true},
+  troglodyte:{name:'Troglodyte',   cr:3,  hp:24, ac:16,atk:5, dmg:[1,8,2], xp:900, speed:1.4, type:'humanoid', spr:'troglodyte',
+             cave:true, poison:{dc:13,abil:'str',dice:[1,3]}},
+  crawler:  {reach:true, name:'Carrion crawler',cr:4,hp:28,ac:16,atk:6,dmg:[1,6,2],xp:1200,speed:1.5, type:'aberration', spr:'crawler',
+             cave:true, paralysis:{dc:13,dur:3}},
+  otyugh:   {reach:true, name:'Otyugh',cr:7, hp:58, ac:17,atk:9, dmg:[1,10,5],xp:2100,speed:1.9, type:'aberration', spr:'otyugh',
+             cave:true, disease:{dc:15,name:'Filth fever'}},
+  umberhulk:{reach:true, name:'Umber hulk',cr:9,hp:74,ac:18,atk:12,dmg:[2,8,6],xp:2700,speed:1.5, type:'aberration', spr:'umberhulk',
+             cave:true, gaze:{dc:16,dur:2.5}},
+  purpleworm:{reach:true,name:'Purple worm',cr:16,hp:120,ac:19,atk:17,dmg:[3,8,9],xp:4800,speed:1.7, type:'vermin', spr:'purpleworm',
+             cave:true, poison:{dc:18,abil:'con',dice:[2,4]}},
 };
 // spawn table by depth: keys allowed at depth n if cr between depth/2-? use per-monster [minD,maxD]
 const SPAWN_DEPTH={
@@ -529,6 +551,8 @@ const SPAWN_DEPTH={
   hobgoblin:[2,5],orc:[2,5],gobshaman:[3,6],spider:[3,7],ghoul:[3,7],gnoll:[3,7],bugbear:[4,8],
   ogre:[6,10],wight:[6,11],wightnec:[8,13],minotaur:[8,13],troll:[10,16],ogremage:[13,99],dragon:[15,99],
   mummy:[10,20],wraith:[12,24],barrowwight:[13,26],bonecolossus:[16,32],deathknight:[20,99],lich:[22,99],bonedrake:[26,99],
+  piercer:[8,18],cavebear:[8,18],troglodyte:[8,18],crawler:[9,20],cavefisher:[12,26],otyugh:[14,26],
+  umberhulk:[18,32],roper:[24,99],purpleworm:[30,99],
 };
 /* Elite templates. The bestiary runs out around depth 20, so past that the
    descent keeps escalating by hardening ordinary monsters rather than by
@@ -1195,7 +1219,112 @@ const MONSTER_ART={
     `<circle cx="54" cy="21.5" r="3.6" fill="url(#bdg)"/>`+
     fangsDown(49,19.5,8,4,1.8,'#e8dfc0')+fangsUp(50,24.5,7,3,1.7,'#e8dfc0')+`|/H|`+
     `<circle cx="58" cy="26" r="0.8" fill="#a8e05a" opacity="0.8"/><circle cx="61" cy="17" r="0.7" fill="#c8ff86" opacity="0.7"/>`}),
+/* ---------- the caves ---------- */
+  piercer:()=>({o:{hp:[32,18],ap:[40,30],lit:'#8a7a5e',mid:'#3a3226',eye:'#ffd27a',rough:[2.6,0.5],seed:61},
+    body:`<path d="M32 4 Q22 26 24 44 Q28 54 32 58 Q36 54 40 44 Q42 26 32 4 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M32 6 Q28 26 29 46 M32 6 Q36 26 35 46" stroke="#241e14" stroke-width="1.2" fill="none" opacity="0.8"/>`+
+    `<path d="M25 22 Q32 26 39 22 M24 30 Q32 34 40 30 M25 38 Q32 42 39 38" stroke="#5c5140" stroke-width="1.4" fill="none"/>`+
+    `|H|<path d="M28 50 Q32 62 36 50 Q34 56 32 57 Q30 56 28 50 Z" fill="#6e6046"/>|/H|`+
+    `|A|<path d="M40 40 Q46 44 47 50" stroke="#6e6046" stroke-width="2.2" fill="none" stroke-linecap="round"/>|/A|`,
+    sharp:`|H|`+gEye(30,52,1.3)+gEye(34,52,1.3)+`|/H|`}),
+
+  cavefisher:()=>({o:{hp:[32,28],ap:[46,30],lit:'#9a7f5a',mid:'#3e3220',eye:'#ffe08a',rough:[2.4,0.45],seed:62},
+    body:`<path d="M20 34 Q18 48 24 56 L40 56 Q46 48 44 34 Q38 28 32 28 Q26 28 20 34 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M22 40 Q32 44 42 40 M23 47 Q32 51 41 47" stroke="#2a2214" stroke-width="1.3" fill="none"/>`+
+    `<path d="M22 54 L18 61 M28 56 L26 62 M36 56 L38 62 M42 54 L46 61" stroke="#7a6544" stroke-width="2"/>`+
+    `|H|<path d="M26 24 Q26 16 32 16 Q38 16 38 24 Q38 30 32 32 Q26 30 26 24 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M27 20 Q32 18 37 20" stroke="#241c10" stroke-width="1.1" fill="none"/>|/H|`+
+    `|A|<path d="M46 26 Q52 12 50 2" stroke="#c8b48a" stroke-width="1.4" fill="none" opacity="0.9"/>`+
+    `<circle cx="50" cy="2.5" r="2.2" fill="#d8c69a"/>`+
+    `<path d="M44 30 Q50 26 52 20" stroke="#7a6544" stroke-width="2.4" fill="none" stroke-linecap="round"/>|/A|`,
+    sharp:`|H|`+gEye(29,23,1.5)+gEye(35,23,1.5)+`|/H|`+
+    fangsDown(27,31,10,4,2,'#d8cba8')}),
+
+  roper:()=>({o:{hp:[32,14],ap:[46,30],lit:'#7d7264',mid:'#2e2a22',eye:'#ffb84a',rough:[2.8,0.55],seed:63},
+    body:`<path d="M24 10 Q18 34 20 60 L44 60 Q46 34 40 10 Q36 4 32 4 Q28 4 24 10 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M27 10 Q24 34 25 58 M32 6 Q31 32 32 58 M37 10 Q40 34 39 58" stroke="#1e1a14" stroke-width="1.3" fill="none" opacity="0.85"/>`+
+    `<path d="M22 24 Q32 28 42 24 M21 38 Q32 42 43 38" stroke="#5a5246" stroke-width="1.2" fill="none" opacity="0.7"/>`+
+    `|H|<path d="M26 16 Q26 8 32 8 Q38 8 38 16 Q38 22 32 24 Q26 22 26 16 Z" fill="#231f18"/>|/H|`+
+    `|A|<path d="M40 26 Q54 22 60 12" stroke="#8a7f6e" stroke-width="2" fill="none" stroke-linecap="round"/>`+
+    `<path d="M41 34 Q56 34 62 28" stroke="#8a7f6e" stroke-width="1.7" fill="none" stroke-linecap="round"/>|/A|`+
+    `<path d="M24 30 Q10 28 4 20" stroke="#8a7f6e" stroke-width="1.8" fill="none" stroke-linecap="round"/>`,
+    sharp:`|H|`+gEye(32,15,2.4)+`|/H|`+
+    fangsUp(26,23,12,5,2.4,'#cfc2a0')}),
+
+  cavebear:()=>({o:{hp:[42,24],ap:[20,34],lit:'#6b5238',mid:'#2c2116',eye:'#ffcf6a',rough:[2.8,0.5],seed:64},
+    body:`<path d="M14 36 Q12 26 20 24 Q28 20 38 24 Q50 28 52 40 Q54 52 46 58 L20 58 Q12 50 14 36 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M20 40 Q32 44 46 40 M20 48 Q32 52 46 48" stroke="#1c150e" stroke-width="1.3" fill="none" opacity="0.6"/>`+
+    `<path d="M22 56 L20 62 M30 57 L29 62 M40 57 L41 62 M47 55 L49 61" stroke="#241a10" stroke-width="3"/>`+
+    `|H|<path d="M36 22 Q36 12 45 12 Q54 12 55 22 Q56 30 46 32 Q37 31 36 22 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M38 14 Q36 8 40 7 Q43 10 42 15 Z M52 14 Q55 8 58 10 Q57 14 54 16 Z" fill="#3a2c1c"/>`+
+    `<ellipse cx="52" cy="26" rx="4" ry="3" fill="#241a10"/>|/H|`+
+    `|A|<path d="M18 34 Q10 40 8 50" stroke="#4e3b26" stroke-width="4" fill="none" stroke-linecap="round"/>|/A|`,
+    sharp:`|H|`+gEye(41,21,1.7)+gEye(50,21,1.7)+fangsDown(46,29,8,3,2.2)+`|/H|`+
+    `|A|`+clawsAt(8,50,[110,135,160],5,'#d8ccaa')+`|/A|`}),
+
+  troglodyte:()=>({o:{hp:[32,24],ap:[46,34],lit:'#5f7a52',mid:'#26301f',eye:'#e0e06a',rough:[2.4,0.45],seed:65},
+    body:`<path d="M24 30 Q20 44 22 59 Q27 55 32 60 Q37 55 42 59 Q44 44 40 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M26 34 Q32 38 38 34 M25 42 Q32 46 39 42 M26 50 Q32 54 38 50" stroke="#1a2214" stroke-width="1.2" fill="none"/>`+
+    `<path d="M32 28 L30 20 M32 28 L34 20" stroke="#4a5c3e" stroke-width="1.6"/>`+
+    `|H|<path d="M25 20 Q25 10 32 10 Q39 10 39 20 Q39 27 32 29 Q25 27 25 20 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M28 11 L27 4 L31 9 M36 11 L37 4 L33 9" stroke="#3e4c34" stroke-width="1.5" fill="none"/>`+
+    `<path d="M28 24 L36 24" stroke="#141a10" stroke-width="1.1"/>|/H|`+
+    `<path d="M24 33 Q15 36 12 44" stroke="#4e6442" stroke-width="2.6" fill="none" stroke-linecap="round"/>`+
+    `|A|<path d="M40 33 Q50 35 53 43" stroke="#4e6442" stroke-width="2.6" fill="none" stroke-linecap="round"/>|/A|`,
+    sharp:`|H|`+gEye(29,19,1.5)+gEye(35,19,1.5)+fangsDown(29,24.5,6,3,1.6,'#cfd8b0')+`|/H|`+
+    `|A|`+clawsAt(53,43,[35,60,85],4.4,'#c8d4a8')+`|/A|`+clawsAt(12,44,[95,120,145],4.4,'#c8d4a8')}),
+
+  crawler:()=>({o:{hp:[46,30],ap:[26,34],lit:'#7a6a3e',mid:'#2e2814',eye:'#c8ff6a',rough:[2.6,0.5],seed:66},
+    body:`<path d="M8 44 Q6 34 14 32 L44 30 Q54 32 54 42 Q54 52 44 54 L16 56 Q8 54 8 44 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M14 34 Q14 54 14 54 M22 32 Q22 55 22 55 M30 31 Q30 56 30 56 M38 31 Q38 55 38 55 M46 32 Q46 54 46 54" stroke="#1e1a0c" stroke-width="1.2" opacity="0.75"/>`+
+    `<path d="M12 55 L10 61 M20 56 L19 62 M30 57 L30 62 M40 56 L41 62 M48 54 L50 60" stroke="#5c5030" stroke-width="1.8"/>`+
+    `|H|<path d="M44 30 Q52 24 58 28 Q62 32 58 38 Q52 42 46 38 Q42 34 44 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M50 26 Q52 16 48 10 M55 28 Q60 20 58 12 M53 40 Q56 48 52 54 M47 41 Q45 50 40 54" stroke="#8a7a46" stroke-width="1.5" fill="none" stroke-linecap="round"/>|/H|`+
+    `|A|<path d="M26 34 Q22 22 14 18" stroke="#8a7a46" stroke-width="1.6" fill="none" stroke-linecap="round"/>`+
+    `<path d="M28 34 Q26 20 20 12" stroke="#8a7a46" stroke-width="1.4" fill="none" stroke-linecap="round"/>|/A|`,
+    sharp:`|H|`+gEye(53,32,1.6)+gEye(56,35,1.3)+`|/H|`}),
+
+  otyugh:()=>({o:{hp:[32,12],ap:[50,34],lit:'#6a6046',mid:'#2a2418',eye:'#ffd24a',rough:[3,0.55],seed:67},
+    body:`<path d="M12 46 Q10 32 22 28 Q32 24 44 28 Q56 32 54 46 Q52 58 42 60 L24 60 Q14 58 12 46 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M18 40 Q32 46 48 40 M16 50 Q32 56 50 50" stroke="#1a1610" stroke-width="1.4" fill="none" opacity="0.7"/>`+
+    `<ellipse cx="32" cy="44" rx="9" ry="7" fill="#1c1810"/>`+
+    fangsDown(24,38,16,7,3,'#c8bc96')+fangsUp(24,50,16,7,3,'#c8bc96')+
+    `<path d="M20 58 L17 62 M30 60 L30 63 M42 58 L45 62" stroke="#4a4230" stroke-width="2.6"/>`+
+    `|H|<path d="M30 24 Q28 12 32 6 Q36 10 34 24 Z" fill="#5c5340"/>`+
+    `<circle cx="33" cy="6" r="3.4" fill="#5c5340"/>|/H|`+
+    `|A|<path d="M50 32 Q60 26 62 14" stroke="#6e6449" stroke-width="2.6" fill="none" stroke-linecap="round"/>|/A|`+
+    `<path d="M14 32 Q4 26 2 14" stroke="#6e6449" stroke-width="2.6" fill="none" stroke-linecap="round"/>`,
+    sharp:`|H|`+gEye(33,6,2)+`|/H|`+gEye(2,14,1.6)+`|A|`+gEye(62,14,1.6)+`|/A|`}),
+
+  umberhulk:()=>({o:{hp:[32,20],ap:[50,32],ad:-0.6,lit:'#6e5230',mid:'#2a1e10',eye:'#ff8a3a',rough:[2.8,0.5],seed:68,
+      extra:glowGrad('uhg','#ff6a1e')},
+    body:`<path d="M16 34 Q14 26 22 24 L42 24 Q50 26 48 34 L50 52 Q50 60 42 60 L22 60 Q14 60 14 52 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M20 34 L44 34 M18 44 L46 44 M19 53 L45 53" stroke="#170f08" stroke-width="1.6"/>`+
+    `<path d="M22 58 L20 63 M42 58 L44 63" stroke="#3c2a16" stroke-width="3.4"/>`+
+    `|H|<path d="M22 12 Q22 4 32 4 Q42 4 42 12 Q42 20 32 23 Q22 20 22 12 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M24 18 Q32 22 40 18" stroke="#140d06" stroke-width="1.4" fill="none"/>`+
+    `<path d="M23 7 L18 2 M41 7 L46 2" stroke="#4a3418" stroke-width="2"/>|/H|`+
+    `|A|<path d="M48 32 Q58 34 60 44" stroke="#5a4224" stroke-width="4" fill="none" stroke-linecap="round"/>`+
+    `<path d="M60 44 L57 52 L63 50 Z" fill="#4a3418"/>|/A|`+
+    `<path d="M16 32 Q6 34 4 44" stroke="#5a4224" stroke-width="4" fill="none" stroke-linecap="round"/>`,
+    sharp:`|H|`+gEye(26.5,11,2.1)+gEye(37.5,11,2.1)+gEye(30,15.5,1.3)+gEye(34,15.5,1.3)+
+    `<ellipse cx="32" cy="12" rx="14" ry="9" fill="url(#uhg)" opacity="0.22"/>`+
+    fangsDown(25,21,14,5,2.4,'#d8c8a0')+`|/H|`}),
+
+  purpleworm:()=>({o:{hp:[38,14],ap:[24,44],lit:'#6a3a72',mid:'#241028',eye:'#ffca4a',rough:[3,0.55],seed:69,
+      extra:glowGrad('pwg','#c060d8')},
+    body:`<path d="M10 62 Q4 48 12 40 Q22 30 30 34 Q40 38 44 28 Q48 16 42 8 Q50 12 52 24 Q54 38 42 44 Q32 50 26 46 Q18 42 16 52 Q15 58 18 62 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M14 56 Q20 52 22 46 M20 60 Q28 54 30 48 M34 44 Q42 40 44 32 M40 46 Q48 38 48 28" stroke="#1a0c1e" stroke-width="1.5" fill="none" opacity="0.8"/>`+
+    `<path d="M8 50 Q14 46 12 40 M46 20 Q52 20 52 26" stroke="#8a5a94" stroke-width="1.2" fill="none" opacity="0.6"/>`+
+    `|H|<path d="M42 8 Q36 2 30 6 Q26 10 30 16 Q36 20 42 16 Q46 12 42 8 Z" fill="url(#bg)" ${RIM}/>`+
+    `<ellipse cx="35" cy="11" rx="6" ry="5.5" fill="#180a1c"/>`+
+    fangsDown(29,7,12,6,2.6,'#e0d2b8')+fangsUp(29,16,12,6,2.6,'#e0d2b8')+
+    `<circle cx="35" cy="11" r="7" fill="url(#pwg)" opacity="0.25"/>|/H|`+
+    `|A|<path d="M24 44 Q16 50 14 60" stroke="#5a2e62" stroke-width="3" fill="none" stroke-linecap="round"/>`+
+    `<path d="M14 60 L11 63 L17 63 Z" fill="#7a4a84"/>|/A|`,
+    sharp:`|H|`+gEye(31,8,1.4)+gEye(39,8,1.4)+`|/H|`}),
 };
+
 
 // pose transforms pivoting at the feet (32,62): breathing, gait lean, coil, lunge.
 // the body scale is squash-and-stretch, so the head travels while the feet stay planted
@@ -1760,8 +1889,13 @@ function tryGen(depth,targetWalk,theme){
   // counter-weight every deep floor turns undead and the crypt stops being
   // special. Elsewhere they are thinned to roughly half, which still leaves the
   // deep floors far more varied than the dragon/ogre-mage monoculture they were.
+  // Caves get the same treatment for the same reason: what lives in the rock
+  // is heavily favoured underground and thinned to a stray elsewhere, so a cave
+  // reads as its own place without the roster leaking into the brickwork.
   const undeadBias=theme.name==='Crypt'?4:0.55;
-  const base=spawnPool(depth).map(([k,w])=>[k,w*(MONSTERS[k].type==='undead'?undeadBias:1)]);
+  const caveBias=theme.name==='Caves'?4:0.55;
+  const base=spawnPool(depth).map(([k,w])=>[k,
+    w*(MONSTERS[k].type==='undead'?undeadBias:1)*(MONSTERS[k].cave?caveBias:1)]);
   const weigh=(ek)=>base.map(([k,w])=>{
     const r=Math.log(threatOf(k,depth,ek)/share);
     return [k,w*Math.exp(-(r*r)/sig)];
@@ -1858,6 +1992,39 @@ function tryGen(depth,targetWalk,theme){
       }
     }
   }
+  // lurkers: a cave's ambushers wait as scenery rather than standing about.
+  // Each one placed removes an ordinary monster from the floor, so a cave
+  // carries the same total threat as any floor at its depth — the ambush
+  // changes the shape of a floor, not its difficulty.
+  let lurkers=[];
+  if(theme.name==='Caves'){
+    const pool=Object.keys(SPAWN_DEPTH).filter(k=>MONSTERS[k].lurk&&depth>=SPAWN_DEPTH[k][0]-1&&depth<=SPAWN_DEPTH[k][1]);
+    if(pool.length){
+      // sized against the floor's per-monster share the same way a standing
+      // spawn is, so depth 30 does not ambush the party with a piercer
+      const lurkWeights=pool.map(k=>{
+        const r=Math.log(threatOf(k,depth,null)/share);
+        return [k,Math.exp(-(r*r)/sig)];
+      });
+      // the bodies a lurker may replace: never the boss, never a bier's keeper
+      const spare=()=>{for(let mi=monsters.length-1;mi>=0;mi--)if(!monsters[mi].boss&&!monsters[mi].ossuary)return mi;return -1;};
+      const want=Math.min(3+rnd(3),Math.max(0,monsters.length-4));
+      let lTries=300;
+      while(lurkers.length<want&&lTries-->0){
+        const x=1+rnd(W-2),y=1+rnd(H-2);
+        if(g[idx(x,y)]!==T_FLOOR)continue;
+        if(x===sx&&y===sy)continue;                       // never on the stairs
+        if(dist[idx(x,y)]<5)continue;                     // nor in the party's lap at the start
+        if(lurkers.some(l=>Math.abs(l.x-x)+Math.abs(l.y-y)<4))continue;
+        if(monsters.some(m=>m.x===x&&m.y===y))continue;
+        const mi=spare();
+        if(mi<0)break;                                    // nothing left that may be traded away
+        const key=pickWeighted(lurkWeights);
+        lurkers.push({x,y,key,dc:trapDC(depth),found:false,sprung:false,noticeTried:false});
+        monsters.splice(mi,1);                            // budget-neutral: one fewer ordinary spawn
+      }
+    }
+  }
   // crypts: the walls are given over to the dead — burial nooks, tomb plaques
   // set into the stone, and candles somebody still comes down here to light
   let crypts=[];
@@ -1877,7 +2044,7 @@ function tryGen(depth,targetWalk,theme){
     }
   }
   return {w:W,h:H,grid:g,start,stairs,traps,items,monsters,secrets,theme,depth,
-    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary};
+    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,lurkers};
 }
 /* ---------- difficulty curve ----------
    Depth, not party level, drives everything. One documented scalar grows every
@@ -2006,8 +2173,9 @@ function mkMonster(key,x,y,depth){
     xp:Math.round(XP_AWARD(def.cr)*(1+0.12*Math.max(0,depth-1))),
     speed:def.speed,type:def.type,ranged:def.ranged||0,caster:def.caster||null,
     reach:!!def.reach,slot:0, // slot 0-1 front rank of its tile, 2-3 rear rank
-    skeletal:!!def.skeletal,incorporeal:!!def.incorporeal,
-    special:{disease:def.disease,poison:def.poison,paralysis:def.paralysis,energyDrain:def.energyDrain,regen:def.regen},
+    skeletal:!!def.skeletal,incorporeal:!!def.incorporeal,cave:!!def.cave,lurk:!!def.lurk,
+    special:{disease:def.disease,poison:def.poison,paralysis:def.paralysis,energyDrain:def.energyDrain,regen:def.regen,
+      gaze:def.gaze,hold:def.hold},
     atkCd:1.5+Math.random()*2,castCd:def.caster?def.caster.cd*(0.5+Math.random()):0,
     moveCd:Math.random(),held:0,slowed:0,sleep:false,shaken:0,stunned:0,awake:false,boss:false,
     id:Math.floor(Math.random()*1e9)};
@@ -2108,7 +2276,7 @@ function charAC(ch){
   if(RACES[ch.race].small)ac+=1;
   if(isRaging(ch))ac-=2;
   for(const b of ch.buffs)if(b.ac)ac+=b.ac;
-  if(hasCond(ch,'paralysis')||hasCond(ch,'sleep'))ac-=4;
+  if(hasCond(ch,'paralysis')||hasCond(ch,'sleep')||hasCond(ch,'hold'))ac-=4;
   return ac;
 }
 function charSaves(ch){
@@ -2239,7 +2407,8 @@ function addCond(ch,cond){
 function removeCond(ch,kind){ch.conditions=ch.conditions.filter(c=>c.kind!==kind);}
 const COND_ICONS={poison:'☠',disease:'🦠',paralysis:'⛓',hold:'⛓',sleep:'💤',stunned:'✶',shaken:'😨',bleeding:'🩸',drained:'🕳'};
 function canAct(ch){
-  return !ch.dead&&ch.hp>0&&!hasCond(ch,'paralysis')&&!hasCond(ch,'sleep')&&!hasCond(ch,'stunned');
+  return !ch.dead&&ch.hp>0&&!hasCond(ch,'paralysis')&&!hasCond(ch,'sleep')
+    &&!hasCond(ch,'stunned')&&!hasCond(ch,'hold');
 }
 function isDown(ch){return ch.dead||ch.hp<=0;}
 function xpToNext(ch){return XP_FOR_LEVEL(ch.level+1);}
@@ -2265,7 +2434,7 @@ const R3={ // renderer state
   scene:null,camera:null,renderer:null,torch:null,ambient:null,
   wallMesh:null,doorMeshes:{},secretMeshes:{},trapDecals:{},itemSprites:{},monsterSprites:{},
   stairsGroup:null,texCache:{},levelGroup:null,
-  camAnim:null,shake:0,liquidFlows:[],liquidShaders:[],candleFlames:[],cryptGroups:[],
+  camAnim:null,shake:0,liquidFlows:[],liquidShaders:[],candleFlames:[],cryptGroups:[],lurkerMeshes:{},
 };
 const TILE=1,WALLH=1.3,EYE=0.62;
 const TEXSS=2; // supersample factor: textures are drawn in 128-space but backed at 128*TEXSS px
@@ -2361,6 +2530,29 @@ function liquidCanvas(){ // seamless brown sludge: smooth soft mottling, no hard
    scroll at different scales/speeds with a domain warp between them, and
    an animated ripple height field perturbs the normal so the torch throws
    moving glints off the surface. --- */
+/* A wall tile is a box, and three.js displaces each vertex along its own face
+   normal. Two faces that share a vertical edge therefore push it in two
+   perpendicular directions and pull apart — a convex corner tears open, and
+   every wall top peels away from the ceiling leaving a black band. Pushing
+   along the horizontal direction out from the tile's axis instead gives both
+   faces the same direction at the edge they share, so the corner stays welded,
+   and it has no Y component at all, so the wall stays pinned to floor and
+   ceiling. The relief is unchanged everywhere else. */
+const WALL_DISP=[
+  '#ifdef USE_DISPLACEMENTMAP',
+  '  vec3 wdVec = vec3( position.x, 0.0, position.z );',
+  '  float wdLen = length( wdVec );',
+  '  vec3 wdDir = wdLen > 0.0001 ? wdVec / wdLen : vec3( 0.0 );',
+  '  transformed += wdDir * ( texture2D( displacementMap, vUv ).x * displacementScale + displacementBias );',
+  '#endif',
+].join('\n');
+// Material.copy does not carry onBeforeCompile, so a cloned wall material has
+// to be re-welded or it tears where the instanced ones do not.
+function weldWallDisp(mat){
+  mat.onBeforeCompile=(sh)=>{sh.vertexShader=sh.vertexShader.replace('#include <displacementmap_vertex>',WALL_DISP);};
+  mat.customProgramCacheKey=()=>'walldisp';
+  return mat;
+}
 const LIQ_VERT_DECL='#include <common>\nvarying vec2 vLiqPos;';
 const LIQ_VERT_POS=`#include <project_vertex>
 {
@@ -2984,7 +3176,7 @@ function disposeLevel(){
   for(const f of R3.liquidFlows)f.tex.dispose();
   R3.liquidFlows=[];R3.liquidShaders=[];
   R3.doorMeshes={};R3.secretMeshes={};R3.trapDecals={};R3.itemSprites={};R3.monsterSprites={};R3.stairsGroup=null;
-  R3.candleFlames=[];R3.cryptGroups=[];
+  R3.candleFlames=[];R3.cryptGroups=[];R3.lurkerMeshes={};R3.wallMats=null;
 }
 function buildLevel(L){
   disposeLevel();
@@ -3005,9 +3197,12 @@ function buildLevel(L){
   for(let v=0;v<NVAR;v++){
     const tex=texFromCanvas(cave?caveWallCanvas(th,v,baseWall):wallCanvas(th,v,grid,baseWall));
     tex.wrapS=tex.wrapT=THREE.RepeatWrapping; // displacement samples can wrap at face edges
-    wallMats.push(new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,bumpScale:cave?0.05:0.02,
-      displacementMap:tex,displacementScale:cave?0.10:0.05,specular:0x191309,shininess:cave?3:5}));
+    const mat=new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,bumpScale:cave?0.05:0.02,
+      displacementMap:tex,displacementScale:cave?0.10:0.05,specular:0x191309,shininess:cave?3:5});
+    wallMats.push(weldWallDisp(mat));
   }
+  // the ambushers are faced with these same textures, so keep them reachable
+  R3.wallMats=wallMats;
   const floorTex=texFromCanvas(cave?caveFloorCanvas(th)
                                    :noiseCanvas(th.floor,th.wall2,false,th.moss));
   const ceilTex=texFromCanvas(noiseCanvas(th.ceil,'#000',false,null));
@@ -3078,7 +3273,7 @@ function buildLevel(L){
     }
     if(!touch)continue;
     if(t===T_SECRET){
-      const m=new THREE.Mesh(wallGeo,wallMats[wallVariant(x,y,NVAR)].clone());
+      const m=new THREE.Mesh(wallGeo,weldWallDisp(wallMats[wallVariant(x,y,NVAR)].clone()));
       m.position.set(x+0.5,WALLH/2,y+0.5);
       m.userData={kind:'secret',x,y};
       grp.add(m);R3.secretMeshes[y*L.w+x]=m;
@@ -3139,7 +3334,7 @@ function buildLevel(L){
     // so its walls are faced with the wall texture — using the variant this
     // tile would have had, and scaled so the brick courses stand the same
     // height as the walls above the floor
-    const shaftTex=wallMats[wallVariant(sxs,sys)].map.clone();
+    const shaftTex=wallMats[wallVariant(sxs,sys,wallMats.length)].map.clone();
     shaftTex.needsUpdate=true;
     shaftTex.wrapS=shaftTex.wrapT=THREE.RepeatWrapping;
     shaftTex.repeat.set(1,(DEPTH+0.06)/WALLH);
@@ -3670,10 +3865,136 @@ function buildLevel(L){
       grp.add(grp2);
     }
   }
+  // caves: the ambushers, wearing rock. Built here rather than as monster
+  // sprites so nothing about them reads as a creature until they move.
+  if(L.lurkers)for(let li=0;li<L.lurkers.length;li++)addLurkerMesh(L.lurkers[li],li,th);
   // items on floor
   for(const i in L.items)refreshItemSprite(L,+i);
   // monsters
   for(const m of L.monsters)addMonsterSprite(m);
+}
+/* ---------- cave ambushers ---------- */
+// A lurker is scenery until it isn't. Each kind wears the formation it hides
+// among: the piercer a hanging spike, the cave fisher a wet knot of ceiling
+// growth, the roper a floor column. Seeded from its own tile so a rebuild
+// (opening a bier, reloading a save) puts the same rock back.
+function addLurkerMesh(l,li,theme){
+  if(l.sprung||!R3.levelGroup)return;
+  const th=theme||G.L.theme;
+  let seed=((l.x*374761393)^(l.y*668265263)^0x5f3a7c)>>>0;
+  const rr=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+  // Faced with the walls' own textures rather than a flat colour, so a
+  // formation is literally the same rock the room is cut from. The maps are
+  // shared with the wall materials — no clones, nothing extra to upload — and
+  // each piece takes a different one of the twelve variants so a formation is
+  // not one repeated stamp. Shaded slightly down, because a lump that catches
+  // the eye is not an ambush; the tell is meant to be the rogue's.
+  const wm=R3.wallMats&&R3.wallMats.length?R3.wallMats:null;
+  const tint=(hex,k)=>new THREE.Color(hex).multiplyScalar(k);
+  const rockMat=(hex,k)=>{
+    if(!wm)return new THREE.MeshPhongMaterial({color:tint(hex,k),specular:0x120d07,shininess:4,flatShading:true});
+    const t=wm[Math.floor(rr()*wm.length)].map;
+    return new THREE.MeshPhongMaterial({map:t,bumpMap:t,bumpScale:0.05,
+      color:new THREE.Color(k,k,k),specular:0x120d07,shininess:3});
+  };
+  const rock=rockMat(th.wall,0.84+rr()*0.10);
+  const dark=rockMat(th.wall2,0.70+rr()*0.09);
+  // nothing underground is turned on a lathe: shove the vertices about a little.
+  // The uvs are stretched to the piece's real size at the same time, so its
+  // grain runs at the walls' texel density instead of one whole map per lump.
+  const roughen=(geo,amt,su,sv)=>{
+    const p=geo.attributes.position;
+    for(let i=0;i<p.count;i++){
+      const x=p.getX(i),y=p.getY(i),z=p.getZ(i),r=Math.hypot(x,z);
+      if(r<1e-4)continue;                            // leave the tip and the axis alone
+      const k=1+(rr()-0.5)*amt;
+      p.setX(i,x*k);p.setZ(i,z*k);p.setY(i,y+(rr()-0.5)*amt*0.10);
+    }
+    const uv=geo.attributes.uv;
+    if(uv&&(su||sv)){
+      // and shifted, or every piece would show the same corner of its variant
+      const ou=rr(),ov=rr();
+      for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*(su||1)+ou,uv.getY(i)*(sv||1)+ov);
+    }
+    geo.computeVertexNormals();
+    return geo;
+  };
+  const TX=1/WALLH;                                  // a wall face is 1 wide by WALLH tall
+  const g0=new THREE.Group();
+  const spike=(len,rad,mat)=>{                      // hangs point-down from the roof
+    const m=new THREE.Mesh(roughen(new THREE.ConeGeometry(rad,len,7,2),0.34,6.28*rad,len*TX),mat);
+    m.rotation.z=Math.PI;                            // cone apex points down
+    return m;
+  };
+  // Where a hanging piece meets the roof there has to be a root: the ceiling is
+  // drawn in its own texture, so without one the spike ends in mid-air against
+  // a surface it shares no colour with. A shallow skirt in the ceiling's own
+  // tone closes the join.
+  const rootAt=(x,z,rad)=>{
+    const sk=new THREE.Mesh(roughen(new THREE.ConeGeometry(rad*1.55,0.07,7,1),0.28,6.28*rad*1.55,0.07*TX),dark);
+    sk.rotation.z=Math.PI;
+    sk.position.set(x,WALLH-0.033,z);
+    g0.add(sk);
+  };
+  if(l.key==='roper'){
+    const h=0.86+rr()*0.30,rt=0.10+rr()*0.03,rb=0.20+rr()*0.05;
+    const col=new THREE.Mesh(roughen(new THREE.CylinderGeometry(rt,rb,h,10,6),0.30,3.14*(rt+rb),h*TX),rock);
+    col.position.y=h/2;g0.add(col);
+    // the cap takes the column's own top radius, so it grows out of it instead
+    // of perching on it
+    const ch=0.16+rr()*0.10;
+    const cap=new THREE.Mesh(roughen(new THREE.ConeGeometry(rt,ch,10,2),0.30,6.28*rt,ch*TX),rock);
+    cap.position.y=h+ch/2-0.02;g0.add(cap);
+    for(let k=0;k<2;k++){                            // lesser stumps at its foot
+      const sr=0.06+rr()*0.03,sh=0.14+rr()*0.18;
+      const s=new THREE.Mesh(roughen(new THREE.ConeGeometry(sr,sh,6,1),0.34,6.28*sr,sh*TX),dark);
+      const a=rr()*6.28,d=0.20+rr()*0.12;
+      s.position.set(Math.cos(a)*d,sh/2,Math.sin(a)*d);g0.add(s);
+    }
+  }else if(l.key==='cavefisher'){
+    // a knobbly mass rather than one solid: three overlapping lumps, each finely
+    // enough faceted to read as rock instead of a cut gem
+    const kr=0.15+rr()*0.04;
+    for(let k=0;k<3;k++){
+      const r2=kr*(0.72+rr()*0.42);
+      // gently: on an 80-face solid the per-vertex jitter that suits a cone
+      // turns neighbouring vertices into spikes, and a cut gem is not an ambush
+      const lump=new THREE.Mesh(roughen(new THREE.IcosahedronGeometry(r2,1),0.09,3.14*r2,2*r2*TX),k?dark:rock);
+      lump.scale.set(1.05,0.68,1.05);lump.rotation.set(rr()*3,rr()*3,rr()*3);
+      lump.position.set((rr()-0.5)*kr*1.1,WALLH-0.07-rr()*0.05,(rr()-0.5)*kr*1.1);
+      g0.add(lump);                                  // wedged hard into the roof
+    }
+    rootAt(0,0,kr*0.85);
+    for(let k=0;k<3;k++){                            // drips beneath it
+      const dl=0.16+rr()*0.22;
+      const s=spike(dl,0.030+rr()*0.018,dark);
+      s.position.set((rr()-0.5)*0.34,WALLH-0.18-dl/2,(rr()-0.5)*0.34);g0.add(s);
+    }
+  }else{                                             // piercer, and anything new
+    const len=0.44+rr()*0.26,rad=0.095+rr()*0.035;
+    const s=spike(len,rad,rock);
+    const px=(rr()-0.5)*0.16,pz=(rr()-0.5)*0.16;
+    s.position.set(px,WALLH-len/2,pz);g0.add(s);
+    rootAt(px,pz,rad);
+    for(let k=0;k<2;k++){                            // honest stalactites for company
+      const sl=0.18+rr()*0.24,sr=0.045+rr()*0.030;
+      const s2=spike(sl,sr,dark);
+      const a=rr()*6.28,d=0.24+rr()*0.12;
+      const qx=Math.cos(a)*d,qz=Math.sin(a)*d;
+      s2.position.set(qx,WALLH-sl/2,qz);g0.add(s2);
+      rootAt(qx,qz,sr);
+    }
+  }
+  g0.position.set(l.x+0.5,0,l.y+0.5);
+  R3.levelGroup.add(g0);
+  R3.lurkerMeshes[li]=g0;
+}
+function removeLurkerMesh(li){
+  const g0=R3.lurkerMeshes[li];
+  if(!g0)return;
+  R3.levelGroup.remove(g0);
+  g0.traverse(o=>{if(o.geometry)o.geometry.dispose();});
+  delete R3.lurkerMeshes[li];
 }
 function doorCanvas(th,locked){
   const {cv,ctx}=newCanvas(128);
@@ -3753,7 +4074,8 @@ function addMonsterSprite(m){
   const mat=new THREE.SpriteMaterial({map:frames.idle0,transparent:true});
   const spr=new THREE.Sprite(mat);
   const sc=m.boss?1.05:(['ogre','troll','minotaur','ogremage','dragon',
-    'bonecolossus','deathknight','bonedrake','lich'].includes(m.key)?0.95:0.72);
+    'bonecolossus','deathknight','bonedrake','lich',
+    'umberhulk','purpleworm','roper','otyugh','cavebear'].includes(m.key)?0.95:0.72);
   spr.scale.set(sc,sc,1);
   spr.position.set(m.x+0.5,sc/2+0.02,m.y+0.5);
   spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss,elite:m.elite};
@@ -3977,7 +4299,8 @@ function tryRotate(dir){ // +1 right, -1 left
 function afterPartyMove(rotOnly){
   markExplored();
   if(!rotOnly){computeDistField();stepOnTile();}
-  passiveSearch();
+  passiveSearch();   // the scan comes first: seeing it at two tiles beats meeting it at one
+  checkLurkers();
   UI.refreshDepthTag();
 }
 function openDoorAt(x,y){
@@ -4070,6 +4393,38 @@ function passiveSearch(){
       }
     }
   }
+  // cave ambushers: scanned on exactly the same terms as a trap, because they
+  // are the same problem — a thing that has not moved yet, on a tile you are
+  // about to walk past. Spotting one pays no XP; not being ambushed is the pay.
+  if(L.lurkers&&L.lurkers.length){
+    const seen=[];
+    if(trapfinder){
+      for(const c of [ {x:G.px,y:G.py}, aheadTile(1), aheadTile(2) ]){
+        const li=lurkerIndexAt(c.x,c.y);
+        if(li>=0&&10+searchBonus(trapfinder)>=L.lurkers[li].dc)seen.push([li,trapfinder]);
+      }
+    }else if(trapAlive.length){
+      const eyes=trapAlive.reduce((a,b)=>noticeBonus(b)>noticeBonus(a)?b:a);
+      for(const c of [ aheadTile(1), {x:G.px,y:G.py} ]){
+        const li=lurkerIndexAt(c.x,c.y);
+        if(li<0)continue;
+        const l=L.lurkers[li];
+        if(l.noticeTried)continue;
+        l.noticeTried=true;   // one glance apiece, so pacing back and forth never guarantees it
+        if(d20()+noticeBonus(eyes)>=l.dc)seen.push([li,eyes]);
+      }
+    }
+    for(const [li,who] of seen)revealLurker(li,true,who);
+  }
+}
+function lurkerIndexAt(x,y){
+  const L=G.L;
+  if(!L.lurkers)return -1;
+  for(let i=0;i<L.lurkers.length;i++){
+    const l=L.lurkers[i];
+    if(!l.sprung&&l.x===x&&l.y===y)return i;
+  }
+  return -1;
 }
 function triggerTrap(tr){
   tr.armed=false;
@@ -4902,6 +5257,25 @@ function monsterSpecials(m,ch){
       }
     }
   }
+  // an umber hulk's gaze: no new condition, just the stun that already exists.
+  // Will save, because it is a mind effect rather than something physical.
+  if(sp.gaze){
+    const sv=charSaves(ch).will+saveBonusVs(ch,'spell');
+    if(d20()+sv<sp.gaze.dc&&!hasCond(ch,'stunned')){
+      addCond(ch,{kind:'stunned',dur:sp.gaze.dur});
+      UI.float(ch,'reeling!','#d0a0e0');
+      UI.toast(ch.name+' reels, unable to make sense of what they are seeing!');
+    }
+  }
+  // a roper's tendrils reuse hold rather than inventing a grapple
+  if(sp.hold){
+    const sv=charSaves(ch).ref;
+    if(d20()+sv<sp.hold.dc&&!hasCond(ch,'hold')){
+      addCond(ch,{kind:'hold',dur:sp.hold.dur});
+      UI.float(ch,'snared!','#c8b070');
+      UI.toast('Tendrils cinch tight around '+ch.name+'!');
+    }
+  }
   if(sp.energyDrain){
     const sv=charSaves(ch).fort;
     if(d20()+sv<14){
@@ -5280,6 +5654,47 @@ function readEpitaph(x,y,n){
   if(Math.abs(x-G.px)+Math.abs(y-G.py)>1){UI.toast('Too far to read the inscription.');return;}
   UI.toast(epitaphAt(x,y,n));
 }
+/* ---------- cave ambushers ---------- */
+// A lurker is a monster the level has not built yet. Spotting one and being
+// jumped by one end the same way — a real, awake creature on that tile — but a
+// party that saw it coming sets itself instead of eating the first blow.
+function revealLurker(li,spotted,who){
+  const L=G.L;
+  const l=L.lurkers&&L.lurkers[li];
+  if(!l||l.sprung)return null;
+  const onTile=p=>walkableTile(tileAt(p.x,p.y))&&!(G.px===p.x&&G.py===p.y)&&freeSlotAt(p.x,p.y,null)>=0;
+  const home={x:l.x,y:l.y};
+  const spot=onTile(home)?home
+    :DIRS.map(([dx,dy])=>({x:l.x+dx,y:l.y+dy})).find(onTile);
+  if(!spot)return null;                    // nowhere to unfold: the rock keeps it a moment longer
+  l.sprung=true;l.found=true;
+  removeLurkerMesh(li);
+  const m=mkMonster(l.key,spot.x,spot.y,G.depth);
+  if(Math.random()<eliteChance(G.depth))makeElite(m,pick(ELITE_KEYS));
+  m.slot=Math.max(0,freeSlotAt(spot.x,spot.y,null));
+  m.awake=true;
+  if(spotted){
+    UI.toast(who.name+' catches it: that is no rock — '+m.name+'!');
+    SFX.found();
+  }else{
+    m.atkCd=0.15;                          // an ambush lands before the party can brace
+    R3.shake=Math.max(R3.shake,0.5);
+    UI.toast('The rock comes apart — '+m.name+' was waiting!');
+    SFX.growl(0);
+  }
+  L.monsters.push(m);addMonsterSprite(m);
+  saveGame();
+  return m;
+}
+function checkLurkers(){
+  const L=G.L;
+  if(!L.lurkers)return;
+  for(let li=0;li<L.lurkers.length;li++){
+    const l=L.lurkers[li];
+    if(l.sprung)continue;
+    if(Math.abs(l.x-G.px)+Math.abs(l.y-G.py)<=1)revealLurker(li,false,null);
+  }
+}
 /* ---------- crypt coffins ---------- */
 // Prising a lid off is loud. Anything asleep nearby hears it — the same
 // consequence a restless camp has, and the reason to clear a room first.
@@ -5425,7 +5840,7 @@ function serializeGame(){
       traps:Object.values(L.traps),items:Object.keys(L.items).map(i=>[+i,L.items[i]]),
       monsters:L.monsters.map(m=>{const c=Object.assign({},m);delete c._sc;delete c._regenT;delete c.dot;return c;}),
       secrets:L.secrets,lockedRoom:L.lockedRoom,restCount:L.restCount||{},restsHere:L.restsHere||0,
-      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,
+      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,lurkers:L.lurkers||[],
     },
   };
 }
@@ -5442,7 +5857,7 @@ function deserializeGame(o){
     w:lv.w,h:lv.h,grid:b64ToU8(lv.grid),explored:b64ToU8(lv.explored),
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
     traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
-    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,
+    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,lurkers:lv.lurkers||[],
   };
   clearFx();
   G.L=L;G.over=false;
