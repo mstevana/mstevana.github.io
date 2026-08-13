@@ -2612,14 +2612,16 @@ function caveFbm(x,y,per,seed){
   for(let o=0;o<4;o++){sum+=amp*caveNoise(x*f,y*f,per*f,seed+o*17);amp*=0.5;f*=2;}
   return sum;
 }
-// the shared earth: packed clay and grit, lumpy but unstructured
-function caveBaseCanvas(th){
+// the shared earth: packed clay and grit, lumpy but unstructured. `hex` lets
+// the floor draw the same ground in its own tone, and `amp` flattens it — a
+// floor seen at a grazing angle wants less relief than a wall seen square on.
+function caveBaseCanvas(th,hex,amp){
   const S=128*TEXSS;
   const cv=document.createElement('canvas');cv.width=cv.height=S;
   const ctx=cv.getContext('2d');
   const img=ctx.createImageData(S,S);
   const px=img.data;
-  const base=parseInt(shade(th.wall,0).slice(4,-1).split(',').map(n=>(+n).toString(16).padStart(2,'0')).join(''),16);
+  const base=parseInt(shade(hex||th.wall,0).slice(4,-1).split(',').map(n=>(+n).toString(16).padStart(2,'0')).join(''),16);
   const br=(base>>16)&255,bg=(base>>8)&255,bb=base&255;
   const PER=4; // few lattice cells: big lumps and hollows rather than sandpaper
   for(let y=0;y<S;y++)for(let x=0;x<S;x++){
@@ -2631,7 +2633,7 @@ function caveBaseCanvas(th){
     const grit=caveNoise(u*11,v*11,PER*11,313);   // fine tooth, kept subordinate
     n=n*0.62+broad*0.28+grit*0.10;
     // widen the range so the bump/displacement map has something to bite on
-    let t=clamp((n-0.30)*2.4,-0.62,0.72);
+    let t=clamp((n-0.30)*2.4,-0.62,0.72)*(amp===undefined?1:amp);
     const i=(y*S+x)*4;
     px[i]  =clamp(Math.round(br*(1+t)),0,255);
     px[i+1]=clamp(Math.round(bg*(1+t)),0,255);
@@ -2722,6 +2724,61 @@ function caveWallCanvas(th,variant,baseCv){
       wrapX(()=>{
         const g=ctx.createRadialGradient(x,y,0.5,x,y,r);
         g.addColorStop(0,shadeA(th.moss,0,0.16));g.addColorStop(1,shadeA(th.moss,0,0));
+        ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+      });
+    }
+  }
+  return cv;
+}
+// the cave floor: the same ground as the walls, trodden flatter, with grit and
+// loose rubble collected on it. Drawn at 128 like everything else, but mapped
+// across several tiles at once so it never restarts on a tile boundary.
+function caveFloorCanvas(th){
+  const base=caveBaseCanvas(th,th.floor,0.72);
+  const {cv,ctx}=newCanvas(128);
+  const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
+  ctx.drawImage(base,0,0,128,128);
+  // loose stone trodden into the floor: flatter and darker than the wall's,
+  // since almost nothing here catches a direct light
+  for(let i=0;i<26;i++){
+    const cx=rnd(128),cy=rnd(128),r=2.5+rnd(6);
+    const body=genBlob(cx,cy,r,0.55);
+    wrapX(()=>{
+      pathBlob(ctx,body);
+      const g=ctx.createRadialGradient(cx-r*0.3,cy-r*0.35,r*0.1,cx,cy,r*1.1);
+      g.addColorStop(0,shade(th.floor,0.34));
+      g.addColorStop(0.65,shade(th.floor,0.12));
+      g.addColorStop(1,shade(th.floor,-0.04));
+      ctx.fillStyle=g;ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,0.22)';ctx.lineWidth=0.8;ctx.stroke();
+    });
+  }
+  // gravel and dust
+  for(let i=0;i<420;i++){
+    const x=rnd(128),y=rnd(128),r=0.4+Math.random()*1.5;
+    const lit=Math.random()<0.4;
+    wrapX(()=>{
+      ctx.fillStyle=lit?shadeA(th.floor,0.26,0.5):shadeA(th.floor,-0.5,0.4);
+      ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+    });
+  }
+  // shallow cracks in the packed earth
+  for(let i=0;i<5;i++){
+    let x=rnd(128),y=rnd(128);
+    const pts=[[x,y]];
+    let a=Math.random()*Math.PI*2;
+    for(let k=0;k<10+rnd(8);k++){a+=(Math.random()-0.5)*1.0;x+=Math.cos(a)*4.5;y+=Math.sin(a)*4.5;pts.push([x,y]);}
+    wrapX(()=>{
+      ctx.strokeStyle='rgba(0,0,0,0.30)';ctx.lineWidth=0.5+Math.random()*0.8;
+      ctx.beginPath();pts.forEach(([qx,qy],k)=>k?ctx.lineTo(qx,qy):ctx.moveTo(qx,qy));ctx.stroke();
+    });
+  }
+  if(th.moss){
+    for(let i=0;i<4;i++){
+      const x=rnd(128),y=rnd(128),r=6+rnd(10);
+      wrapX(()=>{
+        const g=ctx.createRadialGradient(x,y,0.5,x,y,r);
+        g.addColorStop(0,shadeA(th.moss,0,0.13));g.addColorStop(1,shadeA(th.moss,0,0));
         ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
       });
     }
@@ -2951,15 +3008,16 @@ function buildLevel(L){
     wallMats.push(new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,bumpScale:cave?0.05:0.02,
       displacementMap:tex,displacementScale:cave?0.10:0.05,specular:0x191309,shininess:cave?3:5}));
   }
-  const floorTex=texFromCanvas(noiseCanvas(th.floor,th.wall2,false,th.moss));
+  const floorTex=texFromCanvas(cave?caveFloorCanvas(th)
+                                   :noiseCanvas(th.floor,th.wall2,false,th.moss));
   const ceilTex=texFromCanvas(noiseCanvas(th.ceil,'#000',false,null));
   floorTex.wrapS=floorTex.wrapT=THREE.RepeatWrapping;floorTex.repeat.set(1,1);
   ceilTex.wrapS=ceilTex.wrapT=THREE.RepeatWrapping;ceilTex.repeat.set(L.w,L.h);
-  const floorMat=new THREE.MeshPhongMaterial({map:floorTex,bumpMap:floorTex,bumpScale:0.015,specular:0x120e08,shininess:4});
+  const floorMat=new THREE.MeshPhongMaterial({map:floorTex,bumpMap:floorTex,
+    bumpScale:cave?0.03:0.015,specular:0x120e08,shininess:cave?3:4});
   const ceilMat=new THREE.MeshPhongMaterial({map:ceilTex,bumpMap:ceilTex,bumpScale:0.012,specular:0x0c0a06,shininess:3});
-  // floor: one unit plane per non-wall tile, instanced. holes fall out
-  // naturally at the stairs shaft and at sewer lake pits, and the seamless
-  // noise texture repeats once per tile so adjacent tiles join invisibly.
+  // floor: one unit plane per non-wall tile. holes fall out naturally at the
+  // stairs shaft and at sewer lake pits.
   {
     const cells=[];
     for(let y=0;y<L.h;y++)for(let x=0;x<L.w;x++){
@@ -2967,11 +3025,39 @@ function buildLevel(L){
       if(t===T_WALL||t===T_SECRET||t===T_STAIRS||t===T_PIT)continue;
       cells.push([x,y]);
     }
-    const fgeo=new THREE.PlaneGeometry(1,1);fgeo.rotateX(-Math.PI/2);
-    const finst=new THREE.InstancedMesh(fgeo,floorMat,cells.length);
-    const fm=new THREE.Matrix4();
-    cells.forEach(([x,y],i)=>{fm.makeTranslation(x+0.5,0,y+0.5);finst.setMatrixAt(i,fm);});
-    grp.add(finst);
+    if(cave){
+      // A cave floor has no flagstones, so it must not be laid out like them.
+      // The instanced version gives every tile the same texture from 0 to 1,
+      // which restarts the pattern on every tile edge and prints a grid on the
+      // ground. Here the tiles are merged into one mesh whose uvs come from
+      // world position, so the ground runs continuously across them and only
+      // repeats every FSPAN tiles — far enough apart not to read as a lattice.
+      const FSPAN=4;
+      const pos=new Float32Array(cells.length*18),uv=new Float32Array(cells.length*12),
+            nrm=new Float32Array(cells.length*18);
+      cells.forEach(([x,y],i)=>{
+        const x0=x,x1=x+1,z0=y,z1=y+1;
+        // wound so the face normal comes out +Y: (x0,z0)->(x0,z1)->(x1,z0).
+        // The obvious order winds the other way and the floor is culled away.
+        const quad=[[x0,z0],[x0,z1],[x1,z0], [x1,z0],[x0,z1],[x1,z1]];
+        quad.forEach(([qx,qz],k)=>{
+          pos[i*18+k*3]=qx;pos[i*18+k*3+1]=0;pos[i*18+k*3+2]=qz;
+          nrm[i*18+k*3]=0;nrm[i*18+k*3+1]=1;nrm[i*18+k*3+2]=0;
+          uv[i*12+k*2]=qx/FSPAN;uv[i*12+k*2+1]=qz/FSPAN;
+        });
+      });
+      const fgeo=new THREE.BufferGeometry();
+      fgeo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+      fgeo.setAttribute('normal',new THREE.BufferAttribute(nrm,3));
+      fgeo.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+      grp.add(new THREE.Mesh(fgeo,floorMat));
+    }else{
+      const fgeo=new THREE.PlaneGeometry(1,1);fgeo.rotateX(-Math.PI/2);
+      const finst=new THREE.InstancedMesh(fgeo,floorMat,cells.length);
+      const fm=new THREE.Matrix4();
+      cells.forEach(([x,y],i)=>{fm.makeTranslation(x+0.5,0,y+0.5);finst.setMatrixAt(i,fm);});
+      grp.add(finst);
+    }
   }
   const ceil=new THREE.Mesh(new THREE.PlaneGeometry(L.w,L.h),ceilMat);
   ceil.rotation.x=Math.PI/2;ceil.position.set(L.w/2,WALLH,L.h/2);grp.add(ceil);

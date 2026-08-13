@@ -175,7 +175,11 @@ three themes carry real machinery:
   `caveWallCanvas` draws stones (half angular fragments, half worn) and
   cracks over it — **twelve** variants rather than six, so `wallVariant`
   and the material array take the count as a parameter. Caves also carry
-  sparse emissive gem meshes, seeded from tile coordinates.
+  sparse emissive gem meshes, seeded from tile coordinates, and their floor
+  is `caveFloorCanvas` on a **merged** mesh whose uvs come from world
+  position. The other themes keep the instanced per-tile plane, which shows
+  the whole texture on every tile — fine for flagstones, but it restarts the
+  pattern at each tile edge and prints a grid onto bare ground.
 - **`Crypt`** — the most machinery of the three. Wall furniture in
   `L.crypts` (burial nooks with an anthropoid sarcophagus, a stacked pair,
   a 3×3 grid of inscribed tomb plaques, a candle on an iron bracket, an
