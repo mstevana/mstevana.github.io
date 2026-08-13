@@ -354,6 +354,37 @@ against a surface it shares no colour with.
 `lurkers` must be carried through `serializeGame` and `loadGame` like
 everything else a theme writes onto the level.
 
+## The log
+
+The 📜 button (and `L`) opens `ovl-log`: every message the party is shown,
+and the arithmetic behind every roll. `GLOG` is a capped ring in memory —
+`LOG_MAX` entries — and is deliberately **not** serialised, so it is a
+record of the session rather than something that bloats a save.
+
+Two lines per entry: what happened, and the check under it. Attacks made
+and attacks taken both go through `logStrike`, so they read identically;
+saves go through `logSave`. `UI.toast` writes its own message to the log
+on the way past, so anything the player is told is already captured — new
+messages need no extra call.
+
+Spell damage was the awkward part. Each spell rolls inside its own
+`dmgFn`, so there is no dice notation to read off a definition. `roll`
+therefore appends to `_rollTrace` whenever that is armed, and `traceRoll`
+arms it around a call and hands back both the value and the dice. It is
+null at rest, restores the previous trace on the way out (so nesting does
+not swallow the outer dice), and costs one null check per roll.
+
+`renderLog` rebuilds on open rather than on every entry — opening any
+overlay pauses the game, so nothing can be appended while the panel is up.
+It scrolls to the bottom **after** `show`, because a hidden element has no
+`scrollHeight`.
+
+Testing combat from the node harness needs two things that the real game
+defers: monster swings land on a `setTimeout` (stub it to run straight
+through) and offensive spells resolve when their bolt arrives (set
+`G.fx=[]` and call `updateFx(10)`, which lands everything in flight via
+the `f.t>6` branch). T37 covers the whole of this.
+
 ## Known rough edge
 
 The bestiary is no longer as thin at depth — the seven deep undead took

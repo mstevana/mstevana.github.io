@@ -68,7 +68,17 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 .topbtn{position:absolute;top:8px;width:44px;height:44px;border-radius:8px;background:var(--btn);
   border:1px solid var(--btn-line);color:var(--ink);display:flex;align-items:center;justify-content:center;font-size:20px;z-index:5;}
 .topbtn:active{background:#3a2f1d;}
-#b-map{left:8px;} #b-rest{left:58px;} #b-mute{left:108px;} #b-menu{left:158px;}
+#b-map{left:8px;} #b-log{left:58px;} #b-rest{left:108px;} #b-mute{left:158px;} #b-menu{left:208px;}
+#log-list{height:min(52vh,300px);overflow-y:auto;text-align:left;background:#0d0b07;border:1px solid var(--btn-line);
+  border-radius:6px;padding:6px 8px;margin-bottom:8px;font-size:12px;line-height:1.35;}
+#log-list .le{padding:3px 0;border-bottom:1px solid #191510;}
+#log-list .le:last-child{border-bottom:0;}
+#log-list .lt{color:var(--ink);}
+#log-list .ld{color:var(--ink-dim);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;margin-top:1px;}
+#log-list .k-hit .lt{color:#d8c070;} #log-list .k-miss .lt{color:#9a9da2;}
+#log-list .k-hurt .lt{color:#e08070;} #log-list .k-spell .lt{color:#a9c0e6;}
+#log-list .k-save .lt{color:#c0a0d8;} #log-list .k-msg .lt{color:#cdc3ad;}
+#log-list .empty{color:var(--ink-dim);padding:10px 2px;}
 #depth-tag{position:absolute;top:14px;right:10px;z-index:4;font-size:13px;color:var(--ink-dim);text-shadow:0 1px 2px #000;}
 #bossbar{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:4;width:min(340px,62%);text-align:center;pointer-events:none;}
 #bossbar .bb-name{font-size:12px;color:#d8a0a0;text-shadow:0 1px 2px #000;margin-bottom:2px;letter-spacing:1px;}
@@ -190,6 +200,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
     <div id="depth-tag"></div>
     <div id="bossbar" class="hidden"><div class="bb-name" id="bossbar-name"></div><div class="bb-track"><div id="bossbar-fill"></div></div></div>
     <button class="topbtn" id="b-map" title="Map">🗺</button>
+    <button class="topbtn" id="b-log" title="Log">📜</button>
     <button class="topbtn" id="b-rest" title="Rest">⛺</button>
     <button class="topbtn" id="b-mute" title="Sound">🔊</button>
     <button class="topbtn" id="b-menu" title="Menu">☰</button>
@@ -270,6 +281,12 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   <button class="mbtn small" id="sp-close">Close</button>
 </div></div>
 
+<div class="ovl" id="ovl-log"><div class="panel" style="width:min(620px,94vw)">
+  <h2>Log</h2>
+  <div id="log-list"></div>
+  <div class="row"><button class="mbtn small" id="log-clear">Clear</button><button class="mbtn small" id="log-close">Close</button></div>
+</div></div>
+
 <div class="ovl" id="ovl-map"><div class="panel">
   <h2 id="map-title">Map</h2>
   <canvas id="map-cv" width="300" height="300"></canvas>
@@ -297,12 +314,43 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 /* ============================== RULES DATA (D&D 3.5 SRD, simplified) ============================== */
 const rnd = (n)=>Math.floor(Math.random()*n);
 const d = (n)=>1+rnd(n);
-const roll = (num,die,mod=0)=>{let s=mod;for(let i=0;i<num;i++)s+=d(die);return s;};
+// Spell damage comes out of each spell's own dmgFn, which rolls internally, so
+// there is no notation to read off a definition. Arm this instead and the dice
+// report themselves; it is null in every frame the log is not asking.
+let _rollTrace=null;
+const roll = (num,die,mod=0)=>{let s=mod;for(let i=0;i<num;i++)s+=d(die);
+  if(_rollTrace)_rollTrace.push({n:num,d:die,mod,sum:s});
+  return s;};
 const d20 = ()=>d(20);
 const mod = (score)=>Math.floor((score-10)/2);
 const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
 const pick=(arr)=>arr[rnd(arr.length)];
 const fmtMod=(m)=>m>=0?('+'+m):(''+m);
+
+/* ---------- the log ---------- */
+// Everything the party is told, and the arithmetic behind it. Held in memory
+// only and capped: this is a record of the session, not part of the save.
+const LOG_MAX=400;
+const GLOG=[];
+function logAdd(kind,text,detail){
+  GLOG.push({kind,text,detail:detail||''});
+  if(GLOG.length>LOG_MAX)GLOG.shift();
+}
+function traceRoll(fn){
+  const prev=_rollTrace;_rollTrace=[];
+  try{return {value:fn(),dice:_rollTrace.slice()};}
+  finally{_rollTrace=prev;}
+}
+// the two shapes every roll takes: a d20 against a number, and a bag of dice
+function fmtCheck(nat,mod,vs,label){
+  return 'd20 '+nat+' '+fmtMod(mod)+' = '+(nat+mod)+(vs==null?'':' vs '+label+' '+vs);
+}
+function fmtDice(n,die,mod){return n+'d'+die+(mod?fmtMod(mod):'');}
+function fmtTrace(dice){
+  if(!dice||!dice.length)return '';
+  return dice.map(r=>fmtDice(r.n,r.d,r.mod)+' = '+r.sum).join(' + ');
+}
+function natNote(nat){return nat===20?'  ·  natural 20':nat===1?'  ·  natural 1':'';}
 
 const ABILITIES=['str','dex','con','int','wis','cha'];
 const ABIL_LBL={str:'STR',dex:'DEX',con:'CON',int:'INT',wis:'WIS',cha:'CHA'};
@@ -4708,6 +4756,20 @@ function useInventoryItem(ch,ref){
   useSpellItem(ch,it,()=>{if(def.kind==='scroll')consumeOne();});
   return true;
 }
+/* ---------- log entries for the things that resolve on a die ---------- */
+// One line for what happened, one for the arithmetic behind it. Both sides of a
+// blow go through here so an attack made and an attack taken read the same way.
+function logStrike(who,target,nat,mod,ac,hit,crit,dmg,parts){
+  const head=hit?(who+' hits '+target+(crit?' — CRITICAL':'')+' for '+dmg)
+                :(who+' misses '+target);
+  let det=fmtCheck(nat,mod,ac,'AC')+natNote(nat);
+  if(hit&&parts&&parts.length)det+='  ·  '+parts.join(', ')+(parts.length>1?'  =  '+dmg:'');
+  logAdd(hit?'hit':'miss',head,det);
+}
+function logSave(who,kind,nat,mod,dc,made,outcome){
+  logAdd('save',who+(made?' resists ':' fails ')+kind+(outcome?' — '+outcome:''),
+    fmtCheck(nat,mod,dc,'DC')+natNote(nat));
+}
 function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
   const dualWielding=isDualWielding(ch);
   const offhand=dualWielding&&slot==='lhand'?true:(dualWielding?false:undefined);
@@ -4722,24 +4784,28 @@ function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
   const hit=nat===20||(nat!==1&&total>=targetAC);
   const crit=hit&&nat>=wDef.crit[0];
   let dmg=0,sneaked=false;
+  const parts=[];   // every die that went into the number, for the log
   if(hit){
+    const dm=damageMod(ch,wDef,wIt),mult=crit?wDef.crit[1]:1;
     dmg=damageRoll(ch,wDef,wIt,crit);
-    if(CLASSES[ch.cls].favored&&['beast','humanoid'].includes(MONSTERS[m.key].type))dmg+=2;
+    parts.push(fmtDice(wDef.dmg[0]*mult,wDef.dmg[1],dm*mult)+' = '+dmg);
+    if(CLASSES[ch.cls].favored&&['beast','humanoid'].includes(MONSTERS[m.key].type)){dmg+=2;parts.push('favoured foe +2');}
     if(CLASSES[ch.cls].sneak&&(m.sleep||m.held>0||(m.targetName&&m.targetName!==ch.name))){
-      dmg+=roll(Math.floor((ch.level+1)/2),6);
+      const nd=Math.floor((ch.level+1)/2),sn=roll(nd,6);
+      dmg+=sn;parts.push('sneak '+fmtDice(nd,6,0)+' = '+sn);
       sneaked=true;
     }
-    if(ch._smiting){dmg+=ch.level;ch._smiting=false;}
+    if(ch._smiting){dmg+=ch.level;ch._smiting=false;parts.push('smite +'+ch.level);}
   }
   // affixed weapons: the energy rider is rolled once with the swing, and is not
   // multiplied by a crit — it burns the same whether or not the blade found a seam
   const af=wIt&&wIt.affix?AFFIXES[wIt.affix]:null;
   const elemDmg=(hit&&af&&af.dice)?roll(af.dice[0],af.dice[1]):0;
-  if(elemDmg)dmg+=elemDmg;
+  if(elemDmg){dmg+=elemDmg;parts.push(ELEMENTS[af.elem].name+' '+fmtDice(af.dice[0],af.dice[1],0)+' = '+elemDmg);}
   const deliver=()=>{
     if(m.hp<=0||!G.L.monsters.includes(m))return;
     m.awake=true;
-    if(!hit){UI.floatAtMonster(m,'miss','#9a9da2');SFX.whiff();return;}
+    if(!hit){logStrike(ch.name,m.name,nat,atkB,targetAC,false);UI.floatAtMonster(m,'miss','#9a9da2');SFX.whiff();return;}
     if(sneaked)UI.floatAtMonster(m,'sneak!','#d8b040');
     SFX.hit();
     // bone turns a point aside and shatters under a hammer; an incorporeal
@@ -4747,10 +4813,12 @@ function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
     const mult=undeadDamageMult(m,wDef,wIt);
     if(mult!==1){
       dmg=Math.max(1,Math.round(dmg*mult));
+      parts.push((mult>1?'bone ×':'incorporeal ×')+mult);
       UI.floatAtMonster(m,mult>1?'shatters!':'barely bites',mult>1?'#e8c840':'#9a9da2');
     }
     // a vampiric weapon drinks what it actually landed, not the overkill
     const landed=Math.min(dmg,Math.max(0,m.hp));
+    logStrike(ch.name,m.name,nat,atkB,targetAC,true,crit,dmg,parts);
     damageMonster(m,dmg,ch,crit);
     if(elemDmg)UI.floatAtMonster(m,'+'+elemDmg+' '+ELEMENTS[af.elem].name,ELEMENTS[af.elem].col);
     if(af&&af.leech&&landed>0)healChar(ch,Math.max(1,Math.round(landed*af.leech)));
@@ -4926,19 +4994,24 @@ function castSpell(ch,key,opts){
   commit();
   const resolveFoe=(m)=>{
     if(m.hp<=0||!G.L.monsters.includes(m))return;
-    let dmg=sp.dmgFn?sp.dmgFn(cl):0;
-    if(sp.vsUndead&&m.type==='undead')dmg*=2;
-    let negated=false,halved=false;
+    const bag=sp.dmgFn?traceRoll(()=>sp.dmgFn(cl)):{value:0,dice:[]};
+    let dmg=bag.value;
+    const parts=bag.dice.length?[fmtTrace(bag.dice)]:[];
+    if(sp.vsUndead&&m.type==='undead'){dmg*=2;parts.push('undead ×2');}
+    let negated=false,halved=false,saveNote='';
     if(sp.save){
       const s=monsterSave(m,sp.save.type);
+      saveNote='  ·  '+m.name+' '+sp.save.type+' save '+s+' vs DC '+dc;
       if(s>=dc){if(sp.save.negate){negated=true;}else halved=true;}
     }
-    if(sp.humanoidOnly&&m.type!=='humanoid'){UI.floatAtMonster(m,'immune','#9a9da2');return;}
-    if(negated){UI.floatAtMonster(m,'resisted','#9a9da2');return;}
-    if(halved)dmg=Math.floor(dmg/2);
+    const logSpell=(outcome)=>logAdd('spell',ch.name+' casts '+sp.name+' at '+m.name+' — '+outcome,
+      'circle '+sp.circle+', DC '+dc+(parts.length?'  ·  '+parts.join(', '):'')+saveNote);
+    if(sp.humanoidOnly&&m.type!=='humanoid'){logSpell('immune');UI.floatAtMonster(m,'immune','#9a9da2');return;}
+    if(negated){logSpell('resisted, no effect');UI.floatAtMonster(m,'resisted','#9a9da2');return;}
+    if(halved){dmg=Math.floor(dmg/2);parts.push('save halves → '+dmg);}
     if(sp.sleep){
-      if(MONSTERS[m.key].cr<=1&&m.type!=='undead'){m.sleep=true;UI.floatAtMonster(m,'asleep','#9db4d6');}
-      else UI.floatAtMonster(m,'unaffected','#9a9da2');
+      if(MONSTERS[m.key].cr<=1&&m.type!=='undead'){m.sleep=true;logSpell('asleep');UI.floatAtMonster(m,'asleep','#9db4d6');}
+      else {logSpell('unaffected');UI.floatAtMonster(m,'unaffected','#9a9da2');}
       return;
     }
     if(sp.hold){m.held=Math.max(m.held,sp.hold);UI.floatAtMonster(m,'held!','#9db4d6');}
@@ -4949,10 +5022,11 @@ function castSpell(ch,key,opts){
     if(sp.negLevels){m.atk-=sp.negLevels;m.hp-=sp.negLevels*5;UI.floatAtMonster(m,'drained','#b48ae0');if(m.hp<=0){killMonster(m,ch);return;}}
     if(sp.dispel){m.held=0;m.slowed=Math.max(m.slowed,5);UI.floatAtMonster(m,'dispelled','#9db4d6');}
     if(dmg>0){
+      logSpell(dmg+' damage');
       if(sp.drain)healChar(ch,dmg);
       damageMonster(m,dmg,ch,false);
       if(sp.dot&&m.hp>0){m.dot={dmg:sp.dot.dmg,ticks:sp.dot.ticks,t:1.5};}
-    }
+    }else logSpell('no damage');
   };
   const c0=foes[0];
   const color=SPELL_FX[key]||'#9db4d6';
@@ -4979,7 +5053,12 @@ function applySpellToAlly(caster,t,sp,cl){
     UI.refreshParty();return true;
   }
   if(t.dead){UI.toast(t.name+' is dead. Only Raise Dead can help.');return false;}
-  if(sp.healFn){healChar(t,sp.healFn(cl));}
+  if(sp.healFn){
+    const bag=traceRoll(()=>sp.healFn(cl));
+    logAdd('spell',caster.name+' casts '+sp.name+' on '+t.name+' — heals '+bag.value,
+      'circle '+sp.circle+(bag.dice.length?'  ·  '+fmtTrace(bag.dice):''));
+    healChar(t,bag.value);
+  }
   if(sp.cures)for(const c of sp.cures)cureCond(t,c);
   if(sp.restoreAbility){
     let left=sp.restoreAbility===99?999:roll(1,4);
@@ -4989,6 +5068,7 @@ function applySpellToAlly(caster,t,sp,cl){
   }
   if(sp.restoreLevels&&t.negLevels>0){t.negLevels=0;removeCond(t,'drained');recalcHp(t,false);UI.toast('Lost life-force floods back into '+t.name+'.');}
   if(sp.buff){
+    logAdd('spell',caster.name+' casts '+sp.name+' on '+t.name,'circle '+sp.circle);
     const b=Object.assign({},sp.buff);
     b.tag=b.tag||sp.name;
     b.until=G.time+(b.dur||60);delete b.dur;
@@ -5245,11 +5325,14 @@ function monsterMelee(m){
     SFX.monAttack();
     if(nat!==1&&(nat===20||nat+atk>=charAC(ch))){
       const dmg=roll(m.dmg[0],m.dmg[1],m.dmg[2]);
+      logStrike(m.name,ch.name,nat,atk,charAC(ch),true,false,dmg,
+        [fmtDice(m.dmg[0],m.dmg[1],m.dmg[2])+' = '+dmg]);
       hurtChar(ch,dmg,m.name);
       // fire shield
       for(const b of ch.buffs)if(b.fireshield){damageMonster(m,roll(b.fireshield[0],b.fireshield[1]),ch,false);}
       monsterSpecials(m,ch);
     }else{
+      logStrike(m.name,ch.name,nat,atk,charAC(ch),false);
       UI.float(ch,'miss','#9a9da2');
     }
   },500);
@@ -5258,19 +5341,23 @@ function monsterSpecials(m,ch){
   const sp=m.special;
   if(!sp||ch.dead)return;
   if(sp.poison){
-    const sv=charSaves(ch).fort+saveBonusVs(ch,'poison');
-    if(d20()+sv<sp.poison.dc)applyPoison(ch,sp.poison);
+    const sv=charSaves(ch).fort+saveBonusVs(ch,'poison'),nat=d20(),made=nat+sv>=sp.poison.dc;
+    logSave(ch.name,m.name+"'s poison",nat,sv,sp.poison.dc,made,
+      made?'':sp.poison.abil.toUpperCase()+' damage');
+    if(!made)applyPoison(ch,sp.poison);
   }
   if(sp.disease){
-    const sv=charSaves(ch).fort;
-    if(d20()+sv<sp.disease.dc&&!hasCond(ch,'disease')){
+    const sv=charSaves(ch).fort,nat=d20(),made=nat+sv>=sp.disease.dc;
+    logSave(ch.name,m.name+"'s "+sp.disease.name,nat,sv,sp.disease.dc,made,made?'':'diseased');
+    if(!made&&!hasCond(ch,'disease')){
       addCond(ch,{kind:'disease',name:sp.disease.name});
       UI.toast(ch.name+' contracts '+sp.disease.name+'!');
     }
   }
   if(sp.paralysis){
-    const sv=charSaves(ch).fort;
-    if(d20()+sv<sp.paralysis.dc){
+    const sv=charSaves(ch).fort,nat=d20(),made=nat+sv>=sp.paralysis.dc;
+    logSave(ch.name,m.name+"'s paralysis",nat,sv,sp.paralysis.dc,made,made?'':'paralyzed');
+    if(!made){
       if(addCond(ch,{kind:'paralysis',dur:sp.paralysis.dur})){
         UI.float(ch,'paralyzed!','#9db4d6');
         UI.toast(ch.name+' is paralyzed!');
@@ -5280,8 +5367,9 @@ function monsterSpecials(m,ch){
   // an umber hulk's gaze: no new condition, just the stun that already exists.
   // Will save, because it is a mind effect rather than something physical.
   if(sp.gaze){
-    const sv=charSaves(ch).will+saveBonusVs(ch,'spell');
-    if(d20()+sv<sp.gaze.dc&&!hasCond(ch,'stunned')){
+    const sv=charSaves(ch).will+saveBonusVs(ch,'spell'),nat=d20(),made=nat+sv>=sp.gaze.dc;
+    logSave(ch.name,m.name+"'s gaze",nat,sv,sp.gaze.dc,made,made?'':'stunned');
+    if(!made&&!hasCond(ch,'stunned')){
       addCond(ch,{kind:'stunned',dur:sp.gaze.dur});
       UI.float(ch,'reeling!','#d0a0e0');
       UI.toast(ch.name+' reels, unable to make sense of what they are seeing!');
@@ -5289,16 +5377,18 @@ function monsterSpecials(m,ch){
   }
   // a roper's tendrils reuse hold rather than inventing a grapple
   if(sp.hold){
-    const sv=charSaves(ch).ref;
-    if(d20()+sv<sp.hold.dc&&!hasCond(ch,'hold')){
+    const sv=charSaves(ch).ref,nat=d20(),made=nat+sv>=sp.hold.dc;
+    logSave(ch.name,m.name+"'s tendrils",nat,sv,sp.hold.dc,made,made?'':'held');
+    if(!made&&!hasCond(ch,'hold')){
       addCond(ch,{kind:'hold',dur:sp.hold.dur});
       UI.float(ch,'snared!','#c8b070');
       UI.toast('Tendrils cinch tight around '+ch.name+'!');
     }
   }
   if(sp.energyDrain){
-    const sv=charSaves(ch).fort;
-    if(d20()+sv<14){
+    const sv=charSaves(ch).fort,nat=d20(),made=nat+sv>=14;
+    logSave(ch.name,m.name+"'s energy drain",nat,sv,14,made,made?'':'−'+sp.energyDrain+' level');
+    if(!made){
       ch.negLevels+=sp.energyDrain;
       recalcHp(ch,false);
       UI.float(ch,'drained!','#b48ae0');
@@ -5324,9 +5414,15 @@ function monsterShoot(m){
         const ch=pickMeleeTarget();
         if(off>0.75||!ch){SFX.whiff();return;} // the party stepped aside
         const nat=d20();
-        if(nat!==1&&(nat===20||nat+m.atk>=charAC(ch)))
-          hurtChar(ch,roll(m.dmg[0],m.dmg[1],Math.max(0,m.dmg[2])),m.name);
-        else UI.float(ch,'miss','#9a9da2');
+        if(nat!==1&&(nat===20||nat+m.atk>=charAC(ch))){
+          const dmg=roll(m.dmg[0],m.dmg[1],Math.max(0,m.dmg[2]));
+          logStrike(m.name+' (shot)',ch.name,nat,m.atk,charAC(ch),true,false,dmg,
+            [fmtDice(m.dmg[0],m.dmg[1],Math.max(0,m.dmg[2]))+' = '+dmg]);
+          hurtChar(ch,dmg,m.name);
+        }else{
+          logStrike(m.name+' (shot)',ch.name,nat,m.atk,charAC(ch),false);
+          UI.float(ch,'miss','#9a9da2');
+        }
       }});
   },450);
 }
@@ -5347,8 +5443,11 @@ function fireSpellOrb(m){
       const sv=charSaves(ch).ref+saveBonusVs(ch,'spell');
       const dc=12+Math.floor(MONSTERS[m.key].cr);
       const el=m.caster.elem;
-      if(d20()+sv>=dc)hurtChar(ch,Math.floor(dmg/2),m.name,el);
-      else hurtChar(ch,dmg,m.name,el);
+      const nat=d20(),made=nat+sv>=dc,took=made?Math.floor(dmg/2):dmg;
+      logAdd('spell',m.name+"'s "+(el?ELEMENTS[el].name+' ':'')+'bolt strikes '+ch.name+' for '+took,
+        fmtDice(m.caster.dmg[0],m.caster.dmg[1],m.caster.dmg[2])+' = '+dmg+
+        '  ·  Reflex '+fmtCheck(nat,sv,dc,'DC')+natNote(nat)+(made?' — halved':' — full'));
+      hurtChar(ch,took,m.name,el);
     }});
 }
 function monsterCast(m){
@@ -6270,6 +6369,23 @@ const UI=(()=>{
     t.textContent=msg;t.style.opacity=1;
     clearTimeout(toastTimer);
     toastTimer=setTimeout(()=>{t.style.opacity=0;},2200);
+    logAdd('msg',msg);   // a toast is gone in two seconds; the log keeps it
+  }
+  /* ---------- the log ---------- */
+  // Rebuilt on open rather than on every entry: opening any overlay pauses the
+  // game, so nothing can be appended while the panel is on screen.
+  function renderLog(){
+    const box=$('log-list');
+    if(!GLOG.length){box.innerHTML='<div class="empty">Nothing has happened yet.</div>';return;}
+    const esc=(x)=>String(x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    box.innerHTML=GLOG.map(e=>'<div class="le k-'+e.kind+'"><div class="lt">'+esc(e.text)+'</div>'+
+      (e.detail?'<div class="ld">'+esc(e.detail)+'</div>':'')+'</div>').join('');
+    box.scrollTop=box.scrollHeight;   // newest at the bottom, like a running tally
+  }
+  function openLog(){
+    renderLog();show('ovl-log');
+    // and again once the panel is on screen: a hidden element has no scrollHeight
+    const b=$('log-list');b.scrollTop=b.scrollHeight;
   }
   function refreshDepthTag(){
     $('depth-tag').textContent='Depth '+G.depth+' · '+G.L.theme.name+(G.depth%3===0&&G.depth>=6?' ⚔':'');
@@ -6751,6 +6867,8 @@ const UI=(()=>{
     show('ovl-map');
   }
   $('map-close').addEventListener('click',()=>hide('ovl-map'));
+  $('log-close').addEventListener('click',()=>hide('ovl-log'));
+  $('log-clear').addEventListener('click',()=>{GLOG.length=0;renderLog();});
   /* ---------- game over ---------- */
   function gameOver(){
     const best=Math.max(G.depth,+(localStorage.getItem('crawl_best')||0));
@@ -6764,7 +6882,7 @@ const UI=(()=>{
     refreshMenu();
   });
   return {buildPartyDom,refreshParty,tickCooldowns,charFlash,float,floatAtMonster,vignette,trapFlash,toast,
-    refreshDepthTag,pickAlly,paladinMenu,clericMenu,openSpells,spellFlash,openInventory,openStats,openMap,gameOver,show,hide,anyOverlayOpen,refreshInv};
+    refreshDepthTag,pickAlly,paladinMenu,clericMenu,openSpells,spellFlash,openInventory,openStats,openMap,openLog,gameOver,show,hide,anyOverlayOpen,refreshInv};
 })();
 /* ============================== INPUT ============================== */
 function bindPad(id,fn){
@@ -6791,6 +6909,7 @@ function initInput(){
   bindPad('b-rleft',()=>tryRotate(-1));
   bindPad('b-rright',()=>tryRotate(1));
   document.getElementById('b-map').addEventListener('click',()=>{if(G.started&&!G.over)UI.openMap();});
+  document.getElementById('b-log').addEventListener('click',()=>{if(G.started)UI.openLog();});
   document.getElementById('b-rest').addEventListener('click',()=>tryRest());
   document.getElementById('b-mute').addEventListener('click',(e)=>{
     const m=SFX.toggleMute();
@@ -6807,6 +6926,7 @@ function initInput(){
       case 'q':case 'arrowleft':tryRotate(-1);break;
       case 'e':case 'arrowright':tryRotate(1);break;
       case 'm':if(G.started&&!G.over)UI.openMap();break;
+      case 'l':if(G.started)UI.openLog();break;
       case 'r':tryRest();break;
     }
   });
