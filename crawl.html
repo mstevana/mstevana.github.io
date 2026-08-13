@@ -1889,8 +1889,13 @@ function tryGen(depth,targetWalk,theme){
   // counter-weight every deep floor turns undead and the crypt stops being
   // special. Elsewhere they are thinned to roughly half, which still leaves the
   // deep floors far more varied than the dragon/ogre-mage monoculture they were.
+  // Caves get the same treatment for the same reason: what lives in the rock
+  // is heavily favoured underground and thinned to a stray elsewhere, so a cave
+  // reads as its own place without the roster leaking into the brickwork.
   const undeadBias=theme.name==='Crypt'?4:0.55;
-  const base=spawnPool(depth).map(([k,w])=>[k,w*(MONSTERS[k].type==='undead'?undeadBias:1)]);
+  const caveBias=theme.name==='Caves'?4:0.55;
+  const base=spawnPool(depth).map(([k,w])=>[k,
+    w*(MONSTERS[k].type==='undead'?undeadBias:1)*(MONSTERS[k].cave?caveBias:1)]);
   const weigh=(ek)=>base.map(([k,w])=>{
     const r=Math.log(threatOf(k,depth,ek)/share);
     return [k,w*Math.exp(-(r*r)/sig)];
@@ -1995,6 +2000,12 @@ function tryGen(depth,targetWalk,theme){
   if(theme.name==='Caves'){
     const pool=Object.keys(SPAWN_DEPTH).filter(k=>MONSTERS[k].lurk&&depth>=SPAWN_DEPTH[k][0]-1&&depth<=SPAWN_DEPTH[k][1]);
     if(pool.length){
+      // sized against the floor's per-monster share the same way a standing
+      // spawn is, so depth 30 does not ambush the party with a piercer
+      const lurkWeights=pool.map(k=>{
+        const r=Math.log(threatOf(k,depth,null)/share);
+        return [k,Math.exp(-(r*r)/sig)];
+      });
       // the bodies a lurker may replace: never the boss, never a bier's keeper
       const spare=()=>{for(let mi=monsters.length-1;mi>=0;mi--)if(!monsters[mi].boss&&!monsters[mi].ossuary)return mi;return -1;};
       const want=Math.min(3+rnd(3),Math.max(0,monsters.length-4));
@@ -2008,7 +2019,7 @@ function tryGen(depth,targetWalk,theme){
         if(monsters.some(m=>m.x===x&&m.y===y))continue;
         const mi=spare();
         if(mi<0)break;                                    // nothing left that may be traded away
-        const key=pickWeighted(pool.map(k=>[k,1]));
+        const key=pickWeighted(lurkWeights);
         lurkers.push({x,y,key,dc:trapDC(depth),found:false,sprung:false,noticeTried:false});
         monsters.splice(mi,1);                            // budget-neutral: one fewer ordinary spawn
       }
