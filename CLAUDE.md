@@ -311,6 +311,20 @@ pitched at the *shadowed* rock — a formation that catches the eye is not an
 ambush, and the tell is meant to be the rogue's. A new `lurk` creature
 without a branch in there hides inside a piercer's stalactite.
 
+The formations are faced with the walls' own textures, read back off
+`R3.wallMats` (stashed by `buildLevel`, nulled by `disposeLevel`). The maps
+are **shared, never cloned** — nothing extra is uploaded — and each piece
+takes a different one of the twelve variants. Because a shared map cannot
+carry per-mesh `repeat`/`offset`, `roughen` scales and shifts the *uv
+attribute* instead: pass it the piece's real circumference and its height
+over `WALLH` and its grain comes out at the walls' texel density rather
+than one whole map stretched over a lump. Two things learned the hard way:
+the per-vertex jitter that suits a 6-sided cone turns an 80-face
+icosahedron into a spiky cut gem, so lumps want roughly a third of it; and
+anything hanging from the roof needs a `rootAt` skirt, because the ceiling
+is drawn in its own texture and without one a stalactite ends in mid-air
+against a surface it shares no colour with.
+
 `lurkers` must be carried through `serializeGame` and `loadGame` like
 everything else a theme writes onto the level.
 

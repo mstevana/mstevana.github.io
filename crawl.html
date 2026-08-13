@@ -3176,7 +3176,7 @@ function disposeLevel(){
   for(const f of R3.liquidFlows)f.tex.dispose();
   R3.liquidFlows=[];R3.liquidShaders=[];
   R3.doorMeshes={};R3.secretMeshes={};R3.trapDecals={};R3.itemSprites={};R3.monsterSprites={};R3.stairsGroup=null;
-  R3.candleFlames=[];R3.cryptGroups=[];R3.lurkerMeshes={};
+  R3.candleFlames=[];R3.cryptGroups=[];R3.lurkerMeshes={};R3.wallMats=null;
 }
 function buildLevel(L){
   disposeLevel();
@@ -3201,6 +3201,8 @@ function buildLevel(L){
       displacementMap:tex,displacementScale:cave?0.10:0.05,specular:0x191309,shininess:cave?3:5});
     wallMats.push(weldWallDisp(mat));
   }
+  // the ambushers are faced with these same textures, so keep them reachable
+  R3.wallMats=wallMats;
   const floorTex=texFromCanvas(cave?caveFloorCanvas(th)
                                    :noiseCanvas(th.floor,th.wall2,false,th.moss));
   const ceilTex=texFromCanvas(noiseCanvas(th.ceil,'#000',false,null));
@@ -3881,13 +3883,26 @@ function addLurkerMesh(l,li,theme){
   const th=theme||G.L.theme;
   let seed=((l.x*374761393)^(l.y*668265263)^0x5f3a7c)>>>0;
   const rr=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
-  // pitched at the shadowed rock rather than the lit face: a formation that
-  // catches the eye is not an ambush. The tell is meant to be the rogue's.
+  // Faced with the walls' own textures rather than a flat colour, so a
+  // formation is literally the same rock the room is cut from. The maps are
+  // shared with the wall materials — no clones, nothing extra to upload — and
+  // each piece takes a different one of the twelve variants so a formation is
+  // not one repeated stamp. Shaded slightly down, because a lump that catches
+  // the eye is not an ambush; the tell is meant to be the rogue's.
+  const wm=R3.wallMats&&R3.wallMats.length?R3.wallMats:null;
   const tint=(hex,k)=>new THREE.Color(hex).multiplyScalar(k);
-  const rock=new THREE.MeshPhongMaterial({color:tint(th.wall,0.80+rr()*0.14),specular:0x120d07,shininess:4,flatShading:true});
-  const dark=new THREE.MeshPhongMaterial({color:tint(th.wall2,0.90+rr()*0.16),specular:0x120d07,shininess:4,flatShading:true});
-  // nothing underground is turned on a lathe: shove the vertices about a little
-  const roughen=(geo,amt)=>{
+  const rockMat=(hex,k)=>{
+    if(!wm)return new THREE.MeshPhongMaterial({color:tint(hex,k),specular:0x120d07,shininess:4,flatShading:true});
+    const t=wm[Math.floor(rr()*wm.length)].map;
+    return new THREE.MeshPhongMaterial({map:t,bumpMap:t,bumpScale:0.05,
+      color:new THREE.Color(k,k,k),specular:0x120d07,shininess:3});
+  };
+  const rock=rockMat(th.wall,0.84+rr()*0.10);
+  const dark=rockMat(th.wall2,0.70+rr()*0.09);
+  // nothing underground is turned on a lathe: shove the vertices about a little.
+  // The uvs are stretched to the piece's real size at the same time, so its
+  // grain runs at the walls' texel density instead of one whole map per lump.
+  const roughen=(geo,amt,su,sv)=>{
     const p=geo.attributes.position;
     for(let i=0;i<p.count;i++){
       const x=p.getX(i),y=p.getY(i),z=p.getZ(i),r=Math.hypot(x,z);
@@ -3895,45 +3910,79 @@ function addLurkerMesh(l,li,theme){
       const k=1+(rr()-0.5)*amt;
       p.setX(i,x*k);p.setZ(i,z*k);p.setY(i,y+(rr()-0.5)*amt*0.10);
     }
+    const uv=geo.attributes.uv;
+    if(uv&&(su||sv)){
+      // and shifted, or every piece would show the same corner of its variant
+      const ou=rr(),ov=rr();
+      for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*(su||1)+ou,uv.getY(i)*(sv||1)+ov);
+    }
     geo.computeVertexNormals();
     return geo;
   };
+  const TX=1/WALLH;                                  // a wall face is 1 wide by WALLH tall
   const g0=new THREE.Group();
   const spike=(len,rad,mat)=>{                      // hangs point-down from the roof
-    const m=new THREE.Mesh(roughen(new THREE.ConeGeometry(rad,len,6,1),0.34),mat);
+    const m=new THREE.Mesh(roughen(new THREE.ConeGeometry(rad,len,7,2),0.34,6.28*rad,len*TX),mat);
     m.rotation.z=Math.PI;                            // cone apex points down
     return m;
   };
+  // Where a hanging piece meets the roof there has to be a root: the ceiling is
+  // drawn in its own texture, so without one the spike ends in mid-air against
+  // a surface it shares no colour with. A shallow skirt in the ceiling's own
+  // tone closes the join.
+  const rootAt=(x,z,rad)=>{
+    const sk=new THREE.Mesh(roughen(new THREE.ConeGeometry(rad*1.55,0.07,7,1),0.28,6.28*rad*1.55,0.07*TX),dark);
+    sk.rotation.z=Math.PI;
+    sk.position.set(x,WALLH-0.033,z);
+    g0.add(sk);
+  };
   if(l.key==='roper'){
-    const h=0.86+rr()*0.30;
-    const col=new THREE.Mesh(roughen(new THREE.CylinderGeometry(0.10+rr()*0.03,0.20+rr()*0.05,h,8,4),0.24),rock);
+    const h=0.86+rr()*0.30,rt=0.10+rr()*0.03,rb=0.20+rr()*0.05;
+    const col=new THREE.Mesh(roughen(new THREE.CylinderGeometry(rt,rb,h,10,6),0.30,3.14*(rt+rb),h*TX),rock);
     col.position.y=h/2;g0.add(col);
-    const cap=new THREE.Mesh(roughen(new THREE.ConeGeometry(0.11,0.22,8,1),0.30),rock);
-    cap.position.y=h+0.10;g0.add(cap);
+    // the cap takes the column's own top radius, so it grows out of it instead
+    // of perching on it
+    const ch=0.16+rr()*0.10;
+    const cap=new THREE.Mesh(roughen(new THREE.ConeGeometry(rt,ch,10,2),0.30,6.28*rt,ch*TX),rock);
+    cap.position.y=h+ch/2-0.02;g0.add(cap);
     for(let k=0;k<2;k++){                            // lesser stumps at its foot
-      const sh=0.14+rr()*0.18;
-      const s=new THREE.Mesh(roughen(new THREE.ConeGeometry(0.06+rr()*0.03,sh,6,1),0.34),dark);
+      const sr=0.06+rr()*0.03,sh=0.14+rr()*0.18;
+      const s=new THREE.Mesh(roughen(new THREE.ConeGeometry(sr,sh,6,1),0.34,6.28*sr,sh*TX),dark);
       const a=rr()*6.28,d=0.20+rr()*0.12;
       s.position.set(Math.cos(a)*d,sh/2,Math.sin(a)*d);g0.add(s);
     }
   }else if(l.key==='cavefisher'){
-    const knot=new THREE.Mesh(new THREE.DodecahedronGeometry(0.18+rr()*0.05,0),rock);
-    knot.scale.set(1.05,0.70,1.05);knot.rotation.set(rr()*3,rr()*3,rr()*3);
-    knot.position.y=WALLH-0.09;g0.add(knot);         // wedged hard into the roof
+    // a knobbly mass rather than one solid: three overlapping lumps, each finely
+    // enough faceted to read as rock instead of a cut gem
+    const kr=0.15+rr()*0.04;
+    for(let k=0;k<3;k++){
+      const r2=kr*(0.72+rr()*0.42);
+      // gently: on an 80-face solid the per-vertex jitter that suits a cone
+      // turns neighbouring vertices into spikes, and a cut gem is not an ambush
+      const lump=new THREE.Mesh(roughen(new THREE.IcosahedronGeometry(r2,1),0.09,3.14*r2,2*r2*TX),k?dark:rock);
+      lump.scale.set(1.05,0.68,1.05);lump.rotation.set(rr()*3,rr()*3,rr()*3);
+      lump.position.set((rr()-0.5)*kr*1.1,WALLH-0.07-rr()*0.05,(rr()-0.5)*kr*1.1);
+      g0.add(lump);                                  // wedged hard into the roof
+    }
+    rootAt(0,0,kr*0.85);
     for(let k=0;k<3;k++){                            // drips beneath it
       const dl=0.16+rr()*0.22;
       const s=spike(dl,0.030+rr()*0.018,dark);
       s.position.set((rr()-0.5)*0.34,WALLH-0.18-dl/2,(rr()-0.5)*0.34);g0.add(s);
     }
   }else{                                             // piercer, and anything new
-    const len=0.44+rr()*0.26;
-    const s=spike(len,0.095+rr()*0.035,rock);
-    s.position.set((rr()-0.5)*0.16,WALLH-len/2,(rr()-0.5)*0.16);g0.add(s);
+    const len=0.44+rr()*0.26,rad=0.095+rr()*0.035;
+    const s=spike(len,rad,rock);
+    const px=(rr()-0.5)*0.16,pz=(rr()-0.5)*0.16;
+    s.position.set(px,WALLH-len/2,pz);g0.add(s);
+    rootAt(px,pz,rad);
     for(let k=0;k<2;k++){                            // honest stalactites for company
-      const sl=0.18+rr()*0.24;
-      const s2=spike(sl,0.045+rr()*0.030,dark);
+      const sl=0.18+rr()*0.24,sr=0.045+rr()*0.030;
+      const s2=spike(sl,sr,dark);
       const a=rr()*6.28,d=0.24+rr()*0.12;
-      s2.position.set(Math.cos(a)*d,WALLH-sl/2,Math.sin(a)*d);g0.add(s2);
+      const qx=Math.cos(a)*d,qz=Math.sin(a)*d;
+      s2.position.set(qx,WALLH-sl/2,qz);g0.add(s2);
+      rootAt(qx,qz,sr);
     }
   }
   g0.position.set(l.x+0.5,0,l.y+0.5);
