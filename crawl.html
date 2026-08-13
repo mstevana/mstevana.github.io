@@ -2530,6 +2530,29 @@ function liquidCanvas(){ // seamless brown sludge: smooth soft mottling, no hard
    scroll at different scales/speeds with a domain warp between them, and
    an animated ripple height field perturbs the normal so the torch throws
    moving glints off the surface. --- */
+/* A wall tile is a box, and three.js displaces each vertex along its own face
+   normal. Two faces that share a vertical edge therefore push it in two
+   perpendicular directions and pull apart — a convex corner tears open, and
+   every wall top peels away from the ceiling leaving a black band. Pushing
+   along the horizontal direction out from the tile's axis instead gives both
+   faces the same direction at the edge they share, so the corner stays welded,
+   and it has no Y component at all, so the wall stays pinned to floor and
+   ceiling. The relief is unchanged everywhere else. */
+const WALL_DISP=[
+  '#ifdef USE_DISPLACEMENTMAP',
+  '  vec3 wdVec = vec3( position.x, 0.0, position.z );',
+  '  float wdLen = length( wdVec );',
+  '  vec3 wdDir = wdLen > 0.0001 ? wdVec / wdLen : vec3( 0.0 );',
+  '  transformed += wdDir * ( texture2D( displacementMap, vUv ).x * displacementScale + displacementBias );',
+  '#endif',
+].join('\n');
+// Material.copy does not carry onBeforeCompile, so a cloned wall material has
+// to be re-welded or it tears where the instanced ones do not.
+function weldWallDisp(mat){
+  mat.onBeforeCompile=(sh)=>{sh.vertexShader=sh.vertexShader.replace('#include <displacementmap_vertex>',WALL_DISP);};
+  mat.customProgramCacheKey=()=>'walldisp';
+  return mat;
+}
 const LIQ_VERT_DECL='#include <common>\nvarying vec2 vLiqPos;';
 const LIQ_VERT_POS=`#include <project_vertex>
 {
@@ -3174,8 +3197,9 @@ function buildLevel(L){
   for(let v=0;v<NVAR;v++){
     const tex=texFromCanvas(cave?caveWallCanvas(th,v,baseWall):wallCanvas(th,v,grid,baseWall));
     tex.wrapS=tex.wrapT=THREE.RepeatWrapping; // displacement samples can wrap at face edges
-    wallMats.push(new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,bumpScale:cave?0.05:0.02,
-      displacementMap:tex,displacementScale:cave?0.10:0.05,specular:0x191309,shininess:cave?3:5}));
+    const mat=new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,bumpScale:cave?0.05:0.02,
+      displacementMap:tex,displacementScale:cave?0.10:0.05,specular:0x191309,shininess:cave?3:5});
+    wallMats.push(weldWallDisp(mat));
   }
   const floorTex=texFromCanvas(cave?caveFloorCanvas(th)
                                    :noiseCanvas(th.floor,th.wall2,false,th.moss));
@@ -3247,7 +3271,7 @@ function buildLevel(L){
     }
     if(!touch)continue;
     if(t===T_SECRET){
-      const m=new THREE.Mesh(wallGeo,wallMats[wallVariant(x,y,NVAR)].clone());
+      const m=new THREE.Mesh(wallGeo,weldWallDisp(wallMats[wallVariant(x,y,NVAR)].clone()));
       m.position.set(x+0.5,WALLH/2,y+0.5);
       m.userData={kind:'secret',x,y};
       grp.add(m);R3.secretMeshes[y*L.w+x]=m;
@@ -3308,7 +3332,7 @@ function buildLevel(L){
     // so its walls are faced with the wall texture — using the variant this
     // tile would have had, and scaled so the brick courses stand the same
     // height as the walls above the floor
-    const shaftTex=wallMats[wallVariant(sxs,sys)].map.clone();
+    const shaftTex=wallMats[wallVariant(sxs,sys,wallMats.length)].map.clone();
     shaftTex.needsUpdate=true;
     shaftTex.wrapS=shaftTex.wrapT=THREE.RepeatWrapping;
     shaftTex.repeat.set(1,(DEPTH+0.06)/WALLH);
