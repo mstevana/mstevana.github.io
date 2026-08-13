@@ -354,6 +354,36 @@ against a surface it shares no colour with.
 `lurkers` must be carried through `serializeGame` and `loadGame` like
 everything else a theme writes onto the level.
 
+## Left and right
+
+Both sides of a fight pair up by position: a character on the left of the
+formation meets the monster on the left of the line, and that monster
+swings back at them. `SIDE_L`/`SIDE_R`, `monsterSide`, `charSide`,
+`charOnSide` and `facingMonsterAt` hold all of it.
+
+**The two conventions are opposite, which is the whole reason they are
+named rather than inlined:**
+
+- A tile packs monsters 0–1 in front and 2–3 behind, and `rankOffset` puts
+  the **odd** slot of each pair on the party's **left**.
+- The party portraits are a 2×2 CSS grid laid out `[0][1]` over `[2][3]`,
+  so the **even** party indices are the **left** column.
+
+The monster half was measured, not derived: dot each sprite's position
+against the camera's own `matrixWorld` right vector. Deriving it by hand
+gets the sign wrong, and an earlier probe that read `projectToScreen`
+without rendering first reported a mapping that flipped between facings —
+it was reading a stale camera matrix, not finding a bug.
+
+Falling back matters as much as pairing. A lone monster holds the centre
+of its tile (`rankOffset` returns zero offsets below two occupants), so
+everyone fights it; and when someone's opposite number is already down,
+they cross the line rather than stand idle. `facingMonsterAt` with no
+character returns the front-most, which is what movement blocking wants.
+
+`packRanks` renumbers slots as monsters die, so a line re-forms and sides
+are reassigned — that is deliberate, not drift.
+
 ## The log
 
 The 📜 button (and `L`) opens `ovl-log`: every message the party is shown,

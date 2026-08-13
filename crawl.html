@@ -4273,6 +4273,37 @@ function monsterAt(x,y){
   }
   return best;
 }
+/* Left and right, both read from the party's point of view.
+
+   A tile packs its monsters 0-1 in front and 2-3 behind, and `rankOffset` puts
+   the ODD slot of each pair on the party's left (measured, not derived: the
+   camera's own right vector dots positive with slot 0). The party portraits are
+   a 2x2 grid laid out [0][1] over [2][3], so the EVEN party indices are the
+   left-hand column. The two conventions are opposite, which is exactly why they
+   are written down here rather than inlined at each call site. */
+const SIDE_L=0,SIDE_R=1;
+function monsterSide(m){return (m.slot%2)?SIDE_L:SIDE_R;}
+function charSide(ch){return G.party.indexOf(ch)%2===0?SIDE_L:SIDE_R;}
+// Whoever of `list` stands on that side. One character, or an empty side, and
+// the other answers for it -- nobody stands idle because their opposite number
+// is already down.
+function charOnSide(list,side){
+  if(!list.length)return null;
+  if(list.length===1)return list[0];
+  return list.find(ch=>charSide(ch)===side)||pick(list);
+}
+// What a given character's blade meets on that tile. Two monsters abreast and
+// the party fights the one in front of them; without a character (a thrown
+// spell with no caster, a blocking check) it is the front-most as before.
+function facingMonsterAt(x,y,ch){
+  const occ=monstersOn(x,y);
+  if(!occ.length)return null;
+  const anyFront=occ.some(m=>m.slot<2);
+  const line=occ.filter(m=>(m.slot<2)===anyFront);
+  const foremost=()=>line.reduce((a,b)=>a.slot<b.slot?a:b);
+  if(line.length===1||!ch)return foremost();
+  return line.find(m=>monsterSide(m)===charSide(ch))||foremost();
+}
 function freeSlotAt(x,y,except){
   const used=new Set();
   for(const m of G.L.monsters)if(m.hp>0&&m!==except&&m.x===x&&m.y===y)used.add(m.slot);
@@ -4675,11 +4706,11 @@ function canMelee(ch,wDef){
   if(frontRow(ch))return true;
   return !!(wDef&&wDef.reach);
 }
-function firstMonsterAhead(maxRange){
+function firstMonsterAhead(maxRange,ch){
   const [dx,dy]=DIRS[G.facing];
   for(let i=1;i<=maxRange;i++){
     const x=G.px+dx*i,y=G.py+dy*i;
-    const m=monsterAt(x,y);
+    const m=facingMonsterAt(x,y,ch);
     if(m)return {m,dist:i};
     if(!seesThroughTile(tileAt(x,y)))return null;
   }
@@ -4706,15 +4737,15 @@ function useHand(ch,slot){
   if(wDef.hands===2&&anyHandCd(ch)>0)return; // a two-hander needs both hands free
   // ranged?
   if(wDef.ranged){
-    const found=firstMonsterAhead(wDef.ranged);
+    const found=firstMonsterAhead(wDef.ranged,ch);
     if(!found){UI.toast('No target in sight.');return;}
     doAttack(ch,slot,wDef,wIt,found.m,found.dist>1);
     return;
   }
   if(!canMelee(ch,wDef)){UI.toast(ch.name+' cannot reach from the back row.');return;}
   const ahead=aheadTile(1);
-  let m=monsterAt(ahead.x,ahead.y);
-  if(!m&&wDef.reach){const a2=aheadTile(2);m=monsterAt(a2.x,a2.y);}
+  let m=facingMonsterAt(ahead.x,ahead.y,ch);
+  if(!m&&wDef.reach){const a2=aheadTile(2);m=facingMonsterAt(a2.x,a2.y,ch);}
   if(!m){ // swing at air
     const cdv=attackCooldown(ch,wDef)*0.5;
     if(wDef.hands===2)armBoth(ch,cdv);else armHand(ch,slot,cdv);
@@ -4964,7 +4995,7 @@ function castSpell(ch,key,opts){
   // resolve target(s)
   let foes=[];
   if(sp.target==='foe'||sp.target==='foes'){
-    const found=firstMonsterAhead(6);
+    const found=firstMonsterAhead(6,ch);
     if(!found){UI.toast('No foe in sight.');return false;}
     if(sp.target==='foe')foes=[found.m];
     else {
@@ -5304,15 +5335,16 @@ function moveMonster(m,nx,ny){
   const spr=R3.monsterSprites[m.id];
   if(spr)spr.userData.walkUntil=performance.now()+650;
 }
-function pickMeleeTarget(){
+// The front rank takes the blows while it stands, and within that rank a
+// monster swings at whoever is directly opposite it.
+function pickMeleeTarget(m){
   const front=G.party.slice(0,2).filter(ch=>!isDown(ch));
-  if(front.length)return pick(front);
-  const back=G.party.slice(2).filter(ch=>!isDown(ch));
-  if(back.length)return pick(back);
-  return null;
+  const rank=front.length?front:G.party.slice(2).filter(ch=>!isDown(ch));
+  if(!rank.length)return null;
+  return m?charOnSide(rank,monsterSide(m)):pick(rank);
 }
 function monsterMelee(m){
-  const ch=pickMeleeTarget();
+  const ch=pickMeleeTarget(m);
   if(!ch)return;
   windupAnim(m);
   setTimeout(()=>{
@@ -5397,7 +5429,7 @@ function monsterSpecials(m,ch){
   }
 }
 function monsterShoot(m){
-  if(!pickMeleeTarget())return;
+  if(!pickMeleeTarget(m))return;
   windupAnim(m);
   setTimeout(()=>{
     if(m.hp<=0||G.over||G.paused||!G.L.monsters.includes(m))return;
@@ -5411,7 +5443,7 @@ function monsterShoot(m){
       onHit:()=>{
         if(G.over)return;
         const off=Math.hypot(R3.camera.position.x-aim.x,R3.camera.position.z-aim.z);
-        const ch=pickMeleeTarget();
+        const ch=pickMeleeTarget(m);
         if(off>0.75||!ch){SFX.whiff();return;} // the party stepped aside
         const nat=d20();
         if(nat!==1&&(nat===20||nat+m.atk>=charAC(ch))){
@@ -5438,7 +5470,7 @@ function fireSpellOrb(m){
       if(off>0.75){SFX.whiff();return;} // dodged the bolt
       const alive=G.party.filter(ch=>!isDown(ch));
       if(!alive.length)return;
-      const ch=pick(alive);
+      const ch=charOnSide(alive,monsterSide(m));   // a bolt still reaches the back rank
       const dmg=roll(m.caster.dmg[0],m.caster.dmg[1],m.caster.dmg[2]);
       const sv=charSaves(ch).ref+saveBonusVs(ch,'spell');
       const dc=12+Math.floor(MONSTERS[m.key].cr);
