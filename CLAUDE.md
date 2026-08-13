@@ -400,14 +400,46 @@ gets the sign wrong, and an earlier probe that read `projectToScreen`
 without rendering first reported a mapping that flipped between facings —
 it was reading a stale camera matrix, not finding a bug.
 
-Falling back matters as much as pairing. A lone monster holds the centre
-of its tile (`rankOffset` returns zero offsets below two occupants), so
-everyone fights it; and when someone's opposite number is already down,
-they cross the line rather than stand idle. `facingMonsterAt` with no
-character returns the front-most, which is what movement blocking wants.
+Rank matches too. The two formations face each other square on, so
+`pickPartyTarget` reaches for the same side **and** the same rank: a
+front-rank monster meets the party's front rank, and a back-rank monster
+(which needs reach to swing at all) goes for the party's back rank. Every
+way a monster reaches the party runs through that one function — melee,
+shots, and a caster's bolt.
+
+A character holds their place only while they can fight for it. Down, or
+unable to act (`canAct` covers paralysis, hold, sleep, stun), and the lane
+opens: the blow reaches past them to whoever else is in that lane. Note the
+order of the two fallbacks, which is the part worth not breaking — a
+monster tries **both ranks of its own side** before it will cross to the
+other. Trying the other side first would make a character *safer* by being
+paralysed, since blows would flow away from them; as written, if they are
+the last one standing in their lane the blows are still theirs.
+
+On the party's side of it, a lone monster holds the centre of its tile
+(`rankOffset` returns zero offsets below two occupants), so everyone
+fights it, and `facingMonsterAt` with no character returns the front-most,
+which is what movement blocking wants.
 
 `packRanks` renumbers slots as monsters die, so a line re-forms and sides
 are reassigned — that is deliberate, not drift.
+
+## The DEX cap
+
+`dexACBonus` clamps the DEX modifier to the body armour's `maxDex`
+(clothes 99, leather 6, breastplate 3, full plate 1) and `charAC` is the
+only consumer. Three things that are correct and look like bugs:
+
+- **Reflex saves keep the whole modifier.** The cap is an AC rule in 3.5,
+  not a general encumbrance, so `charSaves` uses raw `abilMod(ch,'dex')`.
+- **A DEX penalty is never raised to the cap** — `clamp(mod,-5,maxDex)`,
+  so a clumsy character in plate keeps their −2.
+- **Enchantment does not buy capped DEX back.** A +3 plate adds 3 AC and
+  still caps DEX at 1.
+
+It was always applied; what was missing is that nothing said so. The stats
+screen now prints `AC 20 (DEX +1 of +4 — Full plate caps it at +1)`
+whenever the cap is actually biting, and nothing when it is not.
 
 ## The log
 

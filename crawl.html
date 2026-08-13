@@ -4281,17 +4281,11 @@ function monsterAt(x,y){
    a 2x2 grid laid out [0][1] over [2][3], so the EVEN party indices are the
    left-hand column. The two conventions are opposite, which is exactly why they
    are written down here rather than inlined at each call site. */
-const SIDE_L=0,SIDE_R=1;
+const SIDE_L=0,SIDE_R=1,RANK_F=0,RANK_B=1;
 function monsterSide(m){return (m.slot%2)?SIDE_L:SIDE_R;}
+function monsterRank(m){return m.slot<2?RANK_F:RANK_B;}
 function charSide(ch){return G.party.indexOf(ch)%2===0?SIDE_L:SIDE_R;}
-// Whoever of `list` stands on that side. One character, or an empty side, and
-// the other answers for it -- nobody stands idle because their opposite number
-// is already down.
-function charOnSide(list,side){
-  if(!list.length)return null;
-  if(list.length===1)return list[0];
-  return list.find(ch=>charSide(ch)===side)||pick(list);
-}
+function charRank(ch){return G.party.indexOf(ch)<2?RANK_F:RANK_B;}
 // What a given character's blade meets on that tile. Two monsters abreast and
 // the party fights the one in front of them; without a character (a thrown
 // spell with no caster, a blocking check) it is the front-most as before.
@@ -5340,16 +5334,34 @@ function moveMonster(m,nx,ny){
   const spr=R3.monsterSprites[m.id];
   if(spr)spr.userData.walkUntil=performance.now()+650;
 }
-// The front rank takes the blows while it stands, and within that rank a
-// monster swings at whoever is directly opposite it.
-function pickMeleeTarget(m){
-  const front=G.party.slice(0,2).filter(ch=>!isDown(ch));
-  const rank=front.length?front:G.party.slice(2).filter(ch=>!isDown(ch));
-  if(!rank.length)return null;
-  return m?charOnSide(rank,monsterSide(m)):pick(rank);
+/* A monster reaches for its opposite number: same side, same rank. The two
+   formations face each other square on, so the front of the line meets the
+   front of the party and a creature in the back rank -- which needs reach to
+   swing at all -- goes for the party's back rank.
+
+   A character only holds their place while they can fight for it. Dead,
+   unconscious, paralysed, held, asleep or stunned and the lane opens: the
+   monster reaches past them to whoever else is in that lane. It steps to the
+   OTHER side only when its own lane is empty of the living, so putting a
+   character out of action never makes them safer -- if they are the last one
+   standing in their lane, the blows are still theirs. */
+function pickPartyTarget(m){
+  const alive=G.party.filter(ch=>!isDown(ch));
+  if(!alive.length)return null;
+  if(!m)return pick(alive);
+  const at=(side,rank)=>alive.find(ch=>charSide(ch)===side&&charRank(ch)===rank);
+  const s=monsterSide(m),r=monsterRank(m);
+  // its own lane, own rank first; whoever can still hold it, else whoever is left
+  for(const holding of [true,false])
+    for(const rr of [r,1-r]){
+      const ch=at(s,rr);
+      if(ch&&(!holding||canAct(ch)))return ch;
+    }
+  // the lane is empty: cross the line, keeping rank for rank
+  return at(1-s,r)||at(1-s,1-r)||null;
 }
 function monsterMelee(m){
-  const ch=pickMeleeTarget(m);
+  const ch=pickPartyTarget(m);
   if(!ch)return;
   windupAnim(m);
   setTimeout(()=>{
@@ -5434,7 +5446,7 @@ function monsterSpecials(m,ch){
   }
 }
 function monsterShoot(m){
-  if(!pickMeleeTarget(m))return;
+  if(!pickPartyTarget(m))return;
   windupAnim(m);
   setTimeout(()=>{
     if(m.hp<=0||G.over||G.paused||!G.L.monsters.includes(m))return;
@@ -5448,7 +5460,7 @@ function monsterShoot(m){
       onHit:()=>{
         if(G.over)return;
         const off=Math.hypot(R3.camera.position.x-aim.x,R3.camera.position.z-aim.z);
-        const ch=pickMeleeTarget(m);
+        const ch=pickPartyTarget(m);
         if(off>0.75||!ch){SFX.whiff();return;} // the party stepped aside
         const nat=d20();
         if(nat!==1&&(nat===20||nat+m.atk>=charAC(ch))){
@@ -5475,7 +5487,7 @@ function fireSpellOrb(m){
       if(off>0.75){SFX.whiff();return;} // dodged the bolt
       const alive=G.party.filter(ch=>!isDown(ch));
       if(!alive.length)return;
-      const ch=charOnSide(alive,monsterSide(m));   // a bolt still reaches the back rank
+      const ch=pickPartyTarget(m)||pick(alive);   // a bolt keeps its lane like everything else
       const dmg=roll(m.caster.dmg[0],m.caster.dmg[1],m.caster.dmg[2]);
       const sv=charSaves(ch).ref+saveBonusVs(ch,'spell');
       const dc=12+Math.floor(MONSTERS[m.key].cr);
@@ -6829,6 +6841,14 @@ const UI=(()=>{
       const dmgd=ch.abilDmg[a]>0?` <span style="color:#a05545">(−${ch.abilDmg[a]})</span>`:'';
       return `${ABIL_LBL[a]} <b>${cur}</b> (${fmtMod(mod(cur))})${dmgd}`;
     }).join(' · ');
+    // Heavy armour eats the nimbleness it is worth, and the number it takes is
+    // invisible inside an AC total: a DEX 18 fighter in full plate carries +1 of
+    // their +4 and nothing on the screen used to say so.
+    const rawDex=abilMod(ch,'dex'), usedDex=dexACBonus(ch), armIt=ch.equip.armor;
+    const armDef=armIt?ITEM_DEFS[armIt.base]:null;
+    const acNote=(armDef&&usedDex<rawDex)
+      ? ` <span class="dim-note">(DEX ${fmtMod(usedDex)} of ${fmtMod(rawDex)} — ${armDef.name} caps it at ${fmtMod(armDef.maxDex)})</span>`
+      : '';
     let extra='';
     const c=CLASSES[ch.cls];
     if(c.caster)extra+=`<b>Spell slots</b> ${slots.map((n,i)=>`${i+1}:${Math.max(0,n-ch.slotsUsed[i])}/${n}`).filter((_,i)=>slots[i]>0).join(' ')}<br>`;
@@ -6842,7 +6862,7 @@ const UI=(()=>{
       <b>${RACES[ch.race].name} ${CLASSES[ch.cls].name}</b>, level ${ch.level}<br>
       <span class="dim-note">${RACES[ch.race].traits}</span><br>
       ${abils}<br>
-      <b>HP</b> ${ch.hp}/${ch.maxHp} · <b>AC</b> ${charAC(ch)} · <b>BAB</b> ${fmtMod(babOf(ch.cls,ch.level))}<br>
+      <b>HP</b> ${ch.hp}/${ch.maxHp} · <b>AC</b> ${charAC(ch)}${acNote} · <b>BAB</b> ${fmtMod(babOf(ch.cls,ch.level))}<br>
       <b>Saves</b> Fort ${fmtMod(s.fort)} · Ref ${fmtMod(s.ref)} · Will ${fmtMod(s.will)}<br>
       ${atkLine}${extra}
       <b>XP</b> ${ch.xp} — next level at ${need}
