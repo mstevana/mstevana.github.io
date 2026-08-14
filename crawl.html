@@ -4424,14 +4424,28 @@ function buildLevel(L){
         cup.position.set(0,Y+0.06,0.19);g0.add(cup);
         const stub=new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.026,0.10,6),darkMat);
         stub.position.set(0,Y+0.12,0.19);g0.add(stub);
-        // the flame: unlit geometry so it reads as its own light source
-        const fl=new THREE.Mesh(new THREE.ConeGeometry(0.055,0.19,7),
-          new THREE.MeshBasicMaterial({color:0xffb45a,transparent:true,opacity:0.92}));
-        fl.position.set(0,Y+0.24,0.19);g0.add(fl);
-        const core=new THREE.Mesh(new THREE.ConeGeometry(0.028,0.11,6),
-          new THREE.MeshBasicMaterial({color:0xfff0c0,transparent:true,opacity:0.95}));
-        core.position.set(0,Y+0.215,0.19);g0.add(core);
-        g0.userData.flame=fl;g0.userData.core=core;
+        // The flame is built from additive glow sprites, not geometry. A cone is
+        // a paper triangle however you colour it: fire has no silhouette, it has
+        // layers that add up. Three of them — a wide dull-orange body, a hotter
+        // middle, a small near-white core — plus a couple of embers, each given
+        // its own phase in the flicker loop so the whole thing churns instead of
+        // pulsing in lockstep.
+        const layer=(col,w,h,dy,op)=>{
+          const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:fxGlowTex(col),
+            transparent:true,opacity:op,depthWrite:false,blending:THREE.AdditiveBlending}));
+          sp.scale.set(w,h,1);
+          sp.position.set(0,Y+dy,0.19);
+          sp.userData={w,h,dy};
+          g0.add(sp);return sp;
+        };
+        const fire=[
+          layer('#ff5a12',0.34,0.32,0.155,0.50),  // the body, broad and dull
+          layer('#ff9a28',0.23,0.23,0.145,0.62),  // hotter, tighter
+          layer('#ffe08a',0.13,0.13,0.125,0.78),  // the core, nearly white
+        ];
+        const embers=[layer('#ff8a2a',0.032,0.032,0.26,0.45),
+                      layer('#ffb45a',0.024,0.024,0.32,0.30)];
+        g0.userData.fire=fire;g0.userData.embers=embers;
       }
       g0.rotation.y=Math.atan2(-f.dx,-f.dy);
       g0.position.set(f.x+0.5+f.dx*0.5,0,f.y+0.5+f.dy*0.5);
@@ -4440,7 +4454,7 @@ function buildLevel(L){
         const l=new THREE.PointLight(0xffa855,0.85,3.6,2);
         l.position.set(f.x+0.5+f.dx*0.5-f.dx*0.30,1.16,f.y+0.5+f.dy*0.5-f.dy*0.30);
         grp.add(l);
-        flames.push({light:l,base:0.85,mesh:g0.userData.flame,core:g0.userData.core});
+        flames.push({light:l,base:0.85,fire:g0.userData.fire,embers:g0.userData.embers,y:0.92});
       }
     }
     R3.candleFlames=flames;
@@ -4843,8 +4857,23 @@ function updateCamera(now){
     // each flame keeps its own steady level: a candle is not a wall torch
     if(c.light)c.light.intensity=(c.base||0.55)*(1+f);
     if(c.fl)c.fl.scale.set(1+f*0.12,1+f*0.3,1+f*0.12);
-    if(c.mesh)c.mesh.scale.set(1+f*0.14,1+f*0.34,1+f*0.14);
-    if(c.core)c.core.scale.set(1+f*0.20,1+f*0.40,1+f*0.20);
+    // a torch: each layer breathes on its own phase, and leans as it licks up
+    if(c.fire)for(let k=0;k<c.fire.length;k++){
+      const sp=c.fire[k],u=sp.userData,q=ph+k*2.3;
+      const g=Math.sin(now/(90+k*37)+q)*0.5+Math.sin(now/(41+k*13)+q*1.7)*0.3+0.2;
+      sp.scale.set(u.w*(1+g*0.13),u.h*(1+g*0.30),1);
+      sp.position.x=Math.sin(now/(150+k*40)+q)*0.016*(k+1);
+      sp.position.y=c.y+u.dy+u.h*g*0.14;
+      sp.material.opacity=Math.min(1,(0.55+k*0.15)*(0.82+g*0.35));
+    }
+    // embers ride up and fade, then start again from the wick
+    if(c.embers)for(let k=0;k<c.embers.length;k++){
+      const sp=c.embers[k],u=sp.userData;
+      const t=((now/(900+k*430))+k*0.5)%1;
+      sp.position.y=c.y+u.dy+t*0.30;
+      sp.position.x=Math.sin(t*7+k)*0.035;
+      sp.material.opacity=0.55*(1-t)*(1-t);
+    }
     if(c.halo)c.halo.material.opacity=0.28*(1+f*0.5);
   }
   // sewer liquid animates in its shader; feed it the clock
