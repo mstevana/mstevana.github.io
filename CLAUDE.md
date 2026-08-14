@@ -201,6 +201,20 @@ here (unlike `scotland.html`). Touch all of these:
    swing for creatures that carry a weapon across the body. Omitting the
    markers gives a static sprite that will not telegraph its attacks.
 
+   Six poses exist — `idle0/idle1`, `walk0/walk1`, `windup`, `strike` — and
+   `poseXf` moves the whole body in every one of them, so walking and the
+   telegraph work for any creature regardless of layers. What the layers add is
+   the part that reads: `headXf` bobs and nods the `|H|` layer, `armXf` hauls
+   the `|A|` layer back and drives it through. **`windup` also flares an
+   eye-coloured aura**, which is the telegraph a layerless creature would still
+   get. T51 asserts all of it, including that no pose renders identically to
+   `idle0` and that all six attack paths (`monsterMelee`, `monsterShoot`,
+   `monsterCast`, `bossSummon`, `bossBarrage`, `bossSweep`) call `windupAnim`.
+
+   **A pivot left at `[0,0]` is worse than no layer**: the part rotates about
+   the canvas corner and flies off screen. The kobold carried `ap:[0,0]` for
+   exactly as long as it had no arm to swing.
+
    **One layer is the requirement, not both.** A rat, a spider, a kobold
    and an ooze have no arm to swing — they strike with the head, and the
    head layer plus the `sharp` pose is the whole telegraph. Six creatures

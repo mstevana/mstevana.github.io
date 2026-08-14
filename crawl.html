@@ -1151,14 +1151,21 @@ function clawsAt(x,y,angs,len,c){c=c||'#cfc4a2';
 function drip(x,y,l,c){return `<path d="M${x} ${y} q0.8 ${l*0.6} 0 ${l}" stroke="${c}" stroke-width="1.2" fill="none"/><circle cx="${x}" cy="${y+l}" r="1.1" fill="${c}"/>`;}
 // shared kobold body used by both kobold variants
 function koboldBody(){
+  // The kobold was the one humanoid in the bestiary with no arms at all -- not
+  // even a static pair -- so it neither swung at anything nor telegraphed with
+  // one. It gets the same treatment as everything else: an off-hand in the base
+  // layer here, shared by both kobolds, and a clawed |A| that belongs to the
+  // plain kobold alone -- the slinger builds on this body and brings its own.
   return `<path d="M24 54 Q12 58 10 48" stroke="#4a2e1a" stroke-width="2.8" fill="none"/>`+
   `<path d="M26 32 Q20 36 21 46 Q21 54 26 58 L38 58 Q43 52 42 44 Q41 35 37 32 Z" fill="url(#bg)" ${RIM}/>`+
+  armL(25,37,19.5,45,20,52.5,'#6d4526',2.2,'#8a5c38',null)+
   `<path d="M24 31 L20 27 L25 29 Z M22 38 L17 35 L22 35 Z M21 45 L16 43 L21 42 Z" fill="#2c1c0c"/>`+
   `<path d="M27 57 L26 62 L30 62 M37 57 L38 62 L42 62" stroke="#241408" stroke-width="2.4" fill="none"/>`+
   `|H|<path d="M26 24 Q24 14 33 13 Q41 13 43 20 Q47 21 49 25 Q45 28 40 27 Q38 31 31 30 Q26 29 26 24 Z" fill="url(#bg)" ${RIM}/>`+
   `<path d="M28 14 Q26 8 30 6 L31 12 Z M38 14 Q40 8 37 5 L35 11 Z" fill="#bdb294"/>|/H|`+
   `<path d="M27 44 L37 44 L36 52 L29 53 Z" fill="#1c130a"/>`+
-  `<path d="M29 41 Q30 46 29 50 M33 40 Q34 45 33 50" stroke="#170e06" stroke-width="1" fill="none" opacity="0.6"/>`;
+  `<path d="M29 41 Q30 46 29 50 M33 40 Q34 45 33 50" stroke="#170e06" stroke-width="1" fill="none" opacity="0.6"/>`+
+  ``;
 }
 function koboldSharp(){
   return `|H|`+gEye(31,19,1.7,{slit:1})+gEye(40,21,1.4,{slit:1})+fangsDown(43,25,5,3,2.4)+`|/H|`;
@@ -1191,8 +1198,12 @@ const MONSTER_ART={
     `<path d="M55 46 L56 49.5 M57.5 45.5 L59 48.5" stroke="#cfc4a2" stroke-width="1.1"/>`+
     `<path d="M56 44 L63 42 M56 45.5 L63 46.5" stroke="#7a705e" stroke-width="0.5" opacity="0.6"/>`+
     drip(56,49.5,3.5,'#6a1210')+`|/H|`}),
-  kobold:()=>({o:{hp:[33,31],ap:[0,0],lit:'#8a5c38',mid:'#462c1a',eye:'#ffb32a',rough:[2.2,0.4],seed:11},
-    body:koboldBody(),sharp:koboldSharp()}),
+  kobold:()=>({o:{hp:[33,31],ap:[41,37],lit:'#8a5c38',mid:'#462c1a',eye:'#ffb32a',rough:[2.2,0.4],seed:11},
+    body:koboldBody()+
+      `|A|<path d="M41 37 Q47 42 46 49" stroke="#6d4526" stroke-width="2.6" fill="none" stroke-linecap="round"/>`+
+      `<circle cx="41" cy="37" r="1.5" fill="#6d4526"/>`+
+      `<path d="M46 49 L49 53 M46 49 L44 54 M46 49 L48.5 48" stroke="#bdb294" stroke-width="1.1" stroke-linecap="round"/>|/A|`,
+    sharp:koboldSharp()}),
   koboldsl:()=>({o:{hp:[33,31],ap:[42,38],lit:'#7a5a40',mid:'#3c2e20',eye:'#ffb32a',rough:[2.2,0.4],seed:12},
     body:koboldBody()+`|A|<path d="M42 38 Q50 34 52 26" stroke="#6a533c" stroke-width="2" fill="none"/>`,
     sharp:koboldSharp()+`|A|<path d="M52 26 Q57 20 54 14" stroke="#7a624a" stroke-width="1.6" fill="none"/>`+
