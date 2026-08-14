@@ -229,6 +229,37 @@ creature whose danger is not captured by hp/damage/attack will be
 mis-placed by the budget), and if it is a caster give `caster.elem` one
 of the `ELEMENTS` keys so elemental wards can resist it.
 
+## What wakes a sleeping monster
+
+Two things, and they are deliberately different shapes.
+
+**Sight** — `losClear` from the monster to the party — wakes it at whatever
+range the sight line reaches, with no distance cap of its own. There used to
+be one at seven steps. Note what this does and does not mean: `losClear` is
+**straight-line only**, same row or column, so "in sight" is really "down the
+corridor or along the rank you are standing in". A monster diagonally across
+a lit room does not see you. That is why uncapping it moved so little —
+measured on depth-14 floors, monsters awake when a fight starts went 2.33 to
+2.40. Anything beyond seven steps was rarely on the party's exact axis in the
+first place. If sight is ever meant to mean real visibility, `losClear` is
+the thing to replace, and it is used for shooting as well.
+
+Within **two steps** a monster wakes regardless of the sight line; that close
+it hears and smells the party.
+
+**Noise** — `combatNoise(x,y,r)` with `COMBAT_NOISE` at 10 — is the one that
+matters, and it is a **flood fill, not a radius**. Sound rounds corners and
+does not pass through stone, so a monster ten steps away down a passage hears
+a fight and one three tiles away through a wall does not. Closed doors stop
+it, on the same terms the party's own distance field uses. It fires from
+`damageMonster` and from `hurtChar`, so a blow taken is as loud as one dealt,
+and it early-outs when nothing on the floor is still asleep, because the fill
+is pure waste then. Measured: 2.33 awake before a blow lands, 3.43 after.
+
+Neither shows up in the descent simulation — `fightPack` has no approach
+phase and wakes nothing — so this class of change is measured on a real
+`updateMonsters` loop. T53 does it.
+
 Two constants in `07_game.js` scale what a definition's `speed` actually
 buys, and both are applied at use rather than baked into the data:
 `MOVE_RATE` (1.25) divides every movement cooldown — chasing, wandering and

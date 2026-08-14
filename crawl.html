@@ -6754,6 +6754,40 @@ function computeDistField(){
   }
   G.distField=df;
 }
+/* ---------- fighting is loud ----------
+   Sound travels through open ground and round corners, not through stone, so
+   this is a flood fill from where the blow landed rather than a radius: a
+   monster ten steps away down a corridor hears it, one three tiles away
+   through a wall does not. Closed doors stop it, on the same terms the party's
+   own distance field uses — and opening one is itself noisy.
+
+   The early-out matters: this runs on every blow struck in either direction,
+   and the fill is pure waste on a floor with nothing left asleep. */
+const COMBAT_NOISE=10;
+function combatNoise(x,y,r){
+  const L=G.L;
+  if(!L||!L.monsters.some(m=>m.hp>0&&!m.awake&&!m.guard))return 0;
+  r=r===undefined?COMBAT_NOISE:r;
+  const df=new Int16Array(L.w*L.h).fill(-1);
+  const q=[[x,y]];df[y*L.w+x]=0;let qi=0;
+  while(qi<q.length){
+    const [cx,cy]=q[qi++];const d=df[cy*L.w+cx];
+    if(d>=r)continue;
+    for(const [dx,dy] of DIRS){
+      const nx=cx+dx,ny=cy+dy,t=tileAt(nx,ny);
+      if((t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS)&&df[ny*L.w+nx]<0){
+        df[ny*L.w+nx]=d+1;q.push([nx,ny]);
+      }
+    }
+  }
+  let woke=0;
+  for(const m of L.monsters){
+    if(m.hp<=0||m.awake||m.guard)continue;
+    const d=df[m.y*L.w+m.x];
+    if(d>=0&&d<=r){m.awake=true;woke++;}
+  }
+  return woke;
+}
 function losClear(x0,y0,x1,y1){ // straight-line only (same row/col), through see-through tiles
   if(x0!==x1&&y0!==y1)return false;
   const dx=Math.sign(x1-x0),dy=Math.sign(y1-y0);
@@ -7096,6 +7130,7 @@ function hurtChar(ch,dmg,source,elem){
   if(dmg<=0){UI.float(ch,'absorbed','#9db4d6');return;}
   const wasUp=ch.hp>0;
   ch.hp-=dmg;
+  combatNoise(G.px,G.py);   // a blow taken is as loud as one dealt
   UI.float(ch,'-'+dmg,'#e05545');
   UI.charFlash(ch,'hitflash');
   R3.shake=Math.max(R3.shake,0.5);UI.vignette();
@@ -7346,6 +7381,7 @@ function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
 function damageMonster(m,dmg,byChar,crit){
   m.awake=true;m.sleep=false;
   m.hp-=dmg;
+  combatNoise(m.x,m.y);   // the fight is heard ten steps off, walls or no
   myconidDistress(m);   // a hurt myconid tells the grove, before it worries about dying
   UI.floatAtMonster(m,(crit?'CRIT ':'-')+dmg,crit?'#e8c840':'#e05545');
   if(m.hp<=0){killMonster(m,byChar);return;}
@@ -7713,7 +7749,11 @@ function updateMonsters(dt){
     const df=G.distField;
     const di=df?df[m.y*L.w+m.x]:-1;
     if(!m.awake){
-      if(di>=0&&di<=7&&(di<=2||losClear(m.x,m.y,G.px,G.py))){
+      // Seeing the party wakes a monster at whatever range it can see them:
+      // `losClear` is a straight-line test, so sight is already bounded by the
+      // corridor or room it is standing in. Within two steps it wakes anyway --
+      // that close, it hears and smells them without needing the sight line.
+      if(di>=0&&(di<=2||losClear(m.x,m.y,G.px,G.py))){
         m.awake=true;SFX.growl(di);
         if(m.boss)UI.toast(m.name+' bars the way down!');
       }
