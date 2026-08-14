@@ -229,6 +229,26 @@ creature whose danger is not captured by hp/damage/attack will be
 mis-placed by the budget), and if it is a caster give `caster.elem` one
 of the `ELEMENTS` keys so elemental wards can resist it.
 
+Two constants in `07_game.js` scale what a definition's `speed` actually
+buys, and both are applied at use rather than baked into the data:
+`MOVE_RATE` (1.25) divides every movement cooldown — chasing, wandering and
+routed alike, so a creature does not sprint at the party and then amble the
+moment it loses them — and `ENGAGE_CD` (0.5) clamps `atkCd`/`castCd` on the
+tick a monster comes into range. That clamp is **`Math.min`, never
+assignment**: an ambusher's 0.15 and a vanished shadowblade's 0.2 are
+already shorter and must stay so. It also fires on *entering* range rather
+than every tick, or nothing would ever have a cadence.
+
+Measured from ten tiles out to the first blow landing: 13.4s with neither,
+11.5s with the movement rate alone, 11.4s with the clamp alone, **9.5s with
+both** — and the spread collapses from 2.8s to 0.95s, because the random
+1.5–3.5s `atkCd` a monster is built with no longer leaks into its first
+swing. Note the **descent simulation cannot see either dial**: `fightPack`
+resolves packs to the death with no approach phase, and `monsterDpr` models
+output as `dmg/(speed*1.6)`, reading `speed` as an attack cadence when it is
+really the movement cooldown. Anything that changes pacing has to be
+measured on a real `updateMonsters` loop, which is what T52 does.
+
 **`speed` is a movement cooldown, so lower is faster.** It is seconds
 between steps: `m.moveCd = m.speed * slowMult`. The piercer, an ambusher
 that cannot walk at all, is the slowest thing in the game at 2.6, and

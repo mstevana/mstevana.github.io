@@ -3495,7 +3495,7 @@ function mkMonster(key,x,y,depth){
     special:{disease:def.disease,poison:def.poison,paralysis:def.paralysis,energyDrain:def.energyDrain,regen:def.regen,
       gaze:def.gaze,hold:def.hold,spores:def.spores,drowpoison:def.drowpoison,faerie:def.faerie},
     atkCd:1.5+Math.random()*2,castCd:def.caster?def.caster.cd*(0.5+Math.random()):0,
-    moveCd:Math.random(),held:0,slowed:0,sleep:false,shaken:0,stunned:0,awake:false,boss:false,
+    moveCd:Math.random(),held:0,slowed:0,sleep:false,shaken:0,stunned:0,awake:false,boss:false,inRange:false,
     id:Math.floor(Math.random()*1e9)};
 }
 /* ============================== CHARACTERS ============================== */
@@ -7719,7 +7719,7 @@ function updateMonsters(dt){
       }
       else{
         m.moveCd-=dt;
-        if(m.moveCd<=0){m.moveCd=m.speed*2.5*slowMult;wanderStep(m);}
+        if(m.moveCd<=0){m.moveCd=m.speed*2.5*slowMult/MOVE_RATE;wanderStep(m);}
         continue;
       }
     }else{
@@ -7737,7 +7737,7 @@ function updateMonsters(dt){
     // and the holy symbol until its rout runs out
     if(m.fleeUntil&&m.fleeUntil>G.time){
       m.moveCd-=dt;
-      if(m.moveCd<=0){m.moveCd=m.speed*slowMult;fleeStep(m);}
+      if(m.moveCd<=0){m.moveCd=m.speed*slowMult/MOVE_RATE;fleeStep(m);}
       continue;
     }
     const adjacent=Math.abs(m.x-G.px)+Math.abs(m.y-G.py)===1;
@@ -7746,8 +7746,17 @@ function updateMonsters(dt){
     const canReachParty=adjacent&&(m.slot<2||m.reach);
     // ranged / caster action — also how the rear rank fights, point blank
     const rangedR=m.ranged||(m.caster?m.caster.ranged:0);
+    // In range this tick? Melee reach, or a clear shot inside the weapon's own.
+    const shotDist=Math.abs(m.x-G.px)+Math.abs(m.y-G.py);
+    const inRangeNow=canReachParty||
+      (!!rangedR&&shotDist<=rangedR&&losClear(m.x,m.y,G.px,G.py));
+    if(inRangeNow&&!m.inRange){
+      m.atkCd=Math.min(m.atkCd,ENGAGE_CD);
+      if(m.caster)m.castCd=Math.min(m.castCd,ENGAGE_CD);
+    }
+    m.inRange=inRangeNow;
     if(!canReachParty&&rangedR&&losClear(m.x,m.y,G.px,G.py)){
-      const dist=Math.abs(m.x-G.px)+Math.abs(m.y-G.py);
+      const dist=shotDist;
       if(dist<=rangedR){
         if(m.caster){
           m.castCd-=dt*(1/slowMult);
@@ -7775,7 +7784,7 @@ function updateMonsters(dt){
     // chase
     m.moveCd-=dt;
     if(m.moveCd<=0){
-      m.moveCd=m.speed*slowMult;
+      m.moveCd=m.speed*slowMult/MOVE_RATE;
       chaseStep(m);
     }
   }
@@ -8214,6 +8223,21 @@ function bossSweep(m){ // bruiser bosses wind up a slow sweeping blow that hits 
     }
   },900);
 }
+/* ---------- how quickly a monster closes and commits ----------
+   `speed` on a definition is a movement COOLDOWN in seconds, so closing faster
+   means a SHORTER one: the rate divides it. Applied at the three places a
+   monster steps — chasing, fleeing a turning, and wandering unaware — so a
+   creature does not sprint at the party and then amble once it loses them.
+
+   ENGAGE_CD is the other half. `atkCd` is seeded at 1.5-3.5s when a monster is
+   built and then simply runs down, so a creature that had just refreshed its
+   timer could stand in the party's face for over three seconds before swinging.
+   The moment one comes into range its timer is clamped to this, so contact is
+   answered promptly whatever the monster was doing beforehand. Math.min, never
+   assignment: an ambusher's 0.15 and a vanished shadowblade's 0.2 are already
+   shorter and must stay that way. */
+const MOVE_RATE=1.25;
+const ENGAGE_CD=0.5;
 /* ---------- attack animation phases ---------- */
 function windupAnim(m){
   const s=R3.monsterSprites[m.id];
