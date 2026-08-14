@@ -688,9 +688,14 @@ const MONSTERS={
   mylord:   {name:'Myconid lord', cr:8, hp:38, ac:20,atk:12,dmg:[2,6,4],xp:2400,speed:1.4, type:'plant', spr:'mylord',
              myconid:true, distress:true, reach:true, spores:{dc:17,dur:3,kind:'hold'},
              caster:{dmg:[3,6,4],ranged:6,cd:5,fx:'#c88ae8',elem:'acid'}},
-  mysovereign:{name:'Myconid sovereign',cr:13,hp:96,ac:21,atk:15,dmg:[2,8,8],xp:3900,speed:1.4, type:'plant', spr:'mysovereign',
+  // Resized when BOSSES became a per-theme table. The sovereign holds the grove's
+  // tier-1 slot at depth 39, whose window is 3253 (the hammerlord three floors
+  // above) to 4182 (the drider three below); at hp 96 she scored 6057 and fitted
+  // nowhere, which for a boss-only creature means dead content. Boss-only is
+  // exactly what makes the numbers free to move.
+  mysovereign:{name:'Myconid sovereign',cr:11,hp:60,ac:21,atk:13,dmg:[2,8,5],xp:3300,speed:1.4, type:'plant', spr:'mysovereign',
              myconid:true, distress:true, reach:true, spores:{dc:18,dur:3.5,kind:'hold'},
-             caster:{dmg:[5,6,5],ranged:7,cd:5,fx:'#c88ae8',elem:'acid'}},
+             caster:{dmg:[4,6,4],ranged:7,cd:5,fx:'#c88ae8',elem:'acid'}},
   /* ---------- the drow ----------
      Elves, so the profile is the mirror of the duergar's: less hit points than
      anything else at this depth, and more armour class and attack bonus than
@@ -804,6 +809,11 @@ const MONSTERS={
              dungeon:true, reach:true},
   stonegiant:{name:'Stone giant', cr:10,hp:62, ac:21,atk:13,dmg:[2,8,5], xp:3000,speed:1.4, type:'giant', spr:'stonegiant',
              dungeon:true, reach:true, ranged:7},
+  // Boss-only, like the myconid rulers and the drow matron. The Dungeon's tier-1
+  // slot is depth 45, and it has to out-threat the drider three floors above it
+  // at 4182 -- the stone giant tops out at 4158, so the legion needed a king.
+  giantking:{name:'Fire giant king',cr:14,hp:80,ac:22,atk:15,dmg:[2,8,7], xp:4200,speed:1.4, type:'giant', spr:'giantking',
+             dungeon:true, reach:true, caster:{dmg:[5,6,4],ranged:6,cd:6,fx:'#e0602a',elem:'fire'}},
   purpleworm:{reach:true,name:'Purple worm',cr:16,hp:120,ac:19,atk:17,dmg:[3,8,9],xp:4800,speed:1.7, type:'vermin', spr:'purpleworm',
              cave:true, poison:{dc:18,abil:'con',dice:[2,4]}},
 };
@@ -888,48 +898,73 @@ function affixChance(depth,rich){
 // The first theme block is exempt. On floor 3 the party is still level 1 -- 32
 // hit points between four of them -- against a boss carrying 2.5x hp and +2 AC,
 // which at that level is unhittable rather than hard. Bosses start at 6.
-const BOSSES=[ // every 3rd level from 6: pick by depth
-  {minD:6, base:'bugbear', name:'Grukk the Skullkeeper'},
-  {minD:9, base:'wight',   name:'The Bonelord'},
-  {minD:12,base:'minotaur',name:'Gorehorn, King Below'},
-  {minD:15,base:'troll',   name:'Ubbroth the Unrotting'},
-  // Depth 18 is the last floor of the Myconid block, so the grove gets its own
-  // ruler. The list is ordered by weight, not by flavour, and the lord was
-  // written to fit between Ubbroth and Sinshara rather than the other way round.
-  {minD:18,base:'mylord',  name:'Ilhaeryn, the Standing Grove'},
-  // Depth 21 is the last floor of the Drow block. Same story as the grove: the
-  // matron is boss-only, so her numbers were written to the window between
-  // Ilhaeryn and Sinshara rather than the list being bent to fit her.
-  {minD:21,base:'drowmatron',name:'Matron Zaeryl of House Vhaeraun'},
-  {minD:24,base:'ogremage',name:'Sinshara of the Veil'},
-  {minD:27,base:'dragon',  name:'Vermilax the Patient'},
-  {minD:30,base:'mysovereign',name:'Thass-Mor, the Sporecrown'},
-];
-// Past Vermilax the named bosses run out, and every boss floor was handing you
-// the same dragon forever. The list starts over instead, each pass through it
-// harder than the last and titled so you can see which circle you are on.
-// A boss's hit points are a property of the floor, not of whichever creature the
-// cycle happened to name. A bugbear base is a quarter of a dragon's, so raw base
-// hp made the boss on floor 21 weaker than the one on floor 18, and the same
-// sawtooth repeated on every pass. The creature still decides how the fight goes
-// -- its damage, its reach, whether it casts -- but its weight class comes from
-// the depth. Taken from the list so adding a named boss keeps it honest.
-const BOSS_BASE_HP=BOSSES.reduce((a,b)=>a+MONSTERS[b.base].hp,0)/BOSSES.length;
-const BOSS_RANKS=['Warlord','Tyrant','Devourer','Sovereign','Archfiend','Herald','Fellmaster','Undying','Throneless'];
+/* ---------- bosses ----------
+   A boss belongs to the floor it caps. Boss floors are every third level from
+   depth 6, and because themes cycle every three floors the theme of a boss
+   floor walks Sewers, Crypt, Caves, Duergar, Myconid, Drow, Dungeon and starts
+   over 21 depths later. So a boss is chosen by (theme, tier), where the tier
+   counts how many of that theme's boss floors have already been passed.
+
+   Depth 3 is exempt -- the party is level 1 there, and a boss with 2.5x hp and
+   +2 AC is unhittable rather than hard -- which is why the Dungeon's own first
+   boss floor is 24 rather than 3.
+
+   A slot holds a LIST. One entry is drawn at random per floor, so a boss floor
+   is not the same fight every run. The cost of that is a stricter invariant:
+   every candidate in a slot must out-threat every candidate in the slot three
+   floors above it, because any pair can come up together. T21 checks the whole
+   table pairwise rather than checking a median.
+
+   The arc below was solved against the bestiary rather than asserted. Thirteen
+   of the fourteen slots are filled by creatures that already existed; only the
+   Dungeon's tier-1 slot at depth 45 needed one written for it. */
+const BOSS_TABLE={
+  Sewers: [[{base:'wererat',      name:'Skarrow, Whisker of the Warrens'}],
+           [{base:'troll',        name:'Ubbroth the Unrotting'}]],
+  Crypt:  [[{base:'wight',        name:'The Bonelord'}],
+           [{base:'lich',         name:'Vaunthil, Who Kept His Name'}]],
+  Caves:  [[{base:'minotaur',     name:'Gorehorn, King Below'}],
+           [{base:'roper',        name:'The Patient Stone'}]],
+  Duergar:[[{base:'duergarpriest',name:'Thane Morgrun Ironvow'}],
+           [{base:'duergarlord',  name:'Hammerlord Baruk Grimforge'}]],
+  Myconid:[[{base:'mylord',       name:'Ilhaeryn, the Standing Grove'}],
+           [{base:'mysovereign',  name:'Thass-Mor, the Sporecrown'}]],
+  Drow:   [[{base:'drowmatron',   name:'Matron Zaeryl of House Vhaeraun'}],
+           [{base:'drider',       name:'Xull\'raen the Eight-Legged'}]],
+  Dungeon:[[{base:'hobpriest',    name:'Sinshara of the Veil'}],
+           [{base:'giantking',    name:'Kholgar, King Under the Ash'}]],
+};
+// Which theme a boss floor caps, and which of that theme's boss floors it is.
+function bossSlot(depth){
+  const idx=Math.floor((depth-1)/3)%THEMES.length;
+  let tier=0;
+  for(let d=6;d<depth;d+=3)if(Math.floor((d-1)/3)%THEMES.length===idx)tier++;
+  return {theme:THEMES[idx].name,tier};
+}
+// Every entry in the table, flattened -- used for the cycled boss's weight class
+// and by the tests that walk the whole thing.
+const BOSS_ENTRIES=Object.keys(BOSS_TABLE).reduce((a,t)=>a.concat(...BOSS_TABLE[t]),[]);
+// A cycled boss's hit points are a property of the floor, not of whichever
+// creature the table named: a wererat base is a fraction of a lich's, so raw
+// base hp made a deep boss weaker than the one three floors above it. The
+// creature still decides how the fight goes -- its damage, its reach, whether
+// it casts -- but its weight class comes from the depth.
+const BOSS_BASE_HP=BOSS_ENTRIES.reduce((a,b)=>a+MONSTERS[b.base].hp,0)/BOSS_ENTRIES.length;
 const BOSS_CIRCLES=['of the Sunken Circle','of the Black Cycle','of the Last Gate','Beyond Counting'];
 function bossFor(depth){
-  const lastNamed=BOSSES[BOSSES.length-1].minD;
-  if(depth<=lastNamed){
-    let b=BOSSES[0];
-    for(const c of BOSSES)if(depth>=c.minD)b=c;
-    return {base:b.base,name:b.name,cycle:0};
-  }
-  // boss floors come every third level, so one pass through the list is 18 floors
-  const n=Math.floor((depth-lastNamed)/3)-1;
-  const i=((n%BOSSES.length)+BOSSES.length)%BOSSES.length;
-  const cycle=1+Math.floor(n/BOSSES.length);
-  const base=BOSSES[i].base;
-  return {base,name:MONSTERS[base].name+' '+BOSS_RANKS[i]+' '+BOSS_CIRCLES[(cycle-1)%BOSS_CIRCLES.length],cycle};
+  const {theme,tier}=bossSlot(depth);
+  const rows=BOSS_TABLE[theme];
+  if(!rows||!rows.length)return null;
+  // Past the last written tier the theme's deepest ruler comes back, harder and
+  // titled by the circle it belongs to. Nothing reaches this in practice --
+  // no simulated run has ever passed depth 31 -- but a boss floor must always
+  // have something standing on it.
+  const t=Math.min(tier,rows.length-1);
+  const cycle=tier-t;
+  const c=pick(rows[t]);
+  if(!cycle)return {base:c.base,name:c.name,cycle:0,theme,tier};
+  return {base:c.base,theme,tier,cycle,
+    name:c.name+' '+BOSS_CIRCLES[(cycle-1)%BOSS_CIRCLES.length]};
 }
 const THEMES=[
   {name:'Dungeon', wall:'#4a443a', wall2:'#2e2a22', floor:'#39342b', ceil:'#211d17', fog:0x0a0906, moss:'#39412c', roomBias:.45},
@@ -1197,6 +1232,24 @@ const MONSTER_ART={
      lacquered plate and a black surcoat and differ by rank-mark; the giants are
      the opposite, all bare skin and salvaged gear. That contrast is the whole
      read at sprite size. */
+  giantking:()=>({o:{hp:[32,18],ap:[50,34],lit:'#b06a3a',mid:'#4a2410',eye:'#ffd24a',rough:[1.4,0.45],seed:107,ad:0.8},
+    body:`<path d="M14 29 Q8 46 12 63 L23 69 L43 69 L52 63 Q57 46 51 29 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M17 34 Q32 41 48 34 L50 58 Q32 65 15 58 Z" fill="#5a2a12"/>`+
+    `<path d="M17 34 Q32 41 48 34" stroke="#f0b04a" stroke-width="1.4" fill="none"/>`+
+    `<path d="M21 41 L44 41 M20 49 L45 49 M21 57 L44 57" stroke="#7d3a18" stroke-width="1.8"/>`+
+    `<circle cx="32" cy="46" r="5.5" fill="none" stroke="#f0b04a" stroke-width="1.4"/>`+
+    `<path d="M32 40 L35 46 L32 52 L29 46 Z" fill="#ffd24a"/>`+
+    `|H|<path d="M23 16 Q23 7 32 7 Q41 7 41 16 L41 25 Q36 29 29 29 Q23 26 23 16 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M22 13 Q32 3 42 13 L42 17 Q32 11 22 17 Z" fill="#3a1c0c"/>`+
+    `<path d="M22 10 L15 3 M42 10 L49 3" stroke="#f0b04a" stroke-width="2"/>`+
+    `<path d="M25 23 Q32 28 39 23 Q35 27 32 27 Q29 27 25 23 Z" fill="#2a1408"/>`+
+    `<path d="M27 24 L27 27 M32 25 L32 28 M37 24 L37 27" stroke="#ffeccc" stroke-width="1.1"/>`+
+    `<circle cx="28" cy="18" r="1.6" fill="#ffd24a"/><circle cx="36" cy="18" r="1.6" fill="#ffd24a"/>`+
+    `<path d="M24 12 Q32 8 40 12" stroke="#f0b04a" stroke-width="1" fill="none"/>|/H|`+
+    `|A|<path d="M50 34 L59 31" stroke="#9a5a2e" stroke-width="3.6"/>`+
+    `<path d="M58 32 L63 12" stroke="#5a4a34" stroke-width="3"/>`+
+    `<path d="M55 12 Q63 3 69 12 Q63 20 55 12 Z" fill="#7a6258" ${RIM}/>`+
+    `<path d="M58 11 Q63 8 66 12" stroke="#e0602a" stroke-width="1.2" fill="none"/>|/A|`}),
   hobcaptain:()=>({o:{hp:[32,23],ap:[47,37],lit:'#b06a4a',mid:'#4a2418',eye:'#f0d24a',rough:[1,0.28],seed:101},
     body:`<path d="M19 30 Q16 42 18 55 L24 61 L40 61 L46 55 Q48 42 45 30 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M20 31 L44 31 L45 48 Q32 54 19 48 Z" fill="#7d2f22"/>`+
@@ -6208,7 +6261,7 @@ function addMonsterSprite(m){
   const spr=new THREE.Sprite(mat);
   const sc=m.boss?1.05:(['ogre','troll','minotaur','ogremage','dragon',
     'bonecolossus','deathknight','bonedrake','lich',
-    'umberhulk','purpleworm','roper','otyugh','cavebear','duergarlord','myelder','mylord','mysovereign','shrieker','drider','drowmatron','blackpud','ochrejelly','scrag','ettin','hillgiant','stonegiant'].includes(m.key)?0.95:0.72);
+    'umberhulk','purpleworm','roper','otyugh','cavebear','duergarlord','myelder','mylord','mysovereign','shrieker','drider','drowmatron','blackpud','ochrejelly','scrag','ettin','hillgiant','stonegiant','giantking'].includes(m.key)?0.95:0.72);
   spr.scale.set(sc,sc,1);
   spr.position.set(m.x+0.5,sc/2+0.02,m.y+0.5);
   spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss,elite:m.elite};

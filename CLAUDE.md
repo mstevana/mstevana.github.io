@@ -426,60 +426,49 @@ of the wall plane rather than behind it.
 Depth-gated content that is not theme-driven and will need extending if
 the dungeon grows:
 
-- **`BOSSES`** — one entry per named boss with a `minD`. **Every third
-  floor from depth 6 is a boss floor**, which is also the last floor of a
-  theme block (`THEMES[floor((depth−1)/3)]`), so a boss caps the theme you
-  have been walking through instead of landing in the middle of the next
-  one. `minD` therefore steps by 3, one named boss per boss floor, and
-  three places must agree: `isBossLevel` in `tryGen`, the `/3` in
-  `bossFor`'s cycle arithmetic, and the ⚔ in `refreshDepthTag`.
-  `BOSS_RANKS` must be **at least as long as `BOSSES`**, or a cycled boss
-  from the tail of the list is titled `undefined`.
+- **`BOSS_TABLE`** — bosses, keyed by theme and then by tier. **A boss belongs
+  to the floor it caps.** Boss floors are every third level from depth 6, and
+  because themes cycle every three floors the theme of a boss floor walks
+  Sewers, Crypt, Caves, Duergar, Myconid, Drow, Dungeon and starts over 21
+  depths later. `bossSlot(depth)` returns that theme and the tier — how many of
+  that theme's boss floors have already been passed.
 
-  **The list is ordered by weight, not by flavour**, and T21 holds it to
-  that: each named boss must out-threat the one three floors above it. This
-  is what a themed boss has to be written around rather than against. Depth
-  18 is the last floor of the Myconid block, so the grove gets its own
-  ruler — but a myconid sovereign built for the deep end scored 2906 against
-  a window of 832–1165, so the slot was filled with a **separate, lighter
-  `mylord`** and the sovereign moved to the end of the list at depth 27.
-  Both are **boss-only: neither has a `SPAWN_DEPTH` entry**, which is
-  precisely what frees their numbers to answer to a boss floor instead of a
-  spawn band.
+  Depth 3 is exempt. On floor 3 the party is still level 1 — 32 hit points
+  between four of them, a 3-hp wizard — against a boss carrying 2.5× hp and
+  **+2 AC**, which at that attack bonus is unhittable rather than hard. A
+  simulated descent walled there at 99%. That exemption is why the Dungeon's
+  own first boss floor is 24 rather than 3.
 
-  The drow matron is the same pattern done deliberately rather than
-  discovered: depth 21 caps the Drow block, the window there was 1040–1324,
-  and `drowmatron` was written to land at 1210 before a line of the list
-  moved. **Reach for that before reordering anything.** Adding a theme adds
-  a boss floor, so the named list stretches by one and everything below the
-  new entry slides three floors deeper; the arc is preserved because the
-  order is preserved.
+  **A slot holds a list, and one entry is drawn at random per floor**, so a
+  boss floor is not the same fight every run. The price is a stricter
+  invariant: every candidate in a slot must out-threat *every* candidate in
+  the slot three floors above it, because any pair can come up together. T21
+  checks the table pairwise rather than checking a median.
 
-  The first theme block is exempt. On floor 3 the party is still level 1 —
-  32 hit points between four of them, a 3-hp wizard — against a boss
-  carrying 2.5× hp and **+2 AC**, which at that attack bonus is unhittable
-  rather than hard. A simulated descent walled there at 99%.
+  Three places must agree on the cadence: `isBossLevel` in `tryGen`, the `/3`
+  in `bossSlot`, and the ⚔ in `refreshDepthTag`.
 
-  Past the last named entry `bossFor` cycles the list, each pass harder
-  and titled by its circle, and cycled bosses also wear an elite mantle.
-  Adding a named boss extends the run before cycling starts.
+  The arc was **solved against the bestiary rather than asserted**. Thirteen of
+  the fourteen slots are filled by creatures that already existed; only the
+  Dungeon's tier-1 slot at depth 45 needed one written for it, because the
+  stone giant tops out at 4158 against the drider's 4182 three floors above.
 
-  A cycled boss's **hit points come from `BOSS_BASE_HP`, the list's own
-  mean, not from the creature the cycle named.** A bugbear base is a
-  quarter of a dragon's, so raw base hp handed you a boss a third of the
-  one three floors above, and the sawtooth repeated on every pass. Named
-  bosses keep their own creature's hp — they are hand-placed for their
-  depth, and Sinshara is a caster whose danger is her spells.
+  **A boss-only creature with no slot is dead content.** When the table
+  replaced the old flat list the myconid sovereign fell out of it entirely —
+  she scored 6057 at depth 39 against a window of 3253–4182. Being boss-only
+  is exactly what makes the numbers free to move, so she was resized into the
+  slot rather than dropped. Check this whenever the table changes.
 
-  T21 derives where the cycle starts from `BOSSES` itself rather than
-  writing the depth down, so adding a named boss no longer breaks it.
+  Past the last written tier a theme's deepest ruler returns, titled by the
+  circle it belongs to. Nothing reaches that in practice — no simulated run
+  has passed depth 31 — but a boss floor must always have something on it.
 
-  That split is why T21 measures the two arcs on different things: the
-  named arc on `monsterThreat` (which credits spells, reach and riders,
-  so Sinshara's low hp is not a regression) and the cycled arc on `maxHp`.
-  A cycled boss's *damage* is still whatever creature the list named, so
-  its threat still steps down at the named→cycled handover — that is the
-  list starting over, and it is by design.
+  A returning boss's **hit points come from `BOSS_BASE_HP`, the table's own
+  mean, not from the creature named.** A wererat base is a fraction of a
+  lich's, so raw base hp made a deep boss weaker than the one three floors
+  above it. The creature still decides how the fight goes — its damage, its
+  reach, whether it casts — but its weight class comes from the depth.
+
 - **`trapDice` / `trapDC`** — damage keeps climbing with depth; the spot
   DC deliberately stops just short of a maxed rogue's take-10, so finding
   traps stays the rogue's job at any depth. Do not let the DC past that.
