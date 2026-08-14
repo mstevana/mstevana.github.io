@@ -747,6 +747,9 @@ const THEMES=[
   {name:'Sewers',  wall:'#3a4438', wall2:'#232b21', floor:'#2e352c', ceil:'#181d16', fog:0x070a06, moss:'#4a5a35', roomBias:.25},
   {name:'Crypt',   wall:'#443c44', wall2:'#282228', floor:'#332e33', ceil:'#1c181c', fog:0x0a070a, moss:'#4a3a50', roomBias:.6},
   {name:'Caves',   wall:'#4a3c30', wall2:'#2e241c', floor:'#3a2e24', ceil:'#211a14', fog:0x0a0705, moss:'#5a4a2a', roomBias:.15},
+  // Duergar halls are built, not dug: hence the high roomBias. `gold` is the
+  // inlay colour, used by the wall trim, the frieze runes and the door fittings.
+  {name:'Duergar', wall:'#565a5b', wall2:'#2e3132', floor:'#43474a', ceil:'#1e1d1a', fog:0x080807, moss:'#4a4438', roomBias:.72, gold:'#c9a227'},
 ];
 const FIRST_NAMES=['Aldric','Berrin','Cassia','Dorn','Elva','Fenn','Grimm','Hilda','Ivo','Jora','Kelder','Lysa','Mordin','Nessa','Oskar','Petra','Quinn','Rurik','Sable','Torv','Ulma','Vance','Wren','Yorick','Zora','Brakka','Thistle','Marn','Isolde','Garrick'];
 
@@ -2167,8 +2170,26 @@ function tryGen(depth,targetWalk,theme){
       crypts.push({x,y,dx,dy,kind:pick(KINDS)});
     }
   }
+  // duergar halls: the walls are dressed and furnished — engaged pillars carrying
+  // the roof, and torches burning in iron brackets. Sited exactly like the crypt's
+  // furniture, against a plain wall face with room to stand in front of it.
+  let duergar=[];
+  if(theme.name==='Duergar'){
+    const nD=10+rnd(8);
+    let dTries=400;
+    while(duergar.length<nD&&dTries-->0){
+      const x=1+rnd(W-2),y=1+rnd(H-2);
+      if(g[idx(x,y)]!==T_FLOOR)continue;
+      const wd=DIRS.filter(([dx,dy])=>g[idx(x+dx,y+dy)]===T_WALL);
+      if(!wd.length)continue;
+      if(duergar.some(c=>Math.abs(c.x-x)+Math.abs(c.y-y)<2))continue;
+      const [dx,dy]=pick(wd);
+      // pillars are the commoner sight; a hall is lit but not blazing
+      duergar.push({x,y,dx,dy,kind:Math.random()<0.55?'pillar':'torch'});
+    }
+  }
   return {w:W,h:H,grid:g,start,stairs,traps,items,monsters,secrets,theme,depth,
-    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,lurkers};
+    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,lurkers,duergar};
 }
 /* ---------- difficulty curve ----------
    Depth, not party level, drives everything. One documented scalar grows every
@@ -3117,6 +3138,216 @@ function caveWallCanvas(th,variant,baseCv){
 // the cave floor: the same ground as the walls, trodden flatter, with grit and
 // loose rubble collected on it. Drawn at 128 like everything else, but mapped
 // across several tiles at once so it never restarts on a tile boundary.
+/* ---------- duergar halls: cut and dressed, not quarried ----------
+
+   Everything a wall shares with its neighbours lives in the base: the courses,
+   the drafted margins, the gold trim lines and the channel the inscription runs
+   in. A band that appeared on only some variants would stop dead at a tile
+   join, so the band is shared and only the runes inside it change. That is also
+   what a long inscription looks like -- one frieze, different words.
+
+   Blocks are three courses of two, which comes out roughly square in world
+   space: a wall tile is one unit wide and WALLH tall, so 128 texels across map
+   to 1.0 and 128 down map to 1.3. */
+function duergarBaseCanvas(th){
+  const {cv,ctx}=newCanvas(128);
+  const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
+  const gold=th.gold||'#c9a227';
+  const ROWS=3, RH=128/ROWS, COLS=2, BW=128/COLS;
+  ctx.fillStyle=shade(th.wall,-0.62);ctx.fillRect(0,0,128,128);   // the joints behind everything
+  for(let r=0;r<ROWS;r++){
+    const y=r*RH, phase=(r%2)?BW/2:0;
+    for(let k=-1;k<=COLS;k++){
+      const x=phase+k*BW;
+      // the block face, then a drafted margin chiselled round its edge: a
+      // recessed border with the boss standing proud inside it
+      ctx.fillStyle=shade(th.wall,(r%2?-0.14:-0.19));
+      ctx.fillRect(x+1,y+1,BW-2,RH-2);
+      ctx.fillStyle=shade(th.wall,-0.32);
+      ctx.fillRect(x+2,y+2,BW-4,RH-4);
+      ctx.fillStyle=shade(th.wall,r%2?-0.10:-0.16);
+      ctx.fillRect(x+5,y+5,BW-10,RH-10);
+      // light on the top and left arrises, shadow under the bottom and right
+      ctx.strokeStyle='rgba(255,246,225,0.13)';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(x+1.5,y+RH-1.5);ctx.lineTo(x+1.5,y+1.5);ctx.lineTo(x+BW-1.5,y+1.5);ctx.stroke();
+      ctx.strokeStyle='rgba(0,0,0,0.45)';
+      ctx.beginPath();ctx.moveTo(x+BW-1.5,y+1.5);ctx.lineTo(x+BW-1.5,y+RH-1.5);ctx.lineTo(x+1.5,y+RH-1.5);ctx.stroke();
+      // and the same again, inverted, around the sunk margin
+      ctx.strokeStyle='rgba(0,0,0,0.30)';
+      ctx.beginPath();ctx.moveTo(x+5.5,y+RH-5.5);ctx.lineTo(x+5.5,y+5.5);ctx.lineTo(x+BW-5.5,y+5.5);ctx.stroke();
+      ctx.strokeStyle='rgba(255,246,225,0.10)';
+      ctx.beginPath();ctx.moveTo(x+BW-5.5,y+5.5);ctx.lineTo(x+BW-5.5,y+RH-5.5);ctx.lineTo(x+5.5,y+RH-5.5);ctx.stroke();
+    }
+  }
+  // the frieze: a channel cut along the second course, where the runes will go
+  const FY=RH*1+RH*0.30, FH=RH*0.40;
+  ctx.fillStyle=shade(th.wall,-0.46);ctx.fillRect(0,FY,128,FH);
+  ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(0,FY+0.5);ctx.lineTo(128,FY+0.5);ctx.stroke();
+  ctx.strokeStyle='rgba(255,246,225,0.12)';
+  ctx.beginPath();ctx.moveTo(0,FY+FH-0.5);ctx.lineTo(128,FY+FH-0.5);ctx.stroke();
+  // gold inlay: a fillet above and below the frieze, running the whole wall
+  for(const gy of [FY-3.5,FY+FH+2.5]){
+    ctx.strokeStyle=gold;ctx.lineWidth=1.6;
+    ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(128,gy);ctx.stroke();
+    ctx.strokeStyle='rgba(255,240,190,0.55)';ctx.lineWidth=0.6;
+    ctx.beginPath();ctx.moveTo(0,gy-0.7);ctx.lineTo(128,gy-0.7);ctx.stroke();
+    ctx.strokeStyle='rgba(60,40,0,0.5)';
+    ctx.beginPath();ctx.moveTo(0,gy+0.8);ctx.lineTo(128,gy+0.8);ctx.stroke();
+  }
+  // polish: dressed stone holds a soft vertical sheen that quarried rock does not
+  const gr=ctx.createLinearGradient(0,0,0,128);
+  gr.addColorStop(0,'rgba(232,238,245,0.030)');
+  gr.addColorStop(0.45,'rgba(232,238,245,0.010)');
+  gr.addColorStop(1,'rgba(0,0,0,0.16)');
+  ctx.fillStyle=gr;ctx.fillRect(0,0,128,128);
+  // fine tooling marks, kept faint: this stone was worked, not weathered
+  for(let i=0;i<420;i++){
+    const x=rnd(128),y=rnd(128),len=1+rnd(3);
+    ctx.strokeStyle=Math.random()<0.5?'rgba(255,255,255,0.035)':'rgba(0,0,0,0.07)';
+    ctx.lineWidth=0.7;
+    wrapX(()=>{ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+len,y+(Math.random()-0.5));ctx.stroke();});
+  }
+  return {cv,fy:FY,fh:FH,rh:RH,bw:BW,rows:ROWS,cols:COLS};
+}
+// Dethek is chiselled, so it has no curves: every stroke is straight. A glyph is
+// a stem with two to four branches struck off it at angles.
+function dethekGlyph(ctx,x,y,h,seed){
+  let s=seed>>>0;
+  const rr=()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};
+  ctx.beginPath();
+  ctx.moveTo(x,y);ctx.lineTo(x,y+h);                       // the stem
+  const n=2+Math.floor(rr()*3);
+  for(let i=0;i<n;i++){
+    const at=y+h*(0.12+rr()*0.76);
+    const dir=rr()<0.5?-1:1;
+    const dx=dir*(h*(0.22+rr()*0.24));
+    const dy=(rr()-0.5)*h*0.42;
+    ctx.moveTo(x,at);ctx.lineTo(x+dx,at+dy);
+  }
+  if(rr()<0.35){const at=y+h*(0.2+rr()*0.6);ctx.moveTo(x-h*0.18,at);ctx.lineTo(x+h*0.18,at);}
+  ctx.stroke();
+}
+function duergarWallCanvas(th,variant,base){
+  const {cv,ctx}=newCanvas(128);
+  const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
+  const gold=th.gold||'#c9a227';
+  ctx.drawImage(base.cv,0,0,128,128);
+  // the inscription: same channel on every variant, different words in it, so a
+  // long wall reads as one continuous frieze rather than a repeated stamp
+  {
+    const h=base.fh*0.62, y=base.fy+(base.fh-h)/2;
+    const inGold=(variant%3)===0;                 // some courses are gilded, most incised
+    const step=11, off=(variant*7)%step;
+    for(let x=-step;x<=128+step;x+=step){
+      const gx=x+off+2;
+      const seed=(variant*7919)^(Math.round(gx)*104729);
+      // cut first: a dark stroke reads as the groove
+      ctx.strokeStyle='rgba(0,0,0,0.62)';ctx.lineWidth=2.1;ctx.lineCap='butt';
+      dethekGlyph(ctx,gx,y,h,seed);
+      // then the lit face of the groove, offset a hair up and left
+      ctx.strokeStyle=inGold?gold:'rgba(255,246,225,0.20)';ctx.lineWidth=inGold?1.3:1.0;
+      ctx.save();ctx.translate(-0.5,-0.6);dethekGlyph(ctx,gx,y,h,seed);ctx.restore();
+    }
+  }
+  // per-variant metalwork and wear on the block faces
+  const rr0=(variant*2654435761)>>>0;
+  let sd=rr0;const rr=()=>{sd=(sd*1664525+1013904223)>>>0;return sd/4294967296;};
+  if(variant%4===1){                              // gold studs at the block corners
+    for(let r=0;r<base.rows;r++){
+      const y=r*base.rh, phase=(r%2)?base.bw/2:0;
+      for(let k=-1;k<=base.cols;k++){
+        const x=phase+k*base.bw;
+        for(const [sx,sy] of [[x+8,y+8],[x+base.bw-8,y+8],[x+8,y+base.rh-8],[x+base.bw-8,y+base.rh-8]]){
+          if(sy>base.fy-2&&sy<base.fy+base.fh+2)continue;   // never over the frieze
+          wrapX(()=>{
+            ctx.fillStyle='rgba(0,0,0,0.45)';ctx.beginPath();ctx.arc(sx+0.6,sy+0.7,2.1,0,7);ctx.fill();
+            ctx.fillStyle=gold;ctx.beginPath();ctx.arc(sx,sy,1.9,0,7);ctx.fill();
+            ctx.fillStyle='rgba(255,244,200,0.75)';ctx.beginPath();ctx.arc(sx-0.5,sy-0.6,0.8,0,7);ctx.fill();
+          });
+        }
+      }
+    }
+  }else if(variant%4===2){                        // a chevron course cut into the top band
+    const y=base.rh*0.5, w=8;
+    ctx.lineWidth=1.6;
+    for(let x=-w;x<=128+w;x+=w){
+      ctx.strokeStyle='rgba(0,0,0,0.5)';
+      ctx.beginPath();ctx.moveTo(x,y+4);ctx.lineTo(x+w/2,y-4);ctx.lineTo(x+w,y+4);ctx.stroke();
+      ctx.strokeStyle='rgba(255,246,225,0.16)';
+      ctx.beginPath();ctx.moveTo(x,y+3.2);ctx.lineTo(x+w/2,y-4.8);ctx.lineTo(x+w,y+3.2);ctx.stroke();
+    }
+  }else if(variant%4===3){                        // a carved boss on one block of the bottom course
+    const cx=(variant%2?0.28:0.72)*128, cy=base.rh*2.5;
+    wrapX(()=>{
+      ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(cx,cy,9,0,7);ctx.stroke();
+      ctx.strokeStyle=gold;ctx.lineWidth=1.2;
+      ctx.beginPath();ctx.arc(cx-0.4,cy-0.5,9,0,7);ctx.stroke();
+      // an angular star inside it, struck with the same straight strokes as the runes
+      ctx.strokeStyle='rgba(255,246,225,0.22)';ctx.lineWidth=1.4;
+      for(let a=0;a<6;a++){
+        const t=a*Math.PI/3;
+        ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(t)*7,cy+Math.sin(t)*7);ctx.stroke();
+      }
+    });
+  }
+  // soot gathering under the ceiling, heavier on some walls than others
+  const soot=ctx.createLinearGradient(0,0,0,34);
+  soot.addColorStop(0,`rgba(12,10,8,${0.20+(variant%3)*0.07})`);
+  soot.addColorStop(1,'rgba(12,10,8,0)');
+  ctx.fillStyle=soot;ctx.fillRect(0,0,128,34);
+  // scratches and knocks
+  for(let i=0;i<10+((variant*5)%14);i++){
+    const x=rnd(128),y=8+rnd(112),len=3+rnd(9),a=(Math.random()-0.5)*0.8;
+    wrapX(()=>{
+      ctx.strokeStyle='rgba(0,0,0,0.22)';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.cos(a)*len,y+Math.sin(a)*len);ctx.stroke();
+    });
+  }
+  return cv;
+}
+// Polished slabs: big, tight-jointed, and holding a reflection of the torch.
+function duergarFloorCanvas(th){
+  const {cv,ctx}=newCanvas(128);
+  const wrap9f=(fn)=>{for(const oy of [-128,0,128])for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,oy);fn();ctx.restore();}};
+  const gold=th.gold||'#c9a227';
+  ctx.fillStyle=shade(th.floor,-0.5);ctx.fillRect(0,0,128,128);
+  const N=2, S=128/N;
+  for(let r=0;r<N;r++)for(let c=0;c<N;c++){
+    const x=c*S,y=r*S;
+    ctx.fillStyle=shade(th.floor,((r+c)%2)?0.05:-0.03);
+    ctx.fillRect(x+1,y+1,S-2,S-2);
+    ctx.strokeStyle='rgba(255,250,235,0.09)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(x+1.5,y+S-1.5);ctx.lineTo(x+1.5,y+1.5);ctx.lineTo(x+S-1.5,y+1.5);ctx.stroke();
+    ctx.strokeStyle='rgba(0,0,0,0.35)';
+    ctx.beginPath();ctx.moveTo(x+S-1.5,y+1.5);ctx.lineTo(x+S-1.5,y+S-1.5);ctx.lineTo(x+1.5,y+S-1.5);ctx.stroke();
+  }
+  // veining, faint, following no grid
+  for(let i=0;i<26;i++){
+    const x=rnd(128),y=rnd(128);
+    wrap9f(()=>{
+      ctx.strokeStyle=`rgba(255,250,235,${0.02+Math.random()*0.03})`;ctx.lineWidth=0.8;
+      ctx.beginPath();ctx.moveTo(x,y);
+      let px=x,py=y;
+      for(let k=0;k<4;k++){px+=(Math.random()-0.5)*18;py+=(Math.random()-0.5)*18;ctx.lineTo(px,py);}
+      ctx.stroke();
+    });
+  }
+  // a gold fillet inlaid where four slabs meet
+  ctx.fillStyle=gold;
+  wrap9f(()=>{ctx.globalAlpha=0.5;ctx.fillRect(S-1.5,S-1.5,3,3);ctx.globalAlpha=1;});
+  // the polish itself: a broad soft highlight, and grit too fine to read as noise
+  const gr=ctx.createRadialGradient(48,44,4,64,64,88);
+  gr.addColorStop(0,'rgba(255,250,235,0.07)');
+  gr.addColorStop(1,'rgba(255,250,235,0)');
+  ctx.fillStyle=gr;ctx.fillRect(0,0,128,128);
+  for(let i=0;i<900;i++){
+    ctx.fillStyle=Math.random()<0.5?'rgba(255,255,255,0.025)':'rgba(0,0,0,0.05)';
+    ctx.fillRect(rnd(128),rnd(128),1,1);
+  }
+  return cv;
+}
 function caveFloorCanvas(th){
   const base=caveBaseCanvas(th,th.floor,0.72);
   const {cv,ctx}=newCanvas(128);
@@ -3382,26 +3613,34 @@ function buildLevel(L){
   // a cave is dug, not built: its walls get twelve variants of broken earth over
   // one shared noise base, and deeper relief than a flat brick face wants
   const cave=th.name==='Caves';
-  const NVAR=cave?12:6;
-  const grid=cave?null:brickGrid(th);       // shared brick skeleton, masonry themes only
-  const baseWall=cave?caveBaseCanvas(th)    // shared earth, so tiles still join invisibly
+  const duer=th.name==='Duergar';
+  const NVAR=cave?12:(duer?8:6);
+  const grid=(cave||duer)?null:brickGrid(th); // shared brick skeleton, masonry themes only
+  const baseWall=cave?caveBaseCanvas(th)      // shared earth, so tiles still join invisibly
+                :duer?duergarBaseCanvas(th)   // shared courses, trim and frieze channel
                      :baseWallCanvas(th,grid);
   for(let v=0;v<NVAR;v++){
-    const tex=texFromCanvas(cave?caveWallCanvas(th,v,baseWall):wallCanvas(th,v,grid,baseWall));
+    const tex=texFromCanvas(cave?caveWallCanvas(th,v,baseWall)
+                           :duer?duergarWallCanvas(th,v,baseWall)
+                                :wallCanvas(th,v,grid,baseWall));
     tex.wrapS=tex.wrapT=THREE.RepeatWrapping; // displacement samples can wrap at face edges
-    const mat=new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,bumpScale:cave?0.05:0.02,
-      displacementMap:tex,displacementScale:cave?0.10:0.05,specular:0x191309,shininess:cave?3:5});
+    // dressed stone is flatter than quarried rock and takes a harder highlight
+    const mat=new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,bumpScale:cave?0.05:(duer?0.015:0.02),
+      displacementMap:tex,displacementScale:cave?0.10:(duer?0.025:0.05),
+      specular:duer?0x1c1a14:0x191309,shininess:cave?3:(duer?14:5)});
     wallMats.push(weldWallDisp(mat));
   }
   // the ambushers are faced with these same textures, so keep them reachable
   R3.wallMats=wallMats;
   const floorTex=texFromCanvas(cave?caveFloorCanvas(th)
+                              :duer?duergarFloorCanvas(th)
                                    :noiseCanvas(th.floor,th.wall2,false,th.moss));
   const ceilTex=texFromCanvas(noiseCanvas(th.ceil,'#000',false,null));
   floorTex.wrapS=floorTex.wrapT=THREE.RepeatWrapping;floorTex.repeat.set(1,1);
   ceilTex.wrapS=ceilTex.wrapT=THREE.RepeatWrapping;ceilTex.repeat.set(L.w,L.h);
   const floorMat=new THREE.MeshPhongMaterial({map:floorTex,bumpMap:floorTex,
-    bumpScale:cave?0.03:0.015,specular:0x120e08,shininess:cave?3:4});
+    bumpScale:cave?0.03:(duer?0.006:0.015),
+    specular:duer?0x24211a:0x120e08,shininess:cave?3:(duer?18:4)});
   const ceilMat=new THREE.MeshPhongMaterial({map:ceilTex,bumpMap:ceilTex,bumpScale:0.012,specular:0x0c0a06,shininess:3});
   // floor: one unit plane per non-wall tile. holes fall out naturally at the
   // stairs shaft and at sewer lake pits.
@@ -4011,6 +4250,77 @@ function buildLevel(L){
     }
     R3.candleFlames=flames;
   }
+  // duergar halls: engaged pillars carrying the roof, and torches burning in
+  // iron brackets. Built in the wall's local frame — +X along the wall, +Y up,
+  // +Z out into the room — then turned to face the tile they stand against.
+  // The scan stores dx,dy as floor->wall, so the turn is atan2(-dx,-dy), the
+  // same sign the crypt furniture uses and the opposite of the cave gems.
+  if(th.name==='Duergar'&&L.duergar&&L.duergar.length){
+    const gold=new THREE.Color(th.gold||'#c9a227');
+    const stoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.06),
+      specular:0x24211a,shininess:16});
+    const darkMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall2).multiplyScalar(1.15),
+      specular:0x1a1813,shininess:10});
+    const goldMat=new THREE.MeshPhongMaterial({color:gold,specular:0xfff0c0,shininess:70});
+    const ironMat=new THREE.MeshPhongMaterial({color:0x2b2b2e,specular:0x6a6a70,shininess:34});
+    const flames=R3.candleFlames||[];
+    for(const f of L.duergar){
+      const g0=new THREE.Group();
+      if(f.kind==='pillar'){
+        // a half-round column standing proud of the wall, with base and capital
+        const H=WALLH;
+        const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.145,H*0.78,12,1,false,-Math.PI/2,Math.PI),stoneMat);
+        shaft.position.set(0,H*0.5,0.02);g0.add(shaft);
+        // flutes, cut as thin dark ribs down the face of the shaft
+        for(let i=-2;i<=2;i++){
+          const fl=new THREE.Mesh(new THREE.BoxGeometry(0.012,H*0.74,0.02),darkMat);
+          fl.position.set(i*0.045,H*0.5,0.02+0.128);g0.add(fl);
+        }
+        const base=new THREE.Mesh(new THREE.BoxGeometry(0.36,H*0.10,0.20),stoneMat);
+        base.position.set(0,H*0.05,0.06);g0.add(base);
+        const plinth=new THREE.Mesh(new THREE.BoxGeometry(0.42,H*0.045,0.24),darkMat);
+        plinth.position.set(0,H*0.022,0.07);g0.add(plinth);
+        const cap=new THREE.Mesh(new THREE.BoxGeometry(0.38,H*0.09,0.22),stoneMat);
+        cap.position.set(0,H*0.90,0.065);g0.add(cap);
+        const abac=new THREE.Mesh(new THREE.BoxGeometry(0.44,H*0.04,0.26),darkMat);
+        abac.position.set(0,H*0.965,0.075);g0.add(abac);
+        // a gold band where the capital meets the shaft
+        const band=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,0.022,12,1,false,-Math.PI/2,Math.PI),goldMat);
+        band.position.set(0,H*0.845,0.02);g0.add(band);
+      }else{
+        // torch: an iron bracket out of the wall, a socket, and a live flame
+        const Y=0.92;
+        const arm=new THREE.Mesh(new THREE.BoxGeometry(0.035,0.035,0.20),ironMat);
+        arm.position.set(0,Y,0.10);g0.add(arm);
+        const stay=new THREE.Mesh(new THREE.BoxGeometry(0.028,0.16,0.028),ironMat);
+        stay.position.set(0,Y-0.09,0.045);stay.rotation.x=-0.5;g0.add(stay);
+        const plate=new THREE.Mesh(new THREE.BoxGeometry(0.10,0.14,0.02),ironMat);
+        plate.position.set(0,Y,0.012);g0.add(plate);
+        const cup=new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.035,0.10,8),ironMat);
+        cup.position.set(0,Y+0.06,0.19);g0.add(cup);
+        const stub=new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.026,0.10,6),darkMat);
+        stub.position.set(0,Y+0.12,0.19);g0.add(stub);
+        // the flame: unlit geometry so it reads as its own light source
+        const fl=new THREE.Mesh(new THREE.ConeGeometry(0.055,0.19,7),
+          new THREE.MeshBasicMaterial({color:0xffb45a,transparent:true,opacity:0.92}));
+        fl.position.set(0,Y+0.24,0.19);g0.add(fl);
+        const core=new THREE.Mesh(new THREE.ConeGeometry(0.028,0.11,6),
+          new THREE.MeshBasicMaterial({color:0xfff0c0,transparent:true,opacity:0.95}));
+        core.position.set(0,Y+0.215,0.19);g0.add(core);
+        g0.userData.flame=fl;g0.userData.core=core;
+      }
+      g0.rotation.y=Math.atan2(-f.dx,-f.dy);
+      g0.position.set(f.x+0.5+f.dx*0.5,0,f.y+0.5+f.dy*0.5);
+      grp.add(g0);
+      if(f.kind==='torch'){
+        const l=new THREE.PointLight(0xffa855,0.85,3.6,2);
+        l.position.set(f.x+0.5+f.dx*0.5-f.dx*0.30,1.16,f.y+0.5+f.dy*0.5-f.dy*0.30);
+        grp.add(l);
+        flames.push({light:l,base:0.85,mesh:g0.userData.flame,core:g0.userData.core});
+      }
+    }
+    R3.candleFlames=flames;
+  }
   // caves: a seam of crystal here and there, caught in the torchlight. Real
   // geometry rather than paint, because a gem drawn into a variant texture would
   // appear on every one of the ~29 tiles sharing it — wallpaper, not a find.
@@ -4222,6 +4532,48 @@ function doorCanvas(th,locked){
     }
     return cv;
   }
+  if(th.name==='Duergar'){ // a slab of dressed stone, not a plank of wood
+    const gold=th.gold||'#c9a227';
+    ctx.fillStyle=shade(th.wall,-0.34);ctx.fillRect(0,0,128,128);
+    ctx.fillStyle=shade(th.wall,-0.20);ctx.fillRect(5,5,118,118);   // drafted margin
+    ctx.fillStyle=shade(th.wall,-0.12);ctx.fillRect(12,12,104,104);
+    ctx.strokeStyle='rgba(255,246,225,0.14)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(12,116);ctx.lineTo(12,12);ctx.lineTo(116,12);ctx.stroke();
+    ctx.strokeStyle='rgba(0,0,0,0.45)';
+    ctx.beginPath();ctx.moveTo(116,12);ctx.lineTo(116,116);ctx.lineTo(12,116);ctx.stroke();
+    // a gold frame inlaid inside the margin
+    ctx.strokeStyle=gold;ctx.lineWidth=2;ctx.strokeRect(20,20,88,88);
+    ctx.strokeStyle='rgba(255,244,200,0.5)';ctx.lineWidth=0.8;ctx.strokeRect(19.2,19.2,88,88);
+    // an angular device at the centre, struck in the same straight strokes as
+    // the wall runes, and a band of them beneath it
+    ctx.strokeStyle='rgba(0,0,0,0.55)';ctx.lineWidth=3;
+    ctx.beginPath();
+    ctx.moveTo(64,32);ctx.lineTo(84,52);ctx.lineTo(64,72);ctx.lineTo(44,52);ctx.closePath();
+    ctx.moveTo(64,40);ctx.lineTo(76,52);ctx.lineTo(64,64);ctx.lineTo(52,52);ctx.closePath();
+    ctx.stroke();
+    ctx.strokeStyle=gold;ctx.lineWidth=1.6;
+    ctx.beginPath();
+    ctx.moveTo(63.4,31.4);ctx.lineTo(83.4,51.4);ctx.lineTo(63.4,71.4);ctx.lineTo(43.4,51.4);ctx.closePath();
+    ctx.stroke();
+    ctx.lineCap='butt';
+    for(let i=0;i<5;i++){
+      const gx=36+i*14;
+      ctx.strokeStyle='rgba(0,0,0,0.55)';ctx.lineWidth=2.4;dethekGlyph(ctx,gx,84,16,i*7717+3);
+      ctx.strokeStyle='rgba(255,246,225,0.22)';ctx.lineWidth=1.1;
+      ctx.save();ctx.translate(-0.6,-0.7);dethekGlyph(ctx,gx,84,16,i*7717+3);ctx.restore();
+    }
+    // iron and gold furniture: a ring pull, or a heavy lock if it is barred
+    if(locked){
+      ctx.fillStyle='#2b2b2e';ctx.beginPath();ctx.arc(64,108,11,0,7);ctx.fill();
+      ctx.strokeStyle=gold;ctx.lineWidth=2;ctx.beginPath();ctx.arc(64,108,11,0,7);ctx.stroke();
+      ctx.fillStyle='#100e0a';ctx.beginPath();ctx.arc(64,105,4,0,7);ctx.fill();
+      ctx.fillRect(61.5,106,5,10);
+    }else{
+      ctx.strokeStyle='#3a3a3e';ctx.lineWidth=4;ctx.beginPath();ctx.arc(64,108,9,0,7);ctx.stroke();
+      ctx.strokeStyle=gold;ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(64,107.2,9,0,7);ctx.stroke();
+    }
+    return cv;
+  }
   ctx.fillStyle='#241a10';ctx.fillRect(0,0,128,128);
   ctx.strokeStyle='#0d0906';ctx.lineWidth=3;
   for(let x=8;x<128;x+=24){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,128);ctx.stroke();}
@@ -4364,8 +4716,11 @@ function updateCamera(now){
   for(let i=0;i<R3.candleFlames.length;i++){
     const c=R3.candleFlames[i],ph=i*1.7;
     const f=Math.sin(now/140+ph)*0.16+Math.sin(now/53+ph)*0.09+Math.random()*0.08;
-    if(c.light)c.light.intensity=0.55*(1+f);
+    // each flame keeps its own steady level: a candle is not a wall torch
+    if(c.light)c.light.intensity=(c.base||0.55)*(1+f);
     if(c.fl)c.fl.scale.set(1+f*0.12,1+f*0.3,1+f*0.12);
+    if(c.mesh)c.mesh.scale.set(1+f*0.14,1+f*0.34,1+f*0.14);
+    if(c.core)c.core.scale.set(1+f*0.20,1+f*0.40,1+f*0.20);
     if(c.halo)c.halo.material.opacity=0.28*(1+f*0.5);
   }
   // sewer liquid animates in its shader; feed it the clock
@@ -6261,7 +6616,7 @@ function serializeGame(){
       traps:Object.values(L.traps),items:Object.keys(L.items).map(i=>[+i,L.items[i]]),
       monsters:L.monsters.map(m=>{const c=Object.assign({},m);delete c._sc;delete c._regenT;delete c.dot;return c;}),
       secrets:L.secrets,lockedRoom:L.lockedRoom,restCount:L.restCount||{},restsHere:L.restsHere||0,
-      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,lurkers:L.lurkers||[],
+      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,lurkers:L.lurkers||[],duergar:L.duergar||[],
     },
   };
 }
@@ -6281,7 +6636,7 @@ function deserializeGame(o){
     w:lv.w,h:lv.h,grid:b64ToU8(lv.grid),explored:b64ToU8(lv.explored),
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
     traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
-    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,lurkers:lv.lurkers||[],
+    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],
   };
   clearFx();
   G.L=L;G.over=false;
