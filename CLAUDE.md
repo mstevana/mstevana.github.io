@@ -768,34 +768,38 @@ through) and offensive spells resolve when their bolt arrives (set
 `G.fx=[]` and call `updateFx(10)`, which lands everything in flight via
 the `f.t>6` branch). T37 covers the whole of this.
 
-## The thin ordinary roster — measured, and deliberately left
+## Every theme owns a roster now
 
-The bestiary is no longer thin at depth in total. Five themed rosters —
-undead, cave, duergar, myconid, drow — have taken depth 20 from a handful
-of creatures to **twenty-seven in band**, peaking at thirty around depth 24.
-What is still thin, and has only got thinner in relative terms, is the
-**ordinary** roster: everything carrying none of `type:'undead'`,
-`cave`, `duergar`, `myconid` or `drow`.
+This section used to record that the *ordinary* roster — everything with no
+theme flag — had collapsed to two creatures past depth 16, so that a Dungeon
+or Sewers floor was mostly other people's furniture thinned to `OFF`. That
+is fixed. Dungeon and Sewers were the only two settings without a faction of
+their own, and both now have one: a hobgoblin legion with giants for muscle,
+and a wererat guild keeping oozes and an otyugh as livestock.
 
-| depth | creatures in band | of which ordinary |
+Seven themes, seven rosters, and **exactly one creature left unflagged** —
+plain `ogre`, which is banded 6–10 and can reach neither Dungeon block
+(1–3 and 22–24) without either brutalising depth 3 or littering depth 22
+with weaklings. It is deliberately left as the last piece of wildlife.
+
+| depth | in band | spread |
 |---|---|---|
-| 8 | 8 | 3 |
-| 13 | 14 | 3 |
-| 20 | 27 | **2** |
-| 24 | 30 | **2** |
-| 31 | 17 | **2** |
-| 40 | 10 | **2** |
+| 3 | 15 | dungeon 7, sewers 4, undead 4 |
+| 13 | 17 | cave 6, undead 4, sewers 3, dungeon 2, duergar 2 |
+| 20 | 35 | myconid 6, dungeon 6, drow 5, duergar 5, undead 5, cave 4, sewers 4 |
+| 24 | 41 | dungeon 7, myconid 7, drow 6, duergar 6, sewers 6, undead 5, cave 4 |
+| 31 | 22 | cave 4, undead 4, drow 4, dungeon 3, sewers 3 |
+| 40 | 10 | cave 3, undead 3, and one each of the rest |
 
-Past depth 16 the unthemed roster is two creatures. Every floor in the
-game is therefore carried by somebody's roster, and a Dungeon or Sewers
-floor is mostly other people's furniture thinned to `OFF`. That is the
-real shape of the bestiary now, and it is the argument for filling the
-ordinary band if anyone ever picks the job up.
+Two rules came out of building the last two, and they apply to anything
+added from here:
 
-**This was costed and declined**, and the decision is worth revisiting only
-on the strength of the table above rather than on difficulty. Filling
-depths 9–30 is around nine creatures — definitions, `SPAWN_DEPTH` bands,
-layered `MONSTER_ART` and threat tuning apiece. It buys variety and nothing
-else: with the band settled at 26–30 it is not a difficulty lever, and the
-depth 31+ rows are content no run reaches. If you pick it up, aim it at
-9–30 and skip the deep band; do not treat the table as a bug list.
+- **A flag must reach a floor of its own theme.** Otherwise it is 0.35
+  everywhere and ×4 nowhere — a pure penalty. That is why the bugbear's
+  band was stretched to touch depth 3 and why the ogre is not flagged at
+  all. T48 and T49 both assert it.
+- **Dungeon and Sewers are bimodal by construction.** Their blocks sit at
+  1–3 / 22–24 and 4–6 / 25–27, twenty floors apart with nothing between, so
+  their rosters need a shallow tier and a deep tier and nothing in the
+  middle. Every other theme's two blocks are 21 floors apart too, but their
+  creatures' bands are wide enough to cover both.

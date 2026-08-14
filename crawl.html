@@ -572,32 +572,32 @@ const MONSTERS={
   // dire rat and a giant spider are what a sewer has; a troll is what moves in.
   rat:      {sewers:true, name:'Dire rat',cr:1/3,hp:5,  ac:15,atk:4, dmg:[1,4,0], xp:100, speed:1.1, type:'beast', spr:'rat',
              disease:{dc:11,name:'filth fever'}},
-  kobold:   {name:'Kobold',        cr:1/4,hp:4,  ac:15,atk:1, dmg:[1,6,-1],xp:75,  speed:1.3, type:'humanoid', spr:'kobold'},
-  koboldsl: {name:'Kobold slinger',cr:1/3,hp:4,  ac:15,atk:3, dmg:[1,4,0], xp:100, speed:1.3, type:'humanoid', spr:'koboldsl', ranged:5},
-  goblin:   {name:'Goblin',        cr:1/3,hp:5,  ac:15,atk:2, dmg:[1,6,0], xp:100, speed:1.3, type:'humanoid', spr:'goblin'},
+  kobold:   {dungeon:true, name:'Kobold',        cr:1/4,hp:4,  ac:15,atk:1, dmg:[1,6,-1],xp:75,  speed:1.3, type:'humanoid', spr:'kobold'},
+  koboldsl: {dungeon:true, name:'Kobold slinger',cr:1/3,hp:4,  ac:15,atk:3, dmg:[1,4,0], xp:100, speed:1.3, type:'humanoid', spr:'koboldsl', ranged:5},
+  goblin:   {dungeon:true, name:'Goblin',        cr:1/3,hp:5,  ac:15,atk:2, dmg:[1,6,0], xp:100, speed:1.3, type:'humanoid', spr:'goblin'},
   skeleton: {name:'Skeleton',      cr:1/3,hp:6,  ac:15,atk:1, dmg:[1,4,1], xp:100, speed:1.5, type:'undead', spr:'skeleton', skeletal:true},
   skelarcher:{name:'Skeleton archer',cr:1/2,hp:6,ac:15,atk:3, dmg:[1,6,0], xp:150, speed:1.5, type:'undead', spr:'skelarcher', ranged:6, skeletal:true},
   zombie:   {name:'Zombie',        cr:1/2,hp:16, ac:11,atk:2, dmg:[1,6,1], xp:150, speed:2.4, type:'undead', spr:'zombie'},
-  hobgoblin:{name:'Hobgoblin',     cr:1/2,hp:6,  ac:16,atk:2, dmg:[1,8,1], xp:150, speed:1.4, type:'humanoid', spr:'hobgoblin'},
-  orc:      {name:'Orc',           cr:1/2,hp:5,  ac:13,atk:4, dmg:[1,8,3], xp:150, speed:1.3, type:'humanoid', spr:'orc'},
-  gobshaman:{name:'Goblin shaman', cr:1,  hp:9,  ac:14,atk:1, dmg:[1,4,0], xp:300, speed:1.5, type:'humanoid', spr:'gobshaman',
+  hobgoblin:{dungeon:true, name:'Hobgoblin',     cr:1/2,hp:6,  ac:16,atk:2, dmg:[1,8,1], xp:150, speed:1.4, type:'humanoid', spr:'hobgoblin'},
+  orc:      {dungeon:true, name:'Orc',           cr:1/2,hp:5,  ac:13,atk:4, dmg:[1,8,3], xp:150, speed:1.3, type:'humanoid', spr:'orc'},
+  gobshaman:{dungeon:true, name:'Goblin shaman', cr:1,  hp:9,  ac:14,atk:1, dmg:[1,4,0], xp:300, speed:1.5, type:'humanoid', spr:'gobshaman',
              caster:{dmg:[2,4,1],ranged:6,cd:4.5,fx:'#7fd17f',elem:'acid'}},
   spider:   {sewers:true, name:'Giant spider',cr:1,hp:11,ac:14,atk:4, dmg:[1,6,0], xp:300, speed:1.1, type:'vermin', spr:'spider',
              poison:{dc:12,abil:'str',dice:[1,4]}},
   ghoul:    {name:'Ghoul',         cr:1,  hp:13, ac:14,atk:3, dmg:[1,6,1], xp:300, speed:1.2, type:'undead', spr:'ghoul',
              paralysis:{dc:12,dur:6}},
-  gnoll:    {reach:true, name:'Gnoll',         cr:1,  hp:11, ac:15,atk:3, dmg:[1,8,2], xp:300, speed:1.3, type:'humanoid', spr:'gnoll'},
-  bugbear:  {name:'Bugbear',       cr:2,  hp:16, ac:17,atk:5, dmg:[1,8,2], xp:600, speed:1.3, type:'humanoid', spr:'bugbear'},
+  gnoll:    {dungeon:true, reach:true, name:'Gnoll',         cr:1,  hp:11, ac:15,atk:3, dmg:[1,8,2], xp:300, speed:1.3, type:'humanoid', spr:'gnoll'},
+  bugbear:  {dungeon:true, name:'Bugbear',       cr:2,  hp:16, ac:17,atk:5, dmg:[1,8,2], xp:600, speed:1.3, type:'humanoid', spr:'bugbear'},
   ogre:     {reach:true, name:'Ogre',          cr:3,  hp:29, ac:16,atk:8, dmg:[2,8,7], xp:900, speed:1.6, type:'giant', spr:'ogre'},
   wight:    {name:'Wight',         cr:3,  hp:26, ac:15,atk:4, dmg:[1,4,1], xp:900, speed:1.4, type:'undead', spr:'wight',
              energyDrain:1},
   wightnec: {name:'Wight necromancer',cr:4,hp:30,ac:15,atk:4, dmg:[1,4,1], xp:1200,speed:1.5, type:'undead', spr:'wightnec',
              energyDrain:1, caster:{dmg:[3,6,0],ranged:6,cd:5,fx:'#b48ae0'}},
-  minotaur: {reach:true, name:'Minotaur',      cr:4,  hp:39, ac:14,atk:9, dmg:[3,6,4], xp:1200,speed:1.4, type:'giant', spr:'minotaur'},
+  minotaur: {cave:true, reach:true, name:'Minotaur',      cr:4,  hp:39, ac:14,atk:9, dmg:[3,6,4], xp:1200,speed:1.4, type:'giant', spr:'minotaur'},
   troll:    {reach:true, sewers:true, name:'Troll',cr:5,hp:63, ac:16,atk:9, dmg:[1,6,6], xp:1500,speed:1.4, type:'giant', spr:'troll', regen:3},
-  ogremage: {reach:true, name:'Ogre mage',     cr:8,  hp:37, ac:18,atk:7, dmg:[2,6,7], xp:2400,speed:1.5, type:'giant', spr:'ogremage',
+  ogremage: {dungeon:true, reach:true, name:'Ogre mage',     cr:8,  hp:37, ac:18,atk:7, dmg:[2,6,7], xp:2400,speed:1.5, type:'giant', spr:'ogremage',
              caster:{dmg:[5,6,0],ranged:7,cd:6,fx:'#8ad0e0',elem:'cold'}},
-  dragon:   {reach:true, name:'Young dragon',  cr:7,  hp:66, ac:19,atk:11,dmg:[1,8,4], xp:2100,speed:1.4, type:'dragon', spr:'dragon',
+  dragon:   {cave:true, reach:true, name:'Young dragon',  cr:7,  hp:66, ac:19,atk:11,dmg:[1,8,4], xp:2100,speed:1.4, type:'dragon', spr:'dragon',
              caster:{dmg:[6,6,0],ranged:6,cd:7,fx:'#e08a3a',elem:'fire'}},
   // the deep dead: the crypts past depth 10 had nothing of their own to field,
   // and these double as the heavy end of a bestiary that ran dry around 20
@@ -780,13 +780,37 @@ const MONSTERS={
   wereblade:{name:'Wererat blademaster',cr:10,hp:54,ac:22,atk:15,dmg:[2,6,6],xp:3000,speed:1.2,type:'humanoid',spr:'wereblade',
              sewers:true, disease:{dc:18,name:'Lycanthropy'},
              caster:{dmg:[4,6,3],ranged:6,cd:5.5,fx:'#8fbf6a',elem:'acid'}},
+  /* ---------- the dungeon ----------
+     The goblinoid line, grown up. Everything from the kobold to the bugbear
+     already existed and was unflagged wildlife; this is the half of the legion
+     that holds the deep floors, with giants for muscle the way a hobgoblin
+     legion in 3.5 keeps them.
+
+     The Dungeon blocks are depths 1-3 and 22-24, so like the sewers this roster
+     is bimodal by construction. Sized to the deep block: at depths 22-24 the
+     pool mean and the per-monster share coincide (355/360, 386/388, 427/424),
+     the roster's mean ratio is 1.03-1.09, and nothing in it out-weighs the
+     incumbent ceiling of 714 -- both of the traps that cost a floor of descent
+     when the sewers landed. */
+  hobcaptain:{name:'Hobgoblin captain',cr:7,hp:58,ac:19,atk:12,dmg:[1,10,6],xp:2100,speed:1.3,type:'humanoid',spr:'hobcaptain',
+             dungeon:true},
+  worgrider:{name:'Worg rider',   cr:7, hp:54, ac:17,atk:12,dmg:[1,10,5],xp:2100,speed:1.0, type:'humanoid', spr:'worgrider',
+             dungeon:true},
+  hobpriest:{name:'Hobgoblin war priest',cr:8,hp:52,ac:19,atk:10,dmg:[1,8,5],xp:2400,speed:1.4,type:'humanoid',spr:'hobpriest',
+             dungeon:true, caster:{dmg:[4,6,3],ranged:6,cd:5,fx:'#d05a2a',elem:'fire'}},
+  ettin:    {name:'Ettin',        cr:8, hp:60, ac:18,atk:12,dmg:[2,6,5], xp:2400,speed:1.5, type:'giant', spr:'ettin',
+             dungeon:true, reach:true},
+  hillgiant:{name:'Hill giant',   cr:9, hp:64, ac:19,atk:12,dmg:[2,8,5], xp:2700,speed:1.5, type:'giant', spr:'hillgiant',
+             dungeon:true, reach:true},
+  stonegiant:{name:'Stone giant', cr:10,hp:62, ac:21,atk:13,dmg:[2,8,5], xp:3000,speed:1.4, type:'giant', spr:'stonegiant',
+             dungeon:true, reach:true, ranged:7},
   purpleworm:{reach:true,name:'Purple worm',cr:16,hp:120,ac:19,atk:17,dmg:[3,8,9],xp:4800,speed:1.7, type:'vermin', spr:'purpleworm',
              cave:true, poison:{dc:18,abil:'con',dice:[2,4]}},
 };
 // spawn table by depth: keys allowed at depth n if cr between depth/2-? use per-monster [minD,maxD]
 const SPAWN_DEPTH={
   rat:[1,6],kobold:[1,2],koboldsl:[1,3],goblin:[1,3],skeleton:[1,4],skelarcher:[2,5],zombie:[2,5],
-  hobgoblin:[2,5],orc:[2,5],gobshaman:[3,6],spider:[3,7],ghoul:[3,7],gnoll:[3,7],bugbear:[4,8],
+  hobgoblin:[2,5],orc:[2,5],gobshaman:[3,6],spider:[3,7],ghoul:[3,7],gnoll:[3,7],bugbear:[3,8],
   ogre:[6,10],wight:[6,11],wightnec:[8,13],minotaur:[8,13],troll:[10,28],ogremage:[13,99],dragon:[15,99],
   mummy:[10,20],wraith:[12,24],barrowwight:[13,26],bonecolossus:[16,32],deathknight:[20,99],lich:[22,99],bonedrake:[26,99],
   piercer:[8,18],cavebear:[8,18],troglodyte:[8,18],crawler:[9,20],cavefisher:[12,26],otyugh:[14,28],
@@ -797,6 +821,8 @@ const SPAWN_DEPTH={
   // the sewers, built for its two windows: 4-6 and 25-27
   ratswarm:[2,8],wererat:[3,11],grayooze:[5,14],wererogue:[5,14],
   ochrejelly:[17,28],scrag:[20,32],blackpud:[22,34],wereblade:[23,34],
+  // the legion, built for the deep Dungeon block at 22-24
+  worgrider:[13,24],hobcaptain:[14,26],hobpriest:[17,29],ettin:[18,30],hillgiant:[20,32],stonegiant:[23,34],
   duergar:[12,24],duergarxbow:[12,24],duergarscout:[14,28],
   duergarpriest:[16,30],duergarrune:[19,34],duergarlord:[23,99],
 };
@@ -1166,6 +1192,108 @@ const MONSTER_ART={
      skeleton to hang a head or an arm on, so their |H| is the bulge that rears
      up before a strike and their |A| is the pseudopod that does it — which is
      what an ooze telegraphing an attack actually looks like. */
+  /* ---------- the legion ----------
+     Hobgoblins are drilled and uniformed, so the three of them share a red
+     lacquered plate and a black surcoat and differ by rank-mark; the giants are
+     the opposite, all bare skin and salvaged gear. That contrast is the whole
+     read at sprite size. */
+  hobcaptain:()=>({o:{hp:[32,23],ap:[47,37],lit:'#b06a4a',mid:'#4a2418',eye:'#f0d24a',rough:[1,0.28],seed:101},
+    body:`<path d="M19 30 Q16 42 18 55 L24 61 L40 61 L46 55 Q48 42 45 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M20 31 L44 31 L45 48 Q32 54 19 48 Z" fill="#7d2f22"/>`+
+    `<path d="M20 31 L44 31" stroke="#e0b45a" stroke-width="1.3"/>`+
+    `<path d="M23 36 L41 36 M23 41 L41 41 M24 46 L40 46" stroke="#4a1a12" stroke-width="1.6"/>`+
+    `<path d="M32 32 L32 51" stroke="#e0b45a" stroke-width="0.9"/>`+
+    `<path d="M26 38 L32 34 L38 38 L32 42 Z" fill="#e0b45a"/>`+
+    `|H|<path d="M25 18 Q25 11 32 11 Q39 11 39 18 L39 24 Q35 27 30 27 Q25 25 25 18 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M23 17 Q23 7 32 7 Q41 7 41 17 L41 20 L23 20 Z" fill="#7d2f22"/>`+
+    `<path d="M23 17 Q32 12 41 17" stroke="#e0b45a" stroke-width="1"/>`+
+    `<path d="M31 3 L33 3 L33 8 L31 8 Z" fill="#e0b45a"/><path d="M28 3 L36 3 L32 -1 Z" fill="#c8452a"/>`+
+    `<circle cx="28.5" cy="22" r="1.3" fill="#f0d24a"/><circle cx="35.5" cy="22" r="1.3" fill="#f0d24a"/>`+
+    `<path d="M28 26 Q32 24 36 26" stroke="#5a2a1c" stroke-width="0.8" fill="none"/>`+
+    `<path d="M29 25 L29 27 M35 25 L35 27" stroke="#f0ead0" stroke-width="1"/>|/H|`+
+    `|A|<path d="M47 37 L55 33" stroke="#7d2f22" stroke-width="2.4"/>`+
+    `<path d="M54 34 L64 24" stroke="#c6ccd6" stroke-width="1.8"/>`+
+    `<path d="M52 35 L57 31" stroke="#8a9098" stroke-width="3"/>`+
+    `<path d="M60 26 L64 30" stroke="#e0b45a" stroke-width="1.2"/>|/A|`}),
+  worgrider:()=>({o:{hp:[32,20],ap:[48,32],lit:'#a86048',mid:'#42201a',eye:'#f0d24a',rough:[1.1,0.32],seed:102},
+    body:`<path d="M8 52 Q6 43 14 41 Q24 38 34 41 Q46 43 52 47 Q56 52 52 57 Q40 61 26 61 Q12 60 8 52 Z" fill="#3c342c" ${RIM}/>`+
+    `<path d="M50 44 Q58 40 60 33 Q62 40 57 47 Z" fill="#4a4038"/>`+
+    `<path d="M12 58 L10 63 M22 59 L21 64 M36 59 L37 64 M46 56 L48 62" stroke="#241e18" stroke-width="2.4"/>`+
+    `<path d="M9 45 Q2 42 0 36" stroke="#3c342c" stroke-width="2.4" fill="none"/>`+
+    `<path d="M10 44 Q6 36 13 35 Q18 37 17 44 Z" fill="#4a4038" ${RIM}/>`+
+    `<circle cx="12" cy="40" r="1.2" fill="#e05a2a"/>`+
+    `<path d="M8 43 L4 42" stroke="#d8d0c0" stroke-width="1"/>`+
+    `<path d="M24 40 Q32 34 40 40 L41 44 Q32 48 23 44 Z" fill="url(#bg)"/>`+
+    `|H|<path d="M25 17 Q25 10 32 10 Q39 10 39 17 L39 23 Q35 26 30 26 Q25 24 25 17 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M23 16 Q23 6 32 6 Q41 6 41 16 L41 19 L23 19 Z" fill="#7d2f22"/>`+
+    `<path d="M23 14 L18 9 M41 14 L46 9" stroke="#4a4038" stroke-width="1.6"/>`+
+    `<circle cx="28.5" cy="21" r="1.3" fill="#f0d24a"/><circle cx="35.5" cy="21" r="1.3" fill="#f0d24a"/>`+
+    `<path d="M29 24 L29 26 M35 24 L35 26" stroke="#f0ead0" stroke-width="1"/>|/H|`+
+    `|A|<path d="M48 32 L56 28" stroke="#7d2f22" stroke-width="2.2"/>`+
+    `<path d="M54 30 L64 18" stroke="#6a5a44" stroke-width="2"/>`+
+    `<path d="M62 16 L64 22 L59 20 Z" fill="#c6ccd6"/>|/A|`}),
+  hobpriest:()=>({o:{hp:[32,22],ap:[47,36],lit:'#b06a4a',mid:'#4a2418',eye:'#f0d24a',rough:[1,0.3],seed:103,ad:0.7},
+    body:`<path d="M17 29 Q13 43 16 58 L23 63 L41 63 L48 58 Q51 43 47 29 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M18 30 L46 30 L47 51 Q32 57 17 51 Z" fill="#5a2018"/>`+
+    `<path d="M18 30 L46 30" stroke="#e0b45a" stroke-width="1.3"/>`+
+    `<path d="M32 32 L32 53 M24 38 L40 38 M23 45 L41 45" stroke="#e0b45a" stroke-width="0.9"/>`+
+    `<circle cx="32" cy="41" r="5" fill="none" stroke="#f0a03a" stroke-width="1.3"/>`+
+    `<path d="M32 36 L34 41 L32 46 L30 41 Z" fill="#f0a03a"/>`+
+    `|H|<path d="M25 18 Q25 11 32 11 Q39 11 39 18 L39 24 Q35 27 30 27 Q25 25 25 18 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M22 17 Q22 5 32 5 Q42 5 42 17 Q42 21 40 24 L40 14 Q32 11 24 14 L24 24 Q22 21 22 17 Z" fill="#3a1810"/>`+
+    `<path d="M27 6 Q32 0 37 6 Q32 3 27 6 Z" fill="#f0a03a"/>`+
+    `<circle cx="28.5" cy="22" r="1.3" fill="#f0d24a"/><circle cx="35.5" cy="22" r="1.3" fill="#f0d24a"/>`+
+    `<path d="M29 25 L29 27 M35 25 L35 27" stroke="#f0ead0" stroke-width="1"/>|/H|`+
+    `|A|<path d="M47 36 L55 33" stroke="#5a2018" stroke-width="2.4"/>`+
+    `<path d="M54 34 L58 14" stroke="#6a5a44" stroke-width="2.2"/>`+
+    `<circle cx="58" cy="11" r="4.4" fill="none" stroke="#f0a03a" stroke-width="1.5"/>`+
+    `<circle cx="58" cy="11" r="2" fill="#ffd88a"/>|/A|`}),
+  ettin:()=>({o:{hp:[26,20],ap:[50,36],lit:'#8a7a5e',mid:'#3a3020',eye:'#e0602a',rough:[1.6,0.5],seed:104},
+    body:`<path d="M14 32 Q9 47 13 62 L23 68 L43 68 L52 62 Q56 47 50 32 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M17 36 Q32 42 48 36 L49 58 Q32 65 15 58 Z" fill="#4a3d28"/>`+
+    `<path d="M20 40 L44 46 M19 50 L45 54" stroke="#5f4f34" stroke-width="2.4"/>`+
+    `<path d="M24 36 L26 60 M40 36 L38 60" stroke="#2b2416" stroke-width="1.2"/>`+
+    `|H|<path d="M18 20 Q18 12 25 12 Q32 12 32 20 L32 27 Q28 30 23 30 Q18 28 18 20 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M33 20 Q33 12 40 12 Q47 12 47 20 L47 27 Q43 30 38 30 Q33 28 33 20 Z" fill="#7d6e54" ${RIM}/>`+
+    `<path d="M18 17 Q25 10 32 17 L32 20 Q25 15 18 20 Z" fill="#2f2718"/>`+
+    `<path d="M33 17 Q40 10 47 17 L47 20 Q40 15 33 20 Z" fill="#2f2718"/>`+
+    `<circle cx="22" cy="22" r="1.4" fill="#e0602a"/><circle cx="28" cy="22" r="1.4" fill="#e0602a"/>`+
+    `<circle cx="37" cy="22" r="1.4" fill="#e0602a"/><circle cx="43" cy="22" r="1.4" fill="#e0602a"/>`+
+    `<path d="M21 27 Q25 30 29 27" stroke="#3a3020" stroke-width="1" fill="none"/>`+
+    `<path d="M36 27 Q40 30 44 27" stroke="#3a3020" stroke-width="1" fill="none"/>`+
+    `<path d="M23 26 L23 28 M27 26 L27 28 M38 26 L38 28 M42 26 L42 28" stroke="#f0ead0" stroke-width="1"/>|/H|`+
+    `|A|<path d="M50 36 L58 32" stroke="#7d6e54" stroke-width="3.4"/>`+
+    `<path d="M57 33 L62 18" stroke="#5a4a34" stroke-width="2.6"/>`+
+    `<path d="M56 20 L64 15 L66 22 L58 26 Z" fill="#6a6258" ${RIM}/>|/A|`}),
+  hillgiant:()=>({o:{hp:[32,20],ap:[50,36],lit:'#9a8464',mid:'#443722',eye:'#e0a02a',rough:[1.5,0.5],seed:105},
+    body:`<path d="M14 31 Q8 47 12 63 L23 69 L43 69 L52 63 Q57 47 50 31 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M17 36 Q32 43 48 36 L50 59 Q32 66 15 59 Z" fill="#584626"/>`+
+    `<path d="M20 42 L45 48" stroke="#6e5a30" stroke-width="3"/>`+
+    `<path d="M24 36 L25 62 M40 36 L39 62" stroke="#332a18" stroke-width="1.3"/>`+
+    `<path d="M16 60 Q32 68 49 60" stroke="#3d3018" stroke-width="1.6" fill="none"/>`+
+    `|H|<path d="M23 17 Q23 8 32 8 Q41 8 41 17 L41 26 Q36 30 29 30 Q23 27 23 17 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M23 15 Q32 6 41 15 L41 19 Q32 13 23 19 Z" fill="#3a2e18"/>`+
+    `<path d="M25 24 Q32 29 39 24 Q35 28 32 28 Q29 28 25 24 Z" fill="#2a2110"/>`+
+    `<path d="M27 25 L27 28 M32 26 L32 29 M37 25 L37 28" stroke="#f0ead0" stroke-width="1.1"/>`+
+    `<circle cx="28" cy="19" r="1.6" fill="#e0a02a"/><circle cx="36" cy="19" r="1.6" fill="#e0a02a"/>`+
+    `<path d="M21 20 Q17 18 18 14 M43 20 Q47 18 46 14" stroke="#8a7454" stroke-width="1.6" fill="none"/>|/H|`+
+    `|A|<path d="M50 36 L59 33" stroke="#8a7454" stroke-width="3.6"/>`+
+    `<path d="M58 34 L62 16" stroke="#5a4a34" stroke-width="3"/>`+
+    `<path d="M55 16 Q62 8 68 16 Q62 22 55 16 Z" fill="#6e665c" ${RIM}/>|/A|`}),
+  stonegiant:()=>({o:{hp:[32,19],ap:[50,35],lit:'#8e9298',mid:'#3a3e44',eye:'#cfe0ea',rough:[1.4,0.45],seed:106,ad:0.6},
+    body:`<path d="M15 30 Q9 46 13 62 L24 68 L42 68 L52 62 Q57 46 51 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M18 35 Q32 42 48 35 L49 58 Q32 65 16 58 Z" fill="#4d5257"/>`+
+    `<path d="M22 40 L44 40 M21 48 L45 48 M22 56 L44 56" stroke="#3a3e44" stroke-width="1.6"/>`+
+    `<path d="M32 36 L32 61" stroke="#a8aeb6" stroke-width="0.9"/>`+
+    `<path d="M24 44 L28 40 L36 44 L32 50 Z" fill="#6d747c" opacity="0.7"/>`+
+    `|H|<path d="M24 16 Q24 8 32 8 Q40 8 40 16 L40 25 Q36 29 30 29 Q24 26 24 16 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M24 14 Q32 5 40 14 L40 18 Q32 12 24 18 Z" fill="#2f3338"/>`+
+    `<path d="M26 23 Q32 27 38 23 Q35 26 32 26 Q29 26 26 23 Z" fill="#22262a"/>`+
+    `<circle cx="28" cy="18" r="1.5" fill="#cfe0ea"/><circle cx="36" cy="18" r="1.5" fill="#cfe0ea"/>`+
+    `<path d="M23 13 L20 10 M41 13 L44 10" stroke="#6d747c" stroke-width="1.4"/>|/H|`+
+    `|A|<path d="M50 35 L59 32" stroke="#7d838a" stroke-width="3.4"/>`+
+    `<circle cx="62" cy="27" r="6" fill="#6d747c" ${RIM}/>`+
+    `<path d="M59 24 L64 26 M60 30 L65 29" stroke="#4d5257" stroke-width="1.2"/>|/A|`}),
   ratswarm:()=>({o:{hp:[30,30],ap:[46,40],lit:'#6a5a44',mid:'#2e2519',eye:'#d8b23a',rough:[1.4,0.5],seed:91},
     body:`<ellipse cx="32" cy="50" rx="26" ry="12" fill="#241c12" opacity="0.85"/>`+
     `<ellipse cx="20" cy="47" rx="9" ry="6" fill="url(#bg)" ${RIM}/>`+
@@ -2687,10 +2815,11 @@ function tryGen(depth,targetWalk,theme){
   const mycoBias=theme.name==='Myconid'?4:OFF;
   const drowBias=theme.name==='Drow'?4:OFF;
   const sewBias=theme.name==='Sewers'?4:OFF;
+  const dunBias=theme.name==='Dungeon'?4:OFF;
   const base=spawnPool(depth).map(([k,w])=>[k,
     w*(MONSTERS[k].type==='undead'?undeadBias:1)*(MONSTERS[k].cave?caveBias:1)
      *(MONSTERS[k].duergar?duerBias:1)*(MONSTERS[k].myconid?mycoBias:1)
-     *(MONSTERS[k].drow?drowBias:1)*(MONSTERS[k].sewers?sewBias:1)]);
+     *(MONSTERS[k].drow?drowBias:1)*(MONSTERS[k].sewers?sewBias:1)*(MONSTERS[k].dungeon?dunBias:1)]);
   const weigh=(ek)=>base.map(([k,w])=>{
     const r=Math.log(threatOf(k,depth,ek)/share);
     return [k,w*Math.exp(-(r*r)/sig)];
@@ -3021,7 +3150,7 @@ function mkMonster(key,x,y,depth){
     xp:Math.round(XP_AWARD(def.cr)*(1+0.12*Math.max(0,depth-1))),
     speed:def.speed,type:def.type,ranged:def.ranged||0,caster:def.caster||null,
     reach:!!def.reach,slot:0, // slot 0-1 front rank of its tile, 2-3 rear rank
-    skeletal:!!def.skeletal,incorporeal:!!def.incorporeal,cave:!!def.cave,lurk:!!def.lurk,duergar:!!def.duergar,myconid:!!def.myconid,drow:!!def.drow,sewers:!!def.sewers,
+    skeletal:!!def.skeletal,incorporeal:!!def.incorporeal,cave:!!def.cave,lurk:!!def.lurk,duergar:!!def.duergar,myconid:!!def.myconid,drow:!!def.drow,sewers:!!def.sewers,dungeon:!!def.dungeon,
     enlarge:!!def.enlarge,vanish:!!def.vanish,grown:false,vanished:0,
     distress:!!def.distress,shriek:!!def.shriek,shrieked:false,
     special:{disease:def.disease,poison:def.poison,paralysis:def.paralysis,energyDrain:def.energyDrain,regen:def.regen,
@@ -6079,7 +6208,7 @@ function addMonsterSprite(m){
   const spr=new THREE.Sprite(mat);
   const sc=m.boss?1.05:(['ogre','troll','minotaur','ogremage','dragon',
     'bonecolossus','deathknight','bonedrake','lich',
-    'umberhulk','purpleworm','roper','otyugh','cavebear','duergarlord','myelder','mylord','mysovereign','shrieker','drider','drowmatron','blackpud','ochrejelly','scrag'].includes(m.key)?0.95:0.72);
+    'umberhulk','purpleworm','roper','otyugh','cavebear','duergarlord','myelder','mylord','mysovereign','shrieker','drider','drowmatron','blackpud','ochrejelly','scrag','ettin','hillgiant','stonegiant'].includes(m.key)?0.95:0.72);
   spr.scale.set(sc,sc,1);
   spr.position.set(m.x+0.5,sc/2+0.02,m.y+0.5);
   spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss,elite:m.elite};
