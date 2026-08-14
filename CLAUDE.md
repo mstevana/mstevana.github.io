@@ -109,15 +109,24 @@ heavy undead filling the deep bands, plus the undead damage rules) it
 reads **median 26, middle half 22–29**. After the cave work (nine cave
 creatures, the ambushers, the cave spawn bias) it reads **median 27,
 middle half 24–30**; moving boss floors to every third level took it to
-**median 28, middle half 26–30**.
+**median 28, middle half 26–30**. The duergar and myconid rosters left it
+at **median 27, middle half 26–30**, and the drow at **median 28, middle
+half 25–29**.
 
 **26–30 is the band. Do not treat it as a shortfall.** CLAUDE.md carried an
 intended 30–40 for a long time and the game has never once hit it, which
 kept inviting sessions to retune a curve that is working.
 
-Neither content pass moved it, and both were checked the same way: removing
+No content pass has moved it, and each was checked the same way: removing
 coffin and ossuary fights from the simulation leaves the median unchanged,
 and so does skipping every ambush or flattening the cave bias to 1.
+
+**Run the descent after adding a roster, not just the threat ratios.** The
+myconids measured 0.69–1.35 of their per-monster share — a clean roster by
+every static check — and still walled the descent at depth 16, because
+`speed` had been read as a rate instead of a cooldown (see *Adding a
+monster*). The budget cannot see a creature that simply moves faster than
+the party can retreat; only the simulation can.
 
 The cause is structural, and worth knowing before you touch any dial.
 **The party is level-capped at 20 by depth 20** — `MAX_LEVEL` is 20 and a
@@ -163,6 +172,16 @@ creature whose danger is not captured by hp/damage/attack will be
 mis-placed by the budget), and if it is a caster give `caster.elem` one
 of the `ELEMENTS` keys so elemental wards can resist it.
 
+**`speed` is a movement cooldown, so lower is faster.** It is seconds
+between steps: `m.moveCd = m.speed * slowMult`. The piercer, an ambusher
+that cannot walk at all, is the slowest thing in the game at 2.6, and
+nothing is below 1. Read the other way round it is silently catastrophic
+and `threatOf` will not see it — a shrieker written as `speed:0.01`
+"because it is rooted" came out a hundred times faster than anything else
+in the dungeon, chased the party down on sight, and walled a simulated
+descent at **depth 16** while every threat ratio still measured fine.
+T45 now asserts `speed >= 1` across the whole bestiary.
+
 Undead take two extra flags, both read by `undeadDamageMult`:
 `skeletal:true` (bludgeoning ×1.5, piercing ×0.5 — put it on things made
 of bone, not on dried flesh like the mummy) and `incorporeal:true` (half
@@ -175,6 +194,28 @@ to compensate, and `monsterThreat` must be kept in step with it.
 Whether a creature counts as undead for the crypt spawn bias, for
 Turn Undead and for the antitoxin-style loot faucets is `type:'undead'` —
 there is no separate list to update.
+
+Myconids take one flag, `myconid:true`, which is the whole of what the
+grove spawn bias reads. Three optional behaviours ride on it, all in
+`07_game.js`: `distress:true` (being hurt wakes myconids within 7 tiles),
+`shriek:true` (screams once on seeing the party within 6 and wakes within
+11), and `spores:{dc,dur,kind}` (a Fortitude save or `stunned`/`hold`,
+read by `monsterSpecials` alongside the cave creatures' `gaze` and `hold`).
+
+Drow take `drow:true` for the house spawn bias, and two innate powers read by
+`monsterSpecials`: `drowpoison:{dc,dur}` (a Fortitude save or `sleep` — the
+worst thing in the game to fail, since `canAct` and `charAC` both read it) and
+`faerie:{dc,dur}` (a Reflex save or the `faerie` condition).
+
+**`faerie` is the one condition only `charAC` reads**, and that is deliberate
+rather than the badge-that-blocks-nothing mistake described above: faerie fire
+outlines you in cold light, which costs you your cover and nothing else. It is
+−2 AC, not the −4 a helpless character takes, and `canAct` ignores it.
+
+Note that an **elf shrugs drow poison off entirely** — `addCond` refuses `sleep`
+outright for a sleep-immune race. That is the engine's rule and not 3.5's, and
+it is left alone: the drow's own kin being proof against the drow's signature
+weapon is a better story than the errata.
 
 Cave creatures take two flags of their own. `cave:true` is the whole of
 what the cave spawn bias reads — like `type:'undead'`, there is no list
@@ -230,9 +271,93 @@ three themes carry real machinery:
   bias applied **at placement only** (see the curve section — putting it
   in `spawnPool` would taint `threatBudget`'s depth-keyed memo).
 
-Search for `theme.name==='Sewers'`, `th.name==='Crypt'` and `th.name==='Caves'`
-(plus the `cave` flag in `buildLevel`) to find every hook before adding a
-fourth such theme. Each writes an array onto the level (`rivers`/`pipes`,
+  The counterweight is `OFF` in `tryGen`, the weight a roster gets on
+  somebody else's floor, and **it has to get stronger as rosters are added,
+  not stay put**: a theme's ×4 competes against every foreign roster at
+  once, so each new one dilutes it. At 0.55 with five rosters a deep cave
+  floor had fallen to 54% cave. It is 0.35 now, which puts that back where
+  0.55 held it with two, at a cost of four creature kinds at depth 40
+  (33 → 29). `openCoffin` carries its own version of the same constant and
+  needs the same treatment — it went 0.25 → 0.10 when the drow landed,
+  because at 0.25 a grave had become a lucky dip (83% undead).
+
+- **`Duergar`** — halls, not caves: the highest `roomBias` of any theme,
+  because they are built. Eight wall variants over one shared base that
+  carries the courses, the gold fillets and the channel the inscription
+  runs in — a band on only some variants would stop dead at a tile join,
+  so only the runes inside it vary. Runes are Dethek, which is chiselled
+  and so has no curves. Polished slab floor, stone doors, and wall
+  furniture in `L.duergar`: engaged fluted half-columns, and torches whose
+  point light is registered in `R3.candleFlames` (the flicker loop reads
+  each flame's own `base` intensity, so a wall torch is not a candle).
+
+- **`Myconid`** — a grove that grew rather than one that was built, and the
+  only theme that replaces the **ceiling** as well as the walls and floor:
+  `myconidCeilCanvas` draws the gilled underside of the caps overhead,
+  `myconidWallCanvas` gives six stalk variants over one shared base, and the
+  floor is gravel. The light is purple — `THEMES` carries `light` and `fill`
+  for it, and `buildLevel` tints `R3.torch` from `th.light`, so a theme can
+  now recolour the party's own lantern. Doors are dried stalks, roughly cut
+  and bolted. A ×4 `myconid:true` spawn bias, at placement only, like the
+  crypt's and the cave's.
+
+  The stalks are drawn by sampling a wandering edge every 4 pixels with a
+  per-stalk phase. At 16 the kinks landed at the same height in every stalk
+  and the wall read as a bamboo fence.
+
+- **`Drow`** — a house, and the only theme whose decoration gives off light.
+  Small black bricks (eight courses of six, with a one-pixel draft rather than
+  the duergar's five, which at this size would swallow the brick) and a thin
+  frieze channel cut through the third course of the shared base, so a wall
+  reads as one running inscription rather than a repeated stamp; eight variants
+  change only what is written in it.
+
+  The script is **Espruar**, which is written with a pen and so is the exact
+  inverse of Dethek: not a straight stroke anywhere. A glyph is a leaning
+  S-spine with a bowl hung off one side and a flourish or a closed loop off the
+  other.
+
+  **`drowWallCanvas` is the only wall builder that returns a pair**, `{cv,glow}`
+  — the stone, and a black sheet carrying only the burning parts — and
+  `buildLevel` wires the second up as `emissiveMap`. A colour map can only make
+  something *pale* in torchlight; light of its own needs an emissive map, and
+  that is the whole point of faerzress. Everything else in `buildLevel` treats
+  a builder's return value as a canvas, so the branch keys off `built.glow`.
+
+  Also: wrought-iron gates that you can see through (they take the sewer
+  grate's `alphaTest` path — `grate` in `buildLevel` is now "Sewers or Drow"),
+  rose windows in `L.drow` glazed from `th.glyphs`, and occasional stalactites
+  seeded from tile coordinates like the cave gems, so they need no save data.
+
+  Four things that had to be seen rather than reasoned about:
+
+  - **Do not retint the torch.** The grove's trick turns black brick lilac. The
+    colour in a drow house comes from the things that are burning, so `light`
+    and `fill` here are a cold near-white.
+  - **Brick faces at −0.06 read light grey at torch range.** "Black brick" has
+    to survive being stood next to, not only being seen down a corridor; they
+    sit at −0.20/−0.27.
+  - **Lit glass adds the torch to its own colour and a violet pane comes out
+    white.** The glass is a source, not a surface: `MeshBasicMaterial`. The
+    lead tracery has to stay matte for the same reason.
+  - **A stalactite handed `ceilTex` directly gets a flat wash.** `repeat` lives
+    on the texture, not the material, and `ceilTex` carries `(L.w, L.h)` for
+    the one big ceiling plane. It needs a clone with `repeat` back at 1.
+
+Search for `theme.name==='Sewers'`, `th.name==='Crypt'`, `th.name==='Caves'`,
+`th.name==='Duergar'`, `th.name==='Myconid'` and `th.name==='Drow'`
+(plus the `cave`/`duer`/`myco`/`drow` flags in `buildLevel`) to find every hook
+before adding a seventh such theme.
+
+**Appending a theme moves which depth is which theme**, which broke seven
+tests that had depths hardcoded. They now ask by name — `depthOf(name)` and
+`depthsOf(name)` in the harness — so the next theme will not break them.
+Two statistical checks were also sitting near their tolerances and had to
+be widened rather than relaxed (T22's packing, T29's crypt undead share);
+the crypt's share genuinely falls with each roster added, because each one
+widens the off-theme draw the 0.55 bias has to beat: with five rosters it
+measures 75–78% at depths 7–9 and 60–63% at 25–27, where the myconid bands
+sit right on top of it. Each writes an array onto the level (`rivers`/`pipes`,
 `crypts`/`ossuary`, `lurkers`) in `tryGen` and reads it back in
 `buildLevel`; anything you add that way must also be carried through
 `serializeGame` and `loadGame`, or a reloaded floor comes back stripped
@@ -265,6 +390,27 @@ the dungeon grows:
   one. `minD` therefore steps by 3, one named boss per boss floor, and
   three places must agree: `isBossLevel` in `tryGen`, the `/3` in
   `bossFor`'s cycle arithmetic, and the ⚔ in `refreshDepthTag`.
+  `BOSS_RANKS` must be **at least as long as `BOSSES`**, or a cycled boss
+  from the tail of the list is titled `undefined`.
+
+  **The list is ordered by weight, not by flavour**, and T21 holds it to
+  that: each named boss must out-threat the one three floors above it. This
+  is what a themed boss has to be written around rather than against. Depth
+  18 is the last floor of the Myconid block, so the grove gets its own
+  ruler — but a myconid sovereign built for the deep end scored 2906 against
+  a window of 832–1165, so the slot was filled with a **separate, lighter
+  `mylord`** and the sovereign moved to the end of the list at depth 27.
+  Both are **boss-only: neither has a `SPAWN_DEPTH` entry**, which is
+  precisely what frees their numbers to answer to a boss floor instead of a
+  spawn band.
+
+  The drow matron is the same pattern done deliberately rather than
+  discovered: depth 21 caps the Drow block, the window there was 1040–1324,
+  and `drowmatron` was written to land at 1210 before a line of the list
+  moved. **Reach for that before reordering anything.** Adding a theme adds
+  a boss floor, so the named list stretches by one and everything below the
+  new entry slides three floors deeper; the arc is preserved because the
+  order is preserved.
 
   The first theme block is exempt. On floor 3 the party is still level 1 —
   32 hit points between four of them, a 3-hp wizard — against a boss
@@ -281,6 +427,9 @@ the dungeon grows:
   one three floors above, and the sawtooth repeated on every pass. Named
   bosses keep their own creature's hp — they are hand-placed for their
   depth, and Sinshara is a caster whose danger is her spells.
+
+  T21 derives where the cycle starts from `BOSSES` itself rather than
+  writing the depth down, so adding a named boss no longer breaks it.
 
   That split is why T21 measures the two arcs on different things: the
   named arc on `monsterThreat` (which credits spells, reach and riders,
@@ -578,27 +727,32 @@ the `f.t>6` branch). T37 covers the whole of this.
 
 ## The thin ordinary roster — measured, and deliberately left
 
-The bestiary is no longer thin at depth in total: the seven deep undead
-took depth 40 from roughly 90% dragons and ogre mages to thirteen creature
-kinds, and the nine cave creatures widened the mid-depths further. What is
-thin is the **ordinary** roster — everything that is neither `type:'undead'`
-nor `cave:true`:
+The bestiary is no longer thin at depth in total. Five themed rosters —
+undead, cave, duergar, myconid, drow — have taken depth 20 from a handful
+of creatures to **twenty-seven in band**, peaking at thirty around depth 24.
+What is still thin, and has only got thinner in relative terms, is the
+**ordinary** roster: everything carrying none of `type:'undead'`,
+`cave`, `duergar`, `myconid` or `drow`.
 
-| depths | ordinary creatures in band |
-|---|---|
-| 1–8 | 5–9 — healthy |
-| 9–13 | 3–4 — collapses |
-| 14–30 | **exactly 5** (ogre, minotaur, troll, dragon, ogre mage) |
-| 31+ | decays to 1, then 0 by 44 |
+| depth | creatures in band | of which ordinary |
+|---|---|---|
+| 8 | 8 | 3 |
+| 13 | 14 | 3 |
+| 20 | 27 | **2** |
+| 24 | 30 | **2** |
+| 31 | 17 | **2** |
+| 40 | 10 | **2** |
 
-So the themed rosters are better stocked at depth than the default one,
-and the leak runs both ways: a deep dungeon floor is roughly a third
-undead, and depth 13–15 dungeon floors run about half cave roster. The
-0.55 off-theme bias is what keeps crypts and caves distinct at all.
+Past depth 16 the unthemed roster is two creatures. Every floor in the
+game is therefore carried by somebody's roster, and a Dungeon or Sewers
+floor is mostly other people's furniture thinned to `OFF`. That is the
+real shape of the bestiary now, and it is the argument for filling the
+ordinary band if anyone ever picks the job up.
 
-**This was costed and declined.** Filling depths 9–30 is around nine
-creatures — definitions, `SPAWN_DEPTH` bands, layered `MONSTER_ART` and
-threat tuning apiece. It buys variety and nothing else: with the band
-settled at 26–30 it is not a difficulty lever, and the depth 31+ column
-above is content no run reaches. If you pick it up, aim it at 9–30 and
-skip the deep band; do not treat the table above as a bug list.
+**This was costed and declined**, and the decision is worth revisiting only
+on the strength of the table above rather than on difficulty. Filling
+depths 9–30 is around nine creatures — definitions, `SPAWN_DEPTH` bands,
+layered `MONSTER_ART` and threat tuning apiece. It buys variety and nothing
+else: with the band settled at 26–30 it is not a difficulty lever, and the
+depth 31+ rows are content no run reaches. If you pick it up, aim it at
+9–30 and skip the deep band; do not treat the table as a bug list.
