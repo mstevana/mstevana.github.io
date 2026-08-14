@@ -771,6 +771,11 @@ const THEMES=[
   // Duergar halls are built, not dug: hence the high roomBias. `gold` is the
   // inlay colour, used by the wall trim, the frieze runes and the door fittings.
   {name:'Duergar', wall:'#565a5b', wall2:'#2e3132', floor:'#43474a', ceil:'#1e1d1a', fog:0x080807, moss:'#4a4438', roomBias:.72, gold:'#c9a227'},
+  // A myconid grove is grown, not cut: soft edges, low roomBias, and its own
+  // light. `light`/`fill` retint the party's torch so the whole grove reads
+  // violet without repainting every texture, and `glow` is the spore colour.
+  {name:'Myconid', wall:'#7a6e86', wall2:'#42384f', floor:'#4b4753', ceil:'#5a4670', fog:0x0d0814, moss:'#8a63b8', roomBias:.3,
+   glow:'#c88ae8', light:0xc59ae8, fill:0xdfc4f2},
 ];
 const FIRST_NAMES=['Aldric','Berrin','Cassia','Dorn','Elva','Fenn','Grimm','Hilda','Ivo','Jora','Kelder','Lysa','Mordin','Nessa','Oskar','Petra','Quinn','Rurik','Sable','Torv','Ulma','Vance','Wren','Yorick','Zora','Brakka','Thistle','Marn','Isolde','Garrick'];
 
@@ -3273,6 +3278,256 @@ function caveWallCanvas(th,variant,baseCv){
    Blocks are three courses of two, which comes out roughly square in world
    space: a wall tile is one unit wide and WALLH tall, so 128 texels across map
    to 1.0 and 128 down map to 1.3. */
+/* ---------- myconid groves: grown, not built ----------
+
+   Walls are the stalks of mushrooms big enough to be architecture, pressed
+   shoulder to shoulder. The shared base carries the stalk boundaries and the
+   fibrous grain, so two tiles meet without a seam; variants change what has
+   grown on them -- bracket shelves, spore freckles, a bloom of mould, veiling
+   remnants, a split in the flesh -- rather than moving the stalks themselves. */
+function myconidBaseCanvas(th){
+  const {cv,ctx}=newCanvas(128);
+  const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
+  ctx.fillStyle=shade(th.wall2,-0.25);ctx.fillRect(0,0,128,128);
+  // stalks: uneven widths that still sum to the tile, so the pattern wraps
+  const edges=[0];
+  {let x=0;const W=[19,26,21,30,17,15];let i=0;
+   while(x<128){x+=W[i++%W.length];edges.push(Math.min(128,x));}
+   edges[edges.length-1]=128;}
+  // Each stalk's edges wander over its height and it swells somewhere along the
+  // way, because a mushroom is grown, not extruded. The wander is the same at
+  // y=0 and y=128 so the tile still meets itself top and bottom.
+  // Sampled every four pixels, not every sixteen: coarse samples put a visible
+  // kink at the same height in every stalk, which reads as bamboo nodes. The
+  // swell and lean are given a per-stalk phase for the same reason -- nothing
+  // in a grove should line up with its neighbour.
+  const wander=(seed)=>{
+    const pts=[],ph=seed*1.37;
+    for(let y=0;y<=128;y+=4){
+      const t=y/128;
+      const swell=Math.sin(t*Math.PI)*(2.0+((seed*7)%5)*0.8)
+                 +Math.sin(t*Math.PI*3+ph)*0.9;                    // fat, but not evenly
+      const lean=Math.sin(t*Math.PI*2+ph)*1.6+Math.sin(t*Math.PI*5+ph*2)*0.6;
+      pts.push([y,swell,lean]);
+    }
+    return pts;
+  };
+  for(let i=0;i<edges.length-1;i++){
+    const x0=edges[i],x1=edges[i+1],w=x1-x0;
+    if(w<=0)continue;
+    const L=wander(i*3+1), R=wander(i*5+2);
+    const leftAt =(k)=>x0+L[k][2]-L[k][1]*0.5;
+    const rightAt=(k)=>x1+R[k][2]+R[k][1]*0.5;
+    const outline=()=>{
+      ctx.beginPath();
+      ctx.moveTo(leftAt(0),0);
+      for(let k=1;k<L.length;k++)ctx.lineTo(leftAt(k),L[k][0]);
+      for(let k=R.length-1;k>=0;k--)ctx.lineTo(rightAt(k),R[k][0]);
+      ctx.closePath();
+    };
+    // a stalk is a cylinder: bright a third of the way across, dark at both rims
+    const g=ctx.createLinearGradient(x0,0,x1,0);
+    g.addColorStop(0,shade(th.wall,-0.52));
+    g.addColorStop(0.32,shade(th.wall,0.10));
+    g.addColorStop(0.62,shade(th.wall,-0.10));
+    g.addColorStop(1,shade(th.wall,-0.56));
+    for(const ox of [-128,0,128]){
+      ctx.save();ctx.translate(ox,0);
+      outline();ctx.fillStyle=g;ctx.fill();
+      ctx.restore();
+    }
+    // the fissure between stalks, following the same wandering edge
+    for(const ox of [-128,0,128]){
+      ctx.save();ctx.translate(ox,0);
+      ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=1.4;
+      ctx.beginPath();ctx.moveTo(leftAt(0),0);
+      for(let k=1;k<L.length;k++)ctx.lineTo(leftAt(k),L[k][0]);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // vertical fibre, the grain of the flesh
+    for(let k=0;k<Math.max(3,w>>2);k++){
+      const fx=x0+2+Math.random()*(w-4);
+      ctx.strokeStyle=Math.random()<0.5?'rgba(255,246,255,0.055)':'rgba(0,0,0,0.13)';
+      ctx.lineWidth=0.8+Math.random();
+      ctx.beginPath();ctx.moveTo(fx,0);
+      let py=0,px=fx;
+      while(py<128){py+=10+Math.random()*16;px+=(Math.random()-0.5)*1.6;ctx.lineTo(px,py);}
+      ctx.stroke();
+    }
+    // growth rings, faint and irregular, running across the stalk
+    for(let k=0;k<3;k++){
+      const ry=Math.random()*128;
+      ctx.strokeStyle='rgba(0,0,0,0.10)';ctx.lineWidth=1+Math.random()*1.6;
+      ctx.beginPath();ctx.moveTo(x0,ry);ctx.quadraticCurveTo(x0+w/2,ry+(Math.random()-0.5)*5,x1,ry);ctx.stroke();
+    }
+  }
+  // damp: the base of a stalk is always darker than its crown
+  const damp=ctx.createLinearGradient(0,128,0,60);
+  damp.addColorStop(0,'rgba(20,10,28,0.42)');
+  damp.addColorStop(1,'rgba(20,10,28,0)');
+  ctx.fillStyle=damp;ctx.fillRect(0,60,128,68);
+  return {cv,edges};
+}
+function myconidWallCanvas(th,variant,base){
+  const {cv,ctx}=newCanvas(128);
+  const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
+  const glow=th.glow||'#c88ae8';
+  ctx.drawImage(base.cv,0,0,128,128);
+  let sd=(variant*2654435761+12345)>>>0;
+  const rr=()=>{sd=(sd*1664525+1013904223)>>>0;return sd/4294967296;};
+  const mid=(i)=>{const e=base.edges;const k=i%(e.length-1);return (e[k]+e[k+1])/2;};
+  const v=variant%6;
+  if(v===0){                                   // bracket shelves stepping up a stalk
+    for(let k=0;k<4;k++){
+      const cx=mid(Math.floor(rr()*8)),cy=14+rr()*100,w=7+rr()*9,h=3+rr()*3;
+      wrapX(()=>{
+        ctx.fillStyle=shade(th.wall,-0.42);
+        ctx.beginPath();ctx.ellipse(cx,cy+1.2,w,h,0,0,7);ctx.fill();
+        ctx.fillStyle=shade(th.wall,0.18);
+        ctx.beginPath();ctx.ellipse(cx,cy,w,h,0,0,7);ctx.fill();
+        ctx.strokeStyle='rgba(0,0,0,0.28)';ctx.lineWidth=0.7;
+        for(let r=0;r<4;r++){ctx.beginPath();ctx.ellipse(cx,cy,w*(0.3+r*0.22),h*(0.3+r*0.22),0,0,7);ctx.stroke();}
+      });
+    }
+  }else if(v===1){                             // spore freckles, faintly luminous
+    for(let k=0;k<70;k++){
+      const x=rr()*128,y=rr()*128,r=0.6+rr()*1.6;
+      wrapX(()=>{
+        ctx.fillStyle=glow;ctx.globalAlpha=0.10+rr()*0.22;
+        ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.globalAlpha=1;
+      });
+    }
+  }else if(v===2){                             // a bloom of mould creeping up from the foot
+    for(let k=0;k<30;k++){
+      const x=rr()*128,y=78+rr()*50,r=3+rr()*9;
+      wrapX(()=>{
+        ctx.fillStyle=`rgba(74,110,72,${0.06+rr()*0.10})`;
+        ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+      });
+    }
+    for(let k=0;k<40;k++){
+      const x=rr()*128,y=86+rr()*42;
+      wrapX(()=>{ctx.fillStyle='rgba(150,180,130,0.10)';ctx.fillRect(x,y,1,1+rr()*2);});
+    }
+  }else if(v===3){                             // veil remnants, torn skirts left on the stalk
+    for(let k=0;k<3;k++){
+      const cx=mid(Math.floor(rr()*8)),cy=26+rr()*70;
+      wrapX(()=>{
+        ctx.fillStyle='rgba(236,226,240,0.16)';
+        ctx.beginPath();ctx.moveTo(cx-11,cy);
+        for(let t=-11;t<=11;t+=2.6)ctx.lineTo(cx+t,cy+3+Math.sin(t*0.8)*2.4+rr()*3);
+        ctx.lineTo(cx+11,cy-2);ctx.closePath();ctx.fill();
+        ctx.strokeStyle='rgba(0,0,0,0.18)';ctx.lineWidth=0.7;ctx.stroke();
+      });
+    }
+  }else if(v===4){                             // a split in the flesh, pale inside
+    const cx=mid(Math.floor(rr()*8));
+    wrapX(()=>{
+      ctx.strokeStyle='rgba(0,0,0,0.45)';ctx.lineWidth=3;
+      ctx.beginPath();ctx.moveTo(cx,10);
+      let py=10,px=cx;
+      while(py<118){py+=14+rr()*14;px+=(rr()-0.5)*7;ctx.lineTo(px,py);}
+      ctx.stroke();
+      ctx.strokeStyle=shade(th.wall,0.34);ctx.lineWidth=1.1;
+      ctx.beginPath();ctx.moveTo(cx-0.8,10);
+      py=10;px=cx-0.8;
+      while(py<118){py+=14+rr()*14;px+=(rr()-0.5)*7;ctx.lineTo(px,py);}
+      ctx.stroke();
+    });
+  }else{                                       // young caps budding off the stalk
+    for(let k=0;k<5;k++){
+      const x=rr()*128,y=20+rr()*96,r=2.5+rr()*4;
+      wrapX(()=>{
+        ctx.fillStyle=shade(th.moss,-0.15);
+        ctx.beginPath();ctx.ellipse(x,y,r,r*0.72,0,Math.PI,0);ctx.fill();
+        ctx.fillStyle=shade(th.wall,-0.2);
+        ctx.fillRect(x-0.8,y,1.6,r*0.9);
+        ctx.fillStyle='rgba(255,240,255,0.14)';
+        ctx.beginPath();ctx.ellipse(x-r*0.3,y-r*0.25,r*0.32,r*0.2,0,0,7);ctx.fill();
+      });
+    }
+  }
+  // every wall is a little damp and a little luminous down low
+  for(let k=0;k<24;k++){
+    const x=rr()*128,y=rr()*128;
+    wrapX(()=>{ctx.fillStyle='rgba(255,255,255,0.05)';ctx.fillRect(x,y,1,1);});
+  }
+  return cv;
+}
+// Gravel: the grove's floor is loose grit and shed spore-dust, not stone.
+function myconidFloorCanvas(th){
+  const {cv,ctx}=newCanvas(128);
+  const wrap9f=(fn)=>{for(const oy of [-128,0,128])for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,oy);fn();ctx.restore();}};
+  ctx.fillStyle=shade(th.floor,-0.4);ctx.fillRect(0,0,128,128);
+  for(let i=0;i<1500;i++){                     // the bed of small stones
+    const x=Math.random()*128,y=Math.random()*128;
+    const r=0.7+Math.random()*1.9;
+    const l=(Math.random()-0.4)*0.5;
+    wrap9f(()=>{
+      ctx.fillStyle=shade(th.floor,l-0.28);
+      ctx.beginPath();ctx.ellipse(x+0.4,y+0.5,r,r*0.85,0,0,7);ctx.fill();
+      ctx.fillStyle=shade(th.floor,l+0.14);
+      ctx.beginPath();ctx.ellipse(x,y,r,r*0.85,0,0,7);ctx.fill();
+    });
+  }
+  for(let i=0;i<90;i++){                       // the odd larger stone
+    const x=Math.random()*128,y=Math.random()*128,r=2.4+Math.random()*3;
+    wrap9f(()=>{
+      ctx.fillStyle=shade(th.floor,-0.34);
+      ctx.beginPath();ctx.ellipse(x+0.7,y+0.8,r,r*0.8,Math.random()*3,0,7);ctx.fill();
+      ctx.fillStyle=shade(th.floor,0.20);
+      ctx.beginPath();ctx.ellipse(x,y,r,r*0.8,Math.random()*3,0,7);ctx.fill();
+      ctx.fillStyle='rgba(255,250,255,0.10)';
+      ctx.beginPath();ctx.ellipse(x-r*0.3,y-r*0.3,r*0.3,r*0.22,0,0,7);ctx.fill();
+    });
+  }
+  for(let i=0;i<200;i++){                      // spore dust settled between the stones
+    const x=Math.random()*128,y=Math.random()*128;
+    wrap9f(()=>{ctx.fillStyle=`rgba(200,150,232,${0.03+Math.random()*0.06})`;ctx.fillRect(x,y,1+Math.random()*2,1);});
+  }
+  return cv;
+}
+// The ceiling is the underside of caps big enough to roof a room: gills
+// radiating from a hub, with the hubs offset so the pattern does not grid.
+function myconidCeilCanvas(th){
+  const {cv,ctx}=newCanvas(128);
+  const glow=th.glow||'#c88ae8';
+  ctx.fillStyle=shade(th.ceil,-0.45);ctx.fillRect(0,0,128,128);
+  const caps=[[32,34,40],[96,30,34],[26,96,36],[92,98,42],[64,64,26]];
+  for(const [cx,cy,R] of caps){
+    for(const oy of [-128,0,128])for(const ox of [-128,0,128]){
+      const x=cx+ox,y=cy+oy;
+      if(x<-R||y<-R||x>128+R||y>128+R)continue;
+      const g=ctx.createRadialGradient(x,y,1,x,y,R);
+      g.addColorStop(0,shade(th.ceil,0.30));
+      g.addColorStop(0.55,shade(th.ceil,0.02));
+      g.addColorStop(1,shade(th.ceil,-0.42));
+      ctx.fillStyle=g;
+      ctx.beginPath();ctx.arc(x,y,R,0,7);ctx.fill();
+      // the gills themselves, thin blades from the hub to the rim
+      const n=52;
+      for(let i=0;i<n;i++){
+        const a=i/n*Math.PI*2+(cx+cy)*0.01;
+        ctx.strokeStyle=i%2?'rgba(0,0,0,0.30)':'rgba(255,240,255,0.07)';
+        ctx.lineWidth=i%2?1.5:1;
+        ctx.beginPath();
+        ctx.moveTo(x+Math.cos(a)*R*0.10,y+Math.sin(a)*R*0.10);
+        ctx.lineTo(x+Math.cos(a)*R*0.98,y+Math.sin(a)*R*0.98);
+        ctx.stroke();
+      }
+      // the stem socket at the hub, and a rim of shadow where caps overlap
+      ctx.fillStyle=shade(th.ceil,-0.55);
+      ctx.beginPath();ctx.arc(x,y,R*0.11,0,7);ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,0.35)';ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(x,y,R,0,7);ctx.stroke();
+      // spore light gathering in the gills
+      ctx.globalAlpha=0.10;ctx.fillStyle=glow;
+      ctx.beginPath();ctx.arc(x,y,R*0.5,0,7);ctx.fill();ctx.globalAlpha=1;
+    }
+  }
+  return cv;
+}
 function duergarBaseCanvas(th){
   const {cv,ctx}=newCanvas(128);
   const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
@@ -3731,6 +3986,11 @@ function buildLevel(L){
   const grp=new THREE.Group();R3.levelGroup=grp;R3.scene.add(grp);
   R3.scene.fog=new THREE.FogExp2(th.fog,0.26);
   R3.scene.background=new THREE.Color(th.fog);
+  // a theme may retint the party's light. Everything else in the grove is
+  // painted in ordinary colours; it is the light that makes it violet, which is
+  // both cheaper than repainting and what standing in spore-light would do.
+  if(R3.torch)R3.torch.color.setHex(th.light||0xffb861);
+  if(R3.torchFill)R3.torchFill.color.setHex(th.fill||0xffd8a0);
   // walls: phong with the color map doubling as bump + displacement source
   // (mortar and stains are dark = recessed, brick faces light = proud)
   const wallMats=[];
@@ -3738,32 +3998,40 @@ function buildLevel(L){
   // one shared noise base, and deeper relief than a flat brick face wants
   const cave=th.name==='Caves';
   const duer=th.name==='Duergar';
-  const NVAR=cave?12:(duer?8:6);
-  const grid=(cave||duer)?null:brickGrid(th); // shared brick skeleton, masonry themes only
+  const myco=th.name==='Myconid';
+  const NVAR=cave?12:(duer?8:(myco?6:6));
+  const grid=(cave||duer||myco)?null:brickGrid(th); // brick skeleton, masonry themes only
   const baseWall=cave?caveBaseCanvas(th)      // shared earth, so tiles still join invisibly
                 :duer?duergarBaseCanvas(th)   // shared courses, trim and frieze channel
+                :myco?myconidBaseCanvas(th)   // shared stalk boundaries and grain
                      :baseWallCanvas(th,grid);
   for(let v=0;v<NVAR;v++){
     const tex=texFromCanvas(cave?caveWallCanvas(th,v,baseWall)
                            :duer?duergarWallCanvas(th,v,baseWall)
+                           :myco?myconidWallCanvas(th,v,baseWall)
                                 :wallCanvas(th,v,grid,baseWall));
     tex.wrapS=tex.wrapT=THREE.RepeatWrapping; // displacement samples can wrap at face edges
     // dressed stone is flatter than quarried rock and takes a harder highlight
-    const mat=new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,bumpScale:cave?0.05:(duer?0.015:0.02),
-      displacementMap:tex,displacementScale:cave?0.10:(duer?0.025:0.05),
-      specular:duer?0x1c1a14:0x191309,shininess:cave?3:(duer?14:5)});
+    // fungal flesh is soft and a touch waxy: gentle relief, a low wide highlight
+    const mat=new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,
+      bumpScale:cave?0.05:(duer?0.015:(myco?0.035:0.02)),
+      displacementMap:tex,displacementScale:cave?0.10:(duer?0.025:(myco?0.06:0.05)),
+      specular:duer?0x1c1a14:(myco?0x2a2233:0x191309),
+      shininess:cave?3:(duer?14:(myco?8:5))});
     wallMats.push(weldWallDisp(mat));
   }
   // the ambushers are faced with these same textures, so keep them reachable
   R3.wallMats=wallMats;
   const floorTex=texFromCanvas(cave?caveFloorCanvas(th)
                               :duer?duergarFloorCanvas(th)
+                              :myco?myconidFloorCanvas(th)
                                    :noiseCanvas(th.floor,th.wall2,false,th.moss));
-  const ceilTex=texFromCanvas(noiseCanvas(th.ceil,'#000',false,null));
+  // the only theme that roofs itself with something: caps seen from below
+  const ceilTex=texFromCanvas(myco?myconidCeilCanvas(th):noiseCanvas(th.ceil,'#000',false,null));
   floorTex.wrapS=floorTex.wrapT=THREE.RepeatWrapping;floorTex.repeat.set(1,1);
   ceilTex.wrapS=ceilTex.wrapT=THREE.RepeatWrapping;ceilTex.repeat.set(L.w,L.h);
   const floorMat=new THREE.MeshPhongMaterial({map:floorTex,bumpMap:floorTex,
-    bumpScale:cave?0.03:(duer?0.006:0.015),
+    bumpScale:cave?0.03:(duer?0.006:(myco?0.035:0.015)),   // gravel has real tooth
     specular:duer?0x24211a:0x120e08,shininess:cave?3:(duer?18:4)});
   const ceilMat=new THREE.MeshPhongMaterial({map:ceilTex,bumpMap:ceilTex,bumpScale:0.012,specular:0x0c0a06,shininess:3});
   // floor: one unit plane per non-wall tile. holes fall out naturally at the
@@ -4667,6 +4935,62 @@ function doorCanvas(th,locked){
       ctx.fillStyle='#a8894a';ctx.beginPath();ctx.arc(64,62,13,0,7);ctx.fill();
       ctx.fillStyle='#241a10';ctx.beginPath();ctx.arc(64,58,5,0,7);ctx.fill();
       ctx.fillRect(61,60,6,12);
+    }
+    return cv;
+  }
+  if(th.name==='Myconid'){ // lengths of dried stalk, cut rough and bolted
+    ctx.fillStyle='#2a2230';ctx.fillRect(0,0,128,128);
+    const cols=[0,21,44,63,87,107,128];
+    for(let i=0;i<cols.length-1;i++){
+      const x0=cols[i],w=cols[i+1]-x0;
+      const g=ctx.createLinearGradient(x0,0,x0+w,0);
+      g.addColorStop(0,shade(th.wall,-0.50));
+      g.addColorStop(0.35,shade(th.wall,-0.06));
+      g.addColorStop(1,shade(th.wall,-0.54));
+      ctx.fillStyle=g;
+      // cut by hand: the ends are not square and the lengths do not match
+      const top=2+rnd(6),bot=126-rnd(6);
+      ctx.fillRect(x0+1,top,w-2,bot-top);
+      ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=1.2;
+      ctx.strokeRect(x0+1.5,top+0.5,w-3,bot-top-1);
+      // dried fibre running the length of each stalk
+      for(let k=0;k<5;k++){
+        const fx=x0+3+Math.random()*(w-6);
+        ctx.strokeStyle=Math.random()<0.5?'rgba(255,246,255,0.06)':'rgba(0,0,0,0.20)';
+        ctx.lineWidth=0.8;
+        ctx.beginPath();ctx.moveTo(fx,top+2);
+        let py=top,px=fx;
+        while(py<bot){py+=14+Math.random()*16;px+=(Math.random()-0.5)*2;ctx.lineTo(px,Math.min(py,bot-2));}
+        ctx.stroke();
+      }
+      // shrinkage cracks, which is what drying does to a stalk
+      if(Math.random()<0.6){
+        ctx.strokeStyle='rgba(0,0,0,0.42)';ctx.lineWidth=1.4;
+        const cx=x0+3+Math.random()*(w-6);
+        ctx.beginPath();ctx.moveTo(cx,top+8+Math.random()*20);
+        ctx.lineTo(cx+(Math.random()-0.5)*4,bot-8-Math.random()*20);ctx.stroke();
+      }
+    }
+    // two straps across, and the bolts holding the whole thing together
+    for(const by of [32,94]){
+      ctx.fillStyle='#3b3340';ctx.fillRect(2,by-6,124,12);
+      ctx.fillStyle='#4a4150';ctx.fillRect(2,by-6,124,2);
+      ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(2,by+4,124,2);
+      for(let i=0;i<cols.length-1;i++){
+        const bx=(cols[i]+cols[i+1])/2;
+        ctx.fillStyle='#191320';ctx.beginPath();ctx.arc(bx+0.6,by+0.7,2.6,0,7);ctx.fill();
+        ctx.fillStyle='#6e6478';ctx.beginPath();ctx.arc(bx,by,2.4,0,7);ctx.fill();
+        ctx.fillStyle='#a89ab4';ctx.beginPath();ctx.arc(bx-0.6,by-0.7,1.0,0,7);ctx.fill();
+      }
+    }
+    if(locked){
+      ctx.fillStyle='#3b3340';ctx.beginPath();ctx.arc(64,64,12,0,7);ctx.fill();
+      ctx.fillStyle='#6e6478';ctx.beginPath();ctx.arc(64,64,9,0,7);ctx.fill();
+      ctx.fillStyle='#140f1a';ctx.beginPath();ctx.arc(64,61,4,0,7);ctx.fill();
+      ctx.fillRect(61.5,62,5,10);
+    }else{
+      ctx.strokeStyle='#6e6478';ctx.lineWidth=3.4;
+      ctx.beginPath();ctx.arc(96,64,8,0,7);ctx.stroke();
     }
     return cv;
   }
