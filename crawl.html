@@ -1494,7 +1494,7 @@ function monsterSVG(key,boss,pose,tint){
     `<radialGradient id="ec"><stop offset="0%" stop-color="#fff8e8"/><stop offset="35%" stop-color="${o.eye}"/><stop offset="100%" stop-color="${o.eye}"/></radialGradient>`+
     roughF('rf',o.rough?o.rough[0]:2.2,o.rough?o.rough[1]:0.45,o.seed||3)+
     (boss?glowGrad('bossg','#c01a10'):'')+
-    (tint?`<radialGradient id="elag"><stop offset="0%" stop-color="${tint}" stop-opacity="0.55"/><stop offset="45%" stop-color="${tint}" stop-opacity="0.24"/><stop offset="100%" stop-color="${tint}" stop-opacity="0"/></radialGradient>`:'')+
+    (tint?`<radialGradient id="elag"><stop offset="0%" stop-color="${tint}" stop-opacity="0.92"/><stop offset="22%" stop-color="${tint}" stop-opacity="0.6"/><stop offset="55%" stop-color="${tint}" stop-opacity="0.22"/><stop offset="100%" stop-color="${tint}" stop-opacity="0"/></radialGradient>`:'')+
     (o.extra||'')+'</defs>';
   const ground=boss
     ?`<ellipse cx="32" cy="60" rx="23" ry="5" fill="url(#bossg)" opacity="0.7"/><ellipse cx="32" cy="60.5" rx="16" ry="3.2" fill="#000" opacity="0.55"/>`
