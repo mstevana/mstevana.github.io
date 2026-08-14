@@ -568,34 +568,36 @@ function studyPick(book,lvl){
 /* ---------- monsters ---------- */
 // type tags: humanoid, undead, beast, giant, vermin, dragon ; ranged:tiles ; caster:[spell-ish]
 const MONSTERS={
-  rat:      {name:'Dire rat',      cr:1/3,hp:5,  ac:15,atk:4, dmg:[1,4,0], xp:100, speed:1.1, type:'beast', spr:'rat',
+  // Three creatures that were unflagged wildlife now belong to the guild. A
+  // dire rat and a giant spider are what a sewer has; a troll is what moves in.
+  rat:      {sewers:true, name:'Dire rat',cr:1/3,hp:5,  ac:15,atk:4, dmg:[1,4,0], xp:100, speed:1.1, type:'beast', spr:'rat',
              disease:{dc:11,name:'filth fever'}},
-  kobold:   {name:'Kobold',        cr:1/4,hp:4,  ac:15,atk:1, dmg:[1,6,-1],xp:75,  speed:1.3, type:'humanoid', spr:'kobold'},
-  koboldsl: {name:'Kobold slinger',cr:1/3,hp:4,  ac:15,atk:3, dmg:[1,4,0], xp:100, speed:1.3, type:'humanoid', spr:'koboldsl', ranged:5},
-  goblin:   {name:'Goblin',        cr:1/3,hp:5,  ac:15,atk:2, dmg:[1,6,0], xp:100, speed:1.3, type:'humanoid', spr:'goblin'},
+  kobold:   {dungeon:true, name:'Kobold',        cr:1/4,hp:4,  ac:15,atk:1, dmg:[1,6,-1],xp:75,  speed:1.3, type:'humanoid', spr:'kobold'},
+  koboldsl: {dungeon:true, name:'Kobold slinger',cr:1/3,hp:4,  ac:15,atk:3, dmg:[1,4,0], xp:100, speed:1.3, type:'humanoid', spr:'koboldsl', ranged:5},
+  goblin:   {dungeon:true, name:'Goblin',        cr:1/3,hp:5,  ac:15,atk:2, dmg:[1,6,0], xp:100, speed:1.3, type:'humanoid', spr:'goblin'},
   skeleton: {name:'Skeleton',      cr:1/3,hp:6,  ac:15,atk:1, dmg:[1,4,1], xp:100, speed:1.5, type:'undead', spr:'skeleton', skeletal:true},
   skelarcher:{name:'Skeleton archer',cr:1/2,hp:6,ac:15,atk:3, dmg:[1,6,0], xp:150, speed:1.5, type:'undead', spr:'skelarcher', ranged:6, skeletal:true},
   zombie:   {name:'Zombie',        cr:1/2,hp:16, ac:11,atk:2, dmg:[1,6,1], xp:150, speed:2.4, type:'undead', spr:'zombie'},
-  hobgoblin:{name:'Hobgoblin',     cr:1/2,hp:6,  ac:16,atk:2, dmg:[1,8,1], xp:150, speed:1.4, type:'humanoid', spr:'hobgoblin'},
-  orc:      {name:'Orc',           cr:1/2,hp:5,  ac:13,atk:4, dmg:[1,8,3], xp:150, speed:1.3, type:'humanoid', spr:'orc'},
-  gobshaman:{name:'Goblin shaman', cr:1,  hp:9,  ac:14,atk:1, dmg:[1,4,0], xp:300, speed:1.5, type:'humanoid', spr:'gobshaman',
+  hobgoblin:{dungeon:true, name:'Hobgoblin',     cr:1/2,hp:6,  ac:16,atk:2, dmg:[1,8,1], xp:150, speed:1.4, type:'humanoid', spr:'hobgoblin'},
+  orc:      {dungeon:true, name:'Orc',           cr:1/2,hp:5,  ac:13,atk:4, dmg:[1,8,3], xp:150, speed:1.3, type:'humanoid', spr:'orc'},
+  gobshaman:{dungeon:true, name:'Goblin shaman', cr:1,  hp:9,  ac:14,atk:1, dmg:[1,4,0], xp:300, speed:1.5, type:'humanoid', spr:'gobshaman',
              caster:{dmg:[2,4,1],ranged:6,cd:4.5,fx:'#7fd17f',elem:'acid'}},
-  spider:   {name:'Giant spider',  cr:1,  hp:11, ac:14,atk:4, dmg:[1,6,0], xp:300, speed:1.1, type:'vermin', spr:'spider',
+  spider:   {sewers:true, name:'Giant spider',cr:1,hp:11,ac:14,atk:4, dmg:[1,6,0], xp:300, speed:1.1, type:'vermin', spr:'spider',
              poison:{dc:12,abil:'str',dice:[1,4]}},
   ghoul:    {name:'Ghoul',         cr:1,  hp:13, ac:14,atk:3, dmg:[1,6,1], xp:300, speed:1.2, type:'undead', spr:'ghoul',
              paralysis:{dc:12,dur:6}},
-  gnoll:    {reach:true, name:'Gnoll',         cr:1,  hp:11, ac:15,atk:3, dmg:[1,8,2], xp:300, speed:1.3, type:'humanoid', spr:'gnoll'},
-  bugbear:  {name:'Bugbear',       cr:2,  hp:16, ac:17,atk:5, dmg:[1,8,2], xp:600, speed:1.3, type:'humanoid', spr:'bugbear'},
+  gnoll:    {dungeon:true, reach:true, name:'Gnoll',         cr:1,  hp:11, ac:15,atk:3, dmg:[1,8,2], xp:300, speed:1.3, type:'humanoid', spr:'gnoll'},
+  bugbear:  {dungeon:true, name:'Bugbear',       cr:2,  hp:16, ac:17,atk:5, dmg:[1,8,2], xp:600, speed:1.3, type:'humanoid', spr:'bugbear'},
   ogre:     {reach:true, name:'Ogre',          cr:3,  hp:29, ac:16,atk:8, dmg:[2,8,7], xp:900, speed:1.6, type:'giant', spr:'ogre'},
   wight:    {name:'Wight',         cr:3,  hp:26, ac:15,atk:4, dmg:[1,4,1], xp:900, speed:1.4, type:'undead', spr:'wight',
              energyDrain:1},
   wightnec: {name:'Wight necromancer',cr:4,hp:30,ac:15,atk:4, dmg:[1,4,1], xp:1200,speed:1.5, type:'undead', spr:'wightnec',
              energyDrain:1, caster:{dmg:[3,6,0],ranged:6,cd:5,fx:'#b48ae0'}},
-  minotaur: {reach:true, name:'Minotaur',      cr:4,  hp:39, ac:14,atk:9, dmg:[3,6,4], xp:1200,speed:1.4, type:'giant', spr:'minotaur'},
-  troll:    {reach:true, name:'Troll',         cr:5,  hp:63, ac:16,atk:9, dmg:[1,6,6], xp:1500,speed:1.4, type:'giant', spr:'troll', regen:3},
-  ogremage: {reach:true, name:'Ogre mage',     cr:8,  hp:37, ac:18,atk:7, dmg:[2,6,7], xp:2400,speed:1.5, type:'giant', spr:'ogremage',
+  minotaur: {cave:true, reach:true, name:'Minotaur',      cr:4,  hp:39, ac:14,atk:9, dmg:[3,6,4], xp:1200,speed:1.4, type:'giant', spr:'minotaur'},
+  troll:    {reach:true, sewers:true, name:'Troll',cr:5,hp:63, ac:16,atk:9, dmg:[1,6,6], xp:1500,speed:1.4, type:'giant', spr:'troll', regen:3},
+  ogremage: {dungeon:true, reach:true, name:'Ogre mage',     cr:8,  hp:37, ac:18,atk:7, dmg:[2,6,7], xp:2400,speed:1.5, type:'giant', spr:'ogremage',
              caster:{dmg:[5,6,0],ranged:7,cd:6,fx:'#8ad0e0',elem:'cold'}},
-  dragon:   {reach:true, name:'Young dragon',  cr:7,  hp:66, ac:19,atk:11,dmg:[1,8,4], xp:2100,speed:1.4, type:'dragon', spr:'dragon',
+  dragon:   {cave:true, reach:true, name:'Young dragon',  cr:7,  hp:66, ac:19,atk:11,dmg:[1,8,4], xp:2100,speed:1.4, type:'dragon', spr:'dragon',
              caster:{dmg:[6,6,0],ranged:6,cd:7,fx:'#e08a3a',elem:'fire'}},
   // the deep dead: the crypts past depth 10 had nothing of their own to field,
   // and these double as the heavy end of a bestiary that ran dry around 20
@@ -630,8 +632,11 @@ const MONSTERS={
              cave:true, poison:{dc:13,abil:'str',dice:[1,3]}},
   crawler:  {reach:true, name:'Carrion crawler',cr:4,hp:28,ac:16,atk:6,dmg:[1,6,2],xp:1200,speed:1.5, type:'aberration', spr:'crawler',
              cave:true, paralysis:{dc:13,dur:3}},
+  // The otyugh moves from the caves to the sewers, where it always belonged:
+  // it eats refuse, and the guild keeps it for that. The cave roster can spare
+  // one -- it still fields nine.
   otyugh:   {reach:true, name:'Otyugh',cr:7, hp:58, ac:17,atk:9, dmg:[1,10,5],xp:2100,speed:1.9, type:'aberration', spr:'otyugh',
-             cave:true, disease:{dc:15,name:'Filth fever'}},
+             sewers:true, disease:{dc:15,name:'Filth fever'}},
   umberhulk:{reach:true, name:'Umber hulk',cr:9,hp:74,ac:18,atk:12,dmg:[2,8,6],xp:2700,speed:1.5, type:'aberration', spr:'umberhulk',
              cave:true, gaze:{dc:16,dur:2.5}},
   /* ---------- duergar: the grey dwarves of the deep halls ----------
@@ -683,9 +688,14 @@ const MONSTERS={
   mylord:   {name:'Myconid lord', cr:8, hp:38, ac:20,atk:12,dmg:[2,6,4],xp:2400,speed:1.4, type:'plant', spr:'mylord',
              myconid:true, distress:true, reach:true, spores:{dc:17,dur:3,kind:'hold'},
              caster:{dmg:[3,6,4],ranged:6,cd:5,fx:'#c88ae8',elem:'acid'}},
-  mysovereign:{name:'Myconid sovereign',cr:13,hp:96,ac:21,atk:15,dmg:[2,8,8],xp:3900,speed:1.4, type:'plant', spr:'mysovereign',
+  // Resized when BOSSES became a per-theme table. The sovereign holds the grove's
+  // tier-1 slot at depth 39, whose window is 3253 (the hammerlord three floors
+  // above) to 4182 (the drider three below); at hp 96 she scored 6057 and fitted
+  // nowhere, which for a boss-only creature means dead content. Boss-only is
+  // exactly what makes the numbers free to move.
+  mysovereign:{name:'Myconid sovereign',cr:11,hp:60,ac:21,atk:13,dmg:[2,8,5],xp:3300,speed:1.4, type:'plant', spr:'mysovereign',
              myconid:true, distress:true, reach:true, spores:{dc:18,dur:3.5,kind:'hold'},
-             caster:{dmg:[5,6,5],ranged:7,cd:5,fx:'#c88ae8',elem:'acid'}},
+             caster:{dmg:[4,6,4],ranged:7,cd:5,fx:'#c88ae8',elem:'acid'}},
   /* ---------- the drow ----------
      Elves, so the profile is the mirror of the duergar's: less hit points than
      anything else at this depth, and more armour class and attack bonus than
@@ -724,20 +734,120 @@ const MONSTERS={
   drowmatron:{name:'Drow matron',cr:13,hp:33,ac:22,atk:14,dmg:[2,6,5],xp:3900,speed:1.4, type:'humanoid', spr:'drowmatron',
               drow:true, reach:true, faerie:{dc:18,dur:8}, drowpoison:{dc:18,dur:3},
               caster:{dmg:[4,6,4],ranged:7,cd:4.5,fx:'#a86ce8',elem:'acid'}},
+  /* ---------- the sewers ----------
+     A thieves' guild and its livestock. The wererats own the place; the oozes
+     and the otyugh are what they keep in it, the way a farm keeps pigs — which
+     is why the vermin here are slow and the rats are not.
+
+     The Sewers occupy depths 4-6 and 25-27 and nothing in between, so this is
+     the only roster in the game that has to be built for two windows twenty
+     floors apart. The per-monster share is 4-7 at the shallow end and 450-540
+     at the deep end; a creature written for one is useless in the other.
+
+     Note the shallow ratios sit near 2-3 of share rather than near 1. That is
+     normal down there and not a mis-tuning: at depth 5 the budget cannot pay
+     share value for every body `targetCount` asks for, so the whole shallow
+     bestiary runs high (zombie 2.98, gnoll 2.74, bugbear 3.08). The 0.85-1.2
+     guideline is a deep-band norm. */
+  ratswarm: {name:'Sewer rat swarm',cr:1, hp:18, ac:13,atk:4, dmg:[1,6,1], xp:300, speed:1.2, type:'vermin', spr:'ratswarm',
+             sewers:true, disease:{dc:12,name:'Filth fever'}},
+  wererat:  {name:'Wererat',      cr:2, hp:22, ac:15,atk:5, dmg:[1,6,2], xp:600, speed:1.3, type:'humanoid', spr:'wererat',
+             sewers:true, disease:{dc:13,name:'Lycanthropy'}},
+  // Both sized down hard from CR 3-4. `rawBudget` is the pool's weighted MEAN
+  // threat, so a creature above the mean at a given depth raises the budget for
+  // every roster there -- and the Sewers block is depths 4-6, where the mean is
+  // 17. At CR 3-4 the cutthroat sat at 3.2x that mean and the ooze at 2.3x,
+  // which lifted the depth 4-6 budget by 38% and took the descent from median
+  // 28 to 26. A theme banded this shallow needs shallow-weight creatures.
+  grayooze: {name:'Gray ooze',    cr:1, hp:22, ac:11,atk:4, dmg:[1,6,1], xp:300, speed:2.4, type:'ooze', spr:'grayooze',
+             sewers:true},
+  wererogue:{name:'Wererat cutthroat',cr:2,hp:20,ac:17,atk:5,dmg:[1,4,2],xp:600, speed:1.2, type:'humanoid', spr:'wererogue',
+             sewers:true, ranged:5, disease:{dc:14,name:'Lycanthropy'}},
+  ochrejelly:{name:'Ochre jelly', cr:7, hp:66, ac:13,atk:11,dmg:[2,6,5], xp:2100,speed:2.2, type:'ooze', spr:'ochrejelly',
+             sewers:true},
+  scrag:    {name:'Scrag',        cr:8, hp:62, ac:19,atk:13,dmg:[1,10,6],xp:2400,speed:1.3, type:'giant', spr:'scrag',
+             sewers:true, reach:true, regen:4},
+  // Sized down from hp 94 / atk 15 / 2d8+7 after a descent. Not because its own
+  // ratio was wrong -- 1.57 is inside the range the myconid elder already sits
+  // in -- but because at 822 it was the single heaviest creature at depth 23,
+  // above the previous ceiling-setter, and `poolCeiling` reads the heaviest
+  // thing a depth allows. Lifting the ceiling lifts `threatBudget` for every
+  // roster at once: the budget at depth 26 went 14447 -> 15198 and realised
+  // floor threat 15016 -> 18721, which took the descent from median 28 to 26.
+  // A new roster's top creature must not out-weigh the incumbent top creature.
+  blackpud: {name:'Black pudding',cr:9, hp:64, ac:14,atk:13,dmg:[2,8,4], xp:2700,speed:2.2, type:'ooze', spr:'blackpud',
+             sewers:true, reach:true},
+  // The deep three trimmed together, not individually. On a Sewers floor the x4
+  // bias means this roster takes about half the bodies; at a mean of 1.20x share
+  // that put a depth-26 floor 22% over budget against a 12% baseline. It is the
+  // roster's MEAN ratio that has to sit near 1, not each creature's -- a bias
+  // this strong makes the roster the floor.
+  wereblade:{name:'Wererat blademaster',cr:10,hp:54,ac:22,atk:15,dmg:[2,6,6],xp:3000,speed:1.2,type:'humanoid',spr:'wereblade',
+             sewers:true, disease:{dc:18,name:'Lycanthropy'},
+             caster:{dmg:[4,6,3],ranged:6,cd:5.5,fx:'#8fbf6a',elem:'acid'}},
+  /* ---------- the dungeon ----------
+     The goblinoid line, grown up. Everything from the kobold to the bugbear
+     already existed and was unflagged wildlife; this is the half of the legion
+     that holds the deep floors, with giants for muscle the way a hobgoblin
+     legion in 3.5 keeps them.
+
+     The Dungeon blocks are depths 1-3 and 22-24, so like the sewers this roster
+     is bimodal by construction. Sized to the deep block: at depths 22-24 the
+     pool mean and the per-monster share coincide (355/360, 386/388, 427/424),
+     the roster's mean ratio is 1.03-1.09, and nothing in it out-weighs the
+     incumbent ceiling of 714 -- both of the traps that cost a floor of descent
+     when the sewers landed. */
+  hobcaptain:{name:'Hobgoblin captain',cr:7,hp:58,ac:19,atk:12,dmg:[1,10,6],xp:2100,speed:1.3,type:'humanoid',spr:'hobcaptain',
+             dungeon:true},
+  worgrider:{name:'Worg rider',   cr:7, hp:54, ac:17,atk:12,dmg:[1,10,5],xp:2100,speed:1.0, type:'humanoid', spr:'worgrider',
+             dungeon:true},
+  hobpriest:{name:'Hobgoblin war priest',cr:8,hp:52,ac:19,atk:10,dmg:[1,8,5],xp:2400,speed:1.4,type:'humanoid',spr:'hobpriest',
+             dungeon:true, caster:{dmg:[4,6,3],ranged:6,cd:5,fx:'#d05a2a',elem:'fire'}},
+  ettin:    {name:'Ettin',        cr:8, hp:60, ac:18,atk:12,dmg:[2,6,5], xp:2400,speed:1.5, type:'giant', spr:'ettin',
+             dungeon:true, reach:true},
+  hillgiant:{name:'Hill giant',   cr:9, hp:64, ac:19,atk:12,dmg:[2,8,5], xp:2700,speed:1.5, type:'giant', spr:'hillgiant',
+             dungeon:true, reach:true},
+  stonegiant:{name:'Stone giant', cr:10,hp:62, ac:21,atk:13,dmg:[2,8,5], xp:3000,speed:1.4, type:'giant', spr:'stonegiant',
+             dungeon:true, reach:true, ranged:7},
+  /* ---------- the four bosses the table had no creature for ----------
+     All boss-only: no SPAWN_DEPTH entry, which is what frees their numbers to
+     answer to the boss floor they were written for instead of to a spawn band.
+     Each was sized to the window between the slot above and the slot below
+     BEFORE a line of BOSS_TABLE moved -- 0-124 at depth 6, 586-1040 at 15,
+     1210-1993 at 24, 1452-2726 at 27. */
+  wereratboss:{name:'Wererat guildmaster',cr:3,hp:20,ac:17,atk:5,dmg:[1,6,2],xp:900,speed:1.2,type:'humanoid',spr:'wereratboss',
+             sewers:true, disease:{dc:14,name:'Lycanthropy'}},
+  duergarthane:{name:'Duergar thane',cr:9,hp:50,ac:21,atk:11,dmg:[1,10,5],xp:2700,speed:1.4,type:'humanoid',spr:'duergarthane',
+             duergar:true, reach:true, enlarge:true},
+  hobwarlord:{name:'Hobgoblin warlord',cr:11,hp:54,ac:21,atk:13,dmg:[2,6,5],xp:3300,speed:1.3,type:'humanoid',spr:'hobwarlord',
+             dungeon:true, reach:true},
+  wereratlord:{name:'Wererat guild lord',cr:12,hp:54,ac:22,atk:14,dmg:[2,6,6],xp:3600,speed:1.2,type:'humanoid',spr:'wereratlord',
+             sewers:true, disease:{dc:19,name:'Lycanthropy'},
+             caster:{dmg:[4,6,3],ranged:6,cd:5,fx:'#8fbf6a',elem:'acid'}},
+  // Boss-only, like the myconid rulers and the drow matron. The Dungeon's tier-1
+  // slot is depth 45, and it has to out-threat the drider three floors above it
+  // at 4182 -- the stone giant tops out at 4158, so the legion needed a king.
+  giantking:{name:'Fire giant king',cr:14,hp:80,ac:22,atk:15,dmg:[2,8,7], xp:4200,speed:1.4, type:'giant', spr:'giantking',
+             dungeon:true, reach:true, caster:{dmg:[5,6,4],ranged:6,cd:6,fx:'#e0602a',elem:'fire'}},
   purpleworm:{reach:true,name:'Purple worm',cr:16,hp:120,ac:19,atk:17,dmg:[3,8,9],xp:4800,speed:1.7, type:'vermin', spr:'purpleworm',
              cave:true, poison:{dc:18,abil:'con',dice:[2,4]}},
 };
 // spawn table by depth: keys allowed at depth n if cr between depth/2-? use per-monster [minD,maxD]
 const SPAWN_DEPTH={
-  rat:[1,3],kobold:[1,2],koboldsl:[1,3],goblin:[1,3],skeleton:[1,4],skelarcher:[2,5],zombie:[2,5],
-  hobgoblin:[2,5],orc:[2,5],gobshaman:[3,6],spider:[3,7],ghoul:[3,7],gnoll:[3,7],bugbear:[4,8],
-  ogre:[6,10],wight:[6,11],wightnec:[8,13],minotaur:[8,13],troll:[10,16],ogremage:[13,99],dragon:[15,99],
+  rat:[1,6],kobold:[1,2],koboldsl:[1,3],goblin:[1,3],skeleton:[1,4],skelarcher:[2,5],zombie:[2,5],
+  hobgoblin:[2,5],orc:[2,5],gobshaman:[3,6],spider:[3,7],ghoul:[3,7],gnoll:[3,7],bugbear:[3,8],
+  ogre:[6,10],wight:[6,11],wightnec:[8,13],minotaur:[8,13],troll:[10,28],ogremage:[13,99],dragon:[15,99],
   mummy:[10,20],wraith:[12,24],barrowwight:[13,26],bonecolossus:[16,32],deathknight:[20,99],lich:[22,99],bonedrake:[26,99],
-  piercer:[8,18],cavebear:[8,18],troglodyte:[8,18],crawler:[9,20],cavefisher:[12,26],otyugh:[14,26],
+  piercer:[8,18],cavebear:[8,18],troglodyte:[8,18],crawler:[9,20],cavefisher:[12,26],otyugh:[14,28],
   umberhulk:[18,32],roper:[24,99],purpleworm:[30,99],
   shrieker:[15,24],mysprout:[15,24],violetfungus:[16,28],sporeservant:[17,30],
   myguard:[17,30],mycaster:[20,34],myelder:[24,99],
   drow:[17,28],drowbolt:[17,28],drowblade:[19,32],drowpriest:[20,34],drowmage:[20,34],drider:[23,99],
+  // the sewers, built for its two windows: 4-6 and 25-27
+  ratswarm:[2,8],wererat:[3,11],grayooze:[5,14],wererogue:[5,14],
+  ochrejelly:[17,28],scrag:[20,32],blackpud:[22,34],wereblade:[23,34],
+  // the legion, built for the deep Dungeon block at 22-24
+  worgrider:[13,24],hobcaptain:[14,26],hobpriest:[17,29],ettin:[18,30],hillgiant:[20,32],stonegiant:[23,34],
   duergar:[12,24],duergarxbow:[12,24],duergarscout:[14,28],
   duergarpriest:[16,30],duergarrune:[19,34],duergarlord:[23,99],
 };
@@ -803,48 +913,80 @@ function affixChance(depth,rich){
 // The first theme block is exempt. On floor 3 the party is still level 1 -- 32
 // hit points between four of them -- against a boss carrying 2.5x hp and +2 AC,
 // which at that level is unhittable rather than hard. Bosses start at 6.
-const BOSSES=[ // every 3rd level from 6: pick by depth
-  {minD:6, base:'bugbear', name:'Grukk the Skullkeeper'},
-  {minD:9, base:'wight',   name:'The Bonelord'},
-  {minD:12,base:'minotaur',name:'Gorehorn, King Below'},
-  {minD:15,base:'troll',   name:'Ubbroth the Unrotting'},
-  // Depth 18 is the last floor of the Myconid block, so the grove gets its own
-  // ruler. The list is ordered by weight, not by flavour, and the lord was
-  // written to fit between Ubbroth and Sinshara rather than the other way round.
-  {minD:18,base:'mylord',  name:'Ilhaeryn, the Standing Grove'},
-  // Depth 21 is the last floor of the Drow block. Same story as the grove: the
-  // matron is boss-only, so her numbers were written to the window between
-  // Ilhaeryn and Sinshara rather than the list being bent to fit her.
-  {minD:21,base:'drowmatron',name:'Matron Zaeryl of House Vhaeraun'},
-  {minD:24,base:'ogremage',name:'Sinshara of the Veil'},
-  {minD:27,base:'dragon',  name:'Vermilax the Patient'},
-  {minD:30,base:'mysovereign',name:'Thass-Mor, the Sporecrown'},
-];
-// Past Vermilax the named bosses run out, and every boss floor was handing you
-// the same dragon forever. The list starts over instead, each pass through it
-// harder than the last and titled so you can see which circle you are on.
-// A boss's hit points are a property of the floor, not of whichever creature the
-// cycle happened to name. A bugbear base is a quarter of a dragon's, so raw base
-// hp made the boss on floor 21 weaker than the one on floor 18, and the same
-// sawtooth repeated on every pass. The creature still decides how the fight goes
-// -- its damage, its reach, whether it casts -- but its weight class comes from
-// the depth. Taken from the list so adding a named boss keeps it honest.
-const BOSS_BASE_HP=BOSSES.reduce((a,b)=>a+MONSTERS[b.base].hp,0)/BOSSES.length;
-const BOSS_RANKS=['Warlord','Tyrant','Devourer','Sovereign','Archfiend','Herald','Fellmaster','Undying','Throneless'];
+/* ---------- bosses ----------
+   A boss belongs to the floor it caps. Boss floors are every third level from
+   depth 6, and because themes cycle every three floors the theme of a boss
+   floor walks Sewers, Crypt, Caves, Duergar, Myconid, Drow, Dungeon and starts
+   over 21 depths later. So a boss is chosen by (theme, tier), where the tier
+   counts how many of that theme's boss floors have already been passed.
+
+   Depth 3 is exempt -- the party is level 1 there, and a boss with 2.5x hp and
+   +2 AC is unhittable rather than hard -- which is why the Dungeon's own first
+   boss floor is 24 rather than 3.
+
+   A slot holds a LIST. One entry is drawn at random per floor, so a boss floor
+   is not the same fight every run. The cost of that is a stricter invariant:
+   every candidate in a slot must out-threat every candidate in the slot three
+   floors above it, because any pair can come up together. T21 checks the whole
+   table pairwise rather than checking a median.
+
+   The arc below was solved against the bestiary rather than asserted. Thirteen
+   of the fourteen slots are filled by creatures that already existed; only the
+   Dungeon's tier-1 slot at depth 45 needed one written for it. */
+const BOSS_TABLE={
+  // Four slots hold two candidates, all of them at depths a run actually
+  // reaches. Every candidate in a slot clears every candidate three floors
+  // above: 90/97 at depth 6, 124/199 at 9, 503/586 at 12, 1324/1401 at 24.
+  Sewers: [[{base:'wereratboss',  name:'Skarrow, Whisker of the Warrens'},
+            {base:'grayooze',     name:'The Sump'}],
+           [{base:'wereratlord',  name:'Vhek, the Grey Tithe'}]],
+  Crypt:  [[{base:'wight',        name:'The Bonelord'},
+            {base:'wightnec',     name:'Ossuar, Who Counts the Dead'}],
+           [{base:'lich',         name:'Vaunthil, Who Kept His Name'}]],
+  Caves:  [[{base:'minotaur',     name:'Gorehorn, King Below'},
+            {base:'cavefisher',   name:'The Ceiling Widow'}],
+           [{base:'roper',        name:'The Patient Stone'}]],
+  Duergar:[[{base:'duergarthane', name:'Thane Morgrun Ironvow'}],
+           [{base:'duergarlord',  name:'Hammerlord Baruk Grimforge'}]],
+  Myconid:[[{base:'mylord',       name:'Ilhaeryn, the Standing Grove'}],
+           [{base:'mysovereign',  name:'Thass-Mor, the Sporecrown'}]],
+  Drow:   [[{base:'drowmatron',   name:'Matron Zaeryl of House Vhaeraun'}],
+           [{base:'drider',       name:'Xull\'raen the Eight-Legged'}]],
+  Dungeon:[[{base:'ogremage',     name:'Sinshara of the Veil'},
+            {base:'hobwarlord',   name:'Warlord Ghazrak Ironmaw'}],
+           [{base:'giantking',    name:'Kholgar, King Under the Ash'}]],
+};
+// Which theme a boss floor caps, and which of that theme's boss floors it is.
+function bossSlot(depth){
+  const idx=Math.floor((depth-1)/3)%THEMES.length;
+  let tier=0;
+  for(let d=6;d<depth;d+=3)if(Math.floor((d-1)/3)%THEMES.length===idx)tier++;
+  return {theme:THEMES[idx].name,tier};
+}
+// Every entry in the table, flattened -- used for the cycled boss's weight class
+// and by the tests that walk the whole thing.
+const BOSS_ENTRIES=Object.keys(BOSS_TABLE).reduce((a,t)=>a.concat(...BOSS_TABLE[t]),[]);
+// A cycled boss's hit points are a property of the floor, not of whichever
+// creature the table named: a wererat base is a fraction of a lich's, so raw
+// base hp made a deep boss weaker than the one three floors above it. The
+// creature still decides how the fight goes -- its damage, its reach, whether
+// it casts -- but its weight class comes from the depth.
+const BOSS_BASE_HP=BOSS_ENTRIES.reduce((a,b)=>a+MONSTERS[b.base].hp,0)/BOSS_ENTRIES.length;
 const BOSS_CIRCLES=['of the Sunken Circle','of the Black Cycle','of the Last Gate','Beyond Counting'];
 function bossFor(depth){
-  const lastNamed=BOSSES[BOSSES.length-1].minD;
-  if(depth<=lastNamed){
-    let b=BOSSES[0];
-    for(const c of BOSSES)if(depth>=c.minD)b=c;
-    return {base:b.base,name:b.name,cycle:0};
-  }
-  // boss floors come every third level, so one pass through the list is 18 floors
-  const n=Math.floor((depth-lastNamed)/3)-1;
-  const i=((n%BOSSES.length)+BOSSES.length)%BOSSES.length;
-  const cycle=1+Math.floor(n/BOSSES.length);
-  const base=BOSSES[i].base;
-  return {base,name:MONSTERS[base].name+' '+BOSS_RANKS[i]+' '+BOSS_CIRCLES[(cycle-1)%BOSS_CIRCLES.length],cycle};
+  const {theme,tier}=bossSlot(depth);
+  const rows=BOSS_TABLE[theme];
+  if(!rows||!rows.length)return null;
+  // Past the last written tier the theme's deepest ruler comes back, harder and
+  // titled by the circle it belongs to. Nothing reaches this in practice --
+  // no simulated run has ever passed depth 31 -- but a boss floor must always
+  // have something standing on it.
+  const t=Math.min(tier,rows.length-1);
+  const cycle=tier-t;
+  const c=pick(rows[t]);
+  if(!cycle)return {base:c.base,name:c.name,cycle:0,theme,tier};
+  return {base:c.base,theme,tier,cycle,
+    name:c.name+' '+BOSS_CIRCLES[(cycle-1)%BOSS_CIRCLES.length]};
 }
 const THEMES=[
   {name:'Dungeon', wall:'#4a443a', wall2:'#2e2a22', floor:'#39342b', ceil:'#211d17', fog:0x0a0906, moss:'#39412c', roomBias:.45},
@@ -975,6 +1117,20 @@ function roughF(id,scale,freq,seed){
     `<feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="inside"/></feMerge>`+
     `</filter>`;
 }
+// The off-hand. It is drawn into the BASE layer rather than into |A|, so it
+// stays put while the weapon arm swings -- which is what an off-hand does, and
+// what keeps the swing readable. Every |A| pivot in the table sits on the screen
+// right, so this is always the left arm: shoulder joint, a curved limb, and a
+// fist. `sleeve` draws a cuff where a garment ends and skin begins.
+function armL(sx,sy,ex,ey,hx,hy,col,w,hand,sleeve){
+  const j=(w*0.66).toFixed(2), f=(w*0.62).toFixed(2);
+  const d=`M${sx} ${sy} Q${ex} ${ey} ${hx} ${hy}`;
+  return `<path d="${d}" stroke="#0a0806" stroke-opacity="0.55" stroke-width="${(w+1.4).toFixed(2)}" fill="none" stroke-linecap="round"/>`+
+    `<path d="${d}" stroke="${col}" stroke-width="${w}" fill="none" stroke-linecap="round"/>`+
+    (sleeve?`<path d="M${sx} ${sy} Q${((sx+ex)/2).toFixed(1)} ${((sy+ey)/2).toFixed(1)} ${((ex+hx)/2).toFixed(1)} ${((ey+hy)/2).toFixed(1)}" stroke="${sleeve}" stroke-width="${(w*1.5).toFixed(2)}" fill="none" stroke-linecap="round"/>`:'')+
+    `<circle cx="${sx}" cy="${sy}" r="${j}" fill="${sleeve||col}" stroke="#0a0806" stroke-opacity="0.4" stroke-width="0.6"/>`+
+    (hand?`<circle cx="${hx}" cy="${hy}" r="${f}" fill="${hand}" stroke="#0a0806" stroke-opacity="0.45" stroke-width="0.6"/>`:'');
+}
 function gEye(x,y,r,opts){ // glowing eye: soft halo + hot core (+ optional slit pupil)
   opts=opts||{};
   let s=`<circle cx="${x}" cy="${y}" r="${(r*2.6).toFixed(1)}" fill="url(#eg)"/>`+
@@ -995,14 +1151,21 @@ function clawsAt(x,y,angs,len,c){c=c||'#cfc4a2';
 function drip(x,y,l,c){return `<path d="M${x} ${y} q0.8 ${l*0.6} 0 ${l}" stroke="${c}" stroke-width="1.2" fill="none"/><circle cx="${x}" cy="${y+l}" r="1.1" fill="${c}"/>`;}
 // shared kobold body used by both kobold variants
 function koboldBody(){
+  // The kobold was the one humanoid in the bestiary with no arms at all -- not
+  // even a static pair -- so it neither swung at anything nor telegraphed with
+  // one. It gets the same treatment as everything else: an off-hand in the base
+  // layer here, shared by both kobolds, and a clawed |A| that belongs to the
+  // plain kobold alone -- the slinger builds on this body and brings its own.
   return `<path d="M24 54 Q12 58 10 48" stroke="#4a2e1a" stroke-width="2.8" fill="none"/>`+
   `<path d="M26 32 Q20 36 21 46 Q21 54 26 58 L38 58 Q43 52 42 44 Q41 35 37 32 Z" fill="url(#bg)" ${RIM}/>`+
+  armL(25,37,19.5,45,20,52.5,'#6d4526',2.2,'#8a5c38',null)+
   `<path d="M24 31 L20 27 L25 29 Z M22 38 L17 35 L22 35 Z M21 45 L16 43 L21 42 Z" fill="#2c1c0c"/>`+
   `<path d="M27 57 L26 62 L30 62 M37 57 L38 62 L42 62" stroke="#241408" stroke-width="2.4" fill="none"/>`+
   `|H|<path d="M26 24 Q24 14 33 13 Q41 13 43 20 Q47 21 49 25 Q45 28 40 27 Q38 31 31 30 Q26 29 26 24 Z" fill="url(#bg)" ${RIM}/>`+
   `<path d="M28 14 Q26 8 30 6 L31 12 Z M38 14 Q40 8 37 5 L35 11 Z" fill="#bdb294"/>|/H|`+
   `<path d="M27 44 L37 44 L36 52 L29 53 Z" fill="#1c130a"/>`+
-  `<path d="M29 41 Q30 46 29 50 M33 40 Q34 45 33 50" stroke="#170e06" stroke-width="1" fill="none" opacity="0.6"/>`;
+  `<path d="M29 41 Q30 46 29 50 M33 40 Q34 45 33 50" stroke="#170e06" stroke-width="1" fill="none" opacity="0.6"/>`+
+  ``;
 }
 function koboldSharp(){
   return `|H|`+gEye(31,19,1.7,{slit:1})+gEye(40,21,1.4,{slit:1})+fangsDown(43,25,5,3,2.4)+`|/H|`;
@@ -1035,8 +1198,12 @@ const MONSTER_ART={
     `<path d="M55 46 L56 49.5 M57.5 45.5 L59 48.5" stroke="#cfc4a2" stroke-width="1.1"/>`+
     `<path d="M56 44 L63 42 M56 45.5 L63 46.5" stroke="#7a705e" stroke-width="0.5" opacity="0.6"/>`+
     drip(56,49.5,3.5,'#6a1210')+`|/H|`}),
-  kobold:()=>({o:{hp:[33,31],ap:[0,0],lit:'#8a5c38',mid:'#462c1a',eye:'#ffb32a',rough:[2.2,0.4],seed:11},
-    body:koboldBody(),sharp:koboldSharp()}),
+  kobold:()=>({o:{hp:[33,31],ap:[41,37],lit:'#8a5c38',mid:'#462c1a',eye:'#ffb32a',rough:[2.2,0.4],seed:11},
+    body:koboldBody()+
+      `|A|<path d="M41 37 Q47 42 46 49" stroke="#6d4526" stroke-width="2.6" fill="none" stroke-linecap="round"/>`+
+      `<circle cx="41" cy="37" r="1.5" fill="#6d4526"/>`+
+      `<path d="M46 49 L49 53 M46 49 L44 54 M46 49 L48.5 48" stroke="#bdb294" stroke-width="1.1" stroke-linecap="round"/>|/A|`,
+    sharp:koboldSharp()}),
   koboldsl:()=>({o:{hp:[33,31],ap:[42,38],lit:'#7a5a40',mid:'#3c2e20',eye:'#ffb32a',rough:[2.2,0.4],seed:12},
     body:koboldBody()+`|A|<path d="M42 38 Q50 34 52 26" stroke="#6a533c" stroke-width="2" fill="none"/>`,
     sharp:koboldSharp()+`|A|<path d="M52 26 Q57 20 54 14" stroke="#7a624a" stroke-width="1.6" fill="none"/>`+
@@ -1101,6 +1268,419 @@ const MONSTER_ART={
      to carry the whole silhouette: every one of these reads by its mane and its
      spider-motif gear before it reads by its face. Eyes are the one warm thing
      on them. */
+  /* ---------- the sewers ----------
+     Two families that have to read apart at a glance: the wererats, who wear
+     clothes and carry weapons, and the vermin, which do not. The oozes have no
+     skeleton to hang a head or an arm on, so their |H| is the bulge that rears
+     up before a strike and their |A| is the pseudopod that does it — which is
+     what an ooze telegraphing an attack actually looks like. */
+  /* ---------- the legion ----------
+     Hobgoblins are drilled and uniformed, so the three of them share a red
+     lacquered plate and a black surcoat and differ by rank-mark; the giants are
+     the opposite, all bare skin and salvaged gear. That contrast is the whole
+     read at sprite size. */
+  /* the four written for slots the bestiary had nobody for. Each wears its own
+     faction's livery so it reads as that theme's ruler and not as a stray. */
+  wereratboss:()=>({o:{hp:[32,22],ap:[47,37],lit:'#8a7a5e',mid:'#332a1c',eye:'#e8c84a',rough:[1,0.3],seed:111},
+    body:`<path d="M20 30 Q17 42 19 55 L25 61 L40 61 L46 55 Q48 42 45 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M21 31 L44 31 L45 47 Q32 53 20 47 Z" fill="#4a3a26"/>`+
+    `<path d="M21 31 L44 31" stroke="#c8a24a" stroke-width="1.2"/>`+
+    `<path d="M25 36 Q32 33 39 36 Q32 41 25 36 Z" fill="#c8a24a"/>`+
+    `<path d="M23 44 L42 44" stroke="#6a5636" stroke-width="1.6"/>`+
+    `<path d="M44 50 Q54 55 58 49 Q52 57 43 56 Z" fill="#6a5a44"/>`+
+    armL(21,33,11,42,13,53.5,'#4a3a26',2.5,'#a08a66','#6a5636')+
+    `<path d="M26 37 Q23.5 48 26.5 59" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M39 36 Q41.5 47 38.5 58" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M32.5 48 L32.5 60.5" stroke="#1e1710" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M25.5 56.5 L30.9 56.5 M34.1 56.5 L39.5 56.5" stroke="#1e1710" stroke-width="2.2" stroke-opacity="0.55"/>`+
+    `|H|<ellipse cx="32" cy="20" rx="8.2" ry="7" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M26 24 Q21 30 29 29 Q34 27 33 22 Z" fill="#a08a66"/>`+
+    `<path d="M25 15 Q19 6 27 6 Q31 10 30 16 Z" fill="#4a3d2a"/>`+
+    `<path d="M39 15 Q45 6 37 6 Q33 10 34 16 Z" fill="#4a3d2a"/>`+
+    `<path d="M24 12 Q32 6 40 12" stroke="#c8a24a" stroke-width="1.4" fill="none"/>`+
+    `<circle cx="28" cy="19" r="1.4" fill="#e8c84a"/><circle cx="36" cy="19" r="1.4" fill="#e8c84a"/>`+
+    `<circle cx="27" cy="28" r="1.2" fill="#241c12"/>`+
+    `<path d="M23 27 L19 26 M23 29 L19 30" stroke="#d8ccb2" stroke-width="0.6"/>|/H|`+
+    `|A|<path d="M47 37 L54 34" stroke="#5f4c31" stroke-width="2.3"/>`+
+    `<path d="M53 35 L62 27" stroke="#c6ccd6" stroke-width="1.6"/>`+
+    `<path d="M51 36 L55 33" stroke="#8a9098" stroke-width="3"/>|/A|`,
+    sharp:`|H|`+gEye(28,19,1.4,{pupil:1})+gEye(36,19,1.4,{pupil:1})+`|/H|`}),
+  wereratlord:()=>({o:{hp:[32,21],ap:[48,36],lit:'#9a8a68',mid:'#3a3020',eye:'#f0d24a',rough:[1,0.28],seed:112,ad:0.85},
+    body:`<path d="M18 29 Q15 42 17 56 L24 62 L40 62 L47 56 Q49 42 46 29 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M19 30 L45 30 L46 49 Q32 55 18 49 Z" fill="#3f3524"/>`+
+    `<path d="M19 30 L45 30" stroke="#e0c05a" stroke-width="1.4"/>`+
+    `<path d="M23 35 L41 35 M23 40 L41 40 M24 45 L40 45" stroke="#2b2316" stroke-width="1.5"/>`+
+    `<circle cx="32" cy="39" r="4.2" fill="none" stroke="#8fbf6a" stroke-width="1.2"/>`+
+    `<path d="M32 35 L34 39 L32 43 L30 39 Z" fill="#8fbf6a"/>`+
+    `<path d="M46 52 Q57 57 61 50 Q54 59 45 58 Z" fill="#6a5a44"/>`+
+    armL(19,32,8,42,11,54.5,'#3f3524',2.7,'#b09a72','#4f4534')+
+    `<path d="M25 38 Q22.5 49 25.5 60" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M39 37 Q41.5 48 38.5 59" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M32 49 L32 61.5" stroke="#1e180f" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M24.5 57.5 L30.4 57.5 M33.6 57.5 L39.5 57.5" stroke="#1e180f" stroke-width="2.2" stroke-opacity="0.55"/>`+
+    `|H|<ellipse cx="32" cy="19" rx="8.6" ry="7.2" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M26 23 Q20 30 29 29 Q34 27 33 21 Z" fill="#b09a72"/>`+
+    `<path d="M24 14 Q17 4 26 4 Q31 9 30 15 Z" fill="#4a3d2a"/>`+
+    `<path d="M40 14 Q47 4 38 4 Q33 9 34 15 Z" fill="#4a3d2a"/>`+
+    `<path d="M23 11 Q32 3 41 11" stroke="#e0c05a" stroke-width="1.8" fill="none"/>`+
+    `<circle cx="32" cy="6" r="2" fill="#8fbf6a"/>`+
+    `<circle cx="28" cy="18" r="1.5" fill="#f0d24a"/><circle cx="36" cy="18" r="1.5" fill="#f0d24a"/>`+
+    `<circle cx="27" cy="28" r="1.3" fill="#241c12"/>`+
+    `<path d="M22 27 L18 26 M22 29 L18 30" stroke="#e0d6bc" stroke-width="0.6"/>|/H|`+
+    `|A|<path d="M48 36 L55 32" stroke="#4f4534" stroke-width="2.6"/>`+
+    `<path d="M54 33 L64 21" stroke="#ccd2dc" stroke-width="1.8"/>`+
+    `<path d="M54 33 L60 40" stroke="#b0b6c0" stroke-width="1.3"/>`+
+    `<path d="M52 34 L57 30" stroke="#8a9098" stroke-width="3"/>|/A|`,
+    sharp:`|H|`+gEye(28,18,1.5,{pupil:1})+gEye(36,18,1.5,{pupil:1})+`|/H|`}),
+  duergarthane:()=>({o:{hp:[32,25],ap:[47,37],lit:'#9aa0a6',mid:'#42474c',eye:'#e8582c',rough:[1,0.25],seed:113,ad:0.85},
+    body:`<path d="M18 30 Q15 41 17 53 L23 60 L41 60 L47 53 Q49 41 46 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M19 31 L45 31 L46 46 Q32 52 18 46 Z" fill="#525860"/>`+
+    `<path d="M19 31 L45 31" stroke="#c9a227" stroke-width="1.4"/>`+
+    `<path d="M32 32 L32 50" stroke="#2b2e33" stroke-width="1.1"/>`+
+    `<path d="M23 36 L41 36 M22 42 L42 42" stroke="#c9a227" stroke-width="1"/>`+
+    `<path d="M26 38 L32 34 L38 38 L32 44 Z" fill="#c9a227"/>`+
+    armL(19,33,8,41,11,53.5,'#4a4e55',2.8,'#9aa0a6','#6d7178')+
+    `<path d="M24 36 Q21.5 47 24.5 58" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M40 35 Q42.5 46 39.5 57" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M32 47 L32 59.5" stroke="#20232a" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M23.5 55.5 L30.4 55.5 M33.6 55.5 L40.5 55.5" stroke="#20232a" stroke-width="2.2" stroke-opacity="0.55"/>`+
+    `|H|<path d="M25 19 Q25 11 32 11 Q39 11 39 19 L39 24 Q35 27 29 27 Q25 25 25 19 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M23 17 Q23 6 32 6 Q41 6 41 17 L41 20 L23 20 Z" fill="#4a4e55"/>`+
+    `<path d="M23 17 Q32 12 41 17" stroke="#c9a227" stroke-width="1.1"/>`+
+    `<path d="M22 14 L16 8 M42 14 L48 8" stroke="#c9a227" stroke-width="1.6"/>`+
+    `<circle cx="28.5" cy="22" r="1.3" fill="#e8582c"/><circle cx="35.5" cy="22" r="1.3" fill="#e8582c"/>`+
+    `<path d="M25 26 Q32 42 39 26 Q35 30 32 30 Q29 30 25 26 Z" fill="#dee0e2"/>`+
+    `<path d="M29 33 Q32 35 35 33" stroke="#a5a8ac" stroke-width="0.8" fill="none"/>|/H|`+
+    `|A|<path d="M47 37 L55 33" stroke="#5a4326" stroke-width="2.6"/>`+
+    `<path d="M53 34 L58 20" stroke="#6a5a44" stroke-width="2.4"/>`+
+    `<path d="M51 20 Q58 12 65 20 Q58 27 51 20 Z" fill="#7d838a" ${RIM}/>`+
+    `<path d="M55 19 L61 19" stroke="#c9a227" stroke-width="1"/>|/A|`,
+    sharp:`|H|`+gEye(28.5,22,1.3,{pupil:1})+gEye(35.5,22,1.3,{pupil:1})+`|/H|`}),
+  hobwarlord:()=>({o:{hp:[32,22],ap:[48,36],lit:'#c07a4a',mid:'#52281a',eye:'#ffd24a',rough:[1,0.28],seed:114,ad:0.85,as:1.1},
+    body:`<path d="M18 29 Q15 42 17 55 L23 61 L41 61 L47 55 Q49 42 46 29 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M19 30 L45 30 L46 48 Q32 54 18 48 Z" fill="#8a3524"/>`+
+    `<path d="M19 30 L45 30" stroke="#f0c05a" stroke-width="1.5"/>`+
+    `<path d="M22 35 L42 35 M22 40 L42 40 M23 45 L41 45" stroke="#4a1a12" stroke-width="1.7"/>`+
+    `<path d="M32 31 L32 51" stroke="#f0c05a" stroke-width="1"/>`+
+    `<path d="M25 39 L32 33 L39 39 L32 46 Z" fill="#f0c05a"/>`+
+    `<path d="M25 39 L32 33 L39 39 L32 46 Z" fill="none" stroke="#8a3524" stroke-width="0.8"/>`+
+    armL(19,32,8,42,11,54.5,'#8a3524',2.8,'#c07a4a','#4a1a12')+
+    `<path d="M24 37 Q21.5 48 24.5 59" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M40 36 Q42.5 47 39.5 58" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M32 48 L32 60.5" stroke="#280d0a" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M23.5 56.5 L30.4 56.5 M33.6 56.5 L40.5 56.5" stroke="#280d0a" stroke-width="2.2" stroke-opacity="0.55"/>`+
+    `|H|<path d="M25 18 Q25 10 32 10 Q39 10 39 18 L39 24 Q35 27 29 27 Q25 25 25 18 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M22 17 Q22 5 32 5 Q42 5 42 17 L42 20 L22 20 Z" fill="#8a3524"/>`+
+    `<path d="M22 17 Q32 11 42 17" stroke="#f0c05a" stroke-width="1.2"/>`+
+    `<path d="M22 13 L14 5 M42 13 L50 5" stroke="#f0c05a" stroke-width="1.8"/>`+
+    `<path d="M30 0 L34 0 L34 6 L30 6 Z" fill="#f0c05a"/><path d="M27 0 L37 0 L32 -5 Z" fill="#c8452a"/>`+
+    `<circle cx="28.5" cy="22" r="1.4" fill="#ffd24a"/><circle cx="35.5" cy="22" r="1.4" fill="#ffd24a"/>`+
+    `<path d="M28 26 Q32 24 36 26" stroke="#5a2a1c" stroke-width="0.9" fill="none"/>`+
+    `<path d="M29 25 L29 27.5 M35 25 L35 27.5" stroke="#fff0d8" stroke-width="1.1"/>|/H|`+
+    `|A|<path d="M48 36 L56 32" stroke="#8a3524" stroke-width="2.8"/>`+
+    `<path d="M55 33 L66 20" stroke="#ccd2dc" stroke-width="2"/>`+
+    `<path d="M53 34 L58 30" stroke="#8a9098" stroke-width="3.4"/>`+
+    `<path d="M61 22 L66 27" stroke="#f0c05a" stroke-width="1.3"/>|/A|`,
+    sharp:`|H|`+gEye(28.5,22,1.4,{pupil:1})+gEye(35.5,22,1.4,{pupil:1})+`|/H|`}),
+  giantking:()=>({o:{hp:[32,18],ap:[50,34],lit:'#b06a3a',mid:'#4a2410',eye:'#ffd24a',rough:[1.4,0.45],seed:107,ad:0.8},
+    body:`<path d="M14 29 Q8 46 12 63 L23 69 L43 69 L52 63 Q57 46 51 29 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M17 34 Q32 41 48 34 L50 58 Q32 65 15 58 Z" fill="#5a2a12"/>`+
+    `<path d="M17 34 Q32 41 48 34" stroke="#f0b04a" stroke-width="1.4" fill="none"/>`+
+    `<path d="M21 41 L44 41 M20 49 L45 49 M21 57 L44 57" stroke="#7d3a18" stroke-width="1.8"/>`+
+    `<circle cx="32" cy="46" r="5.5" fill="none" stroke="#f0b04a" stroke-width="1.4"/>`+
+    `<path d="M32 40 L35 46 L32 52 L29 46 Z" fill="#ffd24a"/>`+
+    armL(16,33,3,47,7,60.5,'#9a5a2e',3.6,'#b06a3a','#5a2a12')+
+    `<path d="M24 45 Q21.5 56 24.5 67" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M42 44 Q44.5 55 41.5 66" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M33 56 L33 68.5" stroke="#281308" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M23.5 64.5 L31.4 64.5 M34.6 64.5 L42.5 64.5" stroke="#281308" stroke-width="2.2" stroke-opacity="0.55"/>`+
+    `|H|<path d="M23 16 Q23 7 32 7 Q41 7 41 16 L41 25 Q36 29 29 29 Q23 26 23 16 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M22 13 Q32 3 42 13 L42 17 Q32 11 22 17 Z" fill="#3a1c0c"/>`+
+    `<path d="M22 10 L15 3 M42 10 L49 3" stroke="#f0b04a" stroke-width="2"/>`+
+    `<path d="M25 23 Q32 28 39 23 Q35 27 32 27 Q29 27 25 23 Z" fill="#2a1408"/>`+
+    `<path d="M27 24 L27 27 M32 25 L32 28 M37 24 L37 27" stroke="#ffeccc" stroke-width="1.1"/>`+
+    `<circle cx="28" cy="18" r="1.6" fill="#ffd24a"/><circle cx="36" cy="18" r="1.6" fill="#ffd24a"/>`+
+    `<path d="M24 12 Q32 8 40 12" stroke="#f0b04a" stroke-width="1" fill="none"/>|/H|`+
+    `|A|<path d="M50 34 L59 31" stroke="#9a5a2e" stroke-width="3.6"/>`+
+    `<path d="M58 32 L63 12" stroke="#5a4a34" stroke-width="3"/>`+
+    `<path d="M55 12 Q63 3 69 12 Q63 20 55 12 Z" fill="#7a6258" ${RIM}/>`+
+    `<path d="M58 11 Q63 8 66 12" stroke="#e0602a" stroke-width="1.2" fill="none"/>|/A|`,
+    sharp:`|H|`+gEye(28,18,1.6,{pupil:1})+gEye(36,18,1.6,{pupil:1})+`|/H|`}),
+  hobcaptain:()=>({o:{hp:[32,23],ap:[47,37],lit:'#b06a4a',mid:'#4a2418',eye:'#f0d24a',rough:[1,0.28],seed:101},
+    body:`<path d="M19 30 Q16 42 18 55 L24 61 L40 61 L46 55 Q48 42 45 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M20 31 L44 31 L45 48 Q32 54 19 48 Z" fill="#7d2f22"/>`+
+    `<path d="M20 31 L44 31" stroke="#e0b45a" stroke-width="1.3"/>`+
+    `<path d="M23 36 L41 36 M23 41 L41 41 M24 46 L40 46" stroke="#4a1a12" stroke-width="1.6"/>`+
+    `<path d="M32 32 L32 51" stroke="#e0b45a" stroke-width="0.9"/>`+
+    `<path d="M26 38 L32 34 L38 38 L32 42 Z" fill="#e0b45a"/>`+
+    armL(20,33,10,42,12,53.5,'#7d2f22',2.6,'#b06a4a','#4a1a12')+
+    `<path d="M25 37 Q22.5 48 25.5 59" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M39 36 Q41.5 47 38.5 58" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M32 48 L32 60.5" stroke="#280d0a" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M24.5 56.5 L30.4 56.5 M33.6 56.5 L39.5 56.5" stroke="#280d0a" stroke-width="2.2" stroke-opacity="0.55"/>`+
+    `|H|<path d="M25 18 Q25 11 32 11 Q39 11 39 18 L39 24 Q35 27 30 27 Q25 25 25 18 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M23 17 Q23 7 32 7 Q41 7 41 17 L41 20 L23 20 Z" fill="#7d2f22"/>`+
+    `<path d="M23 17 Q32 12 41 17" stroke="#e0b45a" stroke-width="1"/>`+
+    `<path d="M31 3 L33 3 L33 8 L31 8 Z" fill="#e0b45a"/><path d="M28 3 L36 3 L32 -1 Z" fill="#c8452a"/>`+
+    `<circle cx="28.5" cy="22" r="1.3" fill="#f0d24a"/><circle cx="35.5" cy="22" r="1.3" fill="#f0d24a"/>`+
+    `<path d="M28 26 Q32 24 36 26" stroke="#5a2a1c" stroke-width="0.8" fill="none"/>`+
+    `<path d="M29 25 L29 27 M35 25 L35 27" stroke="#f0ead0" stroke-width="1"/>|/H|`+
+    `|A|<path d="M47 37 L55 33" stroke="#7d2f22" stroke-width="2.4"/>`+
+    `<path d="M54 34 L64 24" stroke="#c6ccd6" stroke-width="1.8"/>`+
+    `<path d="M52 35 L57 31" stroke="#8a9098" stroke-width="3"/>`+
+    `<path d="M60 26 L64 30" stroke="#e0b45a" stroke-width="1.2"/>|/A|`,
+    sharp:`|H|`+gEye(28.5,22,1.3,{pupil:1})+gEye(35.5,22,1.3,{pupil:1})+`|/H|`}),
+  worgrider:()=>({o:{hp:[32,20],ap:[48,32],lit:'#a86048',mid:'#42201a',eye:'#f0d24a',rough:[1.1,0.32],seed:102},
+    body:`<path d="M8 52 Q6 43 14 41 Q24 38 34 41 Q46 43 52 47 Q56 52 52 57 Q40 61 26 61 Q12 60 8 52 Z" fill="#3c342c" ${RIM}/>`+
+    `<path d="M50 44 Q58 40 60 33 Q62 40 57 47 Z" fill="#4a4038"/>`+
+    `<path d="M12 58 L10 63 M22 59 L21 64 M36 59 L37 64 M46 56 L48 62" stroke="#241e18" stroke-width="2.4"/>`+
+    `<path d="M9 45 Q2 42 0 36" stroke="#3c342c" stroke-width="2.4" fill="none"/>`+
+    `<path d="M10 44 Q6 36 13 35 Q18 37 17 44 Z" fill="#4a4038" ${RIM}/>`+
+    `<circle cx="12" cy="40" r="1.2" fill="#e05a2a"/>`+
+    `<path d="M8 43 L4 42" stroke="#d8d0c0" stroke-width="1"/>`+
+    `<path d="M24 40 Q32 34 40 40 L41 44 Q32 48 23 44 Z" fill="url(#bg)"/>`+
+    armL(25,39,16,44,18,53.5,'#7d2f22',2.3,'#a86048',null)+
+    `|H|<path d="M25 17 Q25 10 32 10 Q39 10 39 17 L39 23 Q35 26 30 26 Q25 24 25 17 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M23 16 Q23 6 32 6 Q41 6 41 16 L41 19 L23 19 Z" fill="#7d2f22"/>`+
+    `<path d="M23 14 L18 9 M41 14 L46 9" stroke="#4a4038" stroke-width="1.6"/>`+
+    `<circle cx="28.5" cy="21" r="1.3" fill="#f0d24a"/><circle cx="35.5" cy="21" r="1.3" fill="#f0d24a"/>`+
+    `<path d="M29 24 L29 26 M35 24 L35 26" stroke="#f0ead0" stroke-width="1"/>|/H|`+
+    `|A|<path d="M48 32 L56 28" stroke="#7d2f22" stroke-width="2.2"/>`+
+    `<path d="M54 30 L64 18" stroke="#6a5a44" stroke-width="2"/>`+
+    `<path d="M62 16 L64 22 L59 20 Z" fill="#c6ccd6"/>|/A|`,
+    sharp:`|H|`+gEye(28.5,21,1.3,{pupil:1})+gEye(35.5,21,1.3,{pupil:1})+`|/H|`}),
+  hobpriest:()=>({o:{hp:[32,22],ap:[47,36],lit:'#b06a4a',mid:'#4a2418',eye:'#f0d24a',rough:[1,0.3],seed:103,ad:0.7},
+    body:`<path d="M17 29 Q13 43 16 58 L23 63 L41 63 L48 58 Q51 43 47 29 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M18 30 L46 30 L47 51 Q32 57 17 51 Z" fill="#5a2018"/>`+
+    `<path d="M18 30 L46 30" stroke="#e0b45a" stroke-width="1.3"/>`+
+    `<path d="M32 32 L32 53 M24 38 L40 38 M23 45 L41 45" stroke="#e0b45a" stroke-width="0.9"/>`+
+    `<circle cx="32" cy="41" r="5" fill="none" stroke="#f0a03a" stroke-width="1.3"/>`+
+    `<path d="M32 36 L34 41 L32 46 L30 41 Z" fill="#f0a03a"/>`+
+    armL(18,32,7,43,10,55.5,'#5a2018',2.6,'#b06a4a','#3a1810')+
+    `|H|<path d="M25 18 Q25 11 32 11 Q39 11 39 18 L39 24 Q35 27 30 27 Q25 25 25 18 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M22 17 Q22 5 32 5 Q42 5 42 17 Q42 21 40 24 L40 14 Q32 11 24 14 L24 24 Q22 21 22 17 Z" fill="#3a1810"/>`+
+    `<path d="M27 6 Q32 0 37 6 Q32 3 27 6 Z" fill="#f0a03a"/>`+
+    `<circle cx="28.5" cy="22" r="1.3" fill="#f0d24a"/><circle cx="35.5" cy="22" r="1.3" fill="#f0d24a"/>`+
+    `<path d="M29 25 L29 27 M35 25 L35 27" stroke="#f0ead0" stroke-width="1"/>|/H|`+
+    `|A|<path d="M47 36 L55 33" stroke="#5a2018" stroke-width="2.4"/>`+
+    `<path d="M54 34 L58 14" stroke="#6a5a44" stroke-width="2.2"/>`+
+    `<circle cx="58" cy="11" r="4.4" fill="none" stroke="#f0a03a" stroke-width="1.5"/>`+
+    `<circle cx="58" cy="11" r="2" fill="#ffd88a"/>|/A|`,
+    sharp:`|H|`+gEye(28.5,22,1.3,{pupil:1})+gEye(35.5,22,1.3,{pupil:1})+`|/H|`}),
+  ettin:()=>({o:{hp:[26,20],ap:[50,36],lit:'#8a7a5e',mid:'#3a3020',eye:'#e0602a',rough:[1.6,0.5],seed:104},
+    body:`<path d="M14 32 Q9 47 13 62 L23 68 L43 68 L52 62 Q56 47 50 32 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M17 36 Q32 42 48 36 L49 58 Q32 65 15 58 Z" fill="#4a3d28"/>`+
+    `<path d="M20 40 L44 46 M19 50 L45 54" stroke="#5f4f34" stroke-width="2.4"/>`+
+    `<path d="M24 36 L26 60 M40 36 L38 60" stroke="#2b2416" stroke-width="1.2"/>`+
+    armL(16,36,4,48,8,60.5,'#7d6e54',3.4,'#8a7a5e',null)+
+    `<path d="M24 44 Q21.5 55 24.5 66" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M42 43 Q44.5 54 41.5 65" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M33 55 L33 67.5" stroke="#1e190f" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M23.5 63.5 L31.4 63.5 M34.6 63.5 L42.5 63.5" stroke="#1e190f" stroke-width="2.2" stroke-opacity="0.55"/>`+
+    `|H|<path d="M18 20 Q18 12 25 12 Q32 12 32 20 L32 27 Q28 30 23 30 Q18 28 18 20 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M33 20 Q33 12 40 12 Q47 12 47 20 L47 27 Q43 30 38 30 Q33 28 33 20 Z" fill="#7d6e54" ${RIM}/>`+
+    `<path d="M18 17 Q25 10 32 17 L32 20 Q25 15 18 20 Z" fill="#2f2718"/>`+
+    `<path d="M33 17 Q40 10 47 17 L47 20 Q40 15 33 20 Z" fill="#2f2718"/>`+
+    `<circle cx="22" cy="22" r="1.4" fill="#e0602a"/><circle cx="28" cy="22" r="1.4" fill="#e0602a"/>`+
+    `<circle cx="37" cy="22" r="1.4" fill="#e0602a"/><circle cx="43" cy="22" r="1.4" fill="#e0602a"/>`+
+    `<path d="M21 27 Q25 30 29 27" stroke="#3a3020" stroke-width="1" fill="none"/>`+
+    `<path d="M36 27 Q40 30 44 27" stroke="#3a3020" stroke-width="1" fill="none"/>`+
+    `<path d="M23 26 L23 28 M27 26 L27 28 M38 26 L38 28 M42 26 L42 28" stroke="#f0ead0" stroke-width="1"/>|/H|`+
+    `|A|<path d="M50 36 L58 32" stroke="#7d6e54" stroke-width="3.4"/>`+
+    `<path d="M57 33 L62 18" stroke="#5a4a34" stroke-width="2.6"/>`+
+    `<path d="M56 20 L64 15 L66 22 L58 26 Z" fill="#6a6258" ${RIM}/>|/A|`,
+    sharp:`|H|`+gEye(22,22,1.4,{pupil:1})+gEye(28,22,1.4,{pupil:1})+gEye(37,22,1.4,{pupil:1})+gEye(43,22,1.4,{pupil:1})+`|/H|`}),
+  hillgiant:()=>({o:{hp:[32,20],ap:[50,36],lit:'#9a8464',mid:'#443722',eye:'#e0a02a',rough:[1.5,0.5],seed:105},
+    body:`<path d="M14 31 Q8 47 12 63 L23 69 L43 69 L52 63 Q57 47 50 31 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M17 36 Q32 43 48 36 L50 59 Q32 66 15 59 Z" fill="#584626"/>`+
+    `<path d="M20 42 L45 48" stroke="#6e5a30" stroke-width="3"/>`+
+    `<path d="M24 36 L25 62 M40 36 L39 62" stroke="#332a18" stroke-width="1.3"/>`+
+    `<path d="M16 60 Q32 68 49 60" stroke="#3d3018" stroke-width="1.6" fill="none"/>`+
+    armL(16,35,3,48,7,60.5,'#8a7454',3.6,'#9a8464',null)+
+    `<path d="M24 45 Q21.5 56 24.5 67" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M42 44 Q44.5 55 41.5 66" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M33 56 L33 68.5" stroke="#241d10" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M23.5 64.5 L31.4 64.5 M34.6 64.5 L42.5 64.5" stroke="#241d10" stroke-width="2.2" stroke-opacity="0.55"/>`+
+    `|H|<path d="M23 17 Q23 8 32 8 Q41 8 41 17 L41 26 Q36 30 29 30 Q23 27 23 17 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M23 15 Q32 6 41 15 L41 19 Q32 13 23 19 Z" fill="#3a2e18"/>`+
+    `<path d="M25 24 Q32 29 39 24 Q35 28 32 28 Q29 28 25 24 Z" fill="#2a2110"/>`+
+    `<path d="M27 25 L27 28 M32 26 L32 29 M37 25 L37 28" stroke="#f0ead0" stroke-width="1.1"/>`+
+    `<circle cx="28" cy="19" r="1.6" fill="#e0a02a"/><circle cx="36" cy="19" r="1.6" fill="#e0a02a"/>`+
+    `<path d="M21 20 Q17 18 18 14 M43 20 Q47 18 46 14" stroke="#8a7454" stroke-width="1.6" fill="none"/>|/H|`+
+    `|A|<path d="M50 36 L59 33" stroke="#8a7454" stroke-width="3.6"/>`+
+    `<path d="M58 34 L62 16" stroke="#5a4a34" stroke-width="3"/>`+
+    `<path d="M55 16 Q62 8 68 16 Q62 22 55 16 Z" fill="#6e665c" ${RIM}/>|/A|`,
+    sharp:`|H|`+gEye(28,19,1.6,{pupil:1})+gEye(36,19,1.6,{pupil:1})+`|/H|`}),
+  stonegiant:()=>({o:{hp:[32,19],ap:[50,35],lit:'#8e9298',mid:'#3a3e44',eye:'#cfe0ea',rough:[1.4,0.45],seed:106,ad:0.6},
+    body:`<path d="M15 30 Q9 46 13 62 L24 68 L42 68 L52 62 Q57 46 51 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M18 35 Q32 42 48 35 L49 58 Q32 65 16 58 Z" fill="#4d5257"/>`+
+    `<path d="M22 40 L44 40 M21 48 L45 48 M22 56 L44 56" stroke="#3a3e44" stroke-width="1.6"/>`+
+    `<path d="M32 36 L32 61" stroke="#a8aeb6" stroke-width="0.9"/>`+
+    `<path d="M24 44 L28 40 L36 44 L32 50 Z" fill="#6d747c" opacity="0.7"/>`+
+    armL(17,34,4,47,8,59.5,'#7d838a',3.4,'#8e9298',null)+
+    `<path d="M25 44 Q22.5 55 25.5 66" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M41 43 Q43.5 54 40.5 65" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M33 55 L33 67.5" stroke="#212429" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M24.5 63.5 L31.4 63.5 M34.6 63.5 L41.5 63.5" stroke="#212429" stroke-width="2.2" stroke-opacity="0.55"/>`+
+    `|H|<path d="M24 16 Q24 8 32 8 Q40 8 40 16 L40 25 Q36 29 30 29 Q24 26 24 16 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M24 14 Q32 5 40 14 L40 18 Q32 12 24 18 Z" fill="#2f3338"/>`+
+    `<path d="M26 23 Q32 27 38 23 Q35 26 32 26 Q29 26 26 23 Z" fill="#22262a"/>`+
+    `<circle cx="28" cy="18" r="1.5" fill="#cfe0ea"/><circle cx="36" cy="18" r="1.5" fill="#cfe0ea"/>`+
+    `<path d="M23 13 L20 10 M41 13 L44 10" stroke="#6d747c" stroke-width="1.4"/>|/H|`+
+    `|A|<path d="M50 35 L59 32" stroke="#7d838a" stroke-width="3.4"/>`+
+    `<circle cx="62" cy="27" r="6" fill="#6d747c" ${RIM}/>`+
+    `<path d="M59 24 L64 26 M60 30 L65 29" stroke="#4d5257" stroke-width="1.2"/>|/A|`,
+    sharp:`|H|`+gEye(28,18,1.5,{pupil:1})+gEye(36,18,1.5,{pupil:1})+`|/H|`}),
+  ratswarm:()=>({o:{hp:[30,30],ap:[46,40],lit:'#6a5a44',mid:'#2e2519',eye:'#d8b23a',rough:[1.4,0.5],seed:91},
+    body:`<ellipse cx="32" cy="50" rx="26" ry="12" fill="#241c12" opacity="0.85"/>`+
+    `<ellipse cx="20" cy="47" rx="9" ry="6" fill="url(#bg)" ${RIM}/>`+
+    `<ellipse cx="43" cy="49" rx="9" ry="6" fill="#4a3d2a" ${RIM}/>`+
+    `<ellipse cx="31" cy="55" rx="10" ry="6" fill="#3a2f20"/>`+
+    `<path d="M11 46 Q3 44 1 39 M52 48 Q60 46 63 41 M24 57 Q18 62 11 62 M40 57 Q46 62 53 61" stroke="#5a4a33" stroke-width="1.6" fill="none"/>`+
+    `<circle cx="15" cy="45" r="1.1" fill="#d8b23a"/><circle cx="48" cy="47" r="1.1" fill="#d8b23a"/>`+
+    `<circle cx="27" cy="54" r="1" fill="#d8b23a"/><circle cx="37" cy="56" r="1" fill="#d8b23a"/>`+
+    `|H|<ellipse cx="30" cy="34" rx="10" ry="7.5" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M22 31 Q17 25 23 24 Q27 26 26 31 Z" fill="#4a3d2a"/>`+
+    `<path d="M38 31 Q43 25 37 24 Q33 26 34 31 Z" fill="#4a3d2a"/>`+
+    `<path d="M30 36 L44 40" stroke="#8a7658" stroke-width="1.4"/>`+
+    `<circle cx="27" cy="33" r="1.5" fill="#d8b23a"/><circle cx="34" cy="33" r="1.5" fill="#d8b23a"/>`+
+    `<path d="M28 39 L32 39" stroke="#f0e6d0" stroke-width="1.2"/>|/H|`+
+    `|A|<ellipse cx="49" cy="40" rx="8" ry="5.5" fill="#4a3d2a" ${RIM}/>`+
+    `<path d="M55 39 Q61 34 57 32" stroke="#5a4a33" stroke-width="1.6" fill="none"/>`+
+    `<circle cx="52" cy="39" r="1.2" fill="#d8b23a"/>`+
+    `<path d="M55 42 L59 43" stroke="#f0e6d0" stroke-width="1.1"/>|/A|`,
+    sharp:`|H|`+gEye(27,33,1.5,{slit:1})+gEye(34,33,1.5,{slit:1})+`|/H|`}),
+  wererat:()=>({o:{hp:[32,24],ap:[46,38],lit:'#7a6a52',mid:'#332a1c',eye:'#d8b23a',rough:[1,0.3],seed:92},
+    body:`<path d="M21 31 Q18 42 20 54 L25 60 L40 60 L45 54 Q47 42 44 31 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M22 32 L43 32 L44 47 Q32 52 21 47 Z" fill="#4a3a26"/>`+
+    `<path d="M24 35 L41 39 M23 42 L42 45" stroke="#5f4c31" stroke-width="1.4"/>`+
+    `<path d="M27 33 L25 50 M38 33 L40 50" stroke="#2b2115" stroke-width="1"/>`+
+    `<path d="M44 52 Q54 56 58 50 Q52 58 43 57 Z" fill="#6a5a44"/>`+
+    armL(22,34,12,42,14,52.5,'#4a3a26',2.4,'#8a7658','#6a5a44')+
+    `<path d="M26 36 Q23.5 47 26.5 58" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M39 35 Q41.5 46 38.5 57" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M32.5 47 L32.5 59.5" stroke="#1e1710" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M25.5 55.5 L30.9 55.5 M34.1 55.5 L39.5 55.5" stroke="#1e1710" stroke-width="2.2" stroke-opacity="0.55"/>`+
+    `|H|<ellipse cx="32" cy="21" rx="8" ry="7" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M26 24 Q22 30 30 29 Q34 27 33 23 Z" fill="#8a7658"/>`+
+    `<path d="M25 16 Q20 8 27 8 Q31 11 30 17 Z" fill="#4a3d2a"/>`+
+    `<path d="M39 16 Q44 8 37 8 Q33 11 34 17 Z" fill="#4a3d2a"/>`+
+    `<circle cx="28" cy="19" r="1.4" fill="#d8b23a"/><circle cx="36" cy="19" r="1.4" fill="#d8b23a"/>`+
+    `<circle cx="27" cy="28" r="1.2" fill="#241c12"/>`+
+    `<path d="M24 27 L20 26 M24 29 L20 30 M39 27 L43 26" stroke="#c9bda6" stroke-width="0.6"/>|/H|`+
+    `|A|<path d="M46 38 L53 35" stroke="#5f4c31" stroke-width="2.2"/>`+
+    `<path d="M52 36 L60 30" stroke="#b6bcc6" stroke-width="1.6"/>`+
+    `<path d="M50 37 L54 34" stroke="#6a5a44" stroke-width="2.8"/>|/A|`,
+    sharp:`|H|`+gEye(28,19,1.4,{pupil:1})+gEye(36,19,1.4,{pupil:1})+`|/H|`}),
+  grayooze:()=>({o:{hp:[32,30],ap:[47,42],lit:'#8d9298',mid:'#3d4348',eye:'#c8d0d6',rough:[1.6,0.6],seed:93},
+    body:`<path d="M8 56 Q4 44 12 38 Q20 32 32 33 Q44 32 52 38 Q60 44 56 56 Q44 61 32 61 Q20 61 8 56 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M14 52 Q22 46 32 47 Q42 46 50 52 Q40 56 32 56 Q24 56 14 52 Z" fill="#586066" opacity="0.7"/>`+
+    `<ellipse cx="22" cy="45" rx="4" ry="2.6" fill="#a8b0b6" opacity="0.5"/>`+
+    `<ellipse cx="41" cy="49" rx="3" ry="2" fill="#a8b0b6" opacity="0.4"/>`+
+    `<path d="M12 58 Q10 63 15 63 M50 58 Q53 63 47 63" stroke="#4d5358" stroke-width="2" fill="none"/>`+
+    `|H|<path d="M22 34 Q24 20 32 18 Q40 20 42 34 Q32 38 22 34 Z" fill="url(#bg)" ${RIM}/>`+
+    `<ellipse cx="29" cy="26" rx="3" ry="4" fill="#c8d0d6" opacity="0.45"/>`+
+    `<ellipse cx="36" cy="29" rx="2" ry="2.6" fill="#c8d0d6" opacity="0.35"/>`+
+    `<path d="M27 21 Q32 16 37 21" stroke="#a8b0b6" stroke-width="1" fill="none"/>|/H|`+
+    `|A|<path d="M47 42 Q57 38 61 28 Q63 36 56 44 Q51 47 46 46 Z" fill="#6e767c" ${RIM}/>`+
+    `<ellipse cx="57" cy="35" rx="2.4" ry="3.4" fill="#c8d0d6" opacity="0.4"/>|/A|`,
+    sharp:`|H|<ellipse cx="31" cy="27" rx="7" ry="9" fill="url(#eg)" opacity="0.5"/>`+`<ellipse cx="30" cy="25" rx="2.6" ry="3.6" fill="url(#ec)" opacity="0.8"/>|/H|`+`<ellipse cx="26" cy="50" rx="9" ry="3" fill="url(#eg)" opacity="0.28"/>`}),
+  wererogue:()=>({o:{hp:[32,23],ap:[45,39],lit:'#6f6350',mid:'#2b241a',eye:'#d8b23a',rough:[1,0.3],seed:94,ad:0.45,aw:0.32},
+    body:`<path d="M21 30 Q17 43 19 56 L25 61 L39 61 L45 56 Q47 43 43 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M22 31 L42 31 L43 49 Q32 55 21 49 Z" fill="#3a3124"/>`+
+    `<path d="M24 34 L40 40" stroke="#4f4534" stroke-width="2.2"/>`+
+    `<path d="M26 45 Q32 48 38 45" stroke="#544a38" stroke-width="0.9" fill="none"/>`+
+    `<path d="M22 31 Q32 26 42 31 L42 35 Q32 30 22 35 Z" fill="#241e16"/>`+
+    armL(22,33,12,42,14,53.5,'#3a3124',2.3,'#8a7658',null)+
+    `<path d="M26 37 Q23.5 48 26.5 59" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M38 36 Q40.5 47 37.5 58" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M32 48 L32 60.5" stroke="#19140e" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M25.5 56.5 L30.4 56.5 M33.6 56.5 L38.5 56.5" stroke="#19140e" stroke-width="2.2" stroke-opacity="0.55"/>`+
+    `|H|<ellipse cx="32" cy="20" rx="8" ry="6.6" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M23 20 Q23 9 32 9 Q41 9 41 20 L41 22 Q37 14 32 14 Q27 14 23 22 Z" fill="#241e16"/>`+
+    `<path d="M26 24 Q22 29 29 28 Q33 26 32 22 Z" fill="#8a7658"/>`+
+    `<circle cx="28" cy="19" r="1.3" fill="#d8b23a"/><circle cx="35" cy="19" r="1.3" fill="#d8b23a"/>`+
+    `<path d="M24 26 L20 25 M24 28 L20 29" stroke="#c9bda6" stroke-width="0.6"/>|/H|`+
+    `|A|<path d="M45 39 L52 37" stroke="#4f4534" stroke-width="2.2"/>`+
+    `<path d="M50 33 L50 41 L58 37 Z" fill="#2e2820" ${RIM}/>`+
+    `<path d="M49 32 L49 42" stroke="#8a9098" stroke-width="1.4"/>`+
+    `<path d="M52 37 L62 37" stroke="#8fbf6a" stroke-width="1"/>`+
+    `<path d="M60 35 L64 37 L60 39 Z" fill="#8fbf6a"/>|/A|`,
+    sharp:`|H|`+gEye(28,19,1.3,{pupil:1})+gEye(35,19,1.3,{pupil:1})+`|/H|`}),
+  ochrejelly:()=>({o:{hp:[32,28],ap:[48,42],lit:'#d9a94e',mid:'#6d4a15',eye:'#ffe9b0',rough:[1.6,0.6],seed:95},
+    body:`<path d="M5 55 Q1 40 11 33 Q21 26 32 28 Q43 26 53 33 Q63 40 59 55 Q45 62 32 62 Q19 62 5 55 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M12 50 Q22 43 32 44 Q42 43 52 50 Q41 56 32 56 Q23 56 12 50 Z" fill="#a87c2c" opacity="0.6"/>`+
+    `<ellipse cx="21" cy="42" rx="5" ry="3.2" fill="#ffe9b0" opacity="0.35"/>`+
+    `<ellipse cx="43" cy="47" rx="4" ry="2.6" fill="#ffe9b0" opacity="0.28"/>`+
+    `<ellipse cx="32" cy="52" rx="7" ry="3" fill="#5c3d10" opacity="0.5"/>`+
+    `<path d="M9 58 Q6 64 12 64 M55 58 Q58 64 51 63" stroke="#8a6220" stroke-width="2.2" fill="none"/>`+
+    `|H|<path d="M20 30 Q22 14 32 12 Q42 14 44 30 Q32 35 20 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<ellipse cx="28" cy="21" rx="3.6" ry="4.6" fill="#ffe9b0" opacity="0.4"/>`+
+    `<ellipse cx="37" cy="24" rx="2.4" ry="3" fill="#ffe9b0" opacity="0.3"/>`+
+    `<path d="M26 15 Q32 10 38 15" stroke="#e8c274" stroke-width="1.1" fill="none"/>|/H|`+
+    `|A|<path d="M48 42 Q60 37 64 25 Q66 35 58 45 Q52 49 47 47 Z" fill="#c2903a" ${RIM}/>`+
+    `<ellipse cx="58" cy="34" rx="2.8" ry="4" fill="#ffe9b0" opacity="0.35"/>|/A|`,
+    sharp:`|H|<ellipse cx="32" cy="22" rx="8" ry="10" fill="url(#eg)" opacity="0.55"/>`+`<ellipse cx="30" cy="20" rx="3" ry="4.2" fill="url(#ec)" opacity="0.85"/>|/H|`+`<ellipse cx="28" cy="47" rx="11" ry="3.4" fill="url(#eg)" opacity="0.3"/>`}),
+  scrag:()=>({o:{hp:[32,22],ap:[48,36],lit:'#6f9a6a',mid:'#243c26',eye:'#e8f06a',rough:[1.1,0.35],seed:96},
+    body:`<path d="M19 30 Q14 44 17 58 L24 64 L40 64 L47 58 Q50 44 45 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M22 33 Q32 38 42 33 L44 55 Q32 61 20 55 Z" fill="#2f5231"/>`+
+    `<path d="M24 38 L26 52 M32 36 L32 54 M40 38 L38 52" stroke="#1d3520" stroke-width="1.2"/>`+
+    `<path d="M18 34 Q10 40 8 50 M46 34 Q54 40 56 50" stroke="#4d7a4a" stroke-width="2.6" fill="none"/>`+
+    `<path d="M20 44 L14 42 M20 48 L14 47 M44 44 L50 42 M44 48 L50 47" stroke="#8fbf6a" stroke-width="1.1"/>`+
+    armL(20,34,8,45,11,57.5,'#4d7a4a',3,'#6f9a6a',null)+
+    `<path d="M25 40 Q22.5 51 25.5 62" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M39 39 Q41.5 50 38.5 61" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M32 51 L32 63.5" stroke="#17280f" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M24.5 59.5 L30.4 59.5 M33.6 59.5 L39.5 59.5" stroke="#17280f" stroke-width="2.2" stroke-opacity="0.55"/>`+
+    `|H|<path d="M24 18 Q24 9 32 9 Q40 9 40 18 L40 25 Q36 29 30 29 Q24 26 24 18 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M26 22 Q32 27 38 22 Q35 26 32 26 Q29 26 26 22 Z" fill="#152314"/>`+
+    `<path d="M27 23 L28 26 M31 24 L31 27 M36 23 L35 26" stroke="#f0f6d8" stroke-width="0.9"/>`+
+    `<path d="M24 15 Q18 12 16 6 M40 15 Q46 12 48 6" stroke="#4d7a4a" stroke-width="2" fill="none"/>`+
+    `<circle cx="28" cy="17" r="1.5" fill="#e8f06a"/><circle cx="36" cy="17" r="1.5" fill="#e8f06a"/>`+
+    `<path d="M30 20 Q32 21 34 20" stroke="#2f5231" stroke-width="0.8" fill="none"/>|/H|`+
+    `|A|<path d="M48 36 L58 32" stroke="#5b8a56" stroke-width="3"/>`+
+    `<path d="M57 33 L64 27" stroke="#4d7a4a" stroke-width="2.4"/>`+
+    `<path d="M62 24 L64 30 M60 25 L63 22" stroke="#d8e0c0" stroke-width="1.3"/>|/A|`,
+    sharp:`|H|`+gEye(28,17,1.5,{pupil:1})+gEye(36,17,1.5,{pupil:1})+`|/H|`}),
+  blackpud:()=>({o:{hp:[32,26],ap:[50,44],lit:'#3a3640',mid:'#0e0c12',eye:'#6a5f78',rough:[1.8,0.7],seed:97},
+    body:`<path d="M2 56 Q-2 38 10 30 Q21 22 32 25 Q43 22 54 30 Q66 38 62 56 Q47 63 32 63 Q17 63 2 56 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M10 50 Q21 42 32 43 Q43 42 54 50 Q42 57 32 57 Q22 57 10 50 Z" fill="#1c1922" opacity="0.8"/>`+
+    `<ellipse cx="20" cy="40" rx="5" ry="3" fill="#6a5f78" opacity="0.22"/>`+
+    `<ellipse cx="45" cy="45" rx="4" ry="2.4" fill="#6a5f78" opacity="0.18"/>`+
+    `<path d="M6 59 Q2 65 9 65 M58 59 Q62 65 55 64 M32 60 Q30 66 36 65" stroke="#1c1922" stroke-width="2.4" fill="none"/>`+
+    `|H|<path d="M18 28 Q20 10 32 8 Q44 10 46 28 Q32 34 18 28 Z" fill="url(#bg)" ${RIM}/>`+
+    `<ellipse cx="27" cy="18" rx="3.6" ry="4.8" fill="#6a5f78" opacity="0.25"/>`+
+    `<ellipse cx="38" cy="21" rx="2.4" ry="3.2" fill="#6a5f78" opacity="0.2"/>`+
+    `<path d="M25 11 Q32 5 39 11" stroke="#2b2733" stroke-width="1.4" fill="none"/>|/H|`+
+    `|A|<path d="M50 44 Q63 38 64 22 Q68 34 60 47 Q54 51 49 49 Z" fill="#232029" ${RIM}/>`+
+    `<ellipse cx="59" cy="34" rx="2.6" ry="4.2" fill="#6a5f78" opacity="0.22"/>|/A|`,
+    sharp:`|H|<ellipse cx="32" cy="19" rx="9" ry="11" fill="url(#eg)" opacity="0.45"/>`+`<ellipse cx="29" cy="17" rx="3" ry="4.4" fill="url(#ec)" opacity="0.7"/>|/H|`+`<ellipse cx="27" cy="45" rx="12" ry="3.6" fill="url(#eg)" opacity="0.22"/>`}),
+  wereblade:()=>({o:{hp:[32,22],ap:[47,37],lit:'#8a7c62',mid:'#332a1c',eye:'#e8c84a',rough:[1,0.28],seed:98,ad:0.85,as:1.15},
+    body:`<path d="M19 29 Q16 42 18 55 L24 61 L40 61 L46 55 Q48 42 45 29 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M20 30 L44 30 L45 48 Q32 54 19 48 Z" fill="#3f3524"/>`+
+    `<path d="M20 30 L44 30" stroke="#a89468" stroke-width="1.2"/>`+
+    `<path d="M23 35 L41 35 M23 40 L41 40 M24 45 L40 45" stroke="#2b2316" stroke-width="1.5"/>`+
+    `<path d="M32 31 L32 50" stroke="#a89468" stroke-width="0.8"/>`+
+    `<circle cx="32" cy="38" r="3.4" fill="none" stroke="#8fbf6a" stroke-width="1"/>`+
+    `<circle cx="32" cy="38" r="1.2" fill="#8fbf6a"/>`+
+    armL(20,32,10,42,12,53.5,'#3f3524',2.6,'#a89468','#4f4534')+
+    `<path d="M25 37 Q22.5 48 25.5 59" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M39 36 Q41.5 47 38.5 58" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M32 48 L32 60.5" stroke="#1e180f" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M24.5 56.5 L30.4 56.5 M33.6 56.5 L39.5 56.5" stroke="#1e180f" stroke-width="2.2" stroke-opacity="0.55"/>`+
+    `|H|<ellipse cx="32" cy="19" rx="8.4" ry="7" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M26 23 Q21 29 29 28 Q34 26 33 21 Z" fill="#a89468"/>`+
+    `<path d="M24 14 Q18 5 26 5 Q31 9 30 15 Z" fill="#4a3d2a"/>`+
+    `<path d="M40 14 Q46 5 38 5 Q33 9 34 15 Z" fill="#4a3d2a"/>`+
+    `<path d="M22 12 L28 8 M42 12 L36 8" stroke="#b6bcc6" stroke-width="1.2"/>`+
+    `<circle cx="28" cy="17" r="1.5" fill="#e8c84a"/><circle cx="36" cy="17" r="1.5" fill="#e8c84a"/>`+
+    `<circle cx="27" cy="27" r="1.2" fill="#241c12"/>`+
+    `<path d="M23 26 L19 25 M23 28 L19 29" stroke="#c9bda6" stroke-width="0.6"/>|/H|`+
+    `|A|<path d="M47 37 L54 33" stroke="#4f4534" stroke-width="2.4"/>`+
+    `<path d="M53 34 L64 22" stroke="#ccd2dc" stroke-width="1.8"/>`+
+    `<path d="M53 34 L60 41" stroke="#b0b6c0" stroke-width="1.4"/>`+
+    `<path d="M51 35 L56 31" stroke="#8a9098" stroke-width="3"/>|/A|`,
+    sharp:`|H|`+gEye(28,17,1.5,{pupil:1})+gEye(36,17,1.5,{pupil:1})+`|/H|`}),
   drow:()=>({o:{hp:[32,25],ap:[46,38],lit:'#4a4453',mid:'#1d1a24',eye:'#e05a3a',rough:[1,0.22],seed:81},
     body:`<path d="M20 30 Q17 41 19 53 L24 60 L40 60 L45 53 Q47 41 44 30 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M21 31 L43 31 L44 46 Q32 51 20 46 Z" fill="#232030"/>`+
@@ -1108,6 +1688,11 @@ const MONSTER_ART={
     `<path d="M26 35 Q32 32 38 35 Q32 40 26 35 Z" fill="#8c93a8"/>`+
     `<path d="M32 34 L32 41 M28 37 L36 37" stroke="#8c93a8" stroke-width="0.7"/>`+
     `<path d="M22 47 L42 47" stroke="#5a5470" stroke-width="0.9"/>`+
+    armL(21,33,11,41,13,51.5,'#232030',2.4,'#4a4453','#3a3444')+
+    `<path d="M25 36 Q22.5 47 25.5 58" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M39 35 Q41.5 46 38.5 57" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M32 47 L32 59.5" stroke="#100e16" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M24.5 55.5 L30.4 55.5 M33.6 55.5 L39.5 55.5" stroke="#100e16" stroke-width="2.2" stroke-opacity="0.55"/>`+
     `|H|<path d="M26 18 Q26 11 32 11 Q38 11 38 18 L38 23 Q35 26 30 26 Q26 24 26 18 Z" fill="#3a3444" ${RIM}/>`+
     `<path d="M24 17 Q24 6 32 6 Q40 6 40 17 Q40 22 38 24 L38 15 Q32 12 26 15 L26 24 Q24 22 24 17 Z" fill="#ddd8e8"/>`+
     `<path d="M25 20 Q22 30 24 38" stroke="#ddd8e8" stroke-width="2.6" fill="none"/>`+
@@ -1117,13 +1702,19 @@ const MONSTER_ART={
     `<path d="M30 24 Q32 25 34 24" stroke="#6b6580" stroke-width="0.7" fill="none"/>|/H|`+
     `|A|<path d="M46 38 L53 34" stroke="#3a3444" stroke-width="2.4"/>`+
     `<path d="M52 35 L62 27" stroke="#b8bece" stroke-width="1.6"/>`+
-    `<path d="M50 36 L54 33" stroke="#8c93a8" stroke-width="3"/>|/A|`}),
+    `<path d="M50 36 L54 33" stroke="#8c93a8" stroke-width="3"/>|/A|`,
+    sharp:`|H|`+gEye(29,20,1.2,{pupil:1})+gEye(35,20,1.2,{pupil:1})+`|/H|`}),
   drowbolt:()=>({o:{hp:[32,25],ap:[44,40],lit:'#4a4453',mid:'#1d1a24',eye:'#e05a3a',rough:[1,0.22],seed:82,ad:0.45,aw:0.32},
     body:`<path d="M21 31 Q18 41 20 53 L25 60 L40 60 L44 53 Q46 41 43 31 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M22 32 L42 32 L43 45 Q32 50 21 45 Z" fill="#1f1c2a"/>`+
     `<path d="M23 36 L41 42" stroke="#4a4560" stroke-width="2.4"/>`+
     `<path d="M25 44 Q32 47 39 44" stroke="#5a5470" stroke-width="0.8" fill="none"/>`+
     `<circle cx="27" cy="41" r="1.6" fill="#3fd6a8"/><circle cx="31" cy="43" r="1.4" fill="#3fd6a8"/>`+
+    armL(22,34,12,41,14,51.5,'#1f1c2a',2.3,'#4a4453',null)+
+    `<path d="M26 36 Q23.5 47 26.5 58" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M39 35 Q41.5 46 38.5 57" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M32.5 47 L32.5 59.5" stroke="#100e16" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M25.5 55.5 L30.9 55.5 M34.1 55.5 L39.5 55.5" stroke="#100e16" stroke-width="2.2" stroke-opacity="0.55"/>`+
     `|H|<path d="M26 18 Q26 11 32 11 Q38 11 38 18 L38 23 Q35 26 30 26 Q26 24 26 18 Z" fill="#3a3444" ${RIM}/>`+
     `<path d="M23 18 Q23 7 32 7 Q41 7 41 18 L41 21 Q37 13 32 13 Q27 13 23 21 Z" fill="#e4dfef"/>`+
     `<path d="M24 20 Q21 29 23 35" stroke="#e4dfef" stroke-width="2.2" fill="none"/>`+
@@ -1134,7 +1725,8 @@ const MONSTER_ART={
     `<path d="M50 34 L50 42 L58 38 Z" fill="#2b2836" ${RIM}/>`+
     `<path d="M49 33 L49 43" stroke="#7d8496" stroke-width="1.4"/>`+
     `<path d="M52 38 L62 38" stroke="#3fd6a8" stroke-width="1"/>`+
-    `<path d="M60 36 L64 38 L60 40 Z" fill="#3fd6a8"/>|/A|`}),
+    `<path d="M60 36 L64 38 L60 40 Z" fill="#3fd6a8"/>|/A|`,
+    sharp:`|H|`+gEye(29,20,1.1,{pupil:1})+gEye(35,20,1.1,{pupil:1})+`|/H|`}),
   drowblade:()=>({o:{hp:[32,24],ap:[47,37],lit:'#524b5e',mid:'#201d29',eye:'#e05a3a',rough:[1,0.24],seed:83,ad:0.85,as:1.15},
     body:`<path d="M19 29 Q16 41 18 54 L23 61 L41 61 L46 54 Q48 41 45 29 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M20 30 L44 30 L45 47 Q32 52 19 47 Z" fill="#26222f"/>`+
@@ -1143,6 +1735,11 @@ const MONSTER_ART={
     `<path d="M32 31 L32 48" stroke="#8c93a8" stroke-width="0.8"/>`+
     `<circle cx="32" cy="37" r="3.4" fill="none" stroke="#a86ce8" stroke-width="1"/>`+
     `<circle cx="32" cy="37" r="1.2" fill="#a86ce8"/>`+
+    armL(20,32,10,41,12,52.5,'#26222f',2.5,'#524b5e','#3b364a')+
+    `<path d="M24 37 Q21.5 48 24.5 59" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M40 36 Q42.5 47 39.5 58" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M32 48 L32 60.5" stroke="#131019" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M23.5 56.5 L30.4 56.5 M33.6 56.5 L40.5 56.5" stroke="#131019" stroke-width="2.2" stroke-opacity="0.55"/>`+
     `|H|<path d="M26 17 Q26 10 32 10 Q38 10 38 17 L38 23 Q35 26 30 26 Q26 24 26 17 Z" fill="#403a4c" ${RIM}/>`+
     `<path d="M23 16 Q23 4 32 4 Q41 4 41 16 Q41 20 39 23 L39 13 Q32 10 25 13 L25 23 Q23 20 23 16 Z" fill="#f0ecf7"/>`+
     `<path d="M23 18 Q18 30 21 41" stroke="#f0ecf7" stroke-width="2.8" fill="none"/>`+
@@ -1153,7 +1750,8 @@ const MONSTER_ART={
     `|A|<path d="M47 37 L54 33" stroke="#403a4c" stroke-width="2.4"/>`+
     `<path d="M53 34 L64 22" stroke="#cdd4e6" stroke-width="1.8"/>`+
     `<path d="M53 34 L60 40" stroke="#b0b7ca" stroke-width="1.4"/>`+
-    `<path d="M51 35 L56 31" stroke="#8c93a8" stroke-width="3.2"/>|/A|`}),
+    `<path d="M51 35 L56 31" stroke="#8c93a8" stroke-width="3.2"/>|/A|`,
+    sharp:`|H|`+gEye(29,19,1.2,{pupil:1})+gEye(35,19,1.2,{pupil:1})+`|/H|`}),
   drowpriest:()=>({o:{hp:[32,24],ap:[47,37],lit:'#4d3f60',mid:'#1d1628',eye:'#e05a3a',rough:[1,0.26],seed:84,ad:0.7},
     body:`<path d="M18 29 Q14 43 17 57 L23 63 L41 63 L47 57 Q50 43 46 29 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M19 30 L45 30 L46 50 Q32 56 18 50 Z" fill="#241b33"/>`+
@@ -1162,6 +1760,7 @@ const MONSTER_ART={
     `<path d="M24 40 Q32 36 40 40 Q32 45 24 40 Z" fill="#a86ce8" opacity="0.55"/>`+
     `<path d="M32 34 L32 46 M26 38 L38 38 M27 43 L37 43" stroke="#c79cf0" stroke-width="0.8"/>`+
     `<circle cx="32" cy="40" r="1.8" fill="#e0b0ff"/>`+
+    armL(19,32,8,42,11,54.5,'#241b33',2.6,'#4d3f60','#3d3348')+
     `|H|<path d="M26 17 Q26 10 32 10 Q38 10 38 17 L38 23 Q35 26 30 26 Q26 24 26 17 Z" fill="#3d3348" ${RIM}/>`+
     `<path d="M22 16 Q22 5 32 5 Q42 5 42 16 Q42 21 40 24 L40 13 Q32 10 24 13 L24 24 Q22 21 22 16 Z" fill="#efe9f8"/>`+
     `<path d="M22 18 Q16 32 20 44" stroke="#efe9f8" stroke-width="2.6" fill="none"/>`+
@@ -1173,13 +1772,15 @@ const MONSTER_ART={
     `<path d="M53 34 L57 26" stroke="#5a5470" stroke-width="2"/>`+
     `<path d="M57 26 Q60 20 57 15 M57 26 Q63 22 62 16 M57 26 Q54 19 49 17" stroke="#c9c3d8" stroke-width="1.2" fill="none"/>`+
     `<circle cx="57" cy="14" r="1.6" fill="#a86ce8"/><circle cx="62" cy="15" r="1.4" fill="#a86ce8"/>`+
-    `<circle cx="48" cy="16" r="1.4" fill="#a86ce8"/>|/A|`}),
+    `<circle cx="48" cy="16" r="1.4" fill="#a86ce8"/>|/A|`,
+    sharp:`|H|`+gEye(29,19,1.2,{pupil:1})+gEye(35,19,1.2,{pupil:1})+`|/H|`}),
   drowmage:()=>({o:{hp:[32,24],ap:[47,37],lit:'#3d4a5e',mid:'#161c28',eye:'#e05a3a',rough:[1,0.26],seed:85,ad:0.6},
     body:`<path d="M18 30 Q14 44 17 58 L23 63 L41 63 L47 58 Q50 44 46 30 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M19 31 L45 31 L46 51 Q32 57 18 51 Z" fill="#182130"/>`+
     `<path d="M19 31 L45 31" stroke="#4fc4e0" stroke-width="1.1"/>`+
     `<path d="M23 37 Q32 34 41 37 M22 44 Q32 41 42 44 M22 50 Q32 47 42 50" stroke="#4fc4e0" stroke-width="0.8" fill="none" opacity="0.75"/>`+
     `<circle cx="32" cy="42" r="2.6" fill="none" stroke="#4fc4e0" stroke-width="0.9"/>`+
+    armL(19,33,8,43,11,55.5,'#182130',2.6,'#3d4a5e','#333c4a')+
     `|H|<path d="M26 18 Q26 11 32 11 Q38 11 38 18 L38 23 Q35 26 30 26 Q26 24 26 18 Z" fill="#333c4a" ${RIM}/>`+
     `<path d="M22 17 Q22 6 32 6 Q42 6 42 17 Q42 22 40 25 L40 14 Q32 11 24 14 L24 25 Q22 22 22 17 Z" fill="#e8ecf5"/>`+
     `<path d="M22 19 Q17 33 21 45" stroke="#e8ecf5" stroke-width="2.4" fill="none"/>`+
@@ -1191,7 +1792,8 @@ const MONSTER_ART={
     `<path d="M53 35 L58 12" stroke="#4a4560" stroke-width="2"/>`+
     `<circle cx="58" cy="9" r="4.6" fill="none" stroke="#8c93a8" stroke-width="1.4"/>`+
     `<circle cx="58" cy="9" r="2.6" fill="#4fc4e0"/>`+
-    `<circle cx="58" cy="9" r="1" fill="#dff6ff"/>|/A|`}),
+    `<circle cx="58" cy="9" r="1" fill="#dff6ff"/>|/A|`,
+    sharp:`|H|`+gEye(29,20,1.1,{pupil:1})+gEye(35,20,1.1,{pupil:1})+`|/H|`}),
   drider:()=>({o:{hp:[32,26],ap:[44,32],lit:'#4a3f56',mid:'#171320',eye:'#e05a3a',rough:[1,0.3],seed:86},
     body:`<path d="M13 44 Q2 36 1 26 M15 50 Q4 50 0 42 M51 44 Q62 36 63 26 M49 50 Q60 50 64 42" stroke="#463c5e" stroke-width="2.4" fill="none"/>`+
     `<path d="M14 41 Q5 31 7 21 M50 41 Q59 31 57 21" stroke="#3b3350" stroke-width="2" fill="none"/>`+
@@ -1205,6 +1807,7 @@ const MONSTER_ART={
     `<path d="M25 28 L39 28" stroke="#8c93a8" stroke-width="0.9"/>`+
     `<path d="M28 32 Q32 30 36 32 Q32 36 28 32 Z" fill="#a86ce8" opacity="0.6"/>`+
     `<path d="M32 30 L32 40" stroke="#6b5a86" stroke-width="0.7"/>`+
+    armL(25,30,16,35,17,44.5,'#241d33',2.2,'#4a3f56',null)+
     `|H|<path d="M26 18 Q26 11 32 11 Q38 11 38 18 L38 24 Q35 27 30 27 Q26 25 26 18 Z" fill="#3b3348" ${RIM}/>`+
     `<path d="M22 17 Q22 5 32 5 Q42 5 42 17 Q42 22 40 25 L40 13 Q32 10 24 13 L24 25 Q22 22 22 17 Z" fill="#ded8ea"/>`+
     `<path d="M22 19 Q16 30 19 40" stroke="#ded8ea" stroke-width="2.6" fill="none"/>`+
@@ -1214,7 +1817,8 @@ const MONSTER_ART={
     `<path d="M28 24 Q32 28 36 24" stroke="#7a7090" stroke-width="0.9" fill="none"/>|/H|`+
     `|A|<path d="M43 32 L52 28" stroke="#3b3348" stroke-width="2.4"/>`+
     `<path d="M51 29 L62 18" stroke="#b8bece" stroke-width="1.6"/>`+
-    `<path d="M49 30 L54 26" stroke="#8c93a8" stroke-width="3"/>|/A|`}),
+    `<path d="M49 30 L54 26" stroke="#8c93a8" stroke-width="3"/>|/A|`,
+    sharp:`|H|`+gEye(28,19,1.3,{slit:1})+gEye(36,19,1.3,{slit:1})+gEye(30,15,0.9,{slit:1})+gEye(34,15,0.9,{slit:1})+`|/H|`}),
   drowmatron:()=>({o:{hp:[32,22],ap:[49,36],lit:'#5a4470',mid:'#1e1430',eye:'#ff6a44',rough:[1,0.3],seed:87,ad:0.8},
     body:`<path d="M16 28 Q10 45 14 60 L22 66 L42 66 L50 60 Q54 45 48 28 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M17 29 L47 29 L49 53 Q32 60 15 53 Z" fill="#251636"/>`+
@@ -1223,6 +1827,7 @@ const MONSTER_ART={
     `<path d="M32 30 L32 50 M24 36 L40 36 M23 42 L41 42 M25 48 L39 48" stroke="#cfa2f4" stroke-width="0.9"/>`+
     `<circle cx="32" cy="40" r="3.6" fill="none" stroke="#e0b0ff" stroke-width="1.1"/>`+
     `<circle cx="32" cy="40" r="1.6" fill="#ffe0ff"/>`+
+    armL(17,31,5,43,9,57.5,'#251636',2.8,'#5a4470','#42334f')+
     `|H|<path d="M26 16 Q26 9 32 9 Q38 9 38 16 L38 23 Q35 26 30 26 Q26 24 26 16 Z" fill="#42334f" ${RIM}/>`+
     `<path d="M20 15 Q20 2 32 2 Q44 2 44 15 Q44 21 42 25 L42 12 Q32 8 22 12 L22 25 Q20 21 20 15 Z" fill="#fbf7ff"/>`+
     `<path d="M20 18 Q12 34 17 48" stroke="#fbf7ff" stroke-width="3" fill="none"/>`+
@@ -1236,17 +1841,20 @@ const MONSTER_ART={
     `<path d="M55 33 L59 24" stroke="#5a5470" stroke-width="2.2"/>`+
     `<path d="M59 24 Q63 17 60 10 M59 24 Q65 19 64 12 M59 24 Q56 16 51 13 M59 24 Q53 19 50 21" stroke="#d8d2e6" stroke-width="1.3" fill="none"/>`+
     `<circle cx="60" cy="9" r="1.8" fill="#a86ce8"/><circle cx="64" cy="11" r="1.6" fill="#a86ce8"/>`+
-    `<circle cx="50" cy="12" r="1.6" fill="#a86ce8"/><circle cx="49" cy="21" r="1.5" fill="#a86ce8"/>|/A|`}),
+    `<circle cx="50" cy="12" r="1.6" fill="#a86ce8"/><circle cx="49" cy="21" r="1.5" fill="#a86ce8"/>|/A|`,
+    sharp:`|H|`+gEye(28.5,18,1.3,{pupil:1})+gEye(35.5,18,1.3,{pupil:1})+`|/H|`}),
   mysprout:()=>({o:{hp:[32,24],ap:[44,40],lit:'#cfc2d8',mid:'#6a5a78',eye:'#e0b0ff',rough:[1,0.3],seed:61},
     body:`<path d="M27 34 Q25 46 27 56 L30 60 L34 60 L37 56 Q39 46 37 34 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M29 38 L35 38 M29 44 L35 44" stroke="#5a4a68" stroke-width="0.8"/>`+
+    armL(28,37,20,44,21,53.5,'#5a4470',2,'#8c93a8',null)+
     `|H|<path d="M18 30 Q18 14 32 14 Q46 14 46 30 Q40 33 32 33 Q24 33 18 30 Z" fill="#8a5ea8" ${RIM}/>`+
     `<path d="M20 29 Q32 32 44 29" stroke="#4a3060" stroke-width="1"/>`+
     `<ellipse cx="26" cy="21" rx="3" ry="2" fill="#c88ae8" opacity="0.5"/>`+
     `<ellipse cx="37" cy="24" rx="2.4" ry="1.6" fill="#c88ae8" opacity="0.4"/>`+
     `<path d="M22 30.5 L42 30.5" stroke="#3a2450" stroke-width="1.4"/>`+
     `<circle cx="28" cy="35" r="1.1" fill="#e0b0ff"/><circle cx="36" cy="35" r="1.1" fill="#e0b0ff"/>|/H|`+
-    `|A|<path d="M37 44 L44 41" stroke="#b9aac4" stroke-width="2.2"/>|/A|`}),
+    `|A|<path d="M37 44 L44 41" stroke="#b9aac4" stroke-width="2.2"/>|/A|`,
+    sharp:`|H|`+gEye(28,35,1.1,{slit:1})+gEye(36,35,1.1,{slit:1})+`|/H|`}),
   shrieker:()=>({o:{hp:[32,30],ap:[40,50],lit:'#d8c8e0',mid:'#6a5878',eye:'#e0b0ff',rough:[1,0.35],seed:62},
     body:`<path d="M26 36 Q23 50 26 60 L31 62 L35 62 L40 60 Q43 50 40 36 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M28 40 Q32 43 36 40 M28 48 Q32 51 36 48 M28 55 Q32 58 36 55" stroke="#5a4868" stroke-width="0.9" fill="none"/>`+
@@ -1255,7 +1863,8 @@ const MONSTER_ART={
     `<path d="M22 20 Q32 15 42 20" stroke="#a06ec0" stroke-width="1.4" fill="none"/>`+
     `<path d="M20 26 Q32 21 44 26" stroke="#a06ec0" stroke-width="1.2" fill="none"/>`+
     `<ellipse cx="32" cy="34" rx="6" ry="2.6" fill="#2a1638"/>|/H|`+
-    `|A|<path d="M32 20 L32 4 M26 22 L20 8 M38 22 L44 8" stroke="#c88ae8" stroke-width="1.1" opacity="0.5"/>|/A|`}),
+    `|A|<path d="M32 20 L32 4 M26 22 L20 8 M38 22 L44 8" stroke="#c88ae8" stroke-width="1.1" opacity="0.5"/>|/A|`,
+    sharp:`|H|<ellipse cx="32" cy="31" rx="13" ry="3.4" fill="url(#eg)" opacity="0.85"/>`+`<ellipse cx="32" cy="31" rx="8" ry="1.8" fill="url(#ec)"/>`+`<path d="M24 30 L26 33 M29 30 L30 33 M35 30 L34 33 M40 30 L38 33" stroke="#2a1440" stroke-width="1"/>|/H|`}),
   violetfungus:()=>({o:{hp:[32,26],ap:[48,34],lit:'#a878c0',mid:'#4a2c5e',eye:'#ffd0ff',rough:[2,0.5],seed:63},
     body:`<path d="M24 34 Q20 48 24 60 L30 62 L36 62 L42 60 Q46 48 42 34 Z" fill="url(#bg)" ${RIM}/>`+
     `<ellipse cx="28" cy="44" rx="2.6" ry="4" fill="#3a1f4c"/><ellipse cx="38" cy="50" rx="2.2" ry="3.4" fill="#3a1f4c"/>`+
@@ -1264,7 +1873,8 @@ const MONSTER_ART={
     `<circle cx="27" cy="23" r="2.2" fill="#8a52a8"/><circle cx="37" cy="26" r="1.8" fill="#8a52a8"/>|/H|`+
     `|A|<path d="M44 36 Q54 30 58 38" stroke="#7a4a96" stroke-width="3" fill="none"/>`+
     `<path d="M20 38 Q10 32 6 40" stroke="#7a4a96" stroke-width="3" fill="none"/>`+
-    `<circle cx="58" cy="38" r="2" fill="#ffd0ff" opacity="0.7"/>|/A|`}),
+    `<circle cx="58" cy="38" r="2" fill="#ffd0ff" opacity="0.7"/>|/A|`,
+    sharp:`|H|`+gEye(26,26,1.6,{slit:1})+gEye(38,26,1.6,{slit:1})+`|/H|`+`<circle cx="12" cy="31" r="2.6" fill="url(#eg)"/><circle cx="12" cy="31" r="1.1" fill="url(#ec)"/>`+`<circle cx="52" cy="31" r="2.6" fill="url(#eg)"/><circle cx="52" cy="31" r="1.1" fill="url(#ec)"/>`}),
   sporeservant:()=>({o:{hp:[32,26],ap:[46,38],lit:'#9a8fa6',mid:'#453b52',eye:'#b8f0c0',rough:[2,0.45],seed:64},
     body:`<path d="M21 32 Q18 44 20 54 L25 60 L39 60 L44 54 Q46 44 43 32 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M24 36 Q32 40 40 36 L41 50 Q32 54 23 50 Z" fill="#3a3145"/>`+
@@ -1272,17 +1882,24 @@ const MONSTER_ART={
     `<path d="M26 40 L26 34 M31 42 L31 35 M36 40 L36 34" stroke="#8a63b8" stroke-width="1.4"/>`+
     `<circle cx="26" cy="33" r="2" fill="#8a63b8"/><circle cx="31" cy="34" r="1.6" fill="#8a63b8"/>`+
     `<circle cx="36" cy="33" r="1.8" fill="#8a63b8"/>`+
+    armL(22,35,12,44,14,54.5,'#3f3a4a',2.4,'#8c93a8',null)+
+    `<path d="M26 36 Q23.5 47 26.5 58" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M38 35 Q40.5 46 37.5 57" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M32 47 L32 59.5" stroke="#1c1826" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M25.5 55.5 L30.4 55.5 M33.6 55.5 L38.5 55.5" stroke="#1c1826" stroke-width="2.2" stroke-opacity="0.55"/>`+
     `|H|<path d="M25 19 Q25 11 32 11 Q39 11 39 19 L39 24 Q35 27 29 27 Q25 25 25 19 Z" fill="#9a8fa6" ${RIM}/>`+
     `<circle cx="28.5" cy="20" r="1.3" fill="#b8f0c0"/><circle cx="35.5" cy="20" r="1.3" fill="#b8f0c0"/>`+
     `<path d="M28 25 L36 25" stroke="#2a2333" stroke-width="1.4"/>`+
     `<path d="M30 11 L30 5 M35 12 L36 6" stroke="#8a63b8" stroke-width="1.3"/>`+
     `<circle cx="30" cy="4.5" r="2.2" fill="#8a63b8"/><circle cx="36" cy="5.5" r="1.8" fill="#8a63b8"/>|/H|`+
     `|A|<path d="M46 38 L54 34" stroke="#8a7f96" stroke-width="2.4"/>`+
-    `<path d="M52 32 L60 38" stroke="#6a5a78" stroke-width="2.6"/>|/A|`}),
+    `<path d="M52 32 L60 38" stroke="#6a5a78" stroke-width="2.6"/>|/A|`,
+    sharp:`|H|`+gEye(28.5,20,1.3,{slit:1})+gEye(35.5,20,1.3,{slit:1})+`|/H|`}),
   myguard:()=>({o:{hp:[32,24],ap:[48,38],lit:'#c8b8d4',mid:'#5f4c72',eye:'#e0b0ff',rough:[1,0.3],seed:65},
     body:`<path d="M22 34 Q19 47 22 58 L28 62 L38 62 L44 58 Q47 47 44 34 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M25 38 Q32 42 41 38 L42 52 Q32 56 24 52 Z" fill="#4e3d60"/>`+
     `<path d="M25 44 Q32 47 41 44" stroke="#8a63b8" stroke-width="1"/>`+
+    armL(23,37,13,46,15,56.5,'#3b2850',2.5,'#8c93a8',null)+
     `|H|<path d="M15 30 Q15 12 32 12 Q49 12 49 30 Q41 35 32 35 Q23 35 15 30 Z" fill="#7d4f9c" ${RIM}/>`+
     `<path d="M17 29 Q32 34 47 29" stroke="#3d2152" stroke-width="1.2"/>`+
     `<path d="M22 24 Q32 18 42 24" stroke="#9a68bc" stroke-width="1.4" fill="none"/>`+
@@ -1290,12 +1907,14 @@ const MONSTER_ART={
     `<circle cx="28" cy="36" r="1.3" fill="#e0b0ff"/><circle cx="36" cy="36" r="1.3" fill="#e0b0ff"/>|/H|`+
     `|A|<path d="M47 38 L56 32" stroke="#b6a6c2" stroke-width="2.8"/>`+
     `<path d="M53 34 L64 27" stroke="#5f4c72" stroke-width="3.4"/>`+
-    `<ellipse cx="64" cy="26" rx="4" ry="3" fill="#7d4f9c"/>|/A|`}),
+    `<ellipse cx="64" cy="26" rx="4" ry="3" fill="#7d4f9c"/>|/A|`,
+    sharp:`|H|`+gEye(28,36,1.3,{slit:1})+gEye(36,36,1.3,{slit:1})+`|/H|`}),
   mycaster:()=>({o:{hp:[32,24],ap:[46,38],lit:'#d4c4e0',mid:'#57426c',eye:'#c8ffe8',rough:[1,0.3],seed:66},
     body:`<path d="M22 34 Q17 48 20 60 L27 63 L37 63 L44 60 Q47 48 42 34 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M24 38 Q32 42 40 38 L42 56 Q32 60 22 56 Z" fill="#46345a"/>`+
     `<circle cx="32" cy="46" r="4" fill="none" stroke="#c88ae8" stroke-width="1.2"/>`+
     `<circle cx="32" cy="46" r="1.5" fill="#c88ae8"/>`+
+    armL(23,37,12,47,15,58.5,'#38264e',2.5,'#a87ad0',null)+
     `|H|<path d="M14 29 Q14 10 32 10 Q50 10 50 29 Q41 34 32 34 Q23 34 14 29 Z" fill="#6d4090" ${RIM}/>`+
     `<path d="M16 28 Q32 33 48 28" stroke="#341a48" stroke-width="1.2"/>`+
     `<path d="M20 22 Q32 16 44 22" stroke="#8a55b0" stroke-width="1.3" fill="none"/>`+
@@ -1306,11 +1925,13 @@ const MONSTER_ART={
     `|A|<path d="M46 38 L52 30" stroke="#c0b0cc" stroke-width="2.2"/>`+
     `<path d="M52 32 L52 12" stroke="#6a5878" stroke-width="2"/>`+
     `<ellipse cx="52" cy="10" rx="6" ry="4" fill="#7d4f9c"/>`+
-    `<circle cx="52" cy="12" r="1.8" fill="#c88ae8"/>|/A|`}),
+    `<circle cx="52" cy="12" r="1.8" fill="#c88ae8"/>|/A|`,
+    sharp:`|H|`+gEye(27,35,1.3,{slit:1})+gEye(37,35,1.3,{slit:1})+`|/H|`}),
   myelder:()=>({o:{hp:[32,22],ap:[50,38],lit:'#ddcfe8',mid:'#4e3966',eye:'#c8ffe8',rough:[1,0.35],seed:67},
     body:`<path d="M18 32 Q13 48 17 61 L25 64 L39 64 L47 61 Q51 48 46 32 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M21 36 Q32 41 43 36 L45 58 Q32 63 19 58 Z" fill="#3f2d56"/>`+
     `<path d="M26 42 L26 54 M32 40 L32 56 M38 42 L38 54" stroke="#8a63b8" stroke-width="1"/>`+
+    armL(19,35,8,47,11,58.5,'#3f2d56',2.7,'#cabbd6',null)+
     `|H|<path d="M10 28 Q10 6 32 6 Q54 6 54 28 Q42 34 32 34 Q22 34 10 28 Z" fill="#5f3382" ${RIM}/>`+
     `<path d="M12 27 Q32 34 52 27" stroke="#2c1440" stroke-width="1.4"/>`+
     `<path d="M17 20 Q32 12 47 20" stroke="#7d47a6" stroke-width="1.5" fill="none"/>`+
@@ -1321,12 +1942,14 @@ const MONSTER_ART={
     `|A|<path d="M50 38 L58 32" stroke="#cabbd6" stroke-width="2.6"/>`+
     `<path d="M58 34 L58 12" stroke="#6a5878" stroke-width="2.2"/>`+
     `<ellipse cx="58" cy="10" rx="7" ry="4.6" fill="#6d4090"/>`+
-    `<circle cx="58" cy="12" r="2" fill="#c88ae8"/>|/A|`}),
+    `<circle cx="58" cy="12" r="2" fill="#c88ae8"/>|/A|`,
+    sharp:`|H|`+gEye(27,35,1.4,{slit:1})+gEye(37,35,1.4,{slit:1})+`|/H|`}),
   mylord:()=>({o:{hp:[32,21],ap:[51,38],lit:'#e6d6f0',mid:'#4a3060',eye:'#d0ffe8',rough:[1,0.38],seed:71},
     body:`<path d="M17 32 Q11 49 15 62 L24 65 L40 65 L49 62 Q53 49 47 32 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M20 36 Q32 42 44 36 L46 59 Q32 65 18 59 Z" fill="#3b2850"/>`+
     `<path d="M25 42 L25 55 M32 40 L32 57 M39 42 L39 55" stroke="#a87ad0" stroke-width="1.1"/>`+
     `<circle cx="32" cy="50" r="3.6" fill="none" stroke="#c88ae8" stroke-width="1.2"/>`+
+    armL(18,35,6,48,10,59.5,'#3b2850',2.9,'#d6c6e2',null)+
     `|H|<path d="M7 27 Q7 4 32 4 Q57 4 57 27 Q43 34 32 34 Q21 34 7 27 Z" fill="#5b2f7d" ${RIM}/>`+
     `<path d="M9 26 Q32 34 55 26" stroke="#28123c" stroke-width="1.5"/>`+
     `<path d="M14 19 Q32 10 50 19" stroke="#7c44a5" stroke-width="1.6" fill="none"/>`+
@@ -1337,13 +1960,15 @@ const MONSTER_ART={
     `|A|<path d="M51 38 L59 32" stroke="#d6c6e2" stroke-width="2.8"/>`+
     `<path d="M59 34 L59 10" stroke="#6a5878" stroke-width="2.3"/>`+
     `<ellipse cx="59" cy="8" rx="7.4" ry="4.8" fill="#63398a"/>`+
-    `<circle cx="59" cy="10" r="2.2" fill="#dca8fa"/>|/A|`}),
+    `<circle cx="59" cy="10" r="2.2" fill="#dca8fa"/>|/A|`,
+    sharp:`|H|`+gEye(26,35,1.5,{slit:1})+gEye(38,35,1.5,{slit:1})+`|/H|`}),
   mysovereign:()=>({o:{hp:[32,20],ap:[52,38],lit:'#eee0f6',mid:'#4a2f66',eye:'#d8ffe8',rough:[1,0.4],seed:68},
     body:`<path d="M15 32 Q9 50 14 63 L24 66 L40 66 L50 63 Q55 50 49 32 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M19 36 Q32 42 45 36 L47 60 Q32 66 17 60 Z" fill="#38264e"/>`+
     `<path d="M24 42 L24 56 M32 40 L32 58 M40 42 L40 56" stroke="#c88ae8" stroke-width="1.2"/>`+
     `<circle cx="32" cy="49" r="5" fill="none" stroke="#c88ae8" stroke-width="1.4"/>`+
     `<circle cx="32" cy="49" r="2" fill="#e0b0ff"/>`+
+    armL(16,35,4,49,8,60.5,'#38264e',3,'#ddcfe8',null)+
     `|H|<path d="M4 27 Q4 2 32 2 Q60 2 60 27 Q44 35 32 35 Q20 35 4 27 Z" fill="#562c78" ${RIM}/>`+
     `<path d="M6 26 Q32 35 58 26" stroke="#25103a" stroke-width="1.6"/>`+
     `<path d="M12 18 Q32 8 52 18" stroke="#7a42a4" stroke-width="1.7" fill="none"/>`+
@@ -1355,7 +1980,8 @@ const MONSTER_ART={
     `|A|<path d="M52 38 L61 31" stroke="#ddcfe8" stroke-width="3"/>`+
     `<path d="M60 33 L60 8" stroke="#6a5878" stroke-width="2.4"/>`+
     `<ellipse cx="60" cy="6" rx="8" ry="5" fill="#562c78"/>`+
-    `<circle cx="60" cy="8" r="2.4" fill="#e0b0ff"/>|/A|`}),
+    `<circle cx="60" cy="8" r="2.4" fill="#e0b0ff"/>|/A|`,
+    sharp:`|H|`+gEye(26,36,1.6,{slit:1})+gEye(38,36,1.6,{slit:1})+`|/H|`}),
   /* ---------- duergar ----------
      Grey skin, white beards bound with iron rings, and armour that is plate
      rather than hide: they are the one roster in the game that turned up with
@@ -1367,6 +1993,11 @@ const MONSTER_ART={
     `<path d="M32 33 L32 49" stroke="#2b2e33" stroke-width="1"/>`+
     `<circle cx="24" cy="36" r="1" fill="#c9a227"/><circle cx="40" cy="36" r="1" fill="#c9a227"/>`+
     `<path d="M22 46 L42 46" stroke="#c9a227" stroke-width="0.9"/>`+
+    armL(20,34,10,41,12,51.5,'#4a4e55',2.5,'#8d9096','#6d7178')+
+    `<path d="M24 35 Q21.5 46 24.5 57" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M40 34 Q42.5 45 39.5 56" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M32 46 L32 58.5" stroke="#20232a" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M23.5 54.5 L30.4 54.5 M33.6 54.5 L40.5 54.5" stroke="#20232a" stroke-width="2.2" stroke-opacity="0.55"/>`+
     `|H|<path d="M25 19 Q25 11 32 11 Q39 11 39 19 L39 23 Q35 26 29 26 Q25 24 25 19 Z" fill="#8d9096" ${RIM}/>`+
     `<path d="M24 17 Q24 8 32 8 Q40 8 40 17 L40 19 L24 19 Z" fill="#4a4e55"/>`+
     `<path d="M24 17 Q32 13 40 17" stroke="#9aa0a8" stroke-width="0.9" fill="none"/>`+
@@ -1377,13 +2008,19 @@ const MONSTER_ART={
     `<circle cx="32" cy="34" r="1.1" fill="#8a8d92"/>|/H|`+
     `|A|<path d="M46 38 L54 33" stroke="#5a4326" stroke-width="2.4"/>`+
     `<path d="M51 36 L58 30 L61 34 L54 39 Z" fill="#6d7178" ${RIM}/>`+
-    `<path d="M53 34 L59 34" stroke="#c9a227" stroke-width="0.8"/>|/A|`}),
+    `<path d="M53 34 L59 34" stroke="#c9a227" stroke-width="0.8"/>|/A|`,
+    sharp:`|H|`+gEye(28.5,21,1.2,{pupil:1})+gEye(35.5,21,1.2,{pupil:1})+`|/H|`}),
   duergarxbow:()=>({o:{hp:[32,26],ap:[44,40],lit:'#8d9096',mid:'#3f4348',eye:'#d8402c',rough:[1,0.25],seed:42,ad:0.5,aw:0.35},
     body:`<path d="M20 31 Q17 41 19 52 L24 59 L40 59 L45 52 Q47 41 44 31 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M21 33 L43 33 L44 44 Q32 48 20 44 Z" fill="#474b52"/>`+
     `<path d="M21 33 L43 33" stroke="#8e939b" stroke-width="1"/>`+
     `<path d="M23 37 L41 41" stroke="#3a2a18" stroke-width="2"/>`+
     `<circle cx="26" cy="47" r="1" fill="#c9a227"/>`+
+    armL(21,34,11,41,13,51.5,'#4a4e55',2.4,'#8d9096',null)+
+    `<path d="M25 35 Q22.5 46 25.5 57" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M39 34 Q41.5 45 38.5 56" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M32 46 L32 58.5" stroke="#20232a" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M24.5 54.5 L30.4 54.5 M33.6 54.5 L39.5 54.5" stroke="#20232a" stroke-width="2.2" stroke-opacity="0.55"/>`+
     `|H|<path d="M25 19 Q25 11 32 11 Q39 11 39 19 L39 23 Q35 26 29 26 Q25 24 25 19 Z" fill="#8d9096" ${RIM}/>`+
     `<path d="M24 18 Q24 9 32 9 Q40 9 40 18 L40 20 L24 20 Z" fill="#3f434a"/>`+
     `<path d="M40 13 Q45 15 44 20" stroke="#c9a227" stroke-width="1" fill="none"/>`+
@@ -1392,12 +2029,18 @@ const MONSTER_ART={
     `|A|<path d="M30 40 L50 36" stroke="#4a3720" stroke-width="2.6"/>`+
     `<path d="M44 30 L44 44" stroke="#6d7178" stroke-width="2.2"/>`+
     `<path d="M44 31 L52 37 L44 43" stroke="#2b2e33" stroke-width="1" fill="none"/>`+
-    `<path d="M46 37 L57 37" stroke="#c9a227" stroke-width="1.4"/>|/A|`}),
+    `<path d="M46 37 L57 37" stroke="#c9a227" stroke-width="1.4"/>|/A|`,
+    sharp:`|H|`+gEye(28.5,21.5,1.1,{pupil:1})+gEye(35.5,21.5,1.1,{pupil:1})+`|/H|`}),
   duergarscout:()=>({o:{hp:[32,26],ap:[46,36],lit:'#83868c',mid:'#2f3237',eye:'#e8d24a',rough:[1,0.3],seed:43},
     body:`<path d="M21 31 Q18 41 20 52 L25 59 L39 59 L44 52 Q46 41 43 31 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M22 33 L42 33 L43 45 Q32 49 21 45 Z" fill="#2b2e33"/>`+
     `<path d="M24 34 L40 44 M40 34 L24 44" stroke="#3f434a" stroke-width="1"/>`+
     `<path d="M21 40 L43 40" stroke="#c9a227" stroke-width="0.8"/>`+
+    armL(22,34,12,41,14,51.5,'#33363b',2.3,'#7a7d84',null)+
+    `<path d="M26 35 Q23.5 46 26.5 57" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M38 34 Q40.5 45 37.5 56" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M32 46 L32 58.5" stroke="#16181d" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M25.5 54.5 L30.4 54.5 M33.6 54.5 L38.5 54.5" stroke="#16181d" stroke-width="2.2" stroke-opacity="0.55"/>`+
     `|H|<path d="M25 19 Q25 11 32 11 Q39 11 39 19 L39 23 Q35 26 29 26 Q25 24 25 19 Z" fill="#83868c" ${RIM}/>`+
     `<path d="M23 20 Q23 9 32 9 Q41 9 41 20 L41 22 Q32 17 23 22 Z" fill="#26282c"/>`+
     `<circle cx="28.5" cy="21.5" r="1.2" fill="#e8d24a"/><circle cx="35.5" cy="21.5" r="1.2" fill="#e8d24a"/>`+
@@ -1405,13 +2048,15 @@ const MONSTER_ART={
     `<path d="M27 26 Q32 35 37 26 Q34 28 32 28 Q30 28 27 26 Z" fill="#b9bcc0"/>|/H|`+
     `|A|<path d="M46 36 L53 30" stroke="#4a4e55" stroke-width="2.2"/>`+
     `<path d="M51 32 L60 24" stroke="#cfd6dd" stroke-width="1.8"/>`+
-    `<path d="M58 26 L61 23 L62 26 Z" fill="#9fe0b0"/>|/A|`}),
+    `<path d="M58 26 L61 23 L62 26 Z" fill="#9fe0b0"/>|/A|`,
+    sharp:`|H|`+gEye(28.5,21.5,1.2,{pupil:1})+gEye(35.5,21.5,1.2,{pupil:1})+`|/H|`}),
   duergarpriest:()=>({o:{hp:[32,26],ap:[46,38],lit:'#8d9096',mid:'#3a3d42',eye:'#8fd4c8',rough:[1,0.25],seed:44},
     body:`<path d="M19 31 Q15 42 17 53 L23 60 L41 60 L47 53 Q49 42 45 31 Z" fill="#3d4046" ${RIM}/>`+
     `<path d="M21 33 Q32 37 43 33 L44 52 Q32 56 20 52 Z" fill="#2f3237"/>`+
     `<path d="M32 34 L32 54" stroke="#c9a227" stroke-width="1.2"/>`+
     `<path d="M25 41 L39 41" stroke="#c9a227" stroke-width="1.2"/>`+
     `<circle cx="32" cy="41" r="3" fill="none" stroke="#8fd4c8" stroke-width="1"/>`+
+    armL(20,34,10,42,12,53.5,'#3f434a',2.5,'#8d9096','#5f646c')+
     `|H|<path d="M25 19 Q25 11 32 11 Q39 11 39 19 L39 23 Q35 26 29 26 Q25 24 25 19 Z" fill="#8d9096" ${RIM}/>`+
     `<path d="M23 18 Q23 8 32 8 Q41 8 41 18 L41 20 L23 20 Z" fill="#33363b"/>`+
     `<path d="M27 8 L29 3 L31 8 M33 8 L35 3 L37 8" stroke="#c9a227" stroke-width="1.1" fill="none"/>`+
@@ -1421,13 +2066,15 @@ const MONSTER_ART={
     `|A|<path d="M46 38 L52 30" stroke="#4a4e55" stroke-width="2.2"/>`+
     `<path d="M52 32 L52 14" stroke="#5a4326" stroke-width="2.2"/>`+
     `<circle cx="52" cy="12" r="4" fill="none" stroke="#c9a227" stroke-width="1.6"/>`+
-    `<circle cx="52" cy="12" r="1.6" fill="#8fd4c8"/>|/A|`}),
+    `<circle cx="52" cy="12" r="1.6" fill="#8fd4c8"/>|/A|`,
+    sharp:`|H|`+gEye(28.5,21.5,1.2,{pupil:1})+gEye(35.5,21.5,1.2,{pupil:1})+`|/H|`}),
   duergarrune:()=>({o:{hp:[32,26],ap:[46,38],lit:'#8d9096',mid:'#3a3d42',eye:'#ffb45a',rough:[1,0.25],seed:45},
     body:`<path d="M19 31 Q15 42 17 53 L23 60 L41 60 L47 53 Q49 42 45 31 Z" fill="#43373a" ${RIM}/>`+
     `<path d="M21 34 Q32 38 43 34 L44 53 Q32 57 20 53 Z" fill="#33282b"/>`+
     `<path d="M25 38 L25 48 M23 41 L28 39 M23 45 L28 47" stroke="#ffb45a" stroke-width="0.9" fill="none"/>`+
     `<path d="M33 37 L33 47 M31 40 L36 38 M31 44 L36 46" stroke="#ffb45a" stroke-width="0.9" fill="none"/>`+
     `<path d="M40 39 L40 49 M38 42 L43 40" stroke="#ffb45a" stroke-width="0.9" fill="none"/>`+
+    armL(20,34,10,42,12,53.5,'#3f434a',2.5,'#8d9096','#5f646c')+
     `|H|<path d="M25 19 Q25 11 32 11 Q39 11 39 19 L39 23 Q35 26 29 26 Q25 24 25 19 Z" fill="#8d9096" ${RIM}/>`+
     `<path d="M22 20 Q22 7 32 7 Q42 7 42 20 L42 22 Q32 16 22 22 Z" fill="#2e2529"/>`+
     `<path d="M26 12 L26 18 M24 14 L29 13" stroke="#ffb45a" stroke-width="0.8"/>`+
@@ -1437,7 +2084,8 @@ const MONSTER_ART={
     `|A|<path d="M46 38 L53 32" stroke="#4a4e55" stroke-width="2.2"/>`+
     `<path d="M53 34 L53 16" stroke="#4a3720" stroke-width="2"/>`+
     `<path d="M53 16 L49 11 L53 8 L57 11 Z" fill="#3a2f22" stroke="#ffb45a" stroke-width="1.1"/>`+
-    `<circle cx="53" cy="11" r="1.5" fill="#ffb45a"/>|/A|`}),
+    `<circle cx="53" cy="11" r="1.5" fill="#ffb45a"/>|/A|`,
+    sharp:`|H|`+gEye(28.5,21.5,1.3,{pupil:1})+gEye(35.5,21.5,1.3,{pupil:1})+`|/H|`}),
   duergarlord:()=>({o:{hp:[32,24],ap:[48,38],lit:'#989ba1',mid:'#3f4348',eye:'#ff5a3c',rough:[1,0.3],seed:46,ad:0.9,as:1.15},
     body:`<path d="M16 30 Q12 42 15 54 L21 61 L43 61 L49 54 Q52 42 48 30 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M18 32 L46 32 L47 46 Q32 52 17 46 Z" fill="#4e535a"/>`+
@@ -1445,6 +2093,11 @@ const MONSTER_ART={
     `<path d="M32 33 L32 51" stroke="#2b2e33" stroke-width="1.2"/>`+
     `<path d="M20 37 L44 37 M20 43 L44 43" stroke="#c9a227" stroke-width="1"/>`+
     `<path d="M13 30 L8 24 L17 27 Z M51 30 L56 24 L47 27 Z" fill="#c9a227"/>`+
+    armL(17,33,6,42,9,54.5,'#4a4e55',3,'#8d9096','#6d7178')+
+    `<path d="M22 37 Q19.5 48 22.5 59" stroke="#000" stroke-opacity="0.28" stroke-width="3.2" fill="none"/>`+
+    `<path d="M42 36 Q44.5 47 41.5 58" stroke="#fff" stroke-opacity="0.10" stroke-width="1.6" fill="none"/>`+
+    `<path d="M32 48 L32 60.5" stroke="#20232a" stroke-width="1.3" stroke-linecap="round"/>`+
+    `<path d="M21.5 56.5 L30.4 56.5 M33.6 56.5 L42.5 56.5" stroke="#20232a" stroke-width="2.2" stroke-opacity="0.55"/>`+
     `|H|<path d="M25 18 Q25 10 32 10 Q39 10 39 18 L39 22 Q35 25 29 25 Q25 23 25 18 Z" fill="#989ba1" ${RIM}/>`+
     `<path d="M23 16 Q23 6 32 6 Q41 6 41 16 L41 19 L23 19 Z" fill="#4e535a"/>`+
     `<path d="M22 8 L18 1 L26 5 Z M42 8 L46 1 L38 5 Z" fill="#c9a227"/>`+
@@ -1455,7 +2108,8 @@ const MONSTER_ART={
     `<circle cx="32" cy="38" r="1.2" fill="#c9a227"/>|/H|`+
     `|A|<path d="M48 38 L56 32" stroke="#5a4326" stroke-width="2.8"/>`+
     `<path d="M52 36 L62 27 L67 33 L57 42 Z" fill="#7b8087" ${RIM}/>`+
-    `<path d="M55 33 L64 33 M55 37 L64 37" stroke="#c9a227" stroke-width="1"/>|/A|`}),
+    `<path d="M55 33 L64 33 M55 37 L64 37" stroke="#c9a227" stroke-width="1"/>|/A|`,
+    sharp:`|H|`+gEye(28.5,20.5,1.3,{pupil:1})+gEye(35.5,20.5,1.3,{pupil:1})+`|/H|`}),
   hobgoblin:()=>({o:{hp:[32,28],ap:[45,38],lit:'#9a5c38',mid:'#48291a',eye:'#ff9422',rough:[2,0.4],seed:15},
     body:`<path d="M18 32 L12 26 L20 28 Z M46 32 L52 26 L44 28 Z" fill="#33373b"/>`+
     `<path d="M20 32 Q17 42 19 52 L24 59 L40 59 L45 52 Q47 42 44 32 Z" fill="url(#bg)" ${RIM}/>`+
@@ -2499,10 +3153,12 @@ function tryGen(depth,targetWalk,theme){
   const duerBias=theme.name==='Duergar'?4:OFF;
   const mycoBias=theme.name==='Myconid'?4:OFF;
   const drowBias=theme.name==='Drow'?4:OFF;
+  const sewBias=theme.name==='Sewers'?4:OFF;
+  const dunBias=theme.name==='Dungeon'?4:OFF;
   const base=spawnPool(depth).map(([k,w])=>[k,
     w*(MONSTERS[k].type==='undead'?undeadBias:1)*(MONSTERS[k].cave?caveBias:1)
      *(MONSTERS[k].duergar?duerBias:1)*(MONSTERS[k].myconid?mycoBias:1)
-     *(MONSTERS[k].drow?drowBias:1)]);
+     *(MONSTERS[k].drow?drowBias:1)*(MONSTERS[k].sewers?sewBias:1)*(MONSTERS[k].dungeon?dunBias:1)]);
   const weigh=(ek)=>base.map(([k,w])=>{
     const r=Math.log(threatOf(k,depth,ek)/share);
     return [k,w*Math.exp(-(r*r)/sig)];
@@ -2833,7 +3489,7 @@ function mkMonster(key,x,y,depth){
     xp:Math.round(XP_AWARD(def.cr)*(1+0.12*Math.max(0,depth-1))),
     speed:def.speed,type:def.type,ranged:def.ranged||0,caster:def.caster||null,
     reach:!!def.reach,slot:0, // slot 0-1 front rank of its tile, 2-3 rear rank
-    skeletal:!!def.skeletal,incorporeal:!!def.incorporeal,cave:!!def.cave,lurk:!!def.lurk,duergar:!!def.duergar,myconid:!!def.myconid,drow:!!def.drow,
+    skeletal:!!def.skeletal,incorporeal:!!def.incorporeal,cave:!!def.cave,lurk:!!def.lurk,duergar:!!def.duergar,myconid:!!def.myconid,drow:!!def.drow,sewers:!!def.sewers,dungeon:!!def.dungeon,
     enlarge:!!def.enlarge,vanish:!!def.vanish,grown:false,vanished:0,
     distress:!!def.distress,shriek:!!def.shriek,shrieked:false,
     special:{disease:def.disease,poison:def.poison,paralysis:def.paralysis,energyDrain:def.energyDrain,regen:def.regen,
@@ -5891,7 +6547,7 @@ function addMonsterSprite(m){
   const spr=new THREE.Sprite(mat);
   const sc=m.boss?1.05:(['ogre','troll','minotaur','ogremage','dragon',
     'bonecolossus','deathknight','bonedrake','lich',
-    'umberhulk','purpleworm','roper','otyugh','cavebear','duergarlord','myelder','mylord','mysovereign','shrieker','drider','drowmatron'].includes(m.key)?0.95:0.72);
+    'umberhulk','purpleworm','roper','otyugh','cavebear','duergarlord','myelder','mylord','mysovereign','shrieker','drider','drowmatron','blackpud','ochrejelly','scrag','ettin','hillgiant','stonegiant','giantking'].includes(m.key)?0.95:0.72);
   spr.scale.set(sc,sc,1);
   spr.position.set(m.x+0.5,sc/2+0.02,m.y+0.5);
   spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss,elite:m.elite};

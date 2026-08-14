@@ -110,8 +110,8 @@ reads **median 26, middle half 22–29**. After the cave work (nine cave
 creatures, the ambushers, the cave spawn bias) it reads **median 27,
 middle half 24–30**; moving boss floors to every third level took it to
 **median 28, middle half 26–30**. The duergar and myconid rosters left it
-at **median 27, middle half 26–30**, and the drow at **median 28, middle
-half 25–29**.
+at **median 27, middle half 26–30**, the drow at **median 28, middle half
+25–29**, and the sewers roster at **median 27, middle half 24–29**.
 
 **26–30 is the band. Do not treat it as a shortfall.** CLAUDE.md carried an
 intended 30–40 for a long time and the game has never once hit it, which
@@ -127,6 +127,42 @@ every static check — and still walled the descent at depth 16, because
 `speed` had been read as a rate instead of a cooldown (see *Adding a
 monster*). The budget cannot see a creature that simply moves faster than
 the party can retreat; only the simulation can.
+
+### Adding a roster moves the budget for everybody
+
+This is the mechanism behind the whole drift in the table above, and it is
+easy to miss because it is not a bug in anything.
+
+`rawBudget` is the pool's **weighted mean** threat times `targetCount`:
+
+```js
+for(const [k,w] of pool){tw+=w;ts+=w*threatOf(k,depth);}
+return (ts/tw)*targetCount(depth)*early;
+```
+
+So **any creature banded above the pool's mean at a given depth raises the
+budget at that depth — for every roster on it**. The sewers roster was
+written with a CR 3 ooze and a CR 4 cutthroat banded from depth 5, which is
+inside the Sewers' own block (4–6) where the pool mean is 17. They sat at
+2.3× and 3.2× that mean, lifted the depth 4–6 budget by 38%, and took the
+descent from median 28 to 26 before a single deep creature was involved.
+Both were rebuilt as CR 1–2.
+
+Two rules fall out of it, and neither is the ratio-to-share guideline:
+
+- **Check the pool mean at the depths a new band actually covers**, not just
+  the ratio at the band centre. Share is roughly the mean, so 2–3× share
+  at a shallow depth is 2–3× the mean, and four such creatures move it.
+- **A themed roster's *mean* ratio matters more than any one creature's**,
+  because the ×4 bias makes it about half the bodies on its own floor. The
+  sewers' deep four averaged 1.20× share and put a depth-26 floor 22% over
+  budget against a 12% baseline; trimmed to a mean of 1.0 it came back.
+
+Also worth knowing: **`poolCeiling` is a separate trap in the same area.**
+It reads the single heaviest creature a depth allows, so a new roster's top
+creature out-weighing the incumbent top creature lifts the cap the budget
+is allowed to grow into. The black pudding did that at depth 23 (822 against
+the myconid elder's 714) and was sized down for it.
 
 The cause is structural, and worth knowing before you touch any dial.
 **The party is level-capped at 20 by depth 20** — `MAX_LEVEL` is 20 and a
@@ -164,6 +200,27 @@ here (unlike `scotland.html`). Touch all of these:
    `o.ap` are the head and arm pivots, and `ad`/`aw`/`as` override the
    swing for creatures that carry a weapon across the body. Omitting the
    markers gives a static sprite that will not telegraph its attacks.
+
+   Six poses exist — `idle0/idle1`, `walk0/walk1`, `windup`, `strike` — and
+   `poseXf` moves the whole body in every one of them, so walking and the
+   telegraph work for any creature regardless of layers. What the layers add is
+   the part that reads: `headXf` bobs and nods the `|H|` layer, `armXf` hauls
+   the `|A|` layer back and drives it through. **`windup` also flares an
+   eye-coloured aura**, which is the telegraph a layerless creature would still
+   get. T51 asserts all of it, including that no pose renders identically to
+   `idle0` and that all six attack paths (`monsterMelee`, `monsterShoot`,
+   `monsterCast`, `bossSummon`, `bossBarrage`, `bossSweep`) call `windupAnim`.
+
+   **A pivot left at `[0,0]` is worse than no layer**: the part rotates about
+   the canvas corner and flies off screen. The kobold carried `ap:[0,0]` for
+   exactly as long as it had no arm to swing.
+
+   **One layer is the requirement, not both.** A rat, a spider, a kobold
+   and an ooze have no arm to swing — they strike with the head, and the
+   head layer plus the `sharp` pose is the whole telegraph. Six creatures
+   carry a head layer and no arm for exactly that reason, and nothing in
+   the bestiary is fully static. A test that demands `|A|` of a quadruped
+   is wrong about anatomy rather than finding a gap.
 4. **Sprite scale** — `addMonsterSprite` has a hardcoded list of large
    creatures that render bigger. Add to it if the new creature is big.
 
@@ -383,60 +440,58 @@ of the wall plane rather than behind it.
 Depth-gated content that is not theme-driven and will need extending if
 the dungeon grows:
 
-- **`BOSSES`** — one entry per named boss with a `minD`. **Every third
-  floor from depth 6 is a boss floor**, which is also the last floor of a
-  theme block (`THEMES[floor((depth−1)/3)]`), so a boss caps the theme you
-  have been walking through instead of landing in the middle of the next
-  one. `minD` therefore steps by 3, one named boss per boss floor, and
-  three places must agree: `isBossLevel` in `tryGen`, the `/3` in
-  `bossFor`'s cycle arithmetic, and the ⚔ in `refreshDepthTag`.
-  `BOSS_RANKS` must be **at least as long as `BOSSES`**, or a cycled boss
-  from the tail of the list is titled `undefined`.
+- **`BOSS_TABLE`** — bosses, keyed by theme and then by tier. **A boss belongs
+  to the floor it caps.** Boss floors are every third level from depth 6, and
+  because themes cycle every three floors the theme of a boss floor walks
+  Sewers, Crypt, Caves, Duergar, Myconid, Drow, Dungeon and starts over 21
+  depths later. `bossSlot(depth)` returns that theme and the tier — how many of
+  that theme's boss floors have already been passed.
 
-  **The list is ordered by weight, not by flavour**, and T21 holds it to
-  that: each named boss must out-threat the one three floors above it. This
-  is what a themed boss has to be written around rather than against. Depth
-  18 is the last floor of the Myconid block, so the grove gets its own
-  ruler — but a myconid sovereign built for the deep end scored 2906 against
-  a window of 832–1165, so the slot was filled with a **separate, lighter
-  `mylord`** and the sovereign moved to the end of the list at depth 27.
-  Both are **boss-only: neither has a `SPAWN_DEPTH` entry**, which is
-  precisely what frees their numbers to answer to a boss floor instead of a
-  spawn band.
+  Depth 3 is exempt. On floor 3 the party is still level 1 — 32 hit points
+  between four of them, a 3-hp wizard — against a boss carrying 2.5× hp and
+  **+2 AC**, which at that attack bonus is unhittable rather than hard. A
+  simulated descent walled there at 99%. That exemption is why the Dungeon's
+  own first boss floor is 24 rather than 3.
 
-  The drow matron is the same pattern done deliberately rather than
-  discovered: depth 21 caps the Drow block, the window there was 1040–1324,
-  and `drowmatron` was written to land at 1210 before a line of the list
-  moved. **Reach for that before reordering anything.** Adding a theme adds
-  a boss floor, so the named list stretches by one and everything below the
-  new entry slides three floors deeper; the arc is preserved because the
-  order is preserved.
+  **A slot holds a list, and one entry is drawn at random per floor**, so a
+  boss floor is not the same fight every run. The price is a stricter
+  invariant: every candidate in a slot must out-threat *every* candidate in
+  the slot three floors above it, because any pair can come up together. T21
+  checks the table pairwise rather than checking a median.
 
-  The first theme block is exempt. On floor 3 the party is still level 1 —
-  32 hit points between four of them, a 3-hp wizard — against a boss
-  carrying 2.5× hp and **+2 AC**, which at that attack bonus is unhittable
-  rather than hard. A simulated descent walled there at 99%.
+  Three places must agree on the cadence: `isBossLevel` in `tryGen`, the `/3`
+  in `bossSlot`, and the ⚔ in `refreshDepthTag`.
 
-  Past the last named entry `bossFor` cycles the list, each pass harder
-  and titled by its circle, and cycled bosses also wear an elite mantle.
-  Adding a named boss extends the run before cycling starts.
+  The arc was **solved against the bestiary rather than asserted**: the table
+  was first filled entirely from creatures that already existed, and only then
+  were five written for the slots where no creature both fitted the window and
+  read as that faction's ruler — a wererat guildmaster and guild lord, a
+  duergar thane, a hobgoblin warlord and a fire giant king. Each was sized to
+  its window *before* a line of the table moved. Depth 45 is the one slot that
+  had no arithmetic answer at all: the stone giant tops out at 4158 against the
+  drider's 4182 three floors above.
 
-  A cycled boss's **hit points come from `BOSS_BASE_HP`, the list's own
-  mean, not from the creature the cycle named.** A bugbear base is a
-  quarter of a dragon's, so raw base hp handed you a boss a third of the
-  one three floors above, and the sawtooth repeated on every pass. Named
-  bosses keep their own creature's hp — they are hand-placed for their
-  depth, and Sinshara is a caster whose danger is her spells.
+  Four slots carry two candidates — depths 6, 9, 12 and 24, all of them inside
+  a normal run — so the boss floors a player actually reaches are the ones that
+  vary. T50 asserts they genuinely draw differently rather than merely being
+  allowed to.
 
-  T21 derives where the cycle starts from `BOSSES` itself rather than
-  writing the depth down, so adding a named boss no longer breaks it.
+  **A boss-only creature with no slot is dead content.** When the table
+  replaced the old flat list the myconid sovereign fell out of it entirely —
+  she scored 6057 at depth 39 against a window of 3253–4182. Being boss-only
+  is exactly what makes the numbers free to move, so she was resized into the
+  slot rather than dropped. Check this whenever the table changes.
 
-  That split is why T21 measures the two arcs on different things: the
-  named arc on `monsterThreat` (which credits spells, reach and riders,
-  so Sinshara's low hp is not a regression) and the cycled arc on `maxHp`.
-  A cycled boss's *damage* is still whatever creature the list named, so
-  its threat still steps down at the named→cycled handover — that is the
-  list starting over, and it is by design.
+  Past the last written tier a theme's deepest ruler returns, titled by the
+  circle it belongs to. Nothing reaches that in practice — no simulated run
+  has passed depth 31 — but a boss floor must always have something on it.
+
+  A returning boss's **hit points come from `BOSS_BASE_HP`, the table's own
+  mean, not from the creature named.** A wererat base is a fraction of a
+  lich's, so raw base hp made a deep boss weaker than the one three floors
+  above it. The creature still decides how the fight goes — its damage, its
+  reach, whether it casts — but its weight class comes from the depth.
+
 - **`trapDice` / `trapDC`** — damage keeps climbing with depth; the spot
   DC deliberately stops just short of a maxed rogue's take-10, so finding
   traps stays the rogue's job at any depth. Do not let the DC past that.
@@ -725,34 +780,38 @@ through) and offensive spells resolve when their bolt arrives (set
 `G.fx=[]` and call `updateFx(10)`, which lands everything in flight via
 the `f.t>6` branch). T37 covers the whole of this.
 
-## The thin ordinary roster — measured, and deliberately left
+## Every theme owns a roster now
 
-The bestiary is no longer thin at depth in total. Five themed rosters —
-undead, cave, duergar, myconid, drow — have taken depth 20 from a handful
-of creatures to **twenty-seven in band**, peaking at thirty around depth 24.
-What is still thin, and has only got thinner in relative terms, is the
-**ordinary** roster: everything carrying none of `type:'undead'`,
-`cave`, `duergar`, `myconid` or `drow`.
+This section used to record that the *ordinary* roster — everything with no
+theme flag — had collapsed to two creatures past depth 16, so that a Dungeon
+or Sewers floor was mostly other people's furniture thinned to `OFF`. That
+is fixed. Dungeon and Sewers were the only two settings without a faction of
+their own, and both now have one: a hobgoblin legion with giants for muscle,
+and a wererat guild keeping oozes and an otyugh as livestock.
 
-| depth | creatures in band | of which ordinary |
+Seven themes, seven rosters, and **exactly one creature left unflagged** —
+plain `ogre`, which is banded 6–10 and can reach neither Dungeon block
+(1–3 and 22–24) without either brutalising depth 3 or littering depth 22
+with weaklings. It is deliberately left as the last piece of wildlife.
+
+| depth | in band | spread |
 |---|---|---|
-| 8 | 8 | 3 |
-| 13 | 14 | 3 |
-| 20 | 27 | **2** |
-| 24 | 30 | **2** |
-| 31 | 17 | **2** |
-| 40 | 10 | **2** |
+| 3 | 15 | dungeon 7, sewers 4, undead 4 |
+| 13 | 17 | cave 6, undead 4, sewers 3, dungeon 2, duergar 2 |
+| 20 | 35 | myconid 6, dungeon 6, drow 5, duergar 5, undead 5, cave 4, sewers 4 |
+| 24 | 41 | dungeon 7, myconid 7, drow 6, duergar 6, sewers 6, undead 5, cave 4 |
+| 31 | 22 | cave 4, undead 4, drow 4, dungeon 3, sewers 3 |
+| 40 | 10 | cave 3, undead 3, and one each of the rest |
 
-Past depth 16 the unthemed roster is two creatures. Every floor in the
-game is therefore carried by somebody's roster, and a Dungeon or Sewers
-floor is mostly other people's furniture thinned to `OFF`. That is the
-real shape of the bestiary now, and it is the argument for filling the
-ordinary band if anyone ever picks the job up.
+Two rules came out of building the last two, and they apply to anything
+added from here:
 
-**This was costed and declined**, and the decision is worth revisiting only
-on the strength of the table above rather than on difficulty. Filling
-depths 9–30 is around nine creatures — definitions, `SPAWN_DEPTH` bands,
-layered `MONSTER_ART` and threat tuning apiece. It buys variety and nothing
-else: with the band settled at 26–30 it is not a difficulty lever, and the
-depth 31+ rows are content no run reaches. If you pick it up, aim it at
-9–30 and skip the deep band; do not treat the table as a bug list.
+- **A flag must reach a floor of its own theme.** Otherwise it is 0.35
+  everywhere and ×4 nowhere — a pure penalty. That is why the bugbear's
+  band was stretched to touch depth 3 and why the ogre is not flagged at
+  all. T48 and T49 both assert it.
+- **Dungeon and Sewers are bimodal by construction.** Their blocks sit at
+  1–3 / 22–24 and 4–6 / 25–27, twenty floors apart with nothing between, so
+  their rosters need a shallow tier and a deep tier and nothing in the
+  middle. Every other theme's two blocks are 21 floors apart too, but their
+  creatures' bands are wide enough to cover both.
