@@ -568,7 +568,9 @@ function studyPick(book,lvl){
 /* ---------- monsters ---------- */
 // type tags: humanoid, undead, beast, giant, vermin, dragon ; ranged:tiles ; caster:[spell-ish]
 const MONSTERS={
-  rat:      {name:'Dire rat',      cr:1/3,hp:5,  ac:15,atk:4, dmg:[1,4,0], xp:100, speed:1.1, type:'beast', spr:'rat',
+  // Three creatures that were unflagged wildlife now belong to the guild. A
+  // dire rat and a giant spider are what a sewer has; a troll is what moves in.
+  rat:      {sewers:true, name:'Dire rat',cr:1/3,hp:5,  ac:15,atk:4, dmg:[1,4,0], xp:100, speed:1.1, type:'beast', spr:'rat',
              disease:{dc:11,name:'filth fever'}},
   kobold:   {name:'Kobold',        cr:1/4,hp:4,  ac:15,atk:1, dmg:[1,6,-1],xp:75,  speed:1.3, type:'humanoid', spr:'kobold'},
   koboldsl: {name:'Kobold slinger',cr:1/3,hp:4,  ac:15,atk:3, dmg:[1,4,0], xp:100, speed:1.3, type:'humanoid', spr:'koboldsl', ranged:5},
@@ -580,7 +582,7 @@ const MONSTERS={
   orc:      {name:'Orc',           cr:1/2,hp:5,  ac:13,atk:4, dmg:[1,8,3], xp:150, speed:1.3, type:'humanoid', spr:'orc'},
   gobshaman:{name:'Goblin shaman', cr:1,  hp:9,  ac:14,atk:1, dmg:[1,4,0], xp:300, speed:1.5, type:'humanoid', spr:'gobshaman',
              caster:{dmg:[2,4,1],ranged:6,cd:4.5,fx:'#7fd17f',elem:'acid'}},
-  spider:   {name:'Giant spider',  cr:1,  hp:11, ac:14,atk:4, dmg:[1,6,0], xp:300, speed:1.1, type:'vermin', spr:'spider',
+  spider:   {sewers:true, name:'Giant spider',cr:1,hp:11,ac:14,atk:4, dmg:[1,6,0], xp:300, speed:1.1, type:'vermin', spr:'spider',
              poison:{dc:12,abil:'str',dice:[1,4]}},
   ghoul:    {name:'Ghoul',         cr:1,  hp:13, ac:14,atk:3, dmg:[1,6,1], xp:300, speed:1.2, type:'undead', spr:'ghoul',
              paralysis:{dc:12,dur:6}},
@@ -592,7 +594,7 @@ const MONSTERS={
   wightnec: {name:'Wight necromancer',cr:4,hp:30,ac:15,atk:4, dmg:[1,4,1], xp:1200,speed:1.5, type:'undead', spr:'wightnec',
              energyDrain:1, caster:{dmg:[3,6,0],ranged:6,cd:5,fx:'#b48ae0'}},
   minotaur: {reach:true, name:'Minotaur',      cr:4,  hp:39, ac:14,atk:9, dmg:[3,6,4], xp:1200,speed:1.4, type:'giant', spr:'minotaur'},
-  troll:    {reach:true, name:'Troll',         cr:5,  hp:63, ac:16,atk:9, dmg:[1,6,6], xp:1500,speed:1.4, type:'giant', spr:'troll', regen:3},
+  troll:    {reach:true, sewers:true, name:'Troll',cr:5,hp:63, ac:16,atk:9, dmg:[1,6,6], xp:1500,speed:1.4, type:'giant', spr:'troll', regen:3},
   ogremage: {reach:true, name:'Ogre mage',     cr:8,  hp:37, ac:18,atk:7, dmg:[2,6,7], xp:2400,speed:1.5, type:'giant', spr:'ogremage',
              caster:{dmg:[5,6,0],ranged:7,cd:6,fx:'#8ad0e0',elem:'cold'}},
   dragon:   {reach:true, name:'Young dragon',  cr:7,  hp:66, ac:19,atk:11,dmg:[1,8,4], xp:2100,speed:1.4, type:'dragon', spr:'dragon',
@@ -630,8 +632,11 @@ const MONSTERS={
              cave:true, poison:{dc:13,abil:'str',dice:[1,3]}},
   crawler:  {reach:true, name:'Carrion crawler',cr:4,hp:28,ac:16,atk:6,dmg:[1,6,2],xp:1200,speed:1.5, type:'aberration', spr:'crawler',
              cave:true, paralysis:{dc:13,dur:3}},
+  // The otyugh moves from the caves to the sewers, where it always belonged:
+  // it eats refuse, and the guild keeps it for that. The cave roster can spare
+  // one -- it still fields nine.
   otyugh:   {reach:true, name:'Otyugh',cr:7, hp:58, ac:17,atk:9, dmg:[1,10,5],xp:2100,speed:1.9, type:'aberration', spr:'otyugh',
-             cave:true, disease:{dc:15,name:'Filth fever'}},
+             sewers:true, disease:{dc:15,name:'Filth fever'}},
   umberhulk:{reach:true, name:'Umber hulk',cr:9,hp:74,ac:18,atk:12,dmg:[2,8,6],xp:2700,speed:1.5, type:'aberration', spr:'umberhulk',
              cave:true, gaze:{dc:16,dur:2.5}},
   /* ---------- duergar: the grey dwarves of the deep halls ----------
@@ -724,20 +729,74 @@ const MONSTERS={
   drowmatron:{name:'Drow matron',cr:13,hp:33,ac:22,atk:14,dmg:[2,6,5],xp:3900,speed:1.4, type:'humanoid', spr:'drowmatron',
               drow:true, reach:true, faerie:{dc:18,dur:8}, drowpoison:{dc:18,dur:3},
               caster:{dmg:[4,6,4],ranged:7,cd:4.5,fx:'#a86ce8',elem:'acid'}},
+  /* ---------- the sewers ----------
+     A thieves' guild and its livestock. The wererats own the place; the oozes
+     and the otyugh are what they keep in it, the way a farm keeps pigs — which
+     is why the vermin here are slow and the rats are not.
+
+     The Sewers occupy depths 4-6 and 25-27 and nothing in between, so this is
+     the only roster in the game that has to be built for two windows twenty
+     floors apart. The per-monster share is 4-7 at the shallow end and 450-540
+     at the deep end; a creature written for one is useless in the other.
+
+     Note the shallow ratios sit near 2-3 of share rather than near 1. That is
+     normal down there and not a mis-tuning: at depth 5 the budget cannot pay
+     share value for every body `targetCount` asks for, so the whole shallow
+     bestiary runs high (zombie 2.98, gnoll 2.74, bugbear 3.08). The 0.85-1.2
+     guideline is a deep-band norm. */
+  ratswarm: {name:'Sewer rat swarm',cr:1, hp:18, ac:13,atk:4, dmg:[1,6,1], xp:300, speed:1.2, type:'vermin', spr:'ratswarm',
+             sewers:true, disease:{dc:12,name:'Filth fever'}},
+  wererat:  {name:'Wererat',      cr:2, hp:22, ac:15,atk:5, dmg:[1,6,2], xp:600, speed:1.3, type:'humanoid', spr:'wererat',
+             sewers:true, disease:{dc:13,name:'Lycanthropy'}},
+  // Both sized down hard from CR 3-4. `rawBudget` is the pool's weighted MEAN
+  // threat, so a creature above the mean at a given depth raises the budget for
+  // every roster there -- and the Sewers block is depths 4-6, where the mean is
+  // 17. At CR 3-4 the cutthroat sat at 3.2x that mean and the ooze at 2.3x,
+  // which lifted the depth 4-6 budget by 38% and took the descent from median
+  // 28 to 26. A theme banded this shallow needs shallow-weight creatures.
+  grayooze: {name:'Gray ooze',    cr:1, hp:22, ac:11,atk:4, dmg:[1,6,1], xp:300, speed:2.4, type:'ooze', spr:'grayooze',
+             sewers:true},
+  wererogue:{name:'Wererat cutthroat',cr:2,hp:20,ac:17,atk:5,dmg:[1,4,2],xp:600, speed:1.2, type:'humanoid', spr:'wererogue',
+             sewers:true, ranged:5, disease:{dc:14,name:'Lycanthropy'}},
+  ochrejelly:{name:'Ochre jelly', cr:7, hp:66, ac:13,atk:11,dmg:[2,6,5], xp:2100,speed:2.2, type:'ooze', spr:'ochrejelly',
+             sewers:true},
+  scrag:    {name:'Scrag',        cr:8, hp:62, ac:19,atk:13,dmg:[1,10,6],xp:2400,speed:1.3, type:'giant', spr:'scrag',
+             sewers:true, reach:true, regen:4},
+  // Sized down from hp 94 / atk 15 / 2d8+7 after a descent. Not because its own
+  // ratio was wrong -- 1.57 is inside the range the myconid elder already sits
+  // in -- but because at 822 it was the single heaviest creature at depth 23,
+  // above the previous ceiling-setter, and `poolCeiling` reads the heaviest
+  // thing a depth allows. Lifting the ceiling lifts `threatBudget` for every
+  // roster at once: the budget at depth 26 went 14447 -> 15198 and realised
+  // floor threat 15016 -> 18721, which took the descent from median 28 to 26.
+  // A new roster's top creature must not out-weigh the incumbent top creature.
+  blackpud: {name:'Black pudding',cr:9, hp:64, ac:14,atk:13,dmg:[2,8,4], xp:2700,speed:2.2, type:'ooze', spr:'blackpud',
+             sewers:true, reach:true},
+  // The deep three trimmed together, not individually. On a Sewers floor the x4
+  // bias means this roster takes about half the bodies; at a mean of 1.20x share
+  // that put a depth-26 floor 22% over budget against a 12% baseline. It is the
+  // roster's MEAN ratio that has to sit near 1, not each creature's -- a bias
+  // this strong makes the roster the floor.
+  wereblade:{name:'Wererat blademaster',cr:10,hp:54,ac:22,atk:15,dmg:[2,6,6],xp:3000,speed:1.2,type:'humanoid',spr:'wereblade',
+             sewers:true, disease:{dc:18,name:'Lycanthropy'},
+             caster:{dmg:[4,6,3],ranged:6,cd:5.5,fx:'#8fbf6a',elem:'acid'}},
   purpleworm:{reach:true,name:'Purple worm',cr:16,hp:120,ac:19,atk:17,dmg:[3,8,9],xp:4800,speed:1.7, type:'vermin', spr:'purpleworm',
              cave:true, poison:{dc:18,abil:'con',dice:[2,4]}},
 };
 // spawn table by depth: keys allowed at depth n if cr between depth/2-? use per-monster [minD,maxD]
 const SPAWN_DEPTH={
-  rat:[1,3],kobold:[1,2],koboldsl:[1,3],goblin:[1,3],skeleton:[1,4],skelarcher:[2,5],zombie:[2,5],
+  rat:[1,6],kobold:[1,2],koboldsl:[1,3],goblin:[1,3],skeleton:[1,4],skelarcher:[2,5],zombie:[2,5],
   hobgoblin:[2,5],orc:[2,5],gobshaman:[3,6],spider:[3,7],ghoul:[3,7],gnoll:[3,7],bugbear:[4,8],
-  ogre:[6,10],wight:[6,11],wightnec:[8,13],minotaur:[8,13],troll:[10,16],ogremage:[13,99],dragon:[15,99],
+  ogre:[6,10],wight:[6,11],wightnec:[8,13],minotaur:[8,13],troll:[10,28],ogremage:[13,99],dragon:[15,99],
   mummy:[10,20],wraith:[12,24],barrowwight:[13,26],bonecolossus:[16,32],deathknight:[20,99],lich:[22,99],bonedrake:[26,99],
-  piercer:[8,18],cavebear:[8,18],troglodyte:[8,18],crawler:[9,20],cavefisher:[12,26],otyugh:[14,26],
+  piercer:[8,18],cavebear:[8,18],troglodyte:[8,18],crawler:[9,20],cavefisher:[12,26],otyugh:[14,28],
   umberhulk:[18,32],roper:[24,99],purpleworm:[30,99],
   shrieker:[15,24],mysprout:[15,24],violetfungus:[16,28],sporeservant:[17,30],
   myguard:[17,30],mycaster:[20,34],myelder:[24,99],
   drow:[17,28],drowbolt:[17,28],drowblade:[19,32],drowpriest:[20,34],drowmage:[20,34],drider:[23,99],
+  // the sewers, built for its two windows: 4-6 and 25-27
+  ratswarm:[2,8],wererat:[3,11],grayooze:[5,14],wererogue:[5,14],
+  ochrejelly:[17,28],scrag:[20,32],blackpud:[22,34],wereblade:[23,34],
   duergar:[12,24],duergarxbow:[12,24],duergarscout:[14,28],
   duergarpriest:[16,30],duergarrune:[19,34],duergarlord:[23,99],
 };
@@ -1101,6 +1160,134 @@ const MONSTER_ART={
      to carry the whole silhouette: every one of these reads by its mane and its
      spider-motif gear before it reads by its face. Eyes are the one warm thing
      on them. */
+  /* ---------- the sewers ----------
+     Two families that have to read apart at a glance: the wererats, who wear
+     clothes and carry weapons, and the vermin, which do not. The oozes have no
+     skeleton to hang a head or an arm on, so their |H| is the bulge that rears
+     up before a strike and their |A| is the pseudopod that does it — which is
+     what an ooze telegraphing an attack actually looks like. */
+  ratswarm:()=>({o:{hp:[30,30],ap:[46,40],lit:'#6a5a44',mid:'#2e2519',eye:'#d8b23a',rough:[1.4,0.5],seed:91},
+    body:`<ellipse cx="32" cy="50" rx="26" ry="12" fill="#241c12" opacity="0.85"/>`+
+    `<ellipse cx="20" cy="47" rx="9" ry="6" fill="url(#bg)" ${RIM}/>`+
+    `<ellipse cx="43" cy="49" rx="9" ry="6" fill="#4a3d2a" ${RIM}/>`+
+    `<ellipse cx="31" cy="55" rx="10" ry="6" fill="#3a2f20"/>`+
+    `<path d="M11 46 Q3 44 1 39 M52 48 Q60 46 63 41 M24 57 Q18 62 11 62 M40 57 Q46 62 53 61" stroke="#5a4a33" stroke-width="1.6" fill="none"/>`+
+    `<circle cx="15" cy="45" r="1.1" fill="#d8b23a"/><circle cx="48" cy="47" r="1.1" fill="#d8b23a"/>`+
+    `<circle cx="27" cy="54" r="1" fill="#d8b23a"/><circle cx="37" cy="56" r="1" fill="#d8b23a"/>`+
+    `|H|<ellipse cx="30" cy="34" rx="10" ry="7.5" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M22 31 Q17 25 23 24 Q27 26 26 31 Z" fill="#4a3d2a"/>`+
+    `<path d="M38 31 Q43 25 37 24 Q33 26 34 31 Z" fill="#4a3d2a"/>`+
+    `<path d="M30 36 L44 40" stroke="#8a7658" stroke-width="1.4"/>`+
+    `<circle cx="27" cy="33" r="1.5" fill="#d8b23a"/><circle cx="34" cy="33" r="1.5" fill="#d8b23a"/>`+
+    `<path d="M28 39 L32 39" stroke="#f0e6d0" stroke-width="1.2"/>|/H|`+
+    `|A|<ellipse cx="49" cy="40" rx="8" ry="5.5" fill="#4a3d2a" ${RIM}/>`+
+    `<path d="M55 39 Q61 34 57 32" stroke="#5a4a33" stroke-width="1.6" fill="none"/>`+
+    `<circle cx="52" cy="39" r="1.2" fill="#d8b23a"/>`+
+    `<path d="M55 42 L59 43" stroke="#f0e6d0" stroke-width="1.1"/>|/A|`}),
+  wererat:()=>({o:{hp:[32,24],ap:[46,38],lit:'#7a6a52',mid:'#332a1c',eye:'#d8b23a',rough:[1,0.3],seed:92},
+    body:`<path d="M21 31 Q18 42 20 54 L25 60 L40 60 L45 54 Q47 42 44 31 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M22 32 L43 32 L44 47 Q32 52 21 47 Z" fill="#4a3a26"/>`+
+    `<path d="M24 35 L41 39 M23 42 L42 45" stroke="#5f4c31" stroke-width="1.4"/>`+
+    `<path d="M27 33 L25 50 M38 33 L40 50" stroke="#2b2115" stroke-width="1"/>`+
+    `<path d="M44 52 Q54 56 58 50 Q52 58 43 57 Z" fill="#6a5a44"/>`+
+    `|H|<ellipse cx="32" cy="21" rx="8" ry="7" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M26 24 Q22 30 30 29 Q34 27 33 23 Z" fill="#8a7658"/>`+
+    `<path d="M25 16 Q20 8 27 8 Q31 11 30 17 Z" fill="#4a3d2a"/>`+
+    `<path d="M39 16 Q44 8 37 8 Q33 11 34 17 Z" fill="#4a3d2a"/>`+
+    `<circle cx="28" cy="19" r="1.4" fill="#d8b23a"/><circle cx="36" cy="19" r="1.4" fill="#d8b23a"/>`+
+    `<circle cx="27" cy="28" r="1.2" fill="#241c12"/>`+
+    `<path d="M24 27 L20 26 M24 29 L20 30 M39 27 L43 26" stroke="#c9bda6" stroke-width="0.6"/>|/H|`+
+    `|A|<path d="M46 38 L53 35" stroke="#5f4c31" stroke-width="2.2"/>`+
+    `<path d="M52 36 L60 30" stroke="#b6bcc6" stroke-width="1.6"/>`+
+    `<path d="M50 37 L54 34" stroke="#6a5a44" stroke-width="2.8"/>|/A|`}),
+  grayooze:()=>({o:{hp:[32,30],ap:[47,42],lit:'#8d9298',mid:'#3d4348',eye:'#c8d0d6',rough:[1.6,0.6],seed:93},
+    body:`<path d="M8 56 Q4 44 12 38 Q20 32 32 33 Q44 32 52 38 Q60 44 56 56 Q44 61 32 61 Q20 61 8 56 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M14 52 Q22 46 32 47 Q42 46 50 52 Q40 56 32 56 Q24 56 14 52 Z" fill="#586066" opacity="0.7"/>`+
+    `<ellipse cx="22" cy="45" rx="4" ry="2.6" fill="#a8b0b6" opacity="0.5"/>`+
+    `<ellipse cx="41" cy="49" rx="3" ry="2" fill="#a8b0b6" opacity="0.4"/>`+
+    `<path d="M12 58 Q10 63 15 63 M50 58 Q53 63 47 63" stroke="#4d5358" stroke-width="2" fill="none"/>`+
+    `|H|<path d="M22 34 Q24 20 32 18 Q40 20 42 34 Q32 38 22 34 Z" fill="url(#bg)" ${RIM}/>`+
+    `<ellipse cx="29" cy="26" rx="3" ry="4" fill="#c8d0d6" opacity="0.45"/>`+
+    `<ellipse cx="36" cy="29" rx="2" ry="2.6" fill="#c8d0d6" opacity="0.35"/>`+
+    `<path d="M27 21 Q32 16 37 21" stroke="#a8b0b6" stroke-width="1" fill="none"/>|/H|`+
+    `|A|<path d="M47 42 Q57 38 61 28 Q63 36 56 44 Q51 47 46 46 Z" fill="#6e767c" ${RIM}/>`+
+    `<ellipse cx="57" cy="35" rx="2.4" ry="3.4" fill="#c8d0d6" opacity="0.4"/>|/A|`}),
+  wererogue:()=>({o:{hp:[32,23],ap:[45,39],lit:'#6f6350',mid:'#2b241a',eye:'#d8b23a',rough:[1,0.3],seed:94,ad:0.45,aw:0.32},
+    body:`<path d="M21 30 Q17 43 19 56 L25 61 L39 61 L45 56 Q47 43 43 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M22 31 L42 31 L43 49 Q32 55 21 49 Z" fill="#3a3124"/>`+
+    `<path d="M24 34 L40 40" stroke="#4f4534" stroke-width="2.2"/>`+
+    `<path d="M26 45 Q32 48 38 45" stroke="#544a38" stroke-width="0.9" fill="none"/>`+
+    `<path d="M22 31 Q32 26 42 31 L42 35 Q32 30 22 35 Z" fill="#241e16"/>`+
+    `|H|<ellipse cx="32" cy="20" rx="8" ry="6.6" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M23 20 Q23 9 32 9 Q41 9 41 20 L41 22 Q37 14 32 14 Q27 14 23 22 Z" fill="#241e16"/>`+
+    `<path d="M26 24 Q22 29 29 28 Q33 26 32 22 Z" fill="#8a7658"/>`+
+    `<circle cx="28" cy="19" r="1.3" fill="#d8b23a"/><circle cx="35" cy="19" r="1.3" fill="#d8b23a"/>`+
+    `<path d="M24 26 L20 25 M24 28 L20 29" stroke="#c9bda6" stroke-width="0.6"/>|/H|`+
+    `|A|<path d="M45 39 L52 37" stroke="#4f4534" stroke-width="2.2"/>`+
+    `<path d="M50 33 L50 41 L58 37 Z" fill="#2e2820" ${RIM}/>`+
+    `<path d="M49 32 L49 42" stroke="#8a9098" stroke-width="1.4"/>`+
+    `<path d="M52 37 L62 37" stroke="#8fbf6a" stroke-width="1"/>`+
+    `<path d="M60 35 L64 37 L60 39 Z" fill="#8fbf6a"/>|/A|`}),
+  ochrejelly:()=>({o:{hp:[32,28],ap:[48,42],lit:'#d9a94e',mid:'#6d4a15',eye:'#ffe9b0',rough:[1.6,0.6],seed:95},
+    body:`<path d="M5 55 Q1 40 11 33 Q21 26 32 28 Q43 26 53 33 Q63 40 59 55 Q45 62 32 62 Q19 62 5 55 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M12 50 Q22 43 32 44 Q42 43 52 50 Q41 56 32 56 Q23 56 12 50 Z" fill="#a87c2c" opacity="0.6"/>`+
+    `<ellipse cx="21" cy="42" rx="5" ry="3.2" fill="#ffe9b0" opacity="0.35"/>`+
+    `<ellipse cx="43" cy="47" rx="4" ry="2.6" fill="#ffe9b0" opacity="0.28"/>`+
+    `<ellipse cx="32" cy="52" rx="7" ry="3" fill="#5c3d10" opacity="0.5"/>`+
+    `<path d="M9 58 Q6 64 12 64 M55 58 Q58 64 51 63" stroke="#8a6220" stroke-width="2.2" fill="none"/>`+
+    `|H|<path d="M20 30 Q22 14 32 12 Q42 14 44 30 Q32 35 20 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<ellipse cx="28" cy="21" rx="3.6" ry="4.6" fill="#ffe9b0" opacity="0.4"/>`+
+    `<ellipse cx="37" cy="24" rx="2.4" ry="3" fill="#ffe9b0" opacity="0.3"/>`+
+    `<path d="M26 15 Q32 10 38 15" stroke="#e8c274" stroke-width="1.1" fill="none"/>|/H|`+
+    `|A|<path d="M48 42 Q60 37 64 25 Q66 35 58 45 Q52 49 47 47 Z" fill="#c2903a" ${RIM}/>`+
+    `<ellipse cx="58" cy="34" rx="2.8" ry="4" fill="#ffe9b0" opacity="0.35"/>|/A|`}),
+  scrag:()=>({o:{hp:[32,22],ap:[48,36],lit:'#6f9a6a',mid:'#243c26',eye:'#e8f06a',rough:[1.1,0.35],seed:96},
+    body:`<path d="M19 30 Q14 44 17 58 L24 64 L40 64 L47 58 Q50 44 45 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M22 33 Q32 38 42 33 L44 55 Q32 61 20 55 Z" fill="#2f5231"/>`+
+    `<path d="M24 38 L26 52 M32 36 L32 54 M40 38 L38 52" stroke="#1d3520" stroke-width="1.2"/>`+
+    `<path d="M18 34 Q10 40 8 50 M46 34 Q54 40 56 50" stroke="#4d7a4a" stroke-width="2.6" fill="none"/>`+
+    `<path d="M20 44 L14 42 M20 48 L14 47 M44 44 L50 42 M44 48 L50 47" stroke="#8fbf6a" stroke-width="1.1"/>`+
+    `|H|<path d="M24 18 Q24 9 32 9 Q40 9 40 18 L40 25 Q36 29 30 29 Q24 26 24 18 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M26 22 Q32 27 38 22 Q35 26 32 26 Q29 26 26 22 Z" fill="#152314"/>`+
+    `<path d="M27 23 L28 26 M31 24 L31 27 M36 23 L35 26" stroke="#f0f6d8" stroke-width="0.9"/>`+
+    `<path d="M24 15 Q18 12 16 6 M40 15 Q46 12 48 6" stroke="#4d7a4a" stroke-width="2" fill="none"/>`+
+    `<circle cx="28" cy="17" r="1.5" fill="#e8f06a"/><circle cx="36" cy="17" r="1.5" fill="#e8f06a"/>`+
+    `<path d="M30 20 Q32 21 34 20" stroke="#2f5231" stroke-width="0.8" fill="none"/>|/H|`+
+    `|A|<path d="M48 36 L58 32" stroke="#5b8a56" stroke-width="3"/>`+
+    `<path d="M57 33 L64 27" stroke="#4d7a4a" stroke-width="2.4"/>`+
+    `<path d="M62 24 L64 30 M60 25 L63 22" stroke="#d8e0c0" stroke-width="1.3"/>|/A|`}),
+  blackpud:()=>({o:{hp:[32,26],ap:[50,44],lit:'#3a3640',mid:'#0e0c12',eye:'#6a5f78',rough:[1.8,0.7],seed:97},
+    body:`<path d="M2 56 Q-2 38 10 30 Q21 22 32 25 Q43 22 54 30 Q66 38 62 56 Q47 63 32 63 Q17 63 2 56 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M10 50 Q21 42 32 43 Q43 42 54 50 Q42 57 32 57 Q22 57 10 50 Z" fill="#1c1922" opacity="0.8"/>`+
+    `<ellipse cx="20" cy="40" rx="5" ry="3" fill="#6a5f78" opacity="0.22"/>`+
+    `<ellipse cx="45" cy="45" rx="4" ry="2.4" fill="#6a5f78" opacity="0.18"/>`+
+    `<path d="M6 59 Q2 65 9 65 M58 59 Q62 65 55 64 M32 60 Q30 66 36 65" stroke="#1c1922" stroke-width="2.4" fill="none"/>`+
+    `|H|<path d="M18 28 Q20 10 32 8 Q44 10 46 28 Q32 34 18 28 Z" fill="url(#bg)" ${RIM}/>`+
+    `<ellipse cx="27" cy="18" rx="3.6" ry="4.8" fill="#6a5f78" opacity="0.25"/>`+
+    `<ellipse cx="38" cy="21" rx="2.4" ry="3.2" fill="#6a5f78" opacity="0.2"/>`+
+    `<path d="M25 11 Q32 5 39 11" stroke="#2b2733" stroke-width="1.4" fill="none"/>|/H|`+
+    `|A|<path d="M50 44 Q63 38 64 22 Q68 34 60 47 Q54 51 49 49 Z" fill="#232029" ${RIM}/>`+
+    `<ellipse cx="59" cy="34" rx="2.6" ry="4.2" fill="#6a5f78" opacity="0.22"/>|/A|`}),
+  wereblade:()=>({o:{hp:[32,22],ap:[47,37],lit:'#8a7c62',mid:'#332a1c',eye:'#e8c84a',rough:[1,0.28],seed:98,ad:0.85,as:1.15},
+    body:`<path d="M19 29 Q16 42 18 55 L24 61 L40 61 L46 55 Q48 42 45 29 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M20 30 L44 30 L45 48 Q32 54 19 48 Z" fill="#3f3524"/>`+
+    `<path d="M20 30 L44 30" stroke="#a89468" stroke-width="1.2"/>`+
+    `<path d="M23 35 L41 35 M23 40 L41 40 M24 45 L40 45" stroke="#2b2316" stroke-width="1.5"/>`+
+    `<path d="M32 31 L32 50" stroke="#a89468" stroke-width="0.8"/>`+
+    `<circle cx="32" cy="38" r="3.4" fill="none" stroke="#8fbf6a" stroke-width="1"/>`+
+    `<circle cx="32" cy="38" r="1.2" fill="#8fbf6a"/>`+
+    `|H|<ellipse cx="32" cy="19" rx="8.4" ry="7" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M26 23 Q21 29 29 28 Q34 26 33 21 Z" fill="#a89468"/>`+
+    `<path d="M24 14 Q18 5 26 5 Q31 9 30 15 Z" fill="#4a3d2a"/>`+
+    `<path d="M40 14 Q46 5 38 5 Q33 9 34 15 Z" fill="#4a3d2a"/>`+
+    `<path d="M22 12 L28 8 M42 12 L36 8" stroke="#b6bcc6" stroke-width="1.2"/>`+
+    `<circle cx="28" cy="17" r="1.5" fill="#e8c84a"/><circle cx="36" cy="17" r="1.5" fill="#e8c84a"/>`+
+    `<circle cx="27" cy="27" r="1.2" fill="#241c12"/>`+
+    `<path d="M23 26 L19 25 M23 28 L19 29" stroke="#c9bda6" stroke-width="0.6"/>|/H|`+
+    `|A|<path d="M47 37 L54 33" stroke="#4f4534" stroke-width="2.4"/>`+
+    `<path d="M53 34 L64 22" stroke="#ccd2dc" stroke-width="1.8"/>`+
+    `<path d="M53 34 L60 41" stroke="#b0b6c0" stroke-width="1.4"/>`+
+    `<path d="M51 35 L56 31" stroke="#8a9098" stroke-width="3"/>|/A|`}),
   drow:()=>({o:{hp:[32,25],ap:[46,38],lit:'#4a4453',mid:'#1d1a24',eye:'#e05a3a',rough:[1,0.22],seed:81},
     body:`<path d="M20 30 Q17 41 19 53 L24 60 L40 60 L45 53 Q47 41 44 30 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M21 31 L43 31 L44 46 Q32 51 20 46 Z" fill="#232030"/>`+
@@ -2499,10 +2686,11 @@ function tryGen(depth,targetWalk,theme){
   const duerBias=theme.name==='Duergar'?4:OFF;
   const mycoBias=theme.name==='Myconid'?4:OFF;
   const drowBias=theme.name==='Drow'?4:OFF;
+  const sewBias=theme.name==='Sewers'?4:OFF;
   const base=spawnPool(depth).map(([k,w])=>[k,
     w*(MONSTERS[k].type==='undead'?undeadBias:1)*(MONSTERS[k].cave?caveBias:1)
      *(MONSTERS[k].duergar?duerBias:1)*(MONSTERS[k].myconid?mycoBias:1)
-     *(MONSTERS[k].drow?drowBias:1)]);
+     *(MONSTERS[k].drow?drowBias:1)*(MONSTERS[k].sewers?sewBias:1)]);
   const weigh=(ek)=>base.map(([k,w])=>{
     const r=Math.log(threatOf(k,depth,ek)/share);
     return [k,w*Math.exp(-(r*r)/sig)];
@@ -2833,7 +3021,7 @@ function mkMonster(key,x,y,depth){
     xp:Math.round(XP_AWARD(def.cr)*(1+0.12*Math.max(0,depth-1))),
     speed:def.speed,type:def.type,ranged:def.ranged||0,caster:def.caster||null,
     reach:!!def.reach,slot:0, // slot 0-1 front rank of its tile, 2-3 rear rank
-    skeletal:!!def.skeletal,incorporeal:!!def.incorporeal,cave:!!def.cave,lurk:!!def.lurk,duergar:!!def.duergar,myconid:!!def.myconid,drow:!!def.drow,
+    skeletal:!!def.skeletal,incorporeal:!!def.incorporeal,cave:!!def.cave,lurk:!!def.lurk,duergar:!!def.duergar,myconid:!!def.myconid,drow:!!def.drow,sewers:!!def.sewers,
     enlarge:!!def.enlarge,vanish:!!def.vanish,grown:false,vanished:0,
     distress:!!def.distress,shriek:!!def.shriek,shrieked:false,
     special:{disease:def.disease,poison:def.poison,paralysis:def.paralysis,energyDrain:def.energyDrain,regen:def.regen,
@@ -5891,7 +6079,7 @@ function addMonsterSprite(m){
   const spr=new THREE.Sprite(mat);
   const sc=m.boss?1.05:(['ogre','troll','minotaur','ogremage','dragon',
     'bonecolossus','deathknight','bonedrake','lich',
-    'umberhulk','purpleworm','roper','otyugh','cavebear','duergarlord','myelder','mylord','mysovereign','shrieker','drider','drowmatron'].includes(m.key)?0.95:0.72);
+    'umberhulk','purpleworm','roper','otyugh','cavebear','duergarlord','myelder','mylord','mysovereign','shrieker','drider','drowmatron','blackpud','ochrejelly','scrag'].includes(m.key)?0.95:0.72);
   spr.scale.set(sc,sc,1);
   spr.position.set(m.x+0.5,sc/2+0.02,m.y+0.5);
   spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss,elite:m.elite};

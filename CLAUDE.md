@@ -110,8 +110,8 @@ reads **median 26, middle half 22–29**. After the cave work (nine cave
 creatures, the ambushers, the cave spawn bias) it reads **median 27,
 middle half 24–30**; moving boss floors to every third level took it to
 **median 28, middle half 26–30**. The duergar and myconid rosters left it
-at **median 27, middle half 26–30**, and the drow at **median 28, middle
-half 25–29**.
+at **median 27, middle half 26–30**, the drow at **median 28, middle half
+25–29**, and the sewers roster at **median 27, middle half 24–29**.
 
 **26–30 is the band. Do not treat it as a shortfall.** CLAUDE.md carried an
 intended 30–40 for a long time and the game has never once hit it, which
@@ -127,6 +127,42 @@ every static check — and still walled the descent at depth 16, because
 `speed` had been read as a rate instead of a cooldown (see *Adding a
 monster*). The budget cannot see a creature that simply moves faster than
 the party can retreat; only the simulation can.
+
+### Adding a roster moves the budget for everybody
+
+This is the mechanism behind the whole drift in the table above, and it is
+easy to miss because it is not a bug in anything.
+
+`rawBudget` is the pool's **weighted mean** threat times `targetCount`:
+
+```js
+for(const [k,w] of pool){tw+=w;ts+=w*threatOf(k,depth);}
+return (ts/tw)*targetCount(depth)*early;
+```
+
+So **any creature banded above the pool's mean at a given depth raises the
+budget at that depth — for every roster on it**. The sewers roster was
+written with a CR 3 ooze and a CR 4 cutthroat banded from depth 5, which is
+inside the Sewers' own block (4–6) where the pool mean is 17. They sat at
+2.3× and 3.2× that mean, lifted the depth 4–6 budget by 38%, and took the
+descent from median 28 to 26 before a single deep creature was involved.
+Both were rebuilt as CR 1–2.
+
+Two rules fall out of it, and neither is the ratio-to-share guideline:
+
+- **Check the pool mean at the depths a new band actually covers**, not just
+  the ratio at the band centre. Share is roughly the mean, so 2–3× share
+  at a shallow depth is 2–3× the mean, and four such creatures move it.
+- **A themed roster's *mean* ratio matters more than any one creature's**,
+  because the ×4 bias makes it about half the bodies on its own floor. The
+  sewers' deep four averaged 1.20× share and put a depth-26 floor 22% over
+  budget against a 12% baseline; trimmed to a mean of 1.0 it came back.
+
+Also worth knowing: **`poolCeiling` is a separate trap in the same area.**
+It reads the single heaviest creature a depth allows, so a new roster's top
+creature out-weighing the incumbent top creature lifts the cap the budget
+is allowed to grow into. The black pudding did that at depth 23 (822 against
+the myconid elder's 714) and was sized down for it.
 
 The cause is structural, and worth knowing before you touch any dial.
 **The party is level-capped at 20 by depth 20** — `MAX_LEVEL` is 20 and a
@@ -164,6 +200,13 @@ here (unlike `scotland.html`). Touch all of these:
    `o.ap` are the head and arm pivots, and `ad`/`aw`/`as` override the
    swing for creatures that carry a weapon across the body. Omitting the
    markers gives a static sprite that will not telegraph its attacks.
+
+   **One layer is the requirement, not both.** A rat, a spider, a kobold
+   and an ooze have no arm to swing — they strike with the head, and the
+   head layer plus the `sharp` pose is the whole telegraph. Six creatures
+   carry a head layer and no arm for exactly that reason, and nothing in
+   the bestiary is fully static. A test that demands `|A|` of a quadruped
+   is wrong about anatomy rather than finding a gap.
 4. **Sprite scale** — `addMonsterSprite` has a hardcoded list of large
    creatures that render bigger. Add to it if the new creature is big.
 
