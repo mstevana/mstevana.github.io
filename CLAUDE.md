@@ -109,13 +109,32 @@ heavy undead filling the deep bands, plus the undead damage rules) it
 reads **median 26, middle half 22–29**. After the cave work (nine cave
 creatures, the ambushers, the cave spawn bias) it reads **median 27,
 middle half 24–30**; moving boss floors to every third level took it to
-**median 28, middle half 26–30**. That is still below the intended 30–40
-band and has not been retuned — a deliberate decision to measure first.
+**median 28, middle half 26–30**.
 
-Neither content pass is the cause, and both were checked the same way:
-removing coffin and ossuary fights from the simulation leaves the median
-unchanged, and so does skipping every ambush or flattening the cave bias
-to 1. The movement is the bestiary and the undead damage rules.
+**26–30 is the band. Do not treat it as a shortfall.** CLAUDE.md carried an
+intended 30–40 for a long time and the game has never once hit it, which
+kept inviting sessions to retune a curve that is working.
+
+Neither content pass moved it, and both were checked the same way: removing
+coffin and ossuary fights from the simulation leaves the median unchanged,
+and so does skipping every ambush or flattening the cave bias to 1.
+
+The cause is structural, and worth knowing before you touch any dial.
+**The party is level-capped at 20 by depth 20** — `MAX_LEVEL` is 20 and a
+descent banks enough XP for it around floor 20. From there to the bottom,
+monsters keep compounding (`depthScale` +7% a floor, a rising
+`depthAtkBonus`, a climbing `threatBudget`) while the party gains nothing
+but gear, which itself stops at +5. Depths 20–28 are eight floors of a
+party at its ceiling losing ground to depth. A run ends where character
+growth ran out, not where the numbers were mistuned.
+
+That cap is an **open question, not a settled one**: raising `MAX_LEVEL`,
+slowing the XP curve so 20 lands nearer depth 30, or giving the party some
+post-cap progression would all move the band, and any of them is a real
+design decision rather than a tuning pass. Nobody has taken it. What is
+settled is that the median is not to be chased by fiddling with
+`depthScale`, `threatBudget` or the bestiary — those are not what is
+holding it.
 
 ## Adding a monster
 
@@ -557,13 +576,29 @@ through) and offensive spells resolve when their bolt arrives (set
 `G.fx=[]` and call `updateFx(10)`, which lands everything in flight via
 the `f.t>6` branch). T37 covers the whole of this.
 
-## Known rough edge
+## The thin ordinary roster — measured, and deliberately left
 
-The bestiary is no longer as thin at depth — the seven deep undead took
-depth 40 from roughly 90% dragons and ogre mages to thirteen creature
-kinds, and the nine cave creatures widened the mid-depths further. What
-remains is that both rosters leak: a non-theme bias of 0.55 keeps crypts
-and caves distinct, but a deep dungeon floor still runs roughly a third
-undead, and depth 13–15 dungeon floors run about half cave roster. That
-is one problem seen from two sides — there is not enough *ordinary* meat
-in the middle and deep bands, and more of it is the real fix.
+The bestiary is no longer thin at depth in total: the seven deep undead
+took depth 40 from roughly 90% dragons and ogre mages to thirteen creature
+kinds, and the nine cave creatures widened the mid-depths further. What is
+thin is the **ordinary** roster — everything that is neither `type:'undead'`
+nor `cave:true`:
+
+| depths | ordinary creatures in band |
+|---|---|
+| 1–8 | 5–9 — healthy |
+| 9–13 | 3–4 — collapses |
+| 14–30 | **exactly 5** (ogre, minotaur, troll, dragon, ogre mage) |
+| 31+ | decays to 1, then 0 by 44 |
+
+So the themed rosters are better stocked at depth than the default one,
+and the leak runs both ways: a deep dungeon floor is roughly a third
+undead, and depth 13–15 dungeon floors run about half cave roster. The
+0.55 off-theme bias is what keeps crypts and caves distinct at all.
+
+**This was costed and declined.** Filling depths 9–30 is around nine
+creatures — definitions, `SPAWN_DEPTH` bands, layered `MONSTER_ART` and
+threat tuning apiece. It buys variety and nothing else: with the band
+settled at 26–30 it is not a difficulty lever, and the depth 31+ column
+above is content no run reaches. If you pick it up, aim it at 9–30 and
+skip the deep band; do not treat the table above as a bug list.
