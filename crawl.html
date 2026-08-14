@@ -634,6 +634,25 @@ const MONSTERS={
              cave:true, disease:{dc:15,name:'Filth fever'}},
   umberhulk:{reach:true, name:'Umber hulk',cr:9,hp:74,ac:18,atk:12,dmg:[2,8,6],xp:2700,speed:1.5, type:'aberration', spr:'umberhulk',
              cave:true, gaze:{dc:16,dur:2.5}},
+  /* ---------- duergar: the grey dwarves of the deep halls ----------
+     Sour, disciplined and organised, which is what separates them from the
+     cave roster: they field ranks rather than lone predators. Their 3.5 kit
+     maps onto flags that already exist -- a warhammer line, crossbow shot, a
+     priest who casts, a runecaster whose bolt is elemental -- plus two of
+     their own: `enlarge`, the gift their mind flayer masters left them, and
+     `duergar` itself, which is the whole of what the halls' spawn bias reads. */
+  duergar:  {name:'Duergar warrior', cr:5, hp:46, ac:18,atk:9, dmg:[1,10,6],xp:1500,speed:1.5, type:'humanoid', spr:'duergar',
+             duergar:true, enlarge:true},
+  duergarxbow:{name:'Duergar arbalest',cr:5,hp:40,ac:17,atk:9,dmg:[1,10,4],xp:1500,speed:1.6, type:'humanoid', spr:'duergarxbow',
+             duergar:true, ranged:5},
+  duergarscout:{name:'Duergar shadowblade',cr:7,hp:56,ac:19,atk:12,dmg:[1,8,7],xp:2100,speed:2.1,type:'humanoid',spr:'duergarscout',
+             duergar:true, vanish:true, poison:{dc:15,abil:'dex',dice:[1,4]}},
+  duergarpriest:{name:'Duergar stonepriest',cr:8,hp:52,ac:19,atk:9,dmg:[1,8,4],xp:2400,speed:1.5,type:'humanoid',spr:'duergarpriest',
+             duergar:true, reach:true, caster:{dmg:[3,6,3],ranged:6,cd:5.5,fx:'#8fd4c8',elem:'acid'}},
+  duergarrune:{name:'Duergar runecaster',cr:10,hp:56,ac:19,atk:9,dmg:[1,8,4],xp:3000,speed:1.5,type:'humanoid',spr:'duergarrune',
+             duergar:true, reach:true, caster:{dmg:[4,6,4],ranged:7,cd:5,fx:'#ffb45a',elem:'fire'}},
+  duergarlord:{name:'Duergar hammerlord',cr:11,hp:80,ac:21,atk:14,dmg:[2,8,6],xp:3300,speed:1.4,type:'humanoid',spr:'duergarlord',
+             duergar:true, reach:true, enlarge:true},
   purpleworm:{reach:true,name:'Purple worm',cr:16,hp:120,ac:19,atk:17,dmg:[3,8,9],xp:4800,speed:1.7, type:'vermin', spr:'purpleworm',
              cave:true, poison:{dc:18,abil:'con',dice:[2,4]}},
 };
@@ -645,6 +664,8 @@ const SPAWN_DEPTH={
   mummy:[10,20],wraith:[12,24],barrowwight:[13,26],bonecolossus:[16,32],deathknight:[20,99],lich:[22,99],bonedrake:[26,99],
   piercer:[8,18],cavebear:[8,18],troglodyte:[8,18],crawler:[9,20],cavefisher:[12,26],otyugh:[14,26],
   umberhulk:[18,32],roper:[24,99],purpleworm:[30,99],
+  duergar:[12,24],duergarxbow:[12,24],duergarscout:[14,28],
+  duergarpriest:[16,30],duergarrune:[19,34],duergarlord:[23,99],
 };
 /* Elite templates. The bestiary runs out around depth 20, so past that the
    descent keeps escalating by hardening ordinary monsters rather than by
@@ -972,6 +993,106 @@ const MONSTER_ART={
     `<path d="M30 26 L30 28 M32.5 26.5 L32.5 28.5" stroke="#b8b096" stroke-width="0.9"/>|/H|`+
     clawsAt(10,44,[150,170,190,130],4)+
     drip(33,34,4,'#3c0f0b')}),
+  /* ---------- duergar ----------
+     Grey skin, white beards bound with iron rings, and armour that is plate
+     rather than hide: they are the one roster in the game that turned up with
+     a smith. Males go bald, so the silhouette is beard-and-helm, never hair. */
+  duergar:()=>({o:{hp:[32,26],ap:[46,38],lit:'#8d9096',mid:'#3f4348',eye:'#d8402c',rough:[1,0.25],seed:41},
+    body:`<path d="M19 31 Q16 41 18 52 L23 59 L41 59 L46 52 Q48 41 45 31 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M20 32 L44 32 L45 45 Q32 50 19 45 Z" fill="#4a4e55"/>`+
+    `<path d="M20 32 L44 32" stroke="#8e939b" stroke-width="1.2"/>`+
+    `<path d="M32 33 L32 49" stroke="#2b2e33" stroke-width="1"/>`+
+    `<circle cx="24" cy="36" r="1" fill="#c9a227"/><circle cx="40" cy="36" r="1" fill="#c9a227"/>`+
+    `<path d="M22 46 L42 46" stroke="#c9a227" stroke-width="0.9"/>`+
+    `|H|<path d="M25 19 Q25 11 32 11 Q39 11 39 19 L39 23 Q35 26 29 26 Q25 24 25 19 Z" fill="#8d9096" ${RIM}/>`+
+    `<path d="M24 17 Q24 8 32 8 Q40 8 40 17 L40 19 L24 19 Z" fill="#4a4e55"/>`+
+    `<path d="M24 17 Q32 13 40 17" stroke="#9aa0a8" stroke-width="0.9" fill="none"/>`+
+    `<path d="M31 8 L33 8 L33 19 L31 19 Z" fill="#c9a227"/>`+
+    `<circle cx="28.5" cy="21" r="1.2" fill="#d8402c"/><circle cx="35.5" cy="21" r="1.2" fill="#d8402c"/>`+
+    `<path d="M26 25 Q32 40 38 25 Q35 28 32 28 Q29 28 26 25 Z" fill="#d9dbdd"/>`+
+    `<path d="M29 31 Q32 33 35 31" stroke="#9fa2a6" stroke-width="0.8" fill="none"/>`+
+    `<circle cx="32" cy="34" r="1.1" fill="#8a8d92"/>|/H|`+
+    `|A|<path d="M46 38 L54 33" stroke="#5a4326" stroke-width="2.4"/>`+
+    `<path d="M51 36 L58 30 L61 34 L54 39 Z" fill="#6d7178" ${RIM}/>`+
+    `<path d="M53 34 L59 34" stroke="#c9a227" stroke-width="0.8"/>|/A|`}),
+  duergarxbow:()=>({o:{hp:[32,26],ap:[44,40],lit:'#8d9096',mid:'#3f4348',eye:'#d8402c',rough:[1,0.25],seed:42,ad:0.5,aw:0.35},
+    body:`<path d="M20 31 Q17 41 19 52 L24 59 L40 59 L45 52 Q47 41 44 31 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M21 33 L43 33 L44 44 Q32 48 20 44 Z" fill="#474b52"/>`+
+    `<path d="M21 33 L43 33" stroke="#8e939b" stroke-width="1"/>`+
+    `<path d="M23 37 L41 41" stroke="#3a2a18" stroke-width="2"/>`+
+    `<circle cx="26" cy="47" r="1" fill="#c9a227"/>`+
+    `|H|<path d="M25 19 Q25 11 32 11 Q39 11 39 19 L39 23 Q35 26 29 26 Q25 24 25 19 Z" fill="#8d9096" ${RIM}/>`+
+    `<path d="M24 18 Q24 9 32 9 Q40 9 40 18 L40 20 L24 20 Z" fill="#3f434a"/>`+
+    `<path d="M40 13 Q45 15 44 20" stroke="#c9a227" stroke-width="1" fill="none"/>`+
+    `<circle cx="28.5" cy="21.5" r="1.1" fill="#d8402c"/><circle cx="35.5" cy="21.5" r="1.1" fill="#d8402c"/>`+
+    `<path d="M27 25 Q32 37 37 25 Q34 27.5 32 27.5 Q30 27.5 27 25 Z" fill="#cfd2d5"/>|/H|`+
+    `|A|<path d="M30 40 L50 36" stroke="#4a3720" stroke-width="2.6"/>`+
+    `<path d="M44 30 L44 44" stroke="#6d7178" stroke-width="2.2"/>`+
+    `<path d="M44 31 L52 37 L44 43" stroke="#2b2e33" stroke-width="1" fill="none"/>`+
+    `<path d="M46 37 L57 37" stroke="#c9a227" stroke-width="1.4"/>|/A|`}),
+  duergarscout:()=>({o:{hp:[32,26],ap:[46,36],lit:'#83868c',mid:'#2f3237',eye:'#e8d24a',rough:[1,0.3],seed:43},
+    body:`<path d="M21 31 Q18 41 20 52 L25 59 L39 59 L44 52 Q46 41 43 31 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M22 33 L42 33 L43 45 Q32 49 21 45 Z" fill="#2b2e33"/>`+
+    `<path d="M24 34 L40 44 M40 34 L24 44" stroke="#3f434a" stroke-width="1"/>`+
+    `<path d="M21 40 L43 40" stroke="#c9a227" stroke-width="0.8"/>`+
+    `|H|<path d="M25 19 Q25 11 32 11 Q39 11 39 19 L39 23 Q35 26 29 26 Q25 24 25 19 Z" fill="#83868c" ${RIM}/>`+
+    `<path d="M23 20 Q23 9 32 9 Q41 9 41 20 L41 22 Q32 17 23 22 Z" fill="#26282c"/>`+
+    `<circle cx="28.5" cy="21.5" r="1.2" fill="#e8d24a"/><circle cx="35.5" cy="21.5" r="1.2" fill="#e8d24a"/>`+
+    `<path d="M26 24.5 L38 24.5" stroke="#1c1e21" stroke-width="2.6"/>`+
+    `<path d="M27 26 Q32 35 37 26 Q34 28 32 28 Q30 28 27 26 Z" fill="#b9bcc0"/>|/H|`+
+    `|A|<path d="M46 36 L53 30" stroke="#4a4e55" stroke-width="2.2"/>`+
+    `<path d="M51 32 L60 24" stroke="#cfd6dd" stroke-width="1.8"/>`+
+    `<path d="M58 26 L61 23 L62 26 Z" fill="#9fe0b0"/>|/A|`}),
+  duergarpriest:()=>({o:{hp:[32,26],ap:[46,38],lit:'#8d9096',mid:'#3a3d42',eye:'#8fd4c8',rough:[1,0.25],seed:44},
+    body:`<path d="M19 31 Q15 42 17 53 L23 60 L41 60 L47 53 Q49 42 45 31 Z" fill="#3d4046" ${RIM}/>`+
+    `<path d="M21 33 Q32 37 43 33 L44 52 Q32 56 20 52 Z" fill="#2f3237"/>`+
+    `<path d="M32 34 L32 54" stroke="#c9a227" stroke-width="1.2"/>`+
+    `<path d="M25 41 L39 41" stroke="#c9a227" stroke-width="1.2"/>`+
+    `<circle cx="32" cy="41" r="3" fill="none" stroke="#8fd4c8" stroke-width="1"/>`+
+    `|H|<path d="M25 19 Q25 11 32 11 Q39 11 39 19 L39 23 Q35 26 29 26 Q25 24 25 19 Z" fill="#8d9096" ${RIM}/>`+
+    `<path d="M23 18 Q23 8 32 8 Q41 8 41 18 L41 20 L23 20 Z" fill="#33363b"/>`+
+    `<path d="M27 8 L29 3 L31 8 M33 8 L35 3 L37 8" stroke="#c9a227" stroke-width="1.1" fill="none"/>`+
+    `<circle cx="28.5" cy="21.5" r="1.2" fill="#8fd4c8"/><circle cx="35.5" cy="21.5" r="1.2" fill="#8fd4c8"/>`+
+    `<path d="M25 25 Q32 41 39 25 Q35 28 32 28 Q29 28 25 25 Z" fill="#e2e4e6"/>`+
+    `<circle cx="30" cy="33" r="1" fill="#c9a227"/><circle cx="34" cy="33" r="1" fill="#c9a227"/>|/H|`+
+    `|A|<path d="M46 38 L52 30" stroke="#4a4e55" stroke-width="2.2"/>`+
+    `<path d="M52 32 L52 14" stroke="#5a4326" stroke-width="2.2"/>`+
+    `<circle cx="52" cy="12" r="4" fill="none" stroke="#c9a227" stroke-width="1.6"/>`+
+    `<circle cx="52" cy="12" r="1.6" fill="#8fd4c8"/>|/A|`}),
+  duergarrune:()=>({o:{hp:[32,26],ap:[46,38],lit:'#8d9096',mid:'#3a3d42',eye:'#ffb45a',rough:[1,0.25],seed:45},
+    body:`<path d="M19 31 Q15 42 17 53 L23 60 L41 60 L47 53 Q49 42 45 31 Z" fill="#43373a" ${RIM}/>`+
+    `<path d="M21 34 Q32 38 43 34 L44 53 Q32 57 20 53 Z" fill="#33282b"/>`+
+    `<path d="M25 38 L25 48 M23 41 L28 39 M23 45 L28 47" stroke="#ffb45a" stroke-width="0.9" fill="none"/>`+
+    `<path d="M33 37 L33 47 M31 40 L36 38 M31 44 L36 46" stroke="#ffb45a" stroke-width="0.9" fill="none"/>`+
+    `<path d="M40 39 L40 49 M38 42 L43 40" stroke="#ffb45a" stroke-width="0.9" fill="none"/>`+
+    `|H|<path d="M25 19 Q25 11 32 11 Q39 11 39 19 L39 23 Q35 26 29 26 Q25 24 25 19 Z" fill="#8d9096" ${RIM}/>`+
+    `<path d="M22 20 Q22 7 32 7 Q42 7 42 20 L42 22 Q32 16 22 22 Z" fill="#2e2529"/>`+
+    `<path d="M26 12 L26 18 M24 14 L29 13" stroke="#ffb45a" stroke-width="0.8"/>`+
+    `<path d="M38 12 L38 18 M36 14 L41 13" stroke="#ffb45a" stroke-width="0.8"/>`+
+    `<circle cx="28.5" cy="21.5" r="1.3" fill="#ffb45a"/><circle cx="35.5" cy="21.5" r="1.3" fill="#ffb45a"/>`+
+    `<path d="M25 25 Q32 43 39 25 Q35 28.5 32 28.5 Q29 28.5 25 25 Z" fill="#dcd2c4"/>|/H|`+
+    `|A|<path d="M46 38 L53 32" stroke="#4a4e55" stroke-width="2.2"/>`+
+    `<path d="M53 34 L53 16" stroke="#4a3720" stroke-width="2"/>`+
+    `<path d="M53 16 L49 11 L53 8 L57 11 Z" fill="#3a2f22" stroke="#ffb45a" stroke-width="1.1"/>`+
+    `<circle cx="53" cy="11" r="1.5" fill="#ffb45a"/>|/A|`}),
+  duergarlord:()=>({o:{hp:[32,24],ap:[48,38],lit:'#989ba1',mid:'#3f4348',eye:'#ff5a3c',rough:[1,0.3],seed:46,ad:0.9,as:1.15},
+    body:`<path d="M16 30 Q12 42 15 54 L21 61 L43 61 L49 54 Q52 42 48 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M18 32 L46 32 L47 46 Q32 52 17 46 Z" fill="#4e535a"/>`+
+    `<path d="M18 32 L46 32" stroke="#a6acb4" stroke-width="1.4"/>`+
+    `<path d="M32 33 L32 51" stroke="#2b2e33" stroke-width="1.2"/>`+
+    `<path d="M20 37 L44 37 M20 43 L44 43" stroke="#c9a227" stroke-width="1"/>`+
+    `<path d="M13 30 L8 24 L17 27 Z M51 30 L56 24 L47 27 Z" fill="#c9a227"/>`+
+    `|H|<path d="M25 18 Q25 10 32 10 Q39 10 39 18 L39 22 Q35 25 29 25 Q25 23 25 18 Z" fill="#989ba1" ${RIM}/>`+
+    `<path d="M23 16 Q23 6 32 6 Q41 6 41 16 L41 19 L23 19 Z" fill="#4e535a"/>`+
+    `<path d="M22 8 L18 1 L26 5 Z M42 8 L46 1 L38 5 Z" fill="#c9a227"/>`+
+    `<path d="M31 6 L33 6 L33 19 L31 19 Z" fill="#c9a227"/>`+
+    `<circle cx="28.5" cy="20.5" r="1.3" fill="#ff5a3c"/><circle cx="35.5" cy="20.5" r="1.3" fill="#ff5a3c"/>`+
+    `<path d="M24 24 Q32 44 40 24 Q35 27.5 32 27.5 Q29 27.5 24 24 Z" fill="#eceef0"/>`+
+    `<circle cx="29" cy="33" r="1.2" fill="#c9a227"/><circle cx="35" cy="33" r="1.2" fill="#c9a227"/>`+
+    `<circle cx="32" cy="38" r="1.2" fill="#c9a227"/>|/H|`+
+    `|A|<path d="M48 38 L56 32" stroke="#5a4326" stroke-width="2.8"/>`+
+    `<path d="M52 36 L62 27 L67 33 L57 42 Z" fill="#7b8087" ${RIM}/>`+
+    `<path d="M55 33 L64 33 M55 37 L64 37" stroke="#c9a227" stroke-width="1"/>|/A|`}),
   hobgoblin:()=>({o:{hp:[32,28],ap:[45,38],lit:'#9a5c38',mid:'#48291a',eye:'#ff9422',rough:[2,0.4],seed:15},
     body:`<path d="M18 32 L12 26 L20 28 Z M46 32 L52 26 L44 28 Z" fill="#33373b"/>`+
     `<path d="M20 32 Q17 42 19 52 L24 59 L40 59 L45 52 Q47 42 44 32 Z" fill="url(#bg)" ${RIM}/>`+
@@ -2003,8 +2124,10 @@ function tryGen(depth,targetWalk,theme){
   // reads as its own place without the roster leaking into the brickwork.
   const undeadBias=theme.name==='Crypt'?4:0.55;
   const caveBias=theme.name==='Caves'?4:0.55;
+  const duerBias=theme.name==='Duergar'?4:0.55;
   const base=spawnPool(depth).map(([k,w])=>[k,
-    w*(MONSTERS[k].type==='undead'?undeadBias:1)*(MONSTERS[k].cave?caveBias:1)]);
+    w*(MONSTERS[k].type==='undead'?undeadBias:1)*(MONSTERS[k].cave?caveBias:1)
+     *(MONSTERS[k].duergar?duerBias:1)]);
   const weigh=(ek)=>base.map(([k,w])=>{
     const r=Math.log(threatOf(k,depth,ek)/share);
     return [k,w*Math.exp(-(r*r)/sig)];
@@ -2318,7 +2441,8 @@ function mkMonster(key,x,y,depth){
     xp:Math.round(XP_AWARD(def.cr)*(1+0.12*Math.max(0,depth-1))),
     speed:def.speed,type:def.type,ranged:def.ranged||0,caster:def.caster||null,
     reach:!!def.reach,slot:0, // slot 0-1 front rank of its tile, 2-3 rear rank
-    skeletal:!!def.skeletal,incorporeal:!!def.incorporeal,cave:!!def.cave,lurk:!!def.lurk,
+    skeletal:!!def.skeletal,incorporeal:!!def.incorporeal,cave:!!def.cave,lurk:!!def.lurk,duergar:!!def.duergar,
+    enlarge:!!def.enlarge,vanish:!!def.vanish,grown:false,vanished:0,
     special:{disease:def.disease,poison:def.poison,paralysis:def.paralysis,energyDrain:def.energyDrain,regen:def.regen,
       gaze:def.gaze,hold:def.hold},
     atkCd:1.5+Math.random()*2,castCd:def.caster?def.caster.cd*(0.5+Math.random()):0,
@@ -4619,7 +4743,7 @@ function addMonsterSprite(m){
   const spr=new THREE.Sprite(mat);
   const sc=m.boss?1.05:(['ogre','troll','minotaur','ogremage','dragon',
     'bonecolossus','deathknight','bonedrake','lich',
-    'umberhulk','purpleworm','roper','otyugh','cavebear'].includes(m.key)?0.95:0.72);
+    'umberhulk','purpleworm','roper','otyugh','cavebear','duergarlord'].includes(m.key)?0.95:0.72);
   spr.scale.set(sc,sc,1);
   spr.position.set(m.x+0.5,sc/2+0.02,m.y+0.5);
   spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss,elite:m.elite};
@@ -5762,6 +5886,7 @@ function updateMonsters(dt){
     if(m.held>0){m.held-=dt;continue;}
     if(m.stunned>0){m.stunned-=dt;continue;}
     if(m.shaken>0)m.shaken-=dt;
+    duergarTricks(m);
     const slowMult=m.slowed>0?2:1;
     if(m.slowed>0)m.slowed-=dt;
     const df=G.distField;
@@ -5952,6 +6077,48 @@ function pickPartyTarget(m){
   // the lane is empty: cross the line, keeping rank for rank
   return at(1-s,r)||at(1-s,1-r)||null;
 }
+/* ---------- what the mind flayers left them ----------
+   Duergar carry two innate powers in 3.5, once a day each, and both are worth
+   more to a monster than a flat stat would be. Each fires once per creature and
+   only when it is worth firing, so the party sees them as a turn in the fight
+   rather than as a passive.
+
+   Enlarge: a warrior swells, hitting harder and taking a wider stance. It waits
+   until the fight is genuinely joined -- below two thirds of its hit points --
+   so it reads as an answer to being hurt.
+
+   Invisibility: a shadowblade steps out of sight and the blow that ends it
+   lands on someone who was not braced. `atkCd` is reset so the strike follows
+   quickly, and the sneak bonus is the same +4 a sleeping target gives. */
+function duergarTricks(m){
+  if(m.hp<=0||!m.awake)return;
+  if(m.enlarge&&!m.grown&&m.hp<m.maxHp*0.66){
+    m.grown=true;
+    m.dmg=[m.dmg[0],m.dmg[1],m.dmg[2]+3];
+    m.atk+=1;m.ac-=1;                     // bigger and slower to cover
+    const s=R3.monsterSprites&&R3.monsterSprites[m.id];
+    if(s&&m._sc){m._sc*=1.28;s.scale.set(m._sc,m._sc,1);s.position.y=m._sc/2+0.02;}
+    UI.floatAtMonster(m,'ENLARGED','#e0cf9e');
+    UI.toast(m.name+' swells, armour groaning at the seams!');
+    SFX.growl(0);
+  }
+  if(m.vanish&&!m.vanished&&m.hp<m.maxHp*0.8){
+    m.vanished=1;m.held=0;m.atkCd=0.2;
+    const s=R3.monsterSprites&&R3.monsterSprites[m.id];
+    if(s&&s.material)s.material.opacity=0.22;
+    UI.floatAtMonster(m,'gone','#9db4d6');
+    UI.toast(m.name+' steps out of sight…');
+  }
+}
+// an invisible duergar is only invisible until it strikes
+function duergarReveal(m){
+  if(m.vanished!==1)return 0;
+  m.vanished=2;
+  const s=R3.monsterSprites&&R3.monsterSprites[m.id];
+  if(s&&s.material)s.material.opacity=1;
+  UI.toast(m.name+' is on you before you see it!');
+  return 4;                                // the same edge a sleeping target gives
+}
 function monsterMelee(m){
   const ch=pickPartyTarget(m);
   if(!ch)return;
@@ -5961,7 +6128,7 @@ function monsterMelee(m){
     if(Math.abs(m.x-G.px)+Math.abs(m.y-G.py)!==1)return;
     strikeAnim(m);
     m.targetName=ch.name;
-    let atk=m.atk-(m.shaken>0?2:0);
+    let atk=m.atk-(m.shaken>0?2:0)+duergarReveal(m);
     const nat=d20();
     SFX.monAttack();
     if(nat!==1&&(nat===20||nat+atk>=charAC(ch))){
