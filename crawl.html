@@ -2087,6 +2087,18 @@ function tryGen(depth,targetWalk,theme){
         // A single tile at the centre of a 3x3-or-larger room cannot cut the
         // level in two, so this is safe after the connectivity check.
         g[idx(bx,by)]=T_PIT;
+        // Whatever is already lying here is shoved aside, not destroyed. Loot is
+        // placed before the ossuary is sited, so the bier can land on top of it
+        // -- and the level's only key is one of the things it can land on, which
+        // seals the locked room for good. About one crypt floor in two thousand.
+        const under=items[idx(bx,by)];
+        if(under&&under.length){
+          let spot=DIRS.map(([dx,dy])=>[bx+dx,by+dy]).find(([x,y])=>g[idx(x,y)]===T_FLOOR);
+          if(!spot)for(let yy=r.y;yy<r.y+r.h&&!spot;yy++)
+            for(let xx=r.x;xx<r.x+r.w&&!spot;xx++)
+              if(g[idx(xx,yy)]===T_FLOOR)spot=[xx,yy];
+          if(spot){const j=idx(spot[0],spot[1]);(items[j]=items[j]||[]).push(...under);}
+        }
         delete items[idx(bx,by)];
         delete traps[idx(bx,by)];
         for(let i=monsters.length-1;i>=0;i--)if(monsters[i].x===bx&&monsters[i].y===by)monsters.splice(i,1);

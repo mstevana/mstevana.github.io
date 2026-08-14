@@ -294,6 +294,14 @@ Anything a crypt writes onto the level (`crypts`, `ossuary`, and the
 `opened` flags inside them) must be carried through `serializeGame` and
 `loadGame`, or a reloaded floor comes back looted-clean or bare.
 
+The ossuary is sited **after** loot is placed, so the bier can land on top
+of a floor item. It must **shove what is underneath aside, never delete
+it**: the level's only key is one of the things it can land on, and a bier
+that swallows it seals the locked room for good. That was a real bug, at
+about one crypt floor in two thousand — rare enough that T6 caught it once
+in a run of twenty levels and looked like a flake. T42 samples enough
+crypt floors to catch it outright.
+
 Note that `openBier` calls `buildLevel` to show the shifted lid, so any
 scenery built with `Math.random()` would visibly reshuffle the moment the
 bier is opened. The bone stacking and the floor dressing are both seeded
