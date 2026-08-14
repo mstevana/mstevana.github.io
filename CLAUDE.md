@@ -109,15 +109,23 @@ heavy undead filling the deep bands, plus the undead damage rules) it
 reads **median 26, middle half 22–29**. After the cave work (nine cave
 creatures, the ambushers, the cave spawn bias) it reads **median 27,
 middle half 24–30**; moving boss floors to every third level took it to
-**median 28, middle half 26–30**.
+**median 28, middle half 26–30**. The duergar and myconid rosters left it
+at **median 27, middle half 26–30**.
 
 **26–30 is the band. Do not treat it as a shortfall.** CLAUDE.md carried an
 intended 30–40 for a long time and the game has never once hit it, which
 kept inviting sessions to retune a curve that is working.
 
-Neither content pass moved it, and both were checked the same way: removing
+No content pass has moved it, and each was checked the same way: removing
 coffin and ossuary fights from the simulation leaves the median unchanged,
 and so does skipping every ambush or flattening the cave bias to 1.
+
+**Run the descent after adding a roster, not just the threat ratios.** The
+myconids measured 0.69–1.35 of their per-monster share — a clean roster by
+every static check — and still walled the descent at depth 16, because
+`speed` had been read as a rate instead of a cooldown (see *Adding a
+monster*). The budget cannot see a creature that simply moves faster than
+the party can retreat; only the simulation can.
 
 The cause is structural, and worth knowing before you touch any dial.
 **The party is level-capped at 20 by depth 20** — `MAX_LEVEL` is 20 and a
@@ -163,6 +171,16 @@ creature whose danger is not captured by hp/damage/attack will be
 mis-placed by the budget), and if it is a caster give `caster.elem` one
 of the `ELEMENTS` keys so elemental wards can resist it.
 
+**`speed` is a movement cooldown, so lower is faster.** It is seconds
+between steps: `m.moveCd = m.speed * slowMult`. The piercer, an ambusher
+that cannot walk at all, is the slowest thing in the game at 2.6, and
+nothing is below 1. Read the other way round it is silently catastrophic
+and `threatOf` will not see it — a shrieker written as `speed:0.01`
+"because it is rooted" came out a hundred times faster than anything else
+in the dungeon, chased the party down on sight, and walled a simulated
+descent at **depth 16** while every threat ratio still measured fine.
+T45 now asserts `speed >= 1` across the whole bestiary.
+
 Undead take two extra flags, both read by `undeadDamageMult`:
 `skeletal:true` (bludgeoning ×1.5, piercing ×0.5 — put it on things made
 of bone, not on dried flesh like the mummy) and `incorporeal:true` (half
@@ -175,6 +193,13 @@ to compensate, and `monsterThreat` must be kept in step with it.
 Whether a creature counts as undead for the crypt spawn bias, for
 Turn Undead and for the antitoxin-style loot faucets is `type:'undead'` —
 there is no separate list to update.
+
+Myconids take one flag, `myconid:true`, which is the whole of what the
+grove spawn bias reads. Three optional behaviours ride on it, all in
+`07_game.js`: `distress:true` (being hurt wakes myconids within 7 tiles),
+`shriek:true` (screams once on seeing the party within 6 and wakes within
+11), and `spores:{dc,dur,kind}` (a Fortitude save or `stunned`/`hold`,
+read by `monsterSpecials` alongside the cave creatures' `gaze` and `hold`).
 
 Cave creatures take two flags of their own. `cave:true` is the whole of
 what the cave spawn bias reads — like `type:'undead'`, there is no list
@@ -240,18 +265,34 @@ three themes carry real machinery:
   point light is registered in `R3.candleFlames` (the flicker loop reads
   each flame's own `base` intensity, so a wall torch is not a candle).
 
-Search for `theme.name==='Sewers'`, `th.name==='Crypt'`, `th.name==='Caves'`
-and `th.name==='Duergar'`
-(plus the `cave`/`duer` flags in `buildLevel`) to find every hook before
-adding a fifth such theme.
+- **`Myconid`** — a grove that grew rather than one that was built, and the
+  only theme that replaces the **ceiling** as well as the walls and floor:
+  `myconidCeilCanvas` draws the gilled underside of the caps overhead,
+  `myconidWallCanvas` gives six stalk variants over one shared base, and the
+  floor is gravel. The light is purple — `THEMES` carries `light` and `fill`
+  for it, and `buildLevel` tints `R3.torch` from `th.light`, so a theme can
+  now recolour the party's own lantern. Doors are dried stalks, roughly cut
+  and bolted. A ×4 `myconid:true` spawn bias, at placement only, like the
+  crypt's and the cave's.
+
+  The stalks are drawn by sampling a wandering edge every 4 pixels with a
+  per-stalk phase. At 16 the kinks landed at the same height in every stalk
+  and the wall read as a bamboo fence.
+
+Search for `theme.name==='Sewers'`, `th.name==='Crypt'`, `th.name==='Caves'`,
+`th.name==='Duergar'` and `th.name==='Myconid'`
+(plus the `cave`/`duer`/`myco` flags in `buildLevel`) to find every hook before
+adding a sixth such theme.
 
 **Appending a theme moves which depth is which theme**, which broke seven
 tests that had depths hardcoded. They now ask by name — `depthOf(name)` and
 `depthsOf(name)` in the harness — so the next theme will not break them.
 Two statistical checks were also sitting near their tolerances and had to
 be widened rather than relaxed (T22's packing, T29's crypt undead share);
-the crypt's share genuinely falls with each roster added, measured at 78.5%
-at depth 9 against 69.3% at depth 24. Each writes an array onto the level (`rivers`/`pipes`,
+the crypt's share genuinely falls with each roster added, because each one
+widens the off-theme draw the 0.55 bias has to beat: with five rosters it
+measures 75–78% at depths 7–9 and 60–63% at 25–27, where the myconid bands
+sit right on top of it. Each writes an array onto the level (`rivers`/`pipes`,
 `crypts`/`ossuary`, `lurkers`) in `tryGen` and reads it back in
 `buildLevel`; anything you add that way must also be carried through
 `serializeGame` and `loadGame`, or a reloaded floor comes back stripped
@@ -284,6 +325,19 @@ the dungeon grows:
   one. `minD` therefore steps by 3, one named boss per boss floor, and
   three places must agree: `isBossLevel` in `tryGen`, the `/3` in
   `bossFor`'s cycle arithmetic, and the ⚔ in `refreshDepthTag`.
+  `BOSS_RANKS` must be **at least as long as `BOSSES`**, or a cycled boss
+  from the tail of the list is titled `undefined`.
+
+  **The list is ordered by weight, not by flavour**, and T21 holds it to
+  that: each named boss must out-threat the one three floors above it. This
+  is what a themed boss has to be written around rather than against. Depth
+  18 is the last floor of the Myconid block, so the grove gets its own
+  ruler — but a myconid sovereign built for the deep end scored 2906 against
+  a window of 832–1165, so the slot was filled with a **separate, lighter
+  `mylord`** and the sovereign moved to the end of the list at depth 27.
+  Both are **boss-only: neither has a `SPAWN_DEPTH` entry**, which is
+  precisely what frees their numbers to answer to a boss floor instead of a
+  spawn band. Reach for that pattern before reordering the list.
 
   The first theme block is exempt. On floor 3 the party is still level 1 —
   32 hit points between four of them, a 3-hp wizard — against a boss
@@ -300,6 +354,9 @@ the dungeon grows:
   one three floors above, and the sawtooth repeated on every pass. Named
   bosses keep their own creature's hp — they are hand-placed for their
   depth, and Sinshara is a caster whose danger is her spells.
+
+  T21 derives where the cycle starts from `BOSSES` itself rather than
+  writing the depth down, so adding a named boss no longer breaks it.
 
   That split is why T21 measures the two arcs on different things: the
   named arc on `monsterThreat` (which credits spells, reach and riders,

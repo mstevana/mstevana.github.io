@@ -645,7 +645,7 @@ const MONSTERS={
              duergar:true, enlarge:true},
   duergarxbow:{name:'Duergar arbalest',cr:5,hp:40,ac:17,atk:9,dmg:[1,10,4],xp:1500,speed:1.6, type:'humanoid', spr:'duergarxbow',
              duergar:true, ranged:5},
-  duergarscout:{name:'Duergar shadowblade',cr:7,hp:56,ac:19,atk:12,dmg:[1,8,7],xp:2100,speed:2.1,type:'humanoid',spr:'duergarscout',
+  duergarscout:{name:'Duergar shadowblade',cr:7,hp:56,ac:19,atk:12,dmg:[1,8,7],xp:2100,speed:1.3,type:'humanoid',spr:'duergarscout',
              duergar:true, vanish:true, poison:{dc:15,abil:'dex',dice:[1,4]}},
   duergarpriest:{name:'Duergar stonepriest',cr:8,hp:52,ac:19,atk:9,dmg:[1,8,4],xp:2400,speed:1.5,type:'humanoid',spr:'duergarpriest',
              duergar:true, reach:true, caster:{dmg:[3,6,3],ranged:6,cd:5.5,fx:'#8fd4c8',elem:'acid'}},
@@ -653,6 +653,39 @@ const MONSTERS={
              duergar:true, reach:true, caster:{dmg:[4,6,4],ranged:7,cd:5,fx:'#ffb45a',elem:'fire'}},
   duergarlord:{name:'Duergar hammerlord',cr:11,hp:80,ac:21,atk:14,dmg:[2,8,6],xp:3300,speed:1.4,type:'humanoid',spr:'duergarlord',
              duergar:true, reach:true, enlarge:true},
+  /* ---------- myconids: the grove and what it has grown ----------
+     Fungus folk. They fight with spores rather than steel, which is one new
+     flag -- `spores`, a Fortitude save or a condition that already exists --
+     and `distress`, the alarm a hurt myconid broadcasts to the others. A
+     sovereign's kill does not stay dead: the corpse is overgrown and stood
+     back up as a spore servant, which is why the grove fields more bodies
+     than it has minds. `myconid` is the whole of what the grove bias reads. */
+  mysprout: {name:'Myconid sprout', cr:6, hp:50, ac:16,atk:10,dmg:[1,8,5], xp:1800,speed:1.6, type:'plant', spr:'mysprout',
+             myconid:true, distress:true, poison:{dc:13,abil:'con',dice:[1,3]}},
+  shrieker: {name:'Shrieker', cr:5, hp:62, ac:13,atk:6, dmg:[1,6,2], xp:1500,speed:6,   type:'plant', spr:'shrieker',
+             myconid:true, distress:true, shriek:true},
+  violetfungus:{name:'Violet fungus',cr:6,hp:50,ac:15,atk:9,dmg:[1,8,6],xp:1800,speed:2.8, type:'plant', spr:'violetfungus',
+             myconid:true, reach:true, disease:{dc:14,name:'Rot'}},
+  sporeservant:{name:'Spore servant',cr:7,hp:62,ac:16,atk:10,dmg:[1,10,6],xp:2100,speed:2.0, type:'plant', spr:'sporeservant',
+             myconid:true},
+  myguard:  {name:'Myconid guard', cr:7, hp:54, ac:18,atk:11,dmg:[1,10,6],xp:2100,speed:1.5, type:'plant', spr:'myguard',
+             myconid:true, distress:true, spores:{dc:15,dur:3,kind:'hold'}},
+  mycaster: {name:'Myconid sporecaster',cr:9,hp:58,ac:18,atk:9,dmg:[1,8,4],xp:2700,speed:1.6, type:'plant', spr:'mycaster',
+             myconid:true, distress:true, reach:true, caster:{dmg:[4,6,3],ranged:6,cd:5,fx:'#c88ae8',elem:'acid'},
+             spores:{dc:16,dur:2.5,kind:'stun'}},
+  myelder:  {name:'Myconid elder', cr:10,hp:68, ac:20,atk:12,dmg:[2,8,5],xp:3000,speed:1.5, type:'plant', spr:'myelder',
+             myconid:true, distress:true, reach:true, spores:{dc:17,dur:3,kind:'stun'},
+             caster:{dmg:[4,6,5],ranged:6,cd:5.5,fx:'#c88ae8',elem:'acid'}},
+  // Two myconid rulers, and they are boss-only — neither has a SPAWN_DEPTH entry,
+  // so their numbers are free to be sized to the boss floor they were written for
+  // rather than to a spawn band. The lord caps the grove at depth 18; the
+  // sovereign is the deeper power, and the last named boss in the game.
+  mylord:   {name:'Myconid lord', cr:8, hp:38, ac:20,atk:12,dmg:[2,6,4],xp:2400,speed:1.4, type:'plant', spr:'mylord',
+             myconid:true, distress:true, reach:true, spores:{dc:17,dur:3,kind:'hold'},
+             caster:{dmg:[3,6,4],ranged:6,cd:5,fx:'#c88ae8',elem:'acid'}},
+  mysovereign:{name:'Myconid sovereign',cr:13,hp:96,ac:21,atk:15,dmg:[2,8,8],xp:3900,speed:1.4, type:'plant', spr:'mysovereign',
+             myconid:true, distress:true, reach:true, spores:{dc:18,dur:3.5,kind:'hold'},
+             caster:{dmg:[5,6,5],ranged:7,cd:5,fx:'#c88ae8',elem:'acid'}},
   purpleworm:{reach:true,name:'Purple worm',cr:16,hp:120,ac:19,atk:17,dmg:[3,8,9],xp:4800,speed:1.7, type:'vermin', spr:'purpleworm',
              cave:true, poison:{dc:18,abil:'con',dice:[2,4]}},
 };
@@ -664,6 +697,8 @@ const SPAWN_DEPTH={
   mummy:[10,20],wraith:[12,24],barrowwight:[13,26],bonecolossus:[16,32],deathknight:[20,99],lich:[22,99],bonedrake:[26,99],
   piercer:[8,18],cavebear:[8,18],troglodyte:[8,18],crawler:[9,20],cavefisher:[12,26],otyugh:[14,26],
   umberhulk:[18,32],roper:[24,99],purpleworm:[30,99],
+  shrieker:[15,24],mysprout:[15,24],violetfungus:[16,28],sporeservant:[17,30],
+  myguard:[17,30],mycaster:[20,34],myelder:[24,99],
   duergar:[12,24],duergarxbow:[12,24],duergarscout:[14,28],
   duergarpriest:[16,30],duergarrune:[19,34],duergarlord:[23,99],
 };
@@ -734,8 +769,13 @@ const BOSSES=[ // every 3rd level from 6: pick by depth
   {minD:9, base:'wight',   name:'The Bonelord'},
   {minD:12,base:'minotaur',name:'Gorehorn, King Below'},
   {minD:15,base:'troll',   name:'Ubbroth the Unrotting'},
-  {minD:18,base:'ogremage',name:'Sinshara of the Veil'},
-  {minD:21,base:'dragon',  name:'Vermilax the Patient'},
+  // Depth 18 is the last floor of the Myconid block, so the grove gets its own
+  // ruler. The list is ordered by weight, not by flavour, and the lord was
+  // written to fit between Ubbroth and Sinshara rather than the other way round.
+  {minD:18,base:'mylord',  name:'Ilhaeryn, the Standing Grove'},
+  {minD:21,base:'ogremage',name:'Sinshara of the Veil'},
+  {minD:24,base:'dragon',  name:'Vermilax the Patient'},
+  {minD:27,base:'mysovereign',name:'Thass-Mor, the Sporecrown'},
 ];
 // Past Vermilax the named bosses run out, and every boss floor was handing you
 // the same dragon forever. The list starts over instead, each pass through it
@@ -747,7 +787,7 @@ const BOSSES=[ // every 3rd level from 6: pick by depth
 // -- its damage, its reach, whether it casts -- but its weight class comes from
 // the depth. Taken from the list so adding a named boss keeps it honest.
 const BOSS_BASE_HP=BOSSES.reduce((a,b)=>a+MONSTERS[b.base].hp,0)/BOSSES.length;
-const BOSS_RANKS=['Warlord','Tyrant','Devourer','Sovereign','Archfiend','Herald'];
+const BOSS_RANKS=['Warlord','Tyrant','Devourer','Sovereign','Archfiend','Herald','Fellmaster','Undying'];
 const BOSS_CIRCLES=['of the Sunken Circle','of the Black Cycle','of the Last Gate','Beyond Counting'];
 function bossFor(depth){
   const lastNamed=BOSSES[BOSSES.length-1].minD;
@@ -998,6 +1038,130 @@ const MONSTER_ART={
     `<path d="M30 26 L30 28 M32.5 26.5 L32.5 28.5" stroke="#b8b096" stroke-width="0.9"/>|/H|`+
     clawsAt(10,44,[150,170,190,130],4)+
     drip(33,34,4,'#3c0f0b')}),
+  /* ---------- myconids ----------
+     Fungus, not flesh: a cap for a head, a pale stalk for a body, and gills
+     where a face would be. The cap is the head layer so it tilts and the arm
+     layer is a stubby limb, which is as close to telegraphing as a mushroom
+     gets. Violet throughout, because the grove lights itself. */
+  mysprout:()=>({o:{hp:[32,24],ap:[44,40],lit:'#cfc2d8',mid:'#6a5a78',eye:'#e0b0ff',rough:[1,0.3],seed:61},
+    body:`<path d="M27 34 Q25 46 27 56 L30 60 L34 60 L37 56 Q39 46 37 34 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M29 38 L35 38 M29 44 L35 44" stroke="#5a4a68" stroke-width="0.8"/>`+
+    `|H|<path d="M18 30 Q18 14 32 14 Q46 14 46 30 Q40 33 32 33 Q24 33 18 30 Z" fill="#8a5ea8" ${RIM}/>`+
+    `<path d="M20 29 Q32 32 44 29" stroke="#4a3060" stroke-width="1"/>`+
+    `<ellipse cx="26" cy="21" rx="3" ry="2" fill="#c88ae8" opacity="0.5"/>`+
+    `<ellipse cx="37" cy="24" rx="2.4" ry="1.6" fill="#c88ae8" opacity="0.4"/>`+
+    `<path d="M22 30.5 L42 30.5" stroke="#3a2450" stroke-width="1.4"/>`+
+    `<circle cx="28" cy="35" r="1.1" fill="#e0b0ff"/><circle cx="36" cy="35" r="1.1" fill="#e0b0ff"/>|/H|`+
+    `|A|<path d="M37 44 L44 41" stroke="#b9aac4" stroke-width="2.2"/>|/A|`}),
+  shrieker:()=>({o:{hp:[32,30],ap:[40,50],lit:'#d8c8e0',mid:'#6a5878',eye:'#e0b0ff',rough:[1,0.35],seed:62},
+    body:`<path d="M26 36 Q23 50 26 60 L31 62 L35 62 L40 60 Q43 50 40 36 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M28 40 Q32 43 36 40 M28 48 Q32 51 36 48 M28 55 Q32 58 36 55" stroke="#5a4868" stroke-width="0.9" fill="none"/>`+
+    `|H|<path d="M16 34 Q16 10 32 10 Q48 10 48 34 Q40 38 32 38 Q24 38 16 34 Z" fill="#7a4a98" ${RIM}/>`+
+    `<path d="M18 33 Q32 37 46 33" stroke="#3f2352" stroke-width="1.2"/>`+
+    `<path d="M22 20 Q32 15 42 20" stroke="#a06ec0" stroke-width="1.4" fill="none"/>`+
+    `<path d="M20 26 Q32 21 44 26" stroke="#a06ec0" stroke-width="1.2" fill="none"/>`+
+    `<ellipse cx="32" cy="34" rx="6" ry="2.6" fill="#2a1638"/>|/H|`+
+    `|A|<path d="M32 20 L32 4 M26 22 L20 8 M38 22 L44 8" stroke="#c88ae8" stroke-width="1.1" opacity="0.5"/>|/A|`}),
+  violetfungus:()=>({o:{hp:[32,26],ap:[48,34],lit:'#a878c0',mid:'#4a2c5e',eye:'#ffd0ff',rough:[2,0.5],seed:63},
+    body:`<path d="M24 34 Q20 48 24 60 L30 62 L36 62 L42 60 Q46 48 42 34 Z" fill="url(#bg)" ${RIM}/>`+
+    `<ellipse cx="28" cy="44" rx="2.6" ry="4" fill="#3a1f4c"/><ellipse cx="38" cy="50" rx="2.2" ry="3.4" fill="#3a1f4c"/>`+
+    `|H|<path d="M19 30 Q19 15 32 15 Q45 15 45 30 Q39 34 32 34 Q25 34 19 30 Z" fill="#6a3a86" ${RIM}/>`+
+    `<path d="M21 29 Q32 33 43 29" stroke="#33184a" stroke-width="1"/>`+
+    `<circle cx="27" cy="23" r="2.2" fill="#8a52a8"/><circle cx="37" cy="26" r="1.8" fill="#8a52a8"/>|/H|`+
+    `|A|<path d="M44 36 Q54 30 58 38" stroke="#7a4a96" stroke-width="3" fill="none"/>`+
+    `<path d="M20 38 Q10 32 6 40" stroke="#7a4a96" stroke-width="3" fill="none"/>`+
+    `<circle cx="58" cy="38" r="2" fill="#ffd0ff" opacity="0.7"/>|/A|`}),
+  sporeservant:()=>({o:{hp:[32,26],ap:[46,38],lit:'#9a8fa6',mid:'#453b52',eye:'#b8f0c0',rough:[2,0.45],seed:64},
+    body:`<path d="M21 32 Q18 44 20 54 L25 60 L39 60 L44 54 Q46 44 43 32 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M24 36 Q32 40 40 36 L41 50 Q32 54 23 50 Z" fill="#3a3145"/>`+
+    // the fungus that stood it back up, breaking out through the ribs
+    `<path d="M26 40 L26 34 M31 42 L31 35 M36 40 L36 34" stroke="#8a63b8" stroke-width="1.4"/>`+
+    `<circle cx="26" cy="33" r="2" fill="#8a63b8"/><circle cx="31" cy="34" r="1.6" fill="#8a63b8"/>`+
+    `<circle cx="36" cy="33" r="1.8" fill="#8a63b8"/>`+
+    `|H|<path d="M25 19 Q25 11 32 11 Q39 11 39 19 L39 24 Q35 27 29 27 Q25 25 25 19 Z" fill="#9a8fa6" ${RIM}/>`+
+    `<circle cx="28.5" cy="20" r="1.3" fill="#b8f0c0"/><circle cx="35.5" cy="20" r="1.3" fill="#b8f0c0"/>`+
+    `<path d="M28 25 L36 25" stroke="#2a2333" stroke-width="1.4"/>`+
+    `<path d="M30 11 L30 5 M35 12 L36 6" stroke="#8a63b8" stroke-width="1.3"/>`+
+    `<circle cx="30" cy="4.5" r="2.2" fill="#8a63b8"/><circle cx="36" cy="5.5" r="1.8" fill="#8a63b8"/>|/H|`+
+    `|A|<path d="M46 38 L54 34" stroke="#8a7f96" stroke-width="2.4"/>`+
+    `<path d="M52 32 L60 38" stroke="#6a5a78" stroke-width="2.6"/>|/A|`}),
+  myguard:()=>({o:{hp:[32,24],ap:[48,38],lit:'#c8b8d4',mid:'#5f4c72',eye:'#e0b0ff',rough:[1,0.3],seed:65},
+    body:`<path d="M22 34 Q19 47 22 58 L28 62 L38 62 L44 58 Q47 47 44 34 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M25 38 Q32 42 41 38 L42 52 Q32 56 24 52 Z" fill="#4e3d60"/>`+
+    `<path d="M25 44 Q32 47 41 44" stroke="#8a63b8" stroke-width="1"/>`+
+    `|H|<path d="M15 30 Q15 12 32 12 Q49 12 49 30 Q41 35 32 35 Q23 35 15 30 Z" fill="#7d4f9c" ${RIM}/>`+
+    `<path d="M17 29 Q32 34 47 29" stroke="#3d2152" stroke-width="1.2"/>`+
+    `<path d="M22 24 Q32 18 42 24" stroke="#9a68bc" stroke-width="1.4" fill="none"/>`+
+    `<circle cx="24" cy="20" r="2.4" fill="#9a68bc"/><circle cx="41" cy="22" r="2" fill="#9a68bc"/>`+
+    `<circle cx="28" cy="36" r="1.3" fill="#e0b0ff"/><circle cx="36" cy="36" r="1.3" fill="#e0b0ff"/>|/H|`+
+    `|A|<path d="M47 38 L56 32" stroke="#b6a6c2" stroke-width="2.8"/>`+
+    `<path d="M53 34 L64 27" stroke="#5f4c72" stroke-width="3.4"/>`+
+    `<ellipse cx="64" cy="26" rx="4" ry="3" fill="#7d4f9c"/>|/A|`}),
+  mycaster:()=>({o:{hp:[32,24],ap:[46,38],lit:'#d4c4e0',mid:'#57426c',eye:'#c8ffe8',rough:[1,0.3],seed:66},
+    body:`<path d="M22 34 Q17 48 20 60 L27 63 L37 63 L44 60 Q47 48 42 34 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M24 38 Q32 42 40 38 L42 56 Q32 60 22 56 Z" fill="#46345a"/>`+
+    `<circle cx="32" cy="46" r="4" fill="none" stroke="#c88ae8" stroke-width="1.2"/>`+
+    `<circle cx="32" cy="46" r="1.5" fill="#c88ae8"/>`+
+    `|H|<path d="M14 29 Q14 10 32 10 Q50 10 50 29 Q41 34 32 34 Q23 34 14 29 Z" fill="#6d4090" ${RIM}/>`+
+    `<path d="M16 28 Q32 33 48 28" stroke="#341a48" stroke-width="1.2"/>`+
+    `<path d="M20 22 Q32 16 44 22" stroke="#8a55b0" stroke-width="1.3" fill="none"/>`+
+    `<path d="M18 26 Q32 20 46 26" stroke="#8a55b0" stroke-width="1.1" fill="none"/>`+
+    `<circle cx="27" cy="35" r="1.3" fill="#c8ffe8"/><circle cx="37" cy="35" r="1.3" fill="#c8ffe8"/>`+
+    `<circle cx="23" cy="17" r="2" fill="#c88ae8" opacity="0.75"/>`+
+    `<circle cx="42" cy="19" r="1.7" fill="#c88ae8" opacity="0.65"/>|/H|`+
+    `|A|<path d="M46 38 L52 30" stroke="#c0b0cc" stroke-width="2.2"/>`+
+    `<path d="M52 32 L52 12" stroke="#6a5878" stroke-width="2"/>`+
+    `<ellipse cx="52" cy="10" rx="6" ry="4" fill="#7d4f9c"/>`+
+    `<circle cx="52" cy="12" r="1.8" fill="#c88ae8"/>|/A|`}),
+  myelder:()=>({o:{hp:[32,22],ap:[50,38],lit:'#ddcfe8',mid:'#4e3966',eye:'#c8ffe8',rough:[1,0.35],seed:67},
+    body:`<path d="M18 32 Q13 48 17 61 L25 64 L39 64 L47 61 Q51 48 46 32 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M21 36 Q32 41 43 36 L45 58 Q32 63 19 58 Z" fill="#3f2d56"/>`+
+    `<path d="M26 42 L26 54 M32 40 L32 56 M38 42 L38 54" stroke="#8a63b8" stroke-width="1"/>`+
+    `|H|<path d="M10 28 Q10 6 32 6 Q54 6 54 28 Q42 34 32 34 Q22 34 10 28 Z" fill="#5f3382" ${RIM}/>`+
+    `<path d="M12 27 Q32 34 52 27" stroke="#2c1440" stroke-width="1.4"/>`+
+    `<path d="M17 20 Q32 12 47 20" stroke="#7d47a6" stroke-width="1.5" fill="none"/>`+
+    `<path d="M14 24 Q32 16 50 24" stroke="#7d47a6" stroke-width="1.2" fill="none"/>`+
+    `<circle cx="19" cy="15" r="2.6" fill="#c88ae8" opacity="0.6"/>`+
+    `<circle cx="45" cy="17" r="2.2" fill="#c88ae8" opacity="0.55"/>`+
+    `<circle cx="27" cy="35" r="1.4" fill="#c8ffe8"/><circle cx="37" cy="35" r="1.4" fill="#c8ffe8"/>|/H|`+
+    `|A|<path d="M50 38 L58 32" stroke="#cabbd6" stroke-width="2.6"/>`+
+    `<path d="M58 34 L58 12" stroke="#6a5878" stroke-width="2.2"/>`+
+    `<ellipse cx="58" cy="10" rx="7" ry="4.6" fill="#6d4090"/>`+
+    `<circle cx="58" cy="12" r="2" fill="#c88ae8"/>|/A|`}),
+  mylord:()=>({o:{hp:[32,21],ap:[51,38],lit:'#e6d6f0',mid:'#4a3060',eye:'#d0ffe8',rough:[1,0.38],seed:71},
+    body:`<path d="M17 32 Q11 49 15 62 L24 65 L40 65 L49 62 Q53 49 47 32 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M20 36 Q32 42 44 36 L46 59 Q32 65 18 59 Z" fill="#3b2850"/>`+
+    `<path d="M25 42 L25 55 M32 40 L32 57 M39 42 L39 55" stroke="#a87ad0" stroke-width="1.1"/>`+
+    `<circle cx="32" cy="50" r="3.6" fill="none" stroke="#c88ae8" stroke-width="1.2"/>`+
+    `|H|<path d="M7 27 Q7 4 32 4 Q57 4 57 27 Q43 34 32 34 Q21 34 7 27 Z" fill="#5b2f7d" ${RIM}/>`+
+    `<path d="M9 26 Q32 34 55 26" stroke="#28123c" stroke-width="1.5"/>`+
+    `<path d="M14 19 Q32 10 50 19" stroke="#7c44a5" stroke-width="1.6" fill="none"/>`+
+    `<path d="M10 23 Q32 13 54 23" stroke="#7c44a5" stroke-width="1.2" fill="none"/>`+
+    `<circle cx="17" cy="14" r="2.9" fill="#c88ae8" opacity="0.6"/>`+
+    `<circle cx="47" cy="16" r="2.4" fill="#c88ae8" opacity="0.55"/>`+
+    `<circle cx="26" cy="35" r="1.5" fill="#d0ffe8"/><circle cx="38" cy="35" r="1.5" fill="#d0ffe8"/>|/H|`+
+    `|A|<path d="M51 38 L59 32" stroke="#d6c6e2" stroke-width="2.8"/>`+
+    `<path d="M59 34 L59 10" stroke="#6a5878" stroke-width="2.3"/>`+
+    `<ellipse cx="59" cy="8" rx="7.4" ry="4.8" fill="#63398a"/>`+
+    `<circle cx="59" cy="10" r="2.2" fill="#dca8fa"/>|/A|`}),
+  mysovereign:()=>({o:{hp:[32,20],ap:[52,38],lit:'#eee0f6',mid:'#4a2f66',eye:'#d8ffe8',rough:[1,0.4],seed:68},
+    body:`<path d="M15 32 Q9 50 14 63 L24 66 L40 66 L50 63 Q55 50 49 32 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M19 36 Q32 42 45 36 L47 60 Q32 66 17 60 Z" fill="#38264e"/>`+
+    `<path d="M24 42 L24 56 M32 40 L32 58 M40 42 L40 56" stroke="#c88ae8" stroke-width="1.2"/>`+
+    `<circle cx="32" cy="49" r="5" fill="none" stroke="#c88ae8" stroke-width="1.4"/>`+
+    `<circle cx="32" cy="49" r="2" fill="#e0b0ff"/>`+
+    `|H|<path d="M4 27 Q4 2 32 2 Q60 2 60 27 Q44 35 32 35 Q20 35 4 27 Z" fill="#562c78" ${RIM}/>`+
+    `<path d="M6 26 Q32 35 58 26" stroke="#25103a" stroke-width="1.6"/>`+
+    `<path d="M12 18 Q32 8 52 18" stroke="#7a42a4" stroke-width="1.7" fill="none"/>`+
+    `<path d="M8 23 Q32 12 56 23" stroke="#7a42a4" stroke-width="1.3" fill="none"/>`+
+    `<circle cx="14" cy="13" r="3.2" fill="#c88ae8" opacity="0.6"/>`+
+    `<circle cx="50" cy="15" r="2.8" fill="#c88ae8" opacity="0.55"/>`+
+    `<circle cx="32" cy="9" r="2.4" fill="#e0b0ff" opacity="0.7"/>`+
+    `<circle cx="26" cy="36" r="1.6" fill="#d8ffe8"/><circle cx="38" cy="36" r="1.6" fill="#d8ffe8"/>|/H|`+
+    `|A|<path d="M52 38 L61 31" stroke="#ddcfe8" stroke-width="3"/>`+
+    `<path d="M60 33 L60 8" stroke="#6a5878" stroke-width="2.4"/>`+
+    `<ellipse cx="60" cy="6" rx="8" ry="5" fill="#562c78"/>`+
+    `<circle cx="60" cy="8" r="2.4" fill="#e0b0ff"/>|/A|`}),
   /* ---------- duergar ----------
      Grey skin, white beards bound with iron rings, and armour that is plate
      rather than hide: they are the one roster in the game that turned up with
@@ -2130,9 +2294,10 @@ function tryGen(depth,targetWalk,theme){
   const undeadBias=theme.name==='Crypt'?4:0.55;
   const caveBias=theme.name==='Caves'?4:0.55;
   const duerBias=theme.name==='Duergar'?4:0.55;
+  const mycoBias=theme.name==='Myconid'?4:0.55;
   const base=spawnPool(depth).map(([k,w])=>[k,
     w*(MONSTERS[k].type==='undead'?undeadBias:1)*(MONSTERS[k].cave?caveBias:1)
-     *(MONSTERS[k].duergar?duerBias:1)]);
+     *(MONSTERS[k].duergar?duerBias:1)*(MONSTERS[k].myconid?mycoBias:1)]);
   const weigh=(ek)=>base.map(([k,w])=>{
     const r=Math.log(threatOf(k,depth,ek)/share);
     return [k,w*Math.exp(-(r*r)/sig)];
@@ -2446,10 +2611,11 @@ function mkMonster(key,x,y,depth){
     xp:Math.round(XP_AWARD(def.cr)*(1+0.12*Math.max(0,depth-1))),
     speed:def.speed,type:def.type,ranged:def.ranged||0,caster:def.caster||null,
     reach:!!def.reach,slot:0, // slot 0-1 front rank of its tile, 2-3 rear rank
-    skeletal:!!def.skeletal,incorporeal:!!def.incorporeal,cave:!!def.cave,lurk:!!def.lurk,duergar:!!def.duergar,
+    skeletal:!!def.skeletal,incorporeal:!!def.incorporeal,cave:!!def.cave,lurk:!!def.lurk,duergar:!!def.duergar,myconid:!!def.myconid,
     enlarge:!!def.enlarge,vanish:!!def.vanish,grown:false,vanished:0,
+    distress:!!def.distress,shriek:!!def.shriek,shrieked:false,
     special:{disease:def.disease,poison:def.poison,paralysis:def.paralysis,energyDrain:def.energyDrain,regen:def.regen,
-      gaze:def.gaze,hold:def.hold},
+      gaze:def.gaze,hold:def.hold,spores:def.spores},
     atkCd:1.5+Math.random()*2,castCd:def.caster?def.caster.cd*(0.5+Math.random()):0,
     moveCd:Math.random(),held:0,slowed:0,sleep:false,shaken:0,stunned:0,awake:false,boss:false,
     id:Math.floor(Math.random()*1e9)};
@@ -5081,7 +5247,7 @@ function addMonsterSprite(m){
   const spr=new THREE.Sprite(mat);
   const sc=m.boss?1.05:(['ogre','troll','minotaur','ogremage','dragon',
     'bonecolossus','deathknight','bonedrake','lich',
-    'umberhulk','purpleworm','roper','otyugh','cavebear','duergarlord'].includes(m.key)?0.95:0.72);
+    'umberhulk','purpleworm','roper','otyugh','cavebear','duergarlord','myelder','mylord','mysovereign','shrieker'].includes(m.key)?0.95:0.72);
   spr.scale.set(sc,sc,1);
   spr.position.set(m.x+0.5,sc/2+0.02,m.y+0.5);
   spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss,elite:m.elite};
@@ -5880,6 +6046,7 @@ function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
 function damageMonster(m,dmg,byChar,crit){
   m.awake=true;m.sleep=false;
   m.hp-=dmg;
+  myconidDistress(m);   // a hurt myconid tells the grove, before it worries about dying
   UI.floatAtMonster(m,(crit?'CRIT ':'-')+dmg,crit?'#e8c840':'#e05545');
   if(m.hp<=0){killMonster(m,byChar);return;}
 }
@@ -6240,6 +6407,7 @@ function updateMonsters(dt){
     if(m.stunned>0){m.stunned-=dt;continue;}
     if(m.shaken>0)m.shaken-=dt;
     duergarTricks(m);
+    myconidShriek(m);
     const slowMult=m.slowed>0?2:1;
     if(m.slowed>0)m.slowed-=dt;
     const df=G.distField;
@@ -6430,6 +6598,37 @@ function pickPartyTarget(m){
   // the lane is empty: cross the line, keeping rank for rank
   return at(1-s,r)||at(1-s,1-r)||null;
 }
+/* ---------- the grove answers for its own ----------
+   A myconid that is hurt broadcasts distress, and every other myconid within
+   earshot stands up. A shrieker does nothing else: it cannot fight and cannot
+   move, and its whole purpose is to be the thing that notices you. Both run
+   through the same call, because both are the grove noticing an intrusion. */
+function myconidAlarm(m,r){
+  if(!m||!m.myconid)return 0;
+  let woke=0;
+  for(const o of G.L.monsters){
+    if(o===m||o.hp<=0||o.awake||o.guard)continue;
+    if(Math.abs(o.x-m.x)+Math.abs(o.y-m.y)<=r&&o.myconid){o.awake=true;woke++;}
+  }
+  return woke;
+}
+function myconidDistress(m){
+  if(!m.distress||m.hp<=0)return;
+  const woke=myconidAlarm(m,7);
+  if(woke)UI.toast('Spores burst from '+m.name+' — the grove has been told.');
+}
+// a shrieker screams once, the moment it sees anyone, and wakes a wider circle
+function myconidShriek(m){
+  if(!m.shriek||m.shrieked||!m.awake||m.hp<=0)return;
+  const d=Math.abs(m.x-G.px)+Math.abs(m.y-G.py);
+  if(d>6)return;
+  m.shrieked=true;
+  const woke=myconidAlarm(m,11);
+  SFX.growl(0);
+  UI.floatAtMonster(m,'SHRIEK','#c88ae8');
+  UI.toast(woke?'The shrieker screams, and the grove wakes around you.'
+               :'The shrieker screams. Nothing answers — this time.');
+}
 /* ---------- what the mind flayers left them ----------
    Duergar carry two innate powers in 3.5, once a day each, and both are worth
    more to a monster than a flat stat would be. Each fires once per creature and
@@ -6537,6 +6736,19 @@ function monsterSpecials(m,ch){
     }
   }
   // a roper's tendrils reuse hold rather than inventing a grapple
+  // spores are inhaled, so they are a Fortitude save, and they land on the two
+  // conditions that already stop a character acting rather than inventing a third
+  if(sp.spores){
+    const sv=charSaves(ch).fort+saveBonusVs(ch,'poison');
+    const nat=d20(),made=nat+sv>=sp.spores.dc;
+    const kind=sp.spores.kind==='stun'?'stunned':'hold';
+    logSave(ch.name,m.name+"'s spores",nat,sv,sp.spores.dc,made,made?'':kind);
+    if(!made&&!hasCond(ch,kind)){
+      addCond(ch,{kind,dur:sp.spores.dur});
+      UI.float(ch,kind==='stunned'?'reeling!':'rooted!','#c88ae8');
+      UI.toast('A burst of spores catches '+ch.name+' full in the face!');
+    }
+  }
   if(sp.hold){
     const sv=charSaves(ch).ref,nat=d20(),made=nat+sv>=sp.hold.dc;
     logSave(ch.name,m.name+"'s tendrils",nat,sv,sp.hold.dc,made,made?'':'held');
