@@ -469,26 +469,26 @@ const SPELLS={
   websp:{name:'Web',circle:2,list:'arcane',target:'foe',save:{type:'ref',negate:true},hold:8,desc:'Sticky webs hold the foe for 8s. Reflex negates.'},
   flamingsphere:{name:'Flaming Sphere',circle:2,list:'arcane',target:'foe',save:{type:'ref',half:true},desc:'Rolling ball of fire: 3d6, Reflex half.',dmgFn:()=>roll(3,6)},
   // wizard 3
-  fireball:{name:'Fireball',circle:3,list:'arcane',target:'foes',save:{type:'ref',half:true},desc:'Explosion: 1d6/level (max 10d6) to all foes ahead. Reflex half.',
+  fireball:{name:'Fireball',circle:3,list:'arcane',target:'foes',area:{kind:'burst',r:3},save:{type:'ref',half:true},desc:'Bursts where it lands: 1d6/level (max 10d6) to everything within three tiles. Reflex half.',
     dmgFn:(cl)=>roll(clamp(cl,5,10),6)},
-  lightning:{name:'Lightning Bolt',circle:3,list:'arcane',target:'foes',save:{type:'ref',half:true},desc:'Bolt through all foes in line: 1d6/level (max 10d6). Reflex half.',
+  lightning:{name:'Lightning Bolt',circle:3,list:'arcane',target:'foes',area:{kind:'line',len:10},save:{type:'ref',half:true},desc:'Spears ten tiles straight ahead, through everything in the line: 1d6/level (max 10d6). Reflex half.',
     dmgFn:(cl)=>roll(clamp(cl,5,10),6)},
   haste:{name:'Haste',circle:3,list:'arcane',target:'allies',buff:{haste:true,ac:1,dur:30},desc:'Party attacks 1/3 faster, +1 AC, for 30s.'},
   slow:{name:'Slow',circle:3,list:'arcane',target:'foe',save:{type:'will',negate:true},slow:20,desc:'Foe moves and strikes at half speed for 20s. Will negates.'},
   vampirictouch:{name:'Vampiric Touch',circle:3,list:'arcane',target:'foe',auto:true,drain:true,desc:'Touch: 1d6 per 2 levels; you gain the life stolen.',
     dmgFn:(cl)=>roll(clamp(Math.floor(cl/2),1,10),6)},
   // wizard 4
-  icestorm:{name:'Ice Storm',circle:4,list:'arcane',target:'foes',auto:true,desc:'Hail hammers all foes ahead: 5d6, no save.',dmgFn:()=>roll(5,6)},
+  icestorm:{name:'Ice Storm',circle:4,list:'arcane',target:'foes',area:{kind:'burst',r:3},auto:true,desc:'Hail hammers a three-tile circle: 5d6, no save.',dmgFn:()=>roll(5,6)},
   phantasmalkiller:{name:'Phantasmal Killer',circle:4,list:'arcane',target:'foe',save:{type:'will',half:true},desc:'Nightmare made real: 6d6, Will half (fear pierces the mind).',dmgFn:()=>roll(6,6)},
   stoneskin:{name:'Stoneskin',circle:4,list:'arcane',target:'ally',buff:{dr:10,pool:60,dur:300},desc:'Grants DR 10 until 60 damage is absorbed.'},
   enervation:{name:'Enervation',circle:4,list:'arcane',target:'foe',auto:true,negLevels:2,desc:'Black ray: foe suffers 2 negative levels (weaker attacks, −10 hp).'},
   fireshield:{name:'Fire Shield',circle:4,list:'arcane',target:'self',buff:{fireshield:[2,6],dur:60},desc:'Attackers who strike you take 2d6 fire, for 60s.'},
   // wizard 5
-  conecold:{name:'Cone of Cold',circle:5,list:'arcane',target:'foes',save:{type:'ref',half:true},desc:'Freezing blast: 1d6/level (max 15d6). Reflex half.',
+  conecold:{name:'Cone of Cold',circle:5,list:'arcane',target:'foes',area:{kind:'cone',len:6},save:{type:'ref',half:true},desc:'A widening cone six tiles deep: 1d6/level (max 15d6). Reflex half.',
     dmgFn:(cl)=>roll(clamp(cl,9,15),6)},
   holdmonster:{name:'Hold Monster',circle:5,list:'arcane',target:'foe',save:{type:'will',negate:true},hold:15,desc:'Paralyzes any foe for 15s. Will negates.'},
-  cloudkill:{name:'Cloudkill',circle:5,list:'arcane',target:'foes',save:{type:'fort',half:true},desc:'Poison fog: 6d6 to all foes ahead, Fortitude half.',dmgFn:()=>roll(6,6)},
-  wavesfatigue:{name:'Waves of Exhaustion',circle:5,list:'arcane',target:'foes',auto:true,slowAll:25,desc:'All foes ahead slowed for 25s. No save.'},
+  cloudkill:{name:'Cloudkill',circle:5,list:'arcane',target:'foes',area:{kind:'burst',r:3},save:{type:'fort',half:true},desc:'Poison fog rolls three tiles about where it settles: 6d6, Fortitude half.',dmgFn:()=>roll(6,6)},
+  wavesfatigue:{name:'Waves of Exhaustion',circle:5,list:'arcane',target:'foes',area:{kind:'cone',len:6},auto:true,slowAll:25,desc:'A cone six tiles deep; everything caught is slowed for 25s. No save.'},
   // cleric 1
   clw:{name:'Cure Light Wounds',circle:1,list:'divine',target:'ally',healFn:(cl)=>roll(1,8,clamp(cl,1,5)),desc:'Heals 1d8 + level (max +5).'},
   bless:{name:'Bless',circle:1,list:'divine',target:'allies',buff:{atk:1,dur:60},desc:'+1 attack for the party, 60s.'},
@@ -515,7 +515,7 @@ const SPELLS={
   divinepower:{name:'Divine Power',circle:4,list:'divine',target:'self',buff:{atk:3,str:2,dur:45},desc:'+3 attack, +2 STR for 45s.'},
   freedommove:{name:'Freedom of Movement',circle:4,list:'divine',target:'ally',buff:{freedom:true,dur:120},cures:['paralysis','hold'],desc:'Immune to paralysis and holds for 2 min.'},
   // cleric 5
-  flamestrike:{name:'Flame Strike',circle:5,list:'divine',target:'foes',save:{type:'ref',half:true},desc:'Pillar of divine fire: 1d6/level (max 15d6). Reflex half.',
+  flamestrike:{name:'Flame Strike',circle:5,list:'divine',target:'foes',area:{kind:'column',r:1},save:{type:'ref',half:true},desc:'A pillar of divine fire one tile about where it falls: 1d6/level (max 15d6). Reflex half.',
     dmgFn:(cl)=>roll(clamp(cl,9,15),6)},
   masscure:{name:'Mass Cure Light Wounds',circle:5,list:'divine',target:'allies',healFn:(cl)=>roll(1,8,clamp(cl,9,25)),desc:'Heals the whole party 1d8 + level.'},
   raisedead:{name:'Raise Dead',circle:5,list:'divine',target:'ally',raise:true,desc:'Returns a dead companion to life (at 1 hp, one level poorer).'},
@@ -4466,6 +4466,72 @@ function losClear(x0,y0,x1,y1){ // straight-line only (same row/col), through se
   }
   return true;
 }
+/* ---------- where an area spell lands ----------
+
+   3.5 measures in feet at five to the tile, so a 120-ft bolt is 24 tiles and a
+   20-ft-radius fireball is 4. The bolt does not fit a dungeon whose rooms are
+   six across, so lengths are pulled in; the shapes and their sizes relative to
+   one another are what is kept.
+
+     burst   fireball, ice storm, cloudkill  — a disc about where it lands
+     column  flame strike                    — the same, but a tight pillar
+     line    lightning bolt                  — straight ahead until a wall
+     cone    cone of cold, waves of exhaustion — widening, from the caster
+
+   A burst floods out from its centre through open tiles rather than being
+   masked by sight from the party. That is both closer to a 3.5 spread, which
+   bends around corners, and the fix for the old behaviour: `losClear` is a
+   straight-line test that answers false for anything off the party's own row
+   or column, so gathering with it clipped every blast into a narrow wedge. */
+function spellArea(sp,ox,oy,facing){
+  const a=sp.area,L=G.L;
+  const out=new Set();
+  if(!a||!L)return out;
+  const key=(x,y)=>y*L.w+x;
+  const open=(x,y)=>seesThroughTile(tileAt(x,y));
+  if(a.kind==='line'){
+    const [dx,dy]=DIRS[facing];
+    for(let i=1;i<=a.len;i++){
+      const x=ox+dx*i,y=oy+dy*i;
+      if(!open(x,y))break;                 // a bolt is stopped by the first wall
+      out.add(key(x,y));
+    }
+    return out;
+  }
+  const cand=new Set();
+  if(a.kind==='cone'){
+    const [dx,dy]=DIRS[facing];
+    for(let d=1;d<=a.len;d++){
+      const w=Math.floor(d/2);             // as wide as it is long, by the far end
+      for(let p=-w;p<=w;p++)cand.add(key(ox+dx*d-dy*p,oy+dy*d+dx*p));
+    }
+  }else{
+    const r=a.r;
+    for(let yy=-r;yy<=r;yy++)for(let xx=-r;xx<=r;xx++)
+      if(xx*xx+yy*yy<=r*r+r)cand.add(key(ox+xx,oy+yy));   // rounded, not a square
+  }
+  // flood from the origin, so nothing lands on the far side of a wall
+  const q=[[ox,oy]];out.add(key(ox,oy));
+  for(let qi=0;qi<q.length;qi++){
+    const [cx,cy]=q[qi];
+    for(const [dx,dy] of DIRS){
+      const nx=cx+dx,ny=cy+dy,k=key(nx,ny);
+      if(out.has(k)||!cand.has(k)||!open(nx,ny))continue;
+      out.add(k);q.push([nx,ny]);
+    }
+  }
+  if(!cand.has(key(ox,oy)))out.delete(key(ox,oy));   // a cone starts ahead of the caster
+  return out;
+}
+// A burst is thrown at something; a cone or a line comes off the caster.
+function areaOrigin(sp,ch){
+  const a=sp.area;
+  if(a&&(a.kind==='burst'||a.kind==='column')){
+    const found=firstMonsterAhead(a.range||6,ch);
+    return found?{x:found.m.x,y:found.m.y,m:found.m}:null;
+  }
+  return {x:G.px,y:G.py,m:null};
+}
 function markExplored(){
   const L=G.L;
   for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
@@ -5140,15 +5206,20 @@ function castSpell(ch,key,opts){
   }
   const dc=10+sp.circle+abilMod(ch,casterAbil(ch));
   // resolve target(s)
-  let foes=[];
-  if(sp.target==='foe'||sp.target==='foes'){
+  let foes=[],areaTiles=null;
+  if(sp.target==='foe'){
     const found=firstMonsterAhead(6,ch);
     if(!found){UI.toast('No foe in sight.');return false;}
-    if(sp.target==='foe')foes=[found.m];
-    else {
-      const c0=found.m;
-      foes=G.L.monsters.filter(m=>m.hp>0&&Math.abs(m.x-c0.x)<=2&&Math.abs(m.y-c0.y)<=2&&(losClear(G.px,G.py,m.x,m.y)||m===c0||Math.abs(m.x-c0.x)+Math.abs(m.y-c0.y)<=2));
-    }
+    foes=[found.m];
+  }else if(sp.target==='foes'){
+    const org=areaOrigin(sp,ch);
+    if(!org){UI.toast('No foe in sight.');return false;}
+    areaTiles=spellArea(sp,org.x,org.y,G.facing);
+    foes=G.L.monsters.filter(m=>m.hp>0&&areaTiles.has(m.y*G.L.w+m.x));
+    // a cone or a bolt is aimed by facing alone, so it can catch nothing at all;
+    // do not burn the slot on empty air
+    if(!foes.length){UI.toast('Nothing is caught in it.');return false;}
+    foes.sort((a,b)=>(Math.abs(a.x-G.px)+Math.abs(a.y-G.py))-(Math.abs(b.x-G.px)+Math.abs(b.y-G.py)));
   }
   const commit=()=>{
     // the memorised copy is gone the moment it is spoken; a cleric spends a slot
@@ -5222,7 +5293,16 @@ function castSpell(ch,key,opts){
     onHit:()=>{
       const at=monsterAim(c0);
       if(sp.target==='foes'){
-        spawnBurst(at,color,2.2);
+        // paint the footprint rather than one blob, so the shape is legible:
+        // a bolt reads as a line of flashes, a fireball as a disc
+        if(areaTiles&&areaTiles.size){
+          const tiles=[...areaTiles];
+          const step=Math.max(1,Math.floor(tiles.length/9));
+          for(let i=0;i<tiles.length;i+=step){
+            const t=tiles[i];
+            spawnBurst({x:(t%G.L.w)+0.5,y:0.45,z:Math.floor(t/G.L.w)+0.5},color,1.5);
+          }
+        }else spawnBurst(at,color,2.2);
         for(const m of foes)resolveFoe(m);
       }else{
         spawnBurst(at,color,0.9);

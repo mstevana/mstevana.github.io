@@ -362,6 +362,44 @@ against a surface it shares no colour with.
 `lurkers` must be carried through `serializeGame` and `loadGame` like
 everything else a theme writes onto the level.
 
+## Area spells have shapes
+
+A spell with `target:'foes'` must carry an `area`, and `spellArea` turns it
+into the set of tiles it covers:
+
+| shape | spells | footprint |
+|---|---|---|
+| `burst` | fireball, ice storm, cloudkill | disc of radius `r` about where it lands |
+| `column` | flame strike | the same, but a tight pillar |
+| `line` | lightning bolt | `len` tiles straight ahead, one wide |
+| `cone` | cone of cold, waves of exhaustion | widening from the caster, `len` deep |
+
+3.5 measures in feet at five to the tile, which makes a lightning bolt 24
+tiles and a fireball 4 in radius. The bolt does not fit a dungeon whose
+rooms are six across, so the **lengths are pulled in and the shapes and
+their relative sizes are what is kept** — do not "correct" them back to
+the book numbers without re-measuring the descent.
+
+A burst, column and cone all **flood outward from their origin through
+open tiles**. That is closer to a 3.5 spread, which bends around corners —
+a fireball thrown past a doorway comes through the gap and fans out
+beyond, but never through the stone beside it — and it is the fix for what
+was there before. The old code gathered with `losClear`, which is a
+**straight-line test that answers false for anything off the party's own
+row or column**; every blast was clipped into a narrow wedge that never
+reached past the front rank. `losClear` is still right for its own job
+(can this monster shoot down the corridor at the party) and is left alone.
+
+A bolt is aimed by facing and a cone comes off the caster, so either can
+catch nothing at all; `castSpell` refuses rather than spending the slot on
+empty air. The footprint is painted with a burst per few tiles rather than
+one blob, so the player can see which shape went out.
+
+**The party is never caught in its own area spells** — the filter only
+walks `G.L.monsters`. That is deliberate and asserted in T43, so turning
+friendly fire on is a decision someone makes on purpose rather than a
+regression.
+
 ## The wizard's spellbook
 
 The wizard is the only prepared caster, and `preparesSpells(ch)` is the
