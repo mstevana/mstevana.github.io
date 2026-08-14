@@ -108,13 +108,33 @@ half 25–35** when the curve was authored; after the crypt work (seven new
 heavy undead filling the deep bands, plus the undead damage rules) it
 reads **median 26, middle half 22–29**. After the cave work (nine cave
 creatures, the ambushers, the cave spawn bias) it reads **median 27,
-middle half 24–30**. That is below the intended 30–40 band and has not
-been retuned — a deliberate decision to measure first.
+middle half 24–30**; moving boss floors to every third level took it to
+**median 28, middle half 26–30**.
 
-Neither content pass is the cause, and both were checked the same way:
-removing coffin and ossuary fights from the simulation leaves the median
-unchanged, and so does skipping every ambush or flattening the cave bias
-to 1. The movement is the bestiary and the undead damage rules.
+**26–30 is the band. Do not treat it as a shortfall.** CLAUDE.md carried an
+intended 30–40 for a long time and the game has never once hit it, which
+kept inviting sessions to retune a curve that is working.
+
+Neither content pass moved it, and both were checked the same way: removing
+coffin and ossuary fights from the simulation leaves the median unchanged,
+and so does skipping every ambush or flattening the cave bias to 1.
+
+The cause is structural, and worth knowing before you touch any dial.
+**The party is level-capped at 20 by depth 20** — `MAX_LEVEL` is 20 and a
+descent banks enough XP for it around floor 20. From there to the bottom,
+monsters keep compounding (`depthScale` +7% a floor, a rising
+`depthAtkBonus`, a climbing `threatBudget`) while the party gains nothing
+but gear, which itself stops at +5. Depths 20–28 are eight floors of a
+party at its ceiling losing ground to depth. A run ends where character
+growth ran out, not where the numbers were mistuned.
+
+That cap is an **open question, not a settled one**: raising `MAX_LEVEL`,
+slowing the XP curve so 20 lands nearer depth 30, or giving the party some
+post-cap progression would all move the band, and any of them is a real
+design decision rather than a tuning pass. Nobody has taken it. What is
+settled is that the median is not to be chased by fiddling with
+`depthScale`, `threatBudget` or the bestiary — those are not what is
+holding it.
 
 ## Adding a monster
 
@@ -238,11 +258,36 @@ of the wall plane rather than behind it.
 Depth-gated content that is not theme-driven and will need extending if
 the dungeon grows:
 
-- **`BOSSES`** — one entry per named boss with a `minD`. Every fifth
-  floor is a boss floor. Past the last named entry `bossFor` cycles the
-  list, each pass harder and titled by its circle, and cycled bosses also
-  wear an elite mantle. Adding a named boss extends the run before
-  cycling starts.
+- **`BOSSES`** — one entry per named boss with a `minD`. **Every third
+  floor from depth 6 is a boss floor**, which is also the last floor of a
+  theme block (`THEMES[floor((depth−1)/3)]`), so a boss caps the theme you
+  have been walking through instead of landing in the middle of the next
+  one. `minD` therefore steps by 3, one named boss per boss floor, and
+  three places must agree: `isBossLevel` in `tryGen`, the `/3` in
+  `bossFor`'s cycle arithmetic, and the ⚔ in `refreshDepthTag`.
+
+  The first theme block is exempt. On floor 3 the party is still level 1 —
+  32 hit points between four of them, a 3-hp wizard — against a boss
+  carrying 2.5× hp and **+2 AC**, which at that attack bonus is unhittable
+  rather than hard. A simulated descent walled there at 99%.
+
+  Past the last named entry `bossFor` cycles the list, each pass harder
+  and titled by its circle, and cycled bosses also wear an elite mantle.
+  Adding a named boss extends the run before cycling starts.
+
+  A cycled boss's **hit points come from `BOSS_BASE_HP`, the list's own
+  mean, not from the creature the cycle named.** A bugbear base is a
+  quarter of a dragon's, so raw base hp handed you a boss a third of the
+  one three floors above, and the sawtooth repeated on every pass. Named
+  bosses keep their own creature's hp — they are hand-placed for their
+  depth, and Sinshara is a caster whose danger is her spells.
+
+  That split is why T21 measures the two arcs on different things: the
+  named arc on `monsterThreat` (which credits spells, reach and riders,
+  so Sinshara's low hp is not a regression) and the cycled arc on `maxHp`.
+  A cycled boss's *damage* is still whatever creature the list named, so
+  its threat still steps down at the named→cycled handover — that is the
+  list starting over, and it is by design.
 - **`trapDice` / `trapDC`** — damage keeps climbing with depth; the spot
   DC deliberately stops just short of a maxed rogue's take-10, so finding
   traps stays the rogue's job at any depth. Do not let the DC past that.
@@ -268,6 +313,14 @@ Anything a crypt writes onto the level (`crypts`, `ossuary`, and the
 `opened` flags inside them) must be carried through `serializeGame` and
 `loadGame`, or a reloaded floor comes back looted-clean or bare.
 
+The ossuary is sited **after** loot is placed, so the bier can land on top
+of a floor item. It must **shove what is underneath aside, never delete
+it**: the level's only key is one of the things it can land on, and a bier
+that swallows it seals the locked room for good. That was a real bug, at
+about one crypt floor in two thousand — rare enough that T6 caught it once
+in a run of twenty levels and looked like a flake. T42 samples enough
+crypt floors to catch it outright.
+
 Note that `openBier` calls `buildLevel` to show the shifted lid, so any
 scenery built with `Math.random()` would visibly reshuffle the moment the
 bier is opened. The bone stacking and the floor dressing are both seeded
@@ -282,7 +335,7 @@ removes an ordinary spawn** from `monsters` so the floor keeps the head
 count and the threat `targetCount`/`threatBudget` gave it — the ambush
 changes a floor's shape, not its difficulty. The trade explicitly skips
 `boss` and `ossuary` monsters; popping the last-pushed monster instead
-eats the boss on every fifth floor. Which creature a lurker is comes from
+eats the boss on every third floor. Which creature a lurker is comes from
 the same log-space Gaussian against the floor's per-monster share that a
 standing spawn uses, so a deep floor does not ambush the party with a
 piercer.
@@ -328,13 +381,224 @@ against a surface it shares no colour with.
 `lurkers` must be carried through `serializeGame` and `loadGame` like
 everything else a theme writes onto the level.
 
-## Known rough edge
+## Area spells have shapes
 
-The bestiary is no longer as thin at depth — the seven deep undead took
-depth 40 from roughly 90% dragons and ogre mages to thirteen creature
-kinds, and the nine cave creatures widened the mid-depths further. What
-remains is that both rosters leak: a non-theme bias of 0.55 keeps crypts
-and caves distinct, but a deep dungeon floor still runs roughly a third
-undead, and depth 13–15 dungeon floors run about half cave roster. That
-is one problem seen from two sides — there is not enough *ordinary* meat
-in the middle and deep bands, and more of it is the real fix.
+A spell with `target:'foes'` must carry an `area`, and `spellArea` turns it
+into the set of tiles it covers:
+
+| shape | spells | footprint |
+|---|---|---|
+| `burst` | fireball, ice storm, cloudkill | disc of radius `r` about where it lands |
+| `column` | flame strike | the same, but a tight pillar |
+| `line` | lightning bolt | `len` tiles straight ahead, one wide |
+| `cone` | cone of cold, waves of exhaustion | widening from the caster, `len` deep |
+
+3.5 measures in feet at five to the tile, which makes a lightning bolt 24
+tiles and a fireball 4 in radius. The bolt does not fit a dungeon whose
+rooms are six across, so the **lengths are pulled in and the shapes and
+their relative sizes are what is kept** — do not "correct" them back to
+the book numbers without re-measuring the descent.
+
+A burst, column and cone all **flood outward from their origin through
+open tiles**. That is closer to a 3.5 spread, which bends around corners —
+a fireball thrown past a doorway comes through the gap and fans out
+beyond, but never through the stone beside it — and it is the fix for what
+was there before. The old code gathered with `losClear`, which is a
+**straight-line test that answers false for anything off the party's own
+row or column**; every blast was clipped into a narrow wedge that never
+reached past the front rank. `losClear` is still right for its own job
+(can this monster shoot down the corridor at the party) and is left alone.
+
+A bolt is aimed by facing and a cone comes off the caster, so either can
+catch nothing at all; `castSpell` refuses rather than spending the slot on
+empty air. The footprint is painted with a burst per few tiles rather than
+one blob, so the player can see which shape went out.
+
+**The party is never caught in its own area spells** — the filter only
+walks `G.L.monsters`. That is deliberate and asserted in T43, so turning
+friendly fire on is a decision someone makes on purpose rather than a
+regression.
+
+## The wizard's spellbook
+
+The wizard is the only prepared caster, and `preparesSpells(ch)` is the
+single test for it — a cleric still knows their whole divine list and
+spends slots from it in the moment. Three fields carry the wizard:
+
+- **`ch.book`** — the spells written down. Starts as `WIZ_START_BOOK`,
+  grows by one `studyPick` per level (highest circle they can reach, so a
+  bad run with scrolls can never leave them mute), and by scribing.
+- **`ch.memo`** — the loadout chosen at the last camp. It persists, so a
+  player who does not want to fiddle just rests and gets the same again.
+- **`ch.prepared`** — what is left of that loadout. `spendPrepared`
+  removes one copy per casting; `resetDaily` refills it from `memo`.
+
+Because only a **fed** camp calls `resetDaily`, a cold camp leaves a
+wizard holding whatever they had left — the same rule the other classes
+already followed, and the reason the ration matters to them most.
+
+`ensureBook(ch)` is both the constructor and the migration: a wizard from
+a save written before any of this arrives with no `book` at all, and gets
+one sized to their level plus a filled loadout rather than an empty spell
+screen. It is called from `mkCharacter` and from `deserializeGame`.
+
+Two exemptions worth not "fixing":
+
+- **Items ignore the book entirely.** `castSpell` skips the preparation
+  gate when `opts.item` is set, because a scroll or a wand carries its own
+  magic. This is the same branch that skips the slot check.
+- **`scribeScroll` refuses divine spells, anything above
+  `maxCircle(ch.level)`, and duplicates** — and consumes the scroll on
+  success, so finding one is a choice between a casting now and the spell
+  for the rest of the run.
+
+Memorising is wired into `tryRest`, not into the spell screen: `tryRest`
+walks every living preparer through `UI.openMemo` and only then calls
+`doRest`. `G._preparing` guards the re-entry. Putting it anywhere else
+would let a player re-prepare between fights, which is the decision the
+whole system exists to make.
+
+## Hands and their timers
+
+`ch.cdL` / `ch.cdR` are two independent cooldowns, and which one a use arms
+is decided by **where the thing was held**, not by what it is:
+
+- `armHand(ch,slot,v)` — a one-handed weapon, a potion, a wand, a scroll.
+  Anything worked from a hand occupies that hand alone, so a second wand in
+  the other hand keeps its own timer exactly as a second sword does.
+- `armBoth(ch,v)` — a two-handed weapon, and a **memorised** spell, which
+  is gestures and components rather than an object.
+
+Both item paths (`useHand` and the pack) thread their hand slot through, and
+fall back to `armBoth` when there isn't one — an item used from the pack has
+no hand to charge. `Math.max(handCd(...),v)` everywhere, so arming a hand
+can never *shorten* a longer timer already on it.
+
+The gates match: `useHand` checks `handCd(ch,slot)`, a two-hander and a
+memorised spell check `anyHandCd(ch)`. `castSpell` deliberately skips its
+`anyHandCd` gate for items, because the caller has already checked the one
+hand that matters.
+
+Note the tick is `if(ch.cdL>0)ch.cdL-=dt`, so a timer undershoots slightly
+negative on its last frame and stops there. Harmless — every gate tests
+`>0` — but don't read a negative as a bug.
+
+## Left and right
+
+Both sides of a fight pair up by position: a character on the left of the
+formation meets the monster on the left of the line, and that monster
+swings back at them. `SIDE_L`/`SIDE_R`, `monsterSide`, `charSide`,
+`charOnSide` and `facingMonsterAt` hold all of it.
+
+**The two conventions are opposite, which is the whole reason they are
+named rather than inlined:**
+
+- A tile packs monsters 0–1 in front and 2–3 behind, and `rankOffset` puts
+  the **odd** slot of each pair on the party's **left**.
+- The party portraits are a 2×2 CSS grid laid out `[0][1]` over `[2][3]`,
+  so the **even** party indices are the **left** column.
+
+The monster half was measured, not derived: dot each sprite's position
+against the camera's own `matrixWorld` right vector. Deriving it by hand
+gets the sign wrong, and an earlier probe that read `projectToScreen`
+without rendering first reported a mapping that flipped between facings —
+it was reading a stale camera matrix, not finding a bug.
+
+Rank matches too. The two formations face each other square on, so
+`pickPartyTarget` reaches for the same side **and** the same rank: a
+front-rank monster meets the party's front rank, and a back-rank monster
+(which needs reach to swing at all) goes for the party's back rank. Every
+way a monster reaches the party runs through that one function — melee,
+shots, and a caster's bolt.
+
+A character holds their place only while they can fight for it. Down, or
+unable to act (`canAct` covers paralysis, hold, sleep, stun), and the lane
+opens: the blow reaches past them to whoever else is in that lane. Note the
+order of the two fallbacks, which is the part worth not breaking — a
+monster tries **both ranks of its own side** before it will cross to the
+other. Trying the other side first would make a character *safer* by being
+paralysed, since blows would flow away from them; as written, if they are
+the last one standing in their lane the blows are still theirs.
+
+On the party's side of it, a lone monster holds the centre of its tile
+(`rankOffset` returns zero offsets below two occupants), so everyone
+fights it, and `facingMonsterAt` with no character returns the front-most,
+which is what movement blocking wants.
+
+`packRanks` renumbers slots as monsters die, so a line re-forms and sides
+are reassigned — that is deliberate, not drift.
+
+## The DEX cap
+
+`dexACBonus` clamps the DEX modifier to the body armour's `maxDex`
+(clothes 99, leather 6, breastplate 3, full plate 1) and `charAC` is the
+only consumer. Three things that are correct and look like bugs:
+
+- **Reflex saves keep the whole modifier.** The cap is an AC rule in 3.5,
+  not a general encumbrance, so `charSaves` uses raw `abilMod(ch,'dex')`.
+- **A DEX penalty is never raised to the cap** — `clamp(mod,-5,maxDex)`,
+  so a clumsy character in plate keeps their −2.
+- **Enchantment does not buy capped DEX back.** A +3 plate adds 3 AC and
+  still caps DEX at 1.
+
+It was always applied; what was missing is that nothing said so. The stats
+screen now prints `AC 20 (DEX +1 of +4 — Full plate caps it at +1)`
+whenever the cap is actually biting, and nothing when it is not.
+
+## The log
+
+The 📜 button (and `L`) opens `ovl-log`: every message the party is shown,
+and the arithmetic behind every roll. `GLOG` is a capped ring in memory —
+`LOG_MAX` entries — and is deliberately **not** serialised, so it is a
+record of the session rather than something that bloats a save.
+
+Two lines per entry: what happened, and the check under it. Attacks made
+and attacks taken both go through `logStrike`, so they read identically;
+saves go through `logSave`. `UI.toast` writes its own message to the log
+on the way past, so anything the player is told is already captured — new
+messages need no extra call.
+
+Spell damage was the awkward part. Each spell rolls inside its own
+`dmgFn`, so there is no dice notation to read off a definition. `roll`
+therefore appends to `_rollTrace` whenever that is armed, and `traceRoll`
+arms it around a call and hands back both the value and the dice. It is
+null at rest, restores the previous trace on the way out (so nesting does
+not swallow the outer dice), and costs one null check per roll.
+
+`renderLog` rebuilds on open rather than on every entry — opening any
+overlay pauses the game, so nothing can be appended while the panel is up.
+It scrolls to the bottom **after** `show`, because a hidden element has no
+`scrollHeight`.
+
+Testing combat from the node harness needs two things that the real game
+defers: monster swings land on a `setTimeout` (stub it to run straight
+through) and offensive spells resolve when their bolt arrives (set
+`G.fx=[]` and call `updateFx(10)`, which lands everything in flight via
+the `f.t>6` branch). T37 covers the whole of this.
+
+## The thin ordinary roster — measured, and deliberately left
+
+The bestiary is no longer thin at depth in total: the seven deep undead
+took depth 40 from roughly 90% dragons and ogre mages to thirteen creature
+kinds, and the nine cave creatures widened the mid-depths further. What is
+thin is the **ordinary** roster — everything that is neither `type:'undead'`
+nor `cave:true`:
+
+| depths | ordinary creatures in band |
+|---|---|
+| 1–8 | 5–9 — healthy |
+| 9–13 | 3–4 — collapses |
+| 14–30 | **exactly 5** (ogre, minotaur, troll, dragon, ogre mage) |
+| 31+ | decays to 1, then 0 by 44 |
+
+So the themed rosters are better stocked at depth than the default one,
+and the leak runs both ways: a deep dungeon floor is roughly a third
+undead, and depth 13–15 dungeon floors run about half cave roster. The
+0.55 off-theme bias is what keeps crypts and caves distinct at all.
+
+**This was costed and declined.** Filling depths 9–30 is around nine
+creatures — definitions, `SPAWN_DEPTH` bands, layered `MONSTER_ART` and
+threat tuning apiece. It buys variety and nothing else: with the band
+settled at 26–30 it is not a difficulty lever, and the depth 31+ column
+above is content no run reaches. If you pick it up, aim it at 9–30 and
+skip the deep band; do not treat the table above as a bug list.

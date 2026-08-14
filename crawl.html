@@ -68,7 +68,28 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 .topbtn{position:absolute;top:8px;width:44px;height:44px;border-radius:8px;background:var(--btn);
   border:1px solid var(--btn-line);color:var(--ink);display:flex;align-items:center;justify-content:center;font-size:20px;z-index:5;}
 .topbtn:active{background:#3a2f1d;}
-#b-map{left:8px;} #b-rest{left:58px;} #b-mute{left:108px;} #b-menu{left:158px;}
+#b-map{left:8px;} #b-log{left:58px;} #b-rest{left:108px;} #b-mute{left:158px;} #b-menu{left:208px;}
+#memo-body{height:min(48vh,300px);overflow-y:auto;text-align:left;background:#0d0b07;
+  border:1px solid var(--btn-line);border-radius:6px;padding:6px 8px;margin-bottom:8px;font-size:12px;}
+#memo-body .mcirc{color:#e0cf9e;font-weight:bold;margin:6px 0 3px;border-bottom:1px solid #241d13;padding-bottom:2px;}
+#memo-body .mcirc .full{color:#8a7f66;font-weight:normal;float:right;}
+#memo-body .mrow{display:flex;align-items:center;gap:6px;padding:3px 2px;}
+#memo-body .mname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#memo-body .mcount{width:34px;text-align:center;color:var(--ink);}
+#memo-body .mbtn2{width:26px;height:24px;border-radius:5px;background:var(--btn);border:1px solid var(--btn-line);
+  color:var(--ink);font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;}
+#memo-body .mbtn2:disabled{opacity:.35;}
+#memo-body .none{color:var(--ink-dim);padding:6px 2px;}
+#log-list{height:min(52vh,300px);overflow-y:auto;text-align:left;background:#0d0b07;border:1px solid var(--btn-line);
+  border-radius:6px;padding:6px 8px;margin-bottom:8px;font-size:12px;line-height:1.35;}
+#log-list .le{padding:3px 0;border-bottom:1px solid #191510;}
+#log-list .le:last-child{border-bottom:0;}
+#log-list .lt{color:var(--ink);}
+#log-list .ld{color:var(--ink-dim);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;margin-top:1px;}
+#log-list .k-hit .lt{color:#d8c070;} #log-list .k-miss .lt{color:#9a9da2;}
+#log-list .k-hurt .lt{color:#e08070;} #log-list .k-spell .lt{color:#a9c0e6;}
+#log-list .k-save .lt{color:#c0a0d8;} #log-list .k-msg .lt{color:#cdc3ad;}
+#log-list .empty{color:var(--ink-dim);padding:10px 2px;}
 #depth-tag{position:absolute;top:14px;right:10px;z-index:4;font-size:13px;color:var(--ink-dim);text-shadow:0 1px 2px #000;}
 #bossbar{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:4;width:min(340px,62%);text-align:center;pointer-events:none;}
 #bossbar .bb-name{font-size:12px;color:#d8a0a0;text-shadow:0 1px 2px #000;margin-bottom:2px;letter-spacing:1px;}
@@ -190,6 +211,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
     <div id="depth-tag"></div>
     <div id="bossbar" class="hidden"><div class="bb-name" id="bossbar-name"></div><div class="bb-track"><div id="bossbar-fill"></div></div></div>
     <button class="topbtn" id="b-map" title="Map">🗺</button>
+    <button class="topbtn" id="b-log" title="Log">📜</button>
     <button class="topbtn" id="b-rest" title="Rest">⛺</button>
     <button class="topbtn" id="b-mute" title="Sound">🔊</button>
     <button class="topbtn" id="b-menu" title="Menu">☰</button>
@@ -254,7 +276,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
     <div><div id="inv-grid"></div><div id="item-tip">Drag items between the pack, body slots and companions. Tap an item to inspect.</div></div>
     <div id="inv-party"></div>
   </div>
-  <div class="row"><button class="mbtn small" id="inv-use" disabled>Use</button><button class="mbtn small" id="inv-drop">Drop selected</button><button class="mbtn small" id="inv-close">Close</button></div>
+  <div class="row"><button class="mbtn small" id="inv-use" disabled>Use</button><button class="mbtn small" id="inv-learn" disabled>Learn</button><button class="mbtn small" id="inv-drop">Drop selected</button><button class="mbtn small" id="inv-close">Close</button></div>
 </div></div>
 
 <div class="ovl" id="ovl-stats"><div class="panel" style="min-width:330px">
@@ -268,6 +290,23 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   <div id="spell-list"></div>
   <div id="spell-tip"></div>
   <button class="mbtn small" id="sp-close">Close</button>
+</div></div>
+
+<div class="ovl" id="ovl-memo"><div class="panel" style="width:min(620px,94vw)">
+  <h2 id="memo-title">Memorise</h2>
+  <div class="dim-note" id="memo-sub"></div>
+  <div id="memo-body"></div>
+  <div class="row">
+    <button class="mbtn small" id="memo-clear">Clear all</button>
+    <button class="mbtn small" id="memo-auto">Fill</button>
+    <button class="mbtn small" id="memo-done">Done</button>
+  </div>
+</div></div>
+
+<div class="ovl" id="ovl-log"><div class="panel" style="width:min(620px,94vw)">
+  <h2>Log</h2>
+  <div id="log-list"></div>
+  <div class="row"><button class="mbtn small" id="log-clear">Clear</button><button class="mbtn small" id="log-close">Close</button></div>
 </div></div>
 
 <div class="ovl" id="ovl-map"><div class="panel">
@@ -297,12 +336,43 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 /* ============================== RULES DATA (D&D 3.5 SRD, simplified) ============================== */
 const rnd = (n)=>Math.floor(Math.random()*n);
 const d = (n)=>1+rnd(n);
-const roll = (num,die,mod=0)=>{let s=mod;for(let i=0;i<num;i++)s+=d(die);return s;};
+// Spell damage comes out of each spell's own dmgFn, which rolls internally, so
+// there is no notation to read off a definition. Arm this instead and the dice
+// report themselves; it is null in every frame the log is not asking.
+let _rollTrace=null;
+const roll = (num,die,mod=0)=>{let s=mod;for(let i=0;i<num;i++)s+=d(die);
+  if(_rollTrace)_rollTrace.push({n:num,d:die,mod,sum:s});
+  return s;};
 const d20 = ()=>d(20);
 const mod = (score)=>Math.floor((score-10)/2);
 const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
 const pick=(arr)=>arr[rnd(arr.length)];
 const fmtMod=(m)=>m>=0?('+'+m):(''+m);
+
+/* ---------- the log ---------- */
+// Everything the party is told, and the arithmetic behind it. Held in memory
+// only and capped: this is a record of the session, not part of the save.
+const LOG_MAX=400;
+const GLOG=[];
+function logAdd(kind,text,detail){
+  GLOG.push({kind,text,detail:detail||''});
+  if(GLOG.length>LOG_MAX)GLOG.shift();
+}
+function traceRoll(fn){
+  const prev=_rollTrace;_rollTrace=[];
+  try{return {value:fn(),dice:_rollTrace.slice()};}
+  finally{_rollTrace=prev;}
+}
+// the two shapes every roll takes: a d20 against a number, and a bag of dice
+function fmtCheck(nat,mod,vs,label){
+  return 'd20 '+nat+' '+fmtMod(mod)+' = '+(nat+mod)+(vs==null?'':' vs '+label+' '+vs);
+}
+function fmtDice(n,die,mod){return n+'d'+die+(mod?fmtMod(mod):'');}
+function fmtTrace(dice){
+  if(!dice||!dice.length)return '';
+  return dice.map(r=>fmtDice(r.n,r.d,r.mod)+' = '+r.sum).join(' + ');
+}
+function natNote(nat){return nat===20?'  ·  natural 20':nat===1?'  ·  natural 1':'';}
 
 const ABILITIES=['str','dex','con','int','wis','cha'];
 const ABIL_LBL={str:'STR',dex:'DEX',con:'CON',int:'INT',wis:'WIS',cha:'CHA'};
@@ -399,26 +469,26 @@ const SPELLS={
   websp:{name:'Web',circle:2,list:'arcane',target:'foe',save:{type:'ref',negate:true},hold:8,desc:'Sticky webs hold the foe for 8s. Reflex negates.'},
   flamingsphere:{name:'Flaming Sphere',circle:2,list:'arcane',target:'foe',save:{type:'ref',half:true},desc:'Rolling ball of fire: 3d6, Reflex half.',dmgFn:()=>roll(3,6)},
   // wizard 3
-  fireball:{name:'Fireball',circle:3,list:'arcane',target:'foes',save:{type:'ref',half:true},desc:'Explosion: 1d6/level (max 10d6) to all foes ahead. Reflex half.',
+  fireball:{name:'Fireball',circle:3,list:'arcane',target:'foes',area:{kind:'burst',r:3},save:{type:'ref',half:true},desc:'Bursts where it lands: 1d6/level (max 10d6) to everything within three tiles. Reflex half.',
     dmgFn:(cl)=>roll(clamp(cl,5,10),6)},
-  lightning:{name:'Lightning Bolt',circle:3,list:'arcane',target:'foes',save:{type:'ref',half:true},desc:'Bolt through all foes in line: 1d6/level (max 10d6). Reflex half.',
+  lightning:{name:'Lightning Bolt',circle:3,list:'arcane',target:'foes',area:{kind:'line',len:10},save:{type:'ref',half:true},desc:'Spears ten tiles straight ahead, through everything in the line: 1d6/level (max 10d6). Reflex half.',
     dmgFn:(cl)=>roll(clamp(cl,5,10),6)},
   haste:{name:'Haste',circle:3,list:'arcane',target:'allies',buff:{haste:true,ac:1,dur:30},desc:'Party attacks 1/3 faster, +1 AC, for 30s.'},
   slow:{name:'Slow',circle:3,list:'arcane',target:'foe',save:{type:'will',negate:true},slow:20,desc:'Foe moves and strikes at half speed for 20s. Will negates.'},
   vampirictouch:{name:'Vampiric Touch',circle:3,list:'arcane',target:'foe',auto:true,drain:true,desc:'Touch: 1d6 per 2 levels; you gain the life stolen.',
     dmgFn:(cl)=>roll(clamp(Math.floor(cl/2),1,10),6)},
   // wizard 4
-  icestorm:{name:'Ice Storm',circle:4,list:'arcane',target:'foes',auto:true,desc:'Hail hammers all foes ahead: 5d6, no save.',dmgFn:()=>roll(5,6)},
+  icestorm:{name:'Ice Storm',circle:4,list:'arcane',target:'foes',area:{kind:'burst',r:3},auto:true,desc:'Hail hammers a three-tile circle: 5d6, no save.',dmgFn:()=>roll(5,6)},
   phantasmalkiller:{name:'Phantasmal Killer',circle:4,list:'arcane',target:'foe',save:{type:'will',half:true},desc:'Nightmare made real: 6d6, Will half (fear pierces the mind).',dmgFn:()=>roll(6,6)},
   stoneskin:{name:'Stoneskin',circle:4,list:'arcane',target:'ally',buff:{dr:10,pool:60,dur:300},desc:'Grants DR 10 until 60 damage is absorbed.'},
   enervation:{name:'Enervation',circle:4,list:'arcane',target:'foe',auto:true,negLevels:2,desc:'Black ray: foe suffers 2 negative levels (weaker attacks, −10 hp).'},
   fireshield:{name:'Fire Shield',circle:4,list:'arcane',target:'self',buff:{fireshield:[2,6],dur:60},desc:'Attackers who strike you take 2d6 fire, for 60s.'},
   // wizard 5
-  conecold:{name:'Cone of Cold',circle:5,list:'arcane',target:'foes',save:{type:'ref',half:true},desc:'Freezing blast: 1d6/level (max 15d6). Reflex half.',
+  conecold:{name:'Cone of Cold',circle:5,list:'arcane',target:'foes',area:{kind:'cone',len:6},save:{type:'ref',half:true},desc:'A widening cone six tiles deep: 1d6/level (max 15d6). Reflex half.',
     dmgFn:(cl)=>roll(clamp(cl,9,15),6)},
   holdmonster:{name:'Hold Monster',circle:5,list:'arcane',target:'foe',save:{type:'will',negate:true},hold:15,desc:'Paralyzes any foe for 15s. Will negates.'},
-  cloudkill:{name:'Cloudkill',circle:5,list:'arcane',target:'foes',save:{type:'fort',half:true},desc:'Poison fog: 6d6 to all foes ahead, Fortitude half.',dmgFn:()=>roll(6,6)},
-  wavesfatigue:{name:'Waves of Exhaustion',circle:5,list:'arcane',target:'foes',auto:true,slowAll:25,desc:'All foes ahead slowed for 25s. No save.'},
+  cloudkill:{name:'Cloudkill',circle:5,list:'arcane',target:'foes',area:{kind:'burst',r:3},save:{type:'fort',half:true},desc:'Poison fog rolls three tiles about where it settles: 6d6, Fortitude half.',dmgFn:()=>roll(6,6)},
+  wavesfatigue:{name:'Waves of Exhaustion',circle:5,list:'arcane',target:'foes',area:{kind:'cone',len:6},auto:true,slowAll:25,desc:'A cone six tiles deep; everything caught is slowed for 25s. No save.'},
   // cleric 1
   clw:{name:'Cure Light Wounds',circle:1,list:'divine',target:'ally',healFn:(cl)=>roll(1,8,clamp(cl,1,5)),desc:'Heals 1d8 + level (max +5).'},
   bless:{name:'Bless',circle:1,list:'divine',target:'allies',buff:{atk:1,dur:60},desc:'+1 attack for the party, 60s.'},
@@ -445,7 +515,7 @@ const SPELLS={
   divinepower:{name:'Divine Power',circle:4,list:'divine',target:'self',buff:{atk:3,str:2,dur:45},desc:'+3 attack, +2 STR for 45s.'},
   freedommove:{name:'Freedom of Movement',circle:4,list:'divine',target:'ally',buff:{freedom:true,dur:120},cures:['paralysis','hold'],desc:'Immune to paralysis and holds for 2 min.'},
   // cleric 5
-  flamestrike:{name:'Flame Strike',circle:5,list:'divine',target:'foes',save:{type:'ref',half:true},desc:'Pillar of divine fire: 1d6/level (max 15d6). Reflex half.',
+  flamestrike:{name:'Flame Strike',circle:5,list:'divine',target:'foes',area:{kind:'column',r:1},save:{type:'ref',half:true},desc:'A pillar of divine fire one tile about where it falls: 1d6/level (max 15d6). Reflex half.',
     dmgFn:(cl)=>roll(clamp(cl,9,15),6)},
   masscure:{name:'Mass Cure Light Wounds',circle:5,list:'divine',target:'allies',healFn:(cl)=>roll(1,8,clamp(cl,9,25)),desc:'Heals the whole party 1d8 + level.'},
   raisedead:{name:'Raise Dead',circle:5,list:'divine',target:'ally',raise:true,desc:'Returns a dead companion to life (at 1 hp, one level poorer).'},
@@ -467,10 +537,32 @@ function slotsFor(cls,lvl,abilityScore){
   for(let c=1;c<=5;c++){ if(base[c-1]>0 && m>=c) base[c-1]+= (1+Math.floor((m-c)/4)); }
   return base;
 }
+// The highest circle a caster of this level can command at all.
+function maxCircle(lvl){return lvl>=9?5:lvl>=7?4:lvl>=5?3:lvl>=3?2:1;}
 function spellsKnown(cls,lvl){
   const list=CLASSES[cls].caster; if(!list)return [];
-  const maxC=lvl>=9?5:lvl>=7?4:lvl>=5?3:lvl>=3?2:1;
+  const maxC=maxCircle(lvl);
   return Object.keys(SPELLS).filter(k=>SPELLS[k].list===list&&SPELLS[k].circle<=maxC);
+}
+/* ---------- the wizard's book ---------- */
+// A cleric is granted their whole list and picks freely in the moment; a wizard
+// commands only what is written in their book, and only what they sat down and
+// memorised before sleeping. `preparesSpells` is the single test for which of
+// the two a character is, so a future prepared caster only has to answer here.
+function preparesSpells(ch){return ch&&ch.cls==='wizard';}
+// What a wizard begins with: the attack they will lean on, the armour that
+// keeps them alive, and one trick. Everything else is found or studied.
+const WIZ_START_BOOK=['magicmissile','magearmor','sleep'];
+// Levelling is its own slow study. One new spell of the best circle they can
+// now reach, so a wizard is never left holding a useless book by bad luck with
+// scrolls -- but the interesting spells are still out in the dungeon.
+function studyPick(book,lvl){
+  const want=maxCircle(lvl);
+  for(let c=want;c>=1;c--){
+    const pool=Object.keys(SPELLS).filter(k=>SPELLS[k].list==='arcane'&&SPELLS[k].circle===c&&book.indexOf(k)<0);
+    if(pool.length)return pick(pool);
+  }
+  return null;
 }
 
 /* ---------- monsters ---------- */
@@ -609,17 +701,31 @@ function affixChance(depth,rich){
   if(depth<20)return 0;
   return Math.min(0.45,(depth-19)*0.03)*(rich?1:0.2);
 }
-const BOSSES=[ // every 5th level: pick by depth
-  {minD:5, base:'bugbear', name:'Grukk the Skullkeeper'},
-  {minD:10,base:'wight',   name:'The Bonelord'},
-  {minD:15,base:'minotaur',name:'Gorehorn, King Below'},
-  {minD:20,base:'troll',   name:'Ubbroth the Unrotting'},
-  {minD:25,base:'ogremage',name:'Sinshara of the Veil'},
-  {minD:30,base:'dragon',  name:'Vermilax the Patient'},
+// Boss floors are every third level, which is also the length of a theme block
+// (THEMES[floor((depth-1)/3)]), so a boss always caps the theme you have been
+// walking through rather than landing in the middle of the next one. One named
+// boss per boss floor: minD therefore steps by 3, not by 5.
+// The first theme block is exempt. On floor 3 the party is still level 1 -- 32
+// hit points between four of them -- against a boss carrying 2.5x hp and +2 AC,
+// which at that level is unhittable rather than hard. Bosses start at 6.
+const BOSSES=[ // every 3rd level from 6: pick by depth
+  {minD:6, base:'bugbear', name:'Grukk the Skullkeeper'},
+  {minD:9, base:'wight',   name:'The Bonelord'},
+  {minD:12,base:'minotaur',name:'Gorehorn, King Below'},
+  {minD:15,base:'troll',   name:'Ubbroth the Unrotting'},
+  {minD:18,base:'ogremage',name:'Sinshara of the Veil'},
+  {minD:21,base:'dragon',  name:'Vermilax the Patient'},
 ];
-// Past Vermilax the named bosses run out, and every fifth floor was handing you
+// Past Vermilax the named bosses run out, and every boss floor was handing you
 // the same dragon forever. The list starts over instead, each pass through it
 // harder than the last and titled so you can see which circle you are on.
+// A boss's hit points are a property of the floor, not of whichever creature the
+// cycle happened to name. A bugbear base is a quarter of a dragon's, so raw base
+// hp made the boss on floor 21 weaker than the one on floor 18, and the same
+// sawtooth repeated on every pass. The creature still decides how the fight goes
+// -- its damage, its reach, whether it casts -- but its weight class comes from
+// the depth. Taken from the list so adding a named boss keeps it honest.
+const BOSS_BASE_HP=BOSSES.reduce((a,b)=>a+MONSTERS[b.base].hp,0)/BOSSES.length;
 const BOSS_RANKS=['Warlord','Tyrant','Devourer','Sovereign','Archfiend','Herald'];
 const BOSS_CIRCLES=['of the Sunken Circle','of the Black Cycle','of the Last Gate','Beyond Counting'];
 function bossFor(depth){
@@ -629,8 +735,8 @@ function bossFor(depth){
     for(const c of BOSSES)if(depth>=c.minD)b=c;
     return {base:b.base,name:b.name,cycle:0};
   }
-  // boss floors come every fifth level, so one pass through the list is 30 floors
-  const n=Math.floor((depth-lastNamed)/5)-1;
+  // boss floors come every third level, so one pass through the list is 18 floors
+  const n=Math.floor((depth-lastNamed)/3)-1;
   const i=((n%BOSSES.length)+BOSSES.length)%BOSSES.length;
   const cycle=1+Math.floor(n/BOSSES.length);
   const base=BOSSES[i].base;
@@ -1869,7 +1975,7 @@ function tryGen(depth,targetWalk,theme){
   // 10. monsters — filled to the floor's threat budget rather than a flat count,
   // so difficulty is a curve we author instead of one that falls out of the bands
   const monsters=[];
-  const isBossLevel=depth%5===0;
+  const isBossLevel=depth%3===0&&depth>=6;   // last floor of every theme block but the first
   // How many bodies is fixed by depth; the budget then decides how heavy each
   // of them should be, by favouring pool members whose threat sits near the
   // per-monster share. So a tight budget fills a floor with lesser creatures
@@ -1932,7 +2038,13 @@ function tryGen(depth,targetWalk,theme){
     // have nothing new to introduce, so they sharpen what is already there
     if(bossDef.cycle>0)makeElite(bm,ELITE_KEYS[(bossDef.cycle+depth)%ELITE_KEYS.length]);
     bm.boss=true; bm.name=bossDef.name; bm.cycle=bossDef.cycle;
-    bm.maxHp=Math.round(bm.maxHp*(2.5+0.6*bossDef.cycle))+depth*4; bm.hp=bm.maxHp;
+    // Named bosses keep their own creature's hit points: they are hand-picked for
+    // the depth they sit at, and Sinshara is a caster whose danger is in her
+    // spells rather than her bulk. Cycled bosses march blindly through the list,
+    // so a bugbear pass handed you a boss a third of the dragon three floors up;
+    // those take the list's mean instead.
+    const bossBase=bossDef.cycle>0?BOSS_BASE_HP*depthScale(depth):bm.maxHp;
+    bm.maxHp=Math.round(bossBase*(2.5+0.6*bossDef.cycle))+depth*4; bm.hp=bm.maxHp;
     bm.atk+=2+2*bossDef.cycle; bm.ac+=2+bossDef.cycle; bm.xp*=3;
     bm.guard={x:sx,y:sy,r:3};
     monsters.push(bm);
@@ -1975,6 +2087,18 @@ function tryGen(depth,targetWalk,theme){
         // A single tile at the centre of a 3x3-or-larger room cannot cut the
         // level in two, so this is safe after the connectivity check.
         g[idx(bx,by)]=T_PIT;
+        // Whatever is already lying here is shoved aside, not destroyed. Loot is
+        // placed before the ossuary is sited, so the bier can land on top of it
+        // -- and the level's only key is one of the things it can land on, which
+        // seals the locked room for good. About one crypt floor in two thousand.
+        const under=items[idx(bx,by)];
+        if(under&&under.length){
+          let spot=DIRS.map(([dx,dy])=>[bx+dx,by+dy]).find(([x,y])=>g[idx(x,y)]===T_FLOOR);
+          if(!spot)for(let yy=r.y;yy<r.y+r.h&&!spot;yy++)
+            for(let xx=r.x;xx<r.x+r.w&&!spot;xx++)
+              if(g[idx(xx,yy)]===T_FLOOR)spot=[xx,yy];
+          if(spot){const j=idx(spot[0],spot[1]);(items[j]=items[j]||[]).push(...under);}
+        }
         delete items[idx(bx,by)];
         delete traps[idx(bx,by)];
         for(let i=monsters.length-1;i>=0;i--)if(monsters[i].x===bx&&monsters[i].y===by)monsters.splice(i,1);
@@ -2199,9 +2323,13 @@ function mkCharacter(name,race,cls,scores){
     inventory:new Array(20).fill(null),
     equip:{armor:mkItem('clothes'),helmet:null,boots:null,amulet:null,ring1:null,ring2:null,lhand:null,rhand:null},
     slotsUsed:[0,0,0,0,0],
+    book:[],                       // wizards only: the spells written down
+    memo:[[],[],[],[],[]],         // the loadout chosen at the last camp
+    prepared:[[],[],[],[],[]],     // what is left of it, spent as they cast
     layPool:0,smiteUsed:false,rageUsed:false,rageUntil:0,turnUsed:false,
     cdL:0,cdR:0, // per-hand attack cooldowns (seconds) — dual wielders alternate hands
   };
+  ensureBook(ch);
   ch.equip.rhand=mkItem(CLASSES[cls].startWeapon);
   if(cls==='cleric'||cls==='paladin')ch.inventory[0]=mkItem('pot_clw');
   if(cls==='wizard')ch.inventory[0]=mkItem('scroll',{spell:'magicmissile'});
@@ -2258,8 +2386,68 @@ function recalcHp(ch,full){
 function resetDaily(ch){
   const c=CLASSES[ch.cls];
   ch.slotsUsed=[0,0,0,0,0];
+  // a wizard wakes holding exactly what they sat down and memorised, no more
+  if(preparesSpells(ch))ch.prepared=trimMemo(ch).map(a=>a.slice());
   ch.smiteUsed=false;ch.rageUsed=false;ch.rageUntil=0;ch.turnUsed=false;
   if(c.layon)ch.layPool=Math.max(0,mod(ch.abil.cha))*ch.level||0;
+}
+/* ---------- the wizard's book and what is memorised from it ---------- */
+// Also the migration path: a wizard from a save written before any of this
+// existed arrives with no book at all, and must not wake up mute.
+function ensureBook(ch){
+  if(!preparesSpells(ch))return ch;
+  if(!Array.isArray(ch.book))ch.book=[];
+  if(!ch.book.length){
+    ch.book=WIZ_START_BOOK.filter(k=>SPELLS[k]).slice();
+    // one study pick per level already earned, so a mid-run wizard is whole
+    for(let l=2;l<=ch.level;l++){const k=studyPick(ch.book,l);if(k)ch.book.push(k);}
+  }
+  const blank=()=>[[],[],[],[],[]];
+  if(!Array.isArray(ch.memo)||ch.memo.length!==5)ch.memo=blank();
+  if(!Array.isArray(ch.prepared)||ch.prepared.length!==5)ch.prepared=blank();
+  if(!ch.memo.some(a=>a.length)){autoMemo(ch);ch.prepared=ch.memo.map(a=>a.slice());}
+  return ch;
+}
+function learnSpell(ch,key){
+  if(!preparesSpells(ch)||!SPELLS[key])return false;
+  if(SPELLS[key].list!=='arcane')return false;          // a wizard cannot read divine magic
+  if(SPELLS[key].circle>maxCircle(ch.level))return false; // too far above them to make sense of
+  if(ch.book.indexOf(key)>=0)return false;
+  ch.book.push(key);
+  return true;
+}
+// The book filtered to what this wizard could actually memorise today.
+function bookAt(ch,circle){
+  return ch.book.filter(k=>SPELLS[k]&&SPELLS[k].circle===circle);
+}
+// A loadout can outlive the slots that held it -- ability damage and negative
+// levels both shrink the table -- so trim before it is ever handed out.
+function trimMemo(ch){
+  const slots=charSlots(ch);
+  return ch.memo.map((a,i)=>a.filter(k=>ch.book.indexOf(k)>=0).slice(0,slots[i]));
+}
+function memoCount(ch){return ch.memo.reduce((n,a)=>n+a.length,0);}
+// Fill every slot with something sensible: used for a fresh wizard and for one
+// arriving from an older save, so nobody is ever handed an empty spell screen.
+function autoMemo(ch){
+  const slots=charSlots(ch);
+  ch.memo=[[],[],[],[],[]];
+  for(let c=1;c<=5;c++){
+    const pool=bookAt(ch,c);
+    if(!pool.length)continue;
+    for(let i=0;i<slots[c-1];i++)ch.memo[c-1].push(pool[i%pool.length]);
+  }
+  return ch.memo;
+}
+function preparedCount(ch,key){
+  const sp=SPELLS[key];if(!sp||!ch.prepared)return 0;
+  return ch.prepared[sp.circle-1].filter(k=>k===key).length;
+}
+function spendPrepared(ch,key){
+  const sp=SPELLS[key];if(!sp)return false;
+  const row=ch.prepared[sp.circle-1],i=row.indexOf(key);
+  if(i<0)return false;
+  row.splice(i,1);return true;
 }
 function charSlots(ch){return slotsFor(ch.cls,ch.level,ch.abil[casterAbil(ch)]-ch.abilDmg[casterAbil(ch)]);}
 function dexACBonus(ch){
@@ -2421,6 +2609,10 @@ function grantXp(ch,amount){
     const gain=hpGainAt(ch.cls,ch.level,conM);
     ch.maxHp+=gain;ch.hp=Math.max(ch.hp,0)+gain;
     if(CLASSES[ch.cls].layon)ch.layPool+=Math.max(0,mod(ch.abil.cha));
+    if(preparesSpells(ch)){
+      const learned=studyPick(ch.book,ch.level);
+      if(learned){ch.book.push(learned);UI.toast(`${ch.name} works out ${SPELLS[learned].name} and writes it down.`);}
+    }
     UI.toast(`${ch.name} is now level ${ch.level}!`);
     UI.float(ch,'LEVEL UP','#e0cf9e');
     SFX.levelup();
@@ -4205,6 +4397,31 @@ function monsterAt(x,y){
   }
   return best;
 }
+/* Left and right, both read from the party's point of view.
+
+   A tile packs its monsters 0-1 in front and 2-3 behind, and `rankOffset` puts
+   the ODD slot of each pair on the party's left (measured, not derived: the
+   camera's own right vector dots positive with slot 0). The party portraits are
+   a 2x2 grid laid out [0][1] over [2][3], so the EVEN party indices are the
+   left-hand column. The two conventions are opposite, which is exactly why they
+   are written down here rather than inlined at each call site. */
+const SIDE_L=0,SIDE_R=1,RANK_F=0,RANK_B=1;
+function monsterSide(m){return (m.slot%2)?SIDE_L:SIDE_R;}
+function monsterRank(m){return m.slot<2?RANK_F:RANK_B;}
+function charSide(ch){return G.party.indexOf(ch)%2===0?SIDE_L:SIDE_R;}
+function charRank(ch){return G.party.indexOf(ch)<2?RANK_F:RANK_B;}
+// What a given character's blade meets on that tile. Two monsters abreast and
+// the party fights the one in front of them; without a character (a thrown
+// spell with no caster, a blocking check) it is the front-most as before.
+function facingMonsterAt(x,y,ch){
+  const occ=monstersOn(x,y);
+  if(!occ.length)return null;
+  const anyFront=occ.some(m=>m.slot<2);
+  const line=occ.filter(m=>(m.slot<2)===anyFront);
+  const foremost=()=>line.reduce((a,b)=>a.slot<b.slot?a:b);
+  if(line.length===1||!ch)return foremost();
+  return line.find(m=>monsterSide(m)===charSide(ch))||foremost();
+}
 function freeSlotAt(x,y,except){
   const used=new Set();
   for(const m of G.L.monsters)if(m.hp>0&&m!==except&&m.x===x&&m.y===y)used.add(m.slot);
@@ -4248,6 +4465,72 @@ function losClear(x0,y0,x1,y1){ // straight-line only (same row/col), through se
     x+=dx;y+=dy;
   }
   return true;
+}
+/* ---------- where an area spell lands ----------
+
+   3.5 measures in feet at five to the tile, so a 120-ft bolt is 24 tiles and a
+   20-ft-radius fireball is 4. The bolt does not fit a dungeon whose rooms are
+   six across, so lengths are pulled in; the shapes and their sizes relative to
+   one another are what is kept.
+
+     burst   fireball, ice storm, cloudkill  — a disc about where it lands
+     column  flame strike                    — the same, but a tight pillar
+     line    lightning bolt                  — straight ahead until a wall
+     cone    cone of cold, waves of exhaustion — widening, from the caster
+
+   A burst floods out from its centre through open tiles rather than being
+   masked by sight from the party. That is both closer to a 3.5 spread, which
+   bends around corners, and the fix for the old behaviour: `losClear` is a
+   straight-line test that answers false for anything off the party's own row
+   or column, so gathering with it clipped every blast into a narrow wedge. */
+function spellArea(sp,ox,oy,facing){
+  const a=sp.area,L=G.L;
+  const out=new Set();
+  if(!a||!L)return out;
+  const key=(x,y)=>y*L.w+x;
+  const open=(x,y)=>seesThroughTile(tileAt(x,y));
+  if(a.kind==='line'){
+    const [dx,dy]=DIRS[facing];
+    for(let i=1;i<=a.len;i++){
+      const x=ox+dx*i,y=oy+dy*i;
+      if(!open(x,y))break;                 // a bolt is stopped by the first wall
+      out.add(key(x,y));
+    }
+    return out;
+  }
+  const cand=new Set();
+  if(a.kind==='cone'){
+    const [dx,dy]=DIRS[facing];
+    for(let d=1;d<=a.len;d++){
+      const w=Math.floor(d/2);             // as wide as it is long, by the far end
+      for(let p=-w;p<=w;p++)cand.add(key(ox+dx*d-dy*p,oy+dy*d+dx*p));
+    }
+  }else{
+    const r=a.r;
+    for(let yy=-r;yy<=r;yy++)for(let xx=-r;xx<=r;xx++)
+      if(xx*xx+yy*yy<=r*r+r)cand.add(key(ox+xx,oy+yy));   // rounded, not a square
+  }
+  // flood from the origin, so nothing lands on the far side of a wall
+  const q=[[ox,oy]];out.add(key(ox,oy));
+  for(let qi=0;qi<q.length;qi++){
+    const [cx,cy]=q[qi];
+    for(const [dx,dy] of DIRS){
+      const nx=cx+dx,ny=cy+dy,k=key(nx,ny);
+      if(out.has(k)||!cand.has(k)||!open(nx,ny))continue;
+      out.add(k);q.push([nx,ny]);
+    }
+  }
+  if(!cand.has(key(ox,oy)))out.delete(key(ox,oy));   // a cone starts ahead of the caster
+  return out;
+}
+// A burst is thrown at something; a cone or a line comes off the caster.
+function areaOrigin(sp,ch){
+  const a=sp.area;
+  if(a&&(a.kind==='burst'||a.kind==='column')){
+    const found=firstMonsterAhead(a.range||6,ch);
+    return found?{x:found.m.x,y:found.m.y,m:found.m}:null;
+  }
+  return {x:G.px,y:G.py,m:null};
 }
 function markExplored(){
   const L=G.L;
@@ -4607,11 +4890,11 @@ function canMelee(ch,wDef){
   if(frontRow(ch))return true;
   return !!(wDef&&wDef.reach);
 }
-function firstMonsterAhead(maxRange){
+function firstMonsterAhead(maxRange,ch){
   const [dx,dy]=DIRS[G.facing];
   for(let i=1;i<=maxRange;i++){
     const x=G.px+dx*i,y=G.py+dy*i;
-    const m=monsterAt(x,y);
+    const m=facingMonsterAt(x,y,ch);
     if(m)return {m,dist:i};
     if(!seesThroughTile(tileAt(x,y)))return null;
   }
@@ -4630,7 +4913,7 @@ function useHand(ch,slot){
   const def=it?ITEM_DEFS[it.base]:null;
   const consumeOne=()=>{if((it.qty||1)>1)it.qty--;else ch.equip[slot]=null;};
   if(it&&def.kind==='potion'){UI.pickAlly('Give '+itemName(it)+' to…',(target)=>{drinkPotion(ch,target,it,consumeOne,slot);});return;}
-  if(it&&(def.kind==='scroll'||def.kind==='wand')){useSpellItem(ch,it,()=>{if(def.kind==='scroll')consumeOne();});return;}
+  if(it&&(def.kind==='scroll'||def.kind==='wand')){useSpellItem(ch,it,()=>{if(def.kind==='scroll')consumeOne();},slot);return;}
   if(it&&def.kind==='shield'){UI.toast('A shield guards; it does not strike.');return;}
   // weapon or unarmed
   let wDef=def&&def.kind==='weapon'?def:{name:'Fist',dmg:[1,3],crit:[20,2],hands:1,light:true,unarmed:true};
@@ -4638,15 +4921,15 @@ function useHand(ch,slot){
   if(wDef.hands===2&&anyHandCd(ch)>0)return; // a two-hander needs both hands free
   // ranged?
   if(wDef.ranged){
-    const found=firstMonsterAhead(wDef.ranged);
+    const found=firstMonsterAhead(wDef.ranged,ch);
     if(!found){UI.toast('No target in sight.');return;}
     doAttack(ch,slot,wDef,wIt,found.m,found.dist>1);
     return;
   }
   if(!canMelee(ch,wDef)){UI.toast(ch.name+' cannot reach from the back row.');return;}
   const ahead=aheadTile(1);
-  let m=monsterAt(ahead.x,ahead.y);
-  if(!m&&wDef.reach){const a2=aheadTile(2);m=monsterAt(a2.x,a2.y);}
+  let m=facingMonsterAt(ahead.x,ahead.y,ch);
+  if(!m&&wDef.reach){const a2=aheadTile(2);m=facingMonsterAt(a2.x,a2.y,ch);}
   if(!m){ // swing at air
     const cdv=attackCooldown(ch,wDef)*0.5;
     if(wDef.hands===2)armBoth(ch,cdv);else armHand(ch,slot,cdv);
@@ -4685,8 +4968,22 @@ function useInventoryItem(ch,ref){
     UI.pickAlly('Give '+itemName(it)+' to…',(target)=>{drinkPotion(ch,target,it,consumeOne,held);});
     return true;
   }
-  useSpellItem(ch,it,()=>{if(def.kind==='scroll')consumeOne();});
+  useSpellItem(ch,it,()=>{if(def.kind==='scroll')consumeOne();},held);
   return true;
+}
+/* ---------- log entries for the things that resolve on a die ---------- */
+// One line for what happened, one for the arithmetic behind it. Both sides of a
+// blow go through here so an attack made and an attack taken read the same way.
+function logStrike(who,target,nat,mod,ac,hit,crit,dmg,parts){
+  const head=hit?(who+' hits '+target+(crit?' — CRITICAL':'')+' for '+dmg)
+                :(who+' misses '+target);
+  let det=fmtCheck(nat,mod,ac,'AC')+natNote(nat);
+  if(hit&&parts&&parts.length)det+='  ·  '+parts.join(', ')+(parts.length>1?'  =  '+dmg:'');
+  logAdd(hit?'hit':'miss',head,det);
+}
+function logSave(who,kind,nat,mod,dc,made,outcome){
+  logAdd('save',who+(made?' resists ':' fails ')+kind+(outcome?' — '+outcome:''),
+    fmtCheck(nat,mod,dc,'DC')+natNote(nat));
 }
 function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
   const dualWielding=isDualWielding(ch);
@@ -4702,24 +4999,28 @@ function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
   const hit=nat===20||(nat!==1&&total>=targetAC);
   const crit=hit&&nat>=wDef.crit[0];
   let dmg=0,sneaked=false;
+  const parts=[];   // every die that went into the number, for the log
   if(hit){
+    const dm=damageMod(ch,wDef,wIt),mult=crit?wDef.crit[1]:1;
     dmg=damageRoll(ch,wDef,wIt,crit);
-    if(CLASSES[ch.cls].favored&&['beast','humanoid'].includes(MONSTERS[m.key].type))dmg+=2;
+    parts.push(fmtDice(wDef.dmg[0]*mult,wDef.dmg[1],dm*mult)+' = '+dmg);
+    if(CLASSES[ch.cls].favored&&['beast','humanoid'].includes(MONSTERS[m.key].type)){dmg+=2;parts.push('favoured foe +2');}
     if(CLASSES[ch.cls].sneak&&(m.sleep||m.held>0||(m.targetName&&m.targetName!==ch.name))){
-      dmg+=roll(Math.floor((ch.level+1)/2),6);
+      const nd=Math.floor((ch.level+1)/2),sn=roll(nd,6);
+      dmg+=sn;parts.push('sneak '+fmtDice(nd,6,0)+' = '+sn);
       sneaked=true;
     }
-    if(ch._smiting){dmg+=ch.level;ch._smiting=false;}
+    if(ch._smiting){dmg+=ch.level;ch._smiting=false;parts.push('smite +'+ch.level);}
   }
   // affixed weapons: the energy rider is rolled once with the swing, and is not
   // multiplied by a crit — it burns the same whether or not the blade found a seam
   const af=wIt&&wIt.affix?AFFIXES[wIt.affix]:null;
   const elemDmg=(hit&&af&&af.dice)?roll(af.dice[0],af.dice[1]):0;
-  if(elemDmg)dmg+=elemDmg;
+  if(elemDmg){dmg+=elemDmg;parts.push(ELEMENTS[af.elem].name+' '+fmtDice(af.dice[0],af.dice[1],0)+' = '+elemDmg);}
   const deliver=()=>{
     if(m.hp<=0||!G.L.monsters.includes(m))return;
     m.awake=true;
-    if(!hit){UI.floatAtMonster(m,'miss','#9a9da2');SFX.whiff();return;}
+    if(!hit){logStrike(ch.name,m.name,nat,atkB,targetAC,false);UI.floatAtMonster(m,'miss','#9a9da2');SFX.whiff();return;}
     if(sneaked)UI.floatAtMonster(m,'sneak!','#d8b040');
     SFX.hit();
     // bone turns a point aside and shatters under a hammer; an incorporeal
@@ -4727,10 +5028,12 @@ function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
     const mult=undeadDamageMult(m,wDef,wIt);
     if(mult!==1){
       dmg=Math.max(1,Math.round(dmg*mult));
+      parts.push((mult>1?'bone ×':'incorporeal ×')+mult);
       UI.floatAtMonster(m,mult>1?'shatters!':'barely bites',mult>1?'#e8c840':'#9a9da2');
     }
     // a vampiric weapon drinks what it actually landed, not the overkill
     const landed=Math.min(dmg,Math.max(0,m.hp));
+    logStrike(ch.name,m.name,nat,atkB,targetAC,true,crit,dmg,parts);
     damageMonster(m,dmg,ch,crit);
     if(elemDmg)UI.floatAtMonster(m,'+'+elemDmg+' '+ELEMENTS[af.elem].name,ELEMENTS[af.elem].col);
     if(af&&af.leech&&landed>0)healChar(ch,Math.max(1,Math.round(landed*af.leech)));
@@ -4838,14 +5141,36 @@ function drinkPotion(giver,target,it,consume,slot){
   else armBoth(giver,1.2);
   UI.refreshParty();
 }
-function useSpellItem(ch,it,consume){
+function useSpellItem(ch,it,consume,slot){
   // a Raise Dead scroll answers anyone's plea — the only caster may be the corpse
   if(!CLASSES[ch.cls].caster&&it.spell!=='raisedead'){UI.toast('Only casters can use scrolls and wands.');return;}
   const sp=SPELLS[it.spell];
-  castSpell(ch,it.spell,{item:true,onCast:()=>{
+  castSpell(ch,it.spell,{item:true,slot,onCast:()=>{
     if(it.base==='wand'){it.charges--;if(it.charges<=0){stripItemEverywhere(ch,it);UI.toast('The wand crumbles to dust.');}}
     else consume();
   }});
+}
+// Copying a scroll into the book destroys it: the ink is the spell. A wizard
+// therefore chooses between one casting now and the spell for the rest of the
+// run, which is the whole point of finding one.
+function scribeScroll(ch,it,consume){
+  if(!preparesSpells(ch)){UI.toast(ch.name+' keeps no spellbook.');return false;}
+  const sp=SPELLS[it.spell];
+  if(!sp){UI.toast('There is nothing legible on it.');return false;}
+  if(sp.list!=='arcane'){UI.toast(sp.name+' is divine magic — '+ch.name+' cannot copy it.');return false;}
+  if(sp.circle>maxCircle(ch.level)){
+    UI.toast(sp.name+' is beyond '+ch.name+' for now — it needs the '+sp.circle+ordSuffix(sp.circle)+' circle.');
+    return false;
+  }
+  if(ch.book.indexOf(it.spell)>=0){UI.toast(sp.name+' is already in the book.');return false;}
+  learnSpell(ch,it.spell);
+  consume();
+  SFX.secret();
+  UI.toast(ch.name+' copies '+sp.name+' into their spellbook. The scroll is spent.');
+  logAdd('msg',ch.name+' learns '+sp.name+' from a scroll.');
+  UI.refreshParty();
+  if(UI.refreshInv)UI.refreshInv();
+  return true;
 }
 function stripItemEverywhere(ch,it){
   for(const s in ch.equip)if(ch.equip[s]===it)ch.equip[s]=null;
@@ -4868,26 +5193,47 @@ function castSpell(ch,key,opts){
   if(!canAct(ch)){UI.toast(ch.name+' cannot act.');return false;}
   if(anyHandCd(ch)>0&&!opts.item){UI.toast(ch.name+' is still recovering.');return false;}
   if(!opts.item){
-    const slots=charSlots(ch);
-    const c=sp.circle;
-    if(ch.slotsUsed[c-1]>=slots[c-1]){UI.toast('No '+c+ordSuffix(c)+'-circle slots left. Rest to recover.');return false;}
+    // A wizard casts what they memorised and nothing else; a cleric draws on
+    // their whole list against the slots of the circle.
+    if(preparesSpells(ch)){
+      if(ch.book.indexOf(key)<0){UI.toast(ch.name+' has never learned '+sp.name+'.');return false;}
+      if(preparedCount(ch,key)<1){UI.toast(ch.name+' has not memorised '+sp.name+' today. Camp to prepare it.');return false;}
+    }else{
+      const slots=charSlots(ch);
+      const c=sp.circle;
+      if(ch.slotsUsed[c-1]>=slots[c-1]){UI.toast('No '+c+ordSuffix(c)+'-circle slots left. Rest to recover.');return false;}
+    }
   }
   const dc=10+sp.circle+abilMod(ch,casterAbil(ch));
   // resolve target(s)
-  let foes=[];
-  if(sp.target==='foe'||sp.target==='foes'){
-    const found=firstMonsterAhead(6);
+  let foes=[],areaTiles=null;
+  if(sp.target==='foe'){
+    const found=firstMonsterAhead(6,ch);
     if(!found){UI.toast('No foe in sight.');return false;}
-    if(sp.target==='foe')foes=[found.m];
-    else {
-      const c0=found.m;
-      foes=G.L.monsters.filter(m=>m.hp>0&&Math.abs(m.x-c0.x)<=2&&Math.abs(m.y-c0.y)<=2&&(losClear(G.px,G.py,m.x,m.y)||m===c0||Math.abs(m.x-c0.x)+Math.abs(m.y-c0.y)<=2));
-    }
+    foes=[found.m];
+  }else if(sp.target==='foes'){
+    const org=areaOrigin(sp,ch);
+    if(!org){UI.toast('No foe in sight.');return false;}
+    areaTiles=spellArea(sp,org.x,org.y,G.facing);
+    foes=G.L.monsters.filter(m=>m.hp>0&&areaTiles.has(m.y*G.L.w+m.x));
+    // a cone or a bolt is aimed by facing alone, so it can catch nothing at all;
+    // do not burn the slot on empty air
+    if(!foes.length){UI.toast('Nothing is caught in it.');return false;}
+    foes.sort((a,b)=>(Math.abs(a.x-G.px)+Math.abs(a.y-G.py))-(Math.abs(b.x-G.px)+Math.abs(b.y-G.py)));
   }
   const commit=()=>{
-    if(!opts.item)ch.slotsUsed[sp.circle-1]++;
+    // the memorised copy is gone the moment it is spoken; a cleric spends a slot
+    if(!opts.item){
+      if(preparesSpells(ch))spendPrepared(ch,key);
+      else ch.slotsUsed[sp.circle-1]++;
+    }
     if(opts.onCast)opts.onCast();
-    armBoth(ch,1.8); // casting occupies both hands
+    // An item is worked with the hand that holds it, so a second wand in the
+    // other hand keeps its own timer — exactly as a second sword does. Same rule
+    // the potion path already follows, and it never shortens a longer cooldown.
+    // A memorised spell still takes both: that is gestures and components.
+    if(opts.item&&opts.slot)armHand(ch,opts.slot,Math.max(handCd(ch,opts.slot),1.8));
+    else armBoth(ch,1.8);
     SFX.cast();
     UI.spellFlash(sp);
   };
@@ -4906,19 +5252,24 @@ function castSpell(ch,key,opts){
   commit();
   const resolveFoe=(m)=>{
     if(m.hp<=0||!G.L.monsters.includes(m))return;
-    let dmg=sp.dmgFn?sp.dmgFn(cl):0;
-    if(sp.vsUndead&&m.type==='undead')dmg*=2;
-    let negated=false,halved=false;
+    const bag=sp.dmgFn?traceRoll(()=>sp.dmgFn(cl)):{value:0,dice:[]};
+    let dmg=bag.value;
+    const parts=bag.dice.length?[fmtTrace(bag.dice)]:[];
+    if(sp.vsUndead&&m.type==='undead'){dmg*=2;parts.push('undead ×2');}
+    let negated=false,halved=false,saveNote='';
     if(sp.save){
       const s=monsterSave(m,sp.save.type);
+      saveNote='  ·  '+m.name+' '+sp.save.type+' save '+s+' vs DC '+dc;
       if(s>=dc){if(sp.save.negate){negated=true;}else halved=true;}
     }
-    if(sp.humanoidOnly&&m.type!=='humanoid'){UI.floatAtMonster(m,'immune','#9a9da2');return;}
-    if(negated){UI.floatAtMonster(m,'resisted','#9a9da2');return;}
-    if(halved)dmg=Math.floor(dmg/2);
+    const logSpell=(outcome)=>logAdd('spell',ch.name+' casts '+sp.name+' at '+m.name+' — '+outcome,
+      'circle '+sp.circle+', DC '+dc+(parts.length?'  ·  '+parts.join(', '):'')+saveNote);
+    if(sp.humanoidOnly&&m.type!=='humanoid'){logSpell('immune');UI.floatAtMonster(m,'immune','#9a9da2');return;}
+    if(negated){logSpell('resisted, no effect');UI.floatAtMonster(m,'resisted','#9a9da2');return;}
+    if(halved){dmg=Math.floor(dmg/2);parts.push('save halves → '+dmg);}
     if(sp.sleep){
-      if(MONSTERS[m.key].cr<=1&&m.type!=='undead'){m.sleep=true;UI.floatAtMonster(m,'asleep','#9db4d6');}
-      else UI.floatAtMonster(m,'unaffected','#9a9da2');
+      if(MONSTERS[m.key].cr<=1&&m.type!=='undead'){m.sleep=true;logSpell('asleep');UI.floatAtMonster(m,'asleep','#9db4d6');}
+      else {logSpell('unaffected');UI.floatAtMonster(m,'unaffected','#9a9da2');}
       return;
     }
     if(sp.hold){m.held=Math.max(m.held,sp.hold);UI.floatAtMonster(m,'held!','#9db4d6');}
@@ -4929,10 +5280,11 @@ function castSpell(ch,key,opts){
     if(sp.negLevels){m.atk-=sp.negLevels;m.hp-=sp.negLevels*5;UI.floatAtMonster(m,'drained','#b48ae0');if(m.hp<=0){killMonster(m,ch);return;}}
     if(sp.dispel){m.held=0;m.slowed=Math.max(m.slowed,5);UI.floatAtMonster(m,'dispelled','#9db4d6');}
     if(dmg>0){
+      logSpell(dmg+' damage');
       if(sp.drain)healChar(ch,dmg);
       damageMonster(m,dmg,ch,false);
       if(sp.dot&&m.hp>0){m.dot={dmg:sp.dot.dmg,ticks:sp.dot.ticks,t:1.5};}
-    }
+    }else logSpell('no damage');
   };
   const c0=foes[0];
   const color=SPELL_FX[key]||'#9db4d6';
@@ -4941,7 +5293,16 @@ function castSpell(ch,key,opts){
     onHit:()=>{
       const at=monsterAim(c0);
       if(sp.target==='foes'){
-        spawnBurst(at,color,2.2);
+        // paint the footprint rather than one blob, so the shape is legible:
+        // a bolt reads as a line of flashes, a fireball as a disc
+        if(areaTiles&&areaTiles.size){
+          const tiles=[...areaTiles];
+          const step=Math.max(1,Math.floor(tiles.length/9));
+          for(let i=0;i<tiles.length;i+=step){
+            const t=tiles[i];
+            spawnBurst({x:(t%G.L.w)+0.5,y:0.45,z:Math.floor(t/G.L.w)+0.5},color,1.5);
+          }
+        }else spawnBurst(at,color,2.2);
         for(const m of foes)resolveFoe(m);
       }else{
         spawnBurst(at,color,0.9);
@@ -4959,7 +5320,12 @@ function applySpellToAlly(caster,t,sp,cl){
     UI.refreshParty();return true;
   }
   if(t.dead){UI.toast(t.name+' is dead. Only Raise Dead can help.');return false;}
-  if(sp.healFn){healChar(t,sp.healFn(cl));}
+  if(sp.healFn){
+    const bag=traceRoll(()=>sp.healFn(cl));
+    logAdd('spell',caster.name+' casts '+sp.name+' on '+t.name+' — heals '+bag.value,
+      'circle '+sp.circle+(bag.dice.length?'  ·  '+fmtTrace(bag.dice):''));
+    healChar(t,bag.value);
+  }
   if(sp.cures)for(const c of sp.cures)cureCond(t,c);
   if(sp.restoreAbility){
     let left=sp.restoreAbility===99?999:roll(1,4);
@@ -4969,6 +5335,7 @@ function applySpellToAlly(caster,t,sp,cl){
   }
   if(sp.restoreLevels&&t.negLevels>0){t.negLevels=0;removeCond(t,'drained');recalcHp(t,false);UI.toast('Lost life-force floods back into '+t.name+'.');}
   if(sp.buff){
+    logAdd('spell',caster.name+' casts '+sp.name+' on '+t.name,'circle '+sp.circle);
     const b=Object.assign({},sp.buff);
     b.tag=b.tag||sp.name;
     b.until=G.time+(b.dur||60);delete b.dur;
@@ -5204,15 +5571,34 @@ function moveMonster(m,nx,ny){
   const spr=R3.monsterSprites[m.id];
   if(spr)spr.userData.walkUntil=performance.now()+650;
 }
-function pickMeleeTarget(){
-  const front=G.party.slice(0,2).filter(ch=>!isDown(ch));
-  if(front.length)return pick(front);
-  const back=G.party.slice(2).filter(ch=>!isDown(ch));
-  if(back.length)return pick(back);
-  return null;
+/* A monster reaches for its opposite number: same side, same rank. The two
+   formations face each other square on, so the front of the line meets the
+   front of the party and a creature in the back rank -- which needs reach to
+   swing at all -- goes for the party's back rank.
+
+   A character only holds their place while they can fight for it. Dead,
+   unconscious, paralysed, held, asleep or stunned and the lane opens: the
+   monster reaches past them to whoever else is in that lane. It steps to the
+   OTHER side only when its own lane is empty of the living, so putting a
+   character out of action never makes them safer -- if they are the last one
+   standing in their lane, the blows are still theirs. */
+function pickPartyTarget(m){
+  const alive=G.party.filter(ch=>!isDown(ch));
+  if(!alive.length)return null;
+  if(!m)return pick(alive);
+  const at=(side,rank)=>alive.find(ch=>charSide(ch)===side&&charRank(ch)===rank);
+  const s=monsterSide(m),r=monsterRank(m);
+  // its own lane, own rank first; whoever can still hold it, else whoever is left
+  for(const holding of [true,false])
+    for(const rr of [r,1-r]){
+      const ch=at(s,rr);
+      if(ch&&(!holding||canAct(ch)))return ch;
+    }
+  // the lane is empty: cross the line, keeping rank for rank
+  return at(1-s,r)||at(1-s,1-r)||null;
 }
 function monsterMelee(m){
-  const ch=pickMeleeTarget();
+  const ch=pickPartyTarget(m);
   if(!ch)return;
   windupAnim(m);
   setTimeout(()=>{
@@ -5225,11 +5611,14 @@ function monsterMelee(m){
     SFX.monAttack();
     if(nat!==1&&(nat===20||nat+atk>=charAC(ch))){
       const dmg=roll(m.dmg[0],m.dmg[1],m.dmg[2]);
+      logStrike(m.name,ch.name,nat,atk,charAC(ch),true,false,dmg,
+        [fmtDice(m.dmg[0],m.dmg[1],m.dmg[2])+' = '+dmg]);
       hurtChar(ch,dmg,m.name);
       // fire shield
       for(const b of ch.buffs)if(b.fireshield){damageMonster(m,roll(b.fireshield[0],b.fireshield[1]),ch,false);}
       monsterSpecials(m,ch);
     }else{
+      logStrike(m.name,ch.name,nat,atk,charAC(ch),false);
       UI.float(ch,'miss','#9a9da2');
     }
   },500);
@@ -5238,19 +5627,23 @@ function monsterSpecials(m,ch){
   const sp=m.special;
   if(!sp||ch.dead)return;
   if(sp.poison){
-    const sv=charSaves(ch).fort+saveBonusVs(ch,'poison');
-    if(d20()+sv<sp.poison.dc)applyPoison(ch,sp.poison);
+    const sv=charSaves(ch).fort+saveBonusVs(ch,'poison'),nat=d20(),made=nat+sv>=sp.poison.dc;
+    logSave(ch.name,m.name+"'s poison",nat,sv,sp.poison.dc,made,
+      made?'':sp.poison.abil.toUpperCase()+' damage');
+    if(!made)applyPoison(ch,sp.poison);
   }
   if(sp.disease){
-    const sv=charSaves(ch).fort;
-    if(d20()+sv<sp.disease.dc&&!hasCond(ch,'disease')){
+    const sv=charSaves(ch).fort,nat=d20(),made=nat+sv>=sp.disease.dc;
+    logSave(ch.name,m.name+"'s "+sp.disease.name,nat,sv,sp.disease.dc,made,made?'':'diseased');
+    if(!made&&!hasCond(ch,'disease')){
       addCond(ch,{kind:'disease',name:sp.disease.name});
       UI.toast(ch.name+' contracts '+sp.disease.name+'!');
     }
   }
   if(sp.paralysis){
-    const sv=charSaves(ch).fort;
-    if(d20()+sv<sp.paralysis.dc){
+    const sv=charSaves(ch).fort,nat=d20(),made=nat+sv>=sp.paralysis.dc;
+    logSave(ch.name,m.name+"'s paralysis",nat,sv,sp.paralysis.dc,made,made?'':'paralyzed');
+    if(!made){
       if(addCond(ch,{kind:'paralysis',dur:sp.paralysis.dur})){
         UI.float(ch,'paralyzed!','#9db4d6');
         UI.toast(ch.name+' is paralyzed!');
@@ -5260,8 +5653,9 @@ function monsterSpecials(m,ch){
   // an umber hulk's gaze: no new condition, just the stun that already exists.
   // Will save, because it is a mind effect rather than something physical.
   if(sp.gaze){
-    const sv=charSaves(ch).will+saveBonusVs(ch,'spell');
-    if(d20()+sv<sp.gaze.dc&&!hasCond(ch,'stunned')){
+    const sv=charSaves(ch).will+saveBonusVs(ch,'spell'),nat=d20(),made=nat+sv>=sp.gaze.dc;
+    logSave(ch.name,m.name+"'s gaze",nat,sv,sp.gaze.dc,made,made?'':'stunned');
+    if(!made&&!hasCond(ch,'stunned')){
       addCond(ch,{kind:'stunned',dur:sp.gaze.dur});
       UI.float(ch,'reeling!','#d0a0e0');
       UI.toast(ch.name+' reels, unable to make sense of what they are seeing!');
@@ -5269,16 +5663,18 @@ function monsterSpecials(m,ch){
   }
   // a roper's tendrils reuse hold rather than inventing a grapple
   if(sp.hold){
-    const sv=charSaves(ch).ref;
-    if(d20()+sv<sp.hold.dc&&!hasCond(ch,'hold')){
+    const sv=charSaves(ch).ref,nat=d20(),made=nat+sv>=sp.hold.dc;
+    logSave(ch.name,m.name+"'s tendrils",nat,sv,sp.hold.dc,made,made?'':'held');
+    if(!made&&!hasCond(ch,'hold')){
       addCond(ch,{kind:'hold',dur:sp.hold.dur});
       UI.float(ch,'snared!','#c8b070');
       UI.toast('Tendrils cinch tight around '+ch.name+'!');
     }
   }
   if(sp.energyDrain){
-    const sv=charSaves(ch).fort;
-    if(d20()+sv<14){
+    const sv=charSaves(ch).fort,nat=d20(),made=nat+sv>=14;
+    logSave(ch.name,m.name+"'s energy drain",nat,sv,14,made,made?'':'−'+sp.energyDrain+' level');
+    if(!made){
       ch.negLevels+=sp.energyDrain;
       recalcHp(ch,false);
       UI.float(ch,'drained!','#b48ae0');
@@ -5287,7 +5683,7 @@ function monsterSpecials(m,ch){
   }
 }
 function monsterShoot(m){
-  if(!pickMeleeTarget())return;
+  if(!pickPartyTarget(m))return;
   windupAnim(m);
   setTimeout(()=>{
     if(m.hp<=0||G.over||G.paused||!G.L.monsters.includes(m))return;
@@ -5301,12 +5697,18 @@ function monsterShoot(m){
       onHit:()=>{
         if(G.over)return;
         const off=Math.hypot(R3.camera.position.x-aim.x,R3.camera.position.z-aim.z);
-        const ch=pickMeleeTarget();
+        const ch=pickPartyTarget(m);
         if(off>0.75||!ch){SFX.whiff();return;} // the party stepped aside
         const nat=d20();
-        if(nat!==1&&(nat===20||nat+m.atk>=charAC(ch)))
-          hurtChar(ch,roll(m.dmg[0],m.dmg[1],Math.max(0,m.dmg[2])),m.name);
-        else UI.float(ch,'miss','#9a9da2');
+        if(nat!==1&&(nat===20||nat+m.atk>=charAC(ch))){
+          const dmg=roll(m.dmg[0],m.dmg[1],Math.max(0,m.dmg[2]));
+          logStrike(m.name+' (shot)',ch.name,nat,m.atk,charAC(ch),true,false,dmg,
+            [fmtDice(m.dmg[0],m.dmg[1],Math.max(0,m.dmg[2]))+' = '+dmg]);
+          hurtChar(ch,dmg,m.name);
+        }else{
+          logStrike(m.name+' (shot)',ch.name,nat,m.atk,charAC(ch),false);
+          UI.float(ch,'miss','#9a9da2');
+        }
       }});
   },450);
 }
@@ -5322,13 +5724,16 @@ function fireSpellOrb(m){
       if(off>0.75){SFX.whiff();return;} // dodged the bolt
       const alive=G.party.filter(ch=>!isDown(ch));
       if(!alive.length)return;
-      const ch=pick(alive);
+      const ch=pickPartyTarget(m)||pick(alive);   // a bolt keeps its lane like everything else
       const dmg=roll(m.caster.dmg[0],m.caster.dmg[1],m.caster.dmg[2]);
       const sv=charSaves(ch).ref+saveBonusVs(ch,'spell');
       const dc=12+Math.floor(MONSTERS[m.key].cr);
       const el=m.caster.elem;
-      if(d20()+sv>=dc)hurtChar(ch,Math.floor(dmg/2),m.name,el);
-      else hurtChar(ch,dmg,m.name,el);
+      const nat=d20(),made=nat+sv>=dc,took=made?Math.floor(dmg/2):dmg;
+      logAdd('spell',m.name+"'s "+(el?ELEMENTS[el].name+' ':'')+'bolt strikes '+ch.name+' for '+took,
+        fmtDice(m.caster.dmg[0],m.caster.dmg[1],m.caster.dmg[2])+' = '+dmg+
+        '  ·  Reflex '+fmtCheck(nat,sv,dc,'DC')+natNote(nat)+(made?' — halved':' — full'));
+      hurtChar(ch,took,m.name,el);
     }});
 }
 function monsterCast(m){
@@ -5544,6 +5949,22 @@ function tryRest(){
   if(G.paused||G.over)return;
   const near=G.L.monsters.some(m=>m.hp>0&&m.awake&&G.distField&&G.distField[m.y*G.L.w+m.x]>=0&&G.distField[m.y*G.L.w+m.x]<=8);
   if(near){UI.toast('Too dangerous — enemies are near!');SFX.bump();return;}
+  // Memorising is the last thing done before sleeping, so the loadout the
+  // wizard wakes with is the one they just chose. Each preparer in turn, then
+  // the camp itself. A cold camp still asks: they simply wake with it unfilled.
+  const toPrepare=G.party.filter(ch=>!isDown(ch)&&preparesSpells(ch));
+  if(toPrepare.length&&!G._preparing){
+    G._preparing=true;
+    const step=(i)=>{
+      if(i>=toPrepare.length){G._preparing=false;doRest();return;}
+      UI.openMemo(toPrepare[i],()=>step(i+1));
+    };
+    step(0);
+    return;
+  }
+  doRest();
+}
+function doRest(){
   // a camp needs food. Without it the party still sleeps, but wakes hungry,
   // half-rested and with nothing memorised — never hard-stuck, always poorer.
   const fed=takeRation();
@@ -5850,6 +6271,9 @@ function deserializeGame(o){
   // saves written before drain became purely negLevels can carry a stale
   // 'drained' condition that nothing clears; drop it on the way in
   for(const ch of G.party)if(ch.conditions)ch.conditions=ch.conditions.filter(c=>c.kind!=='drained');
+  // a wizard saved before the spellbook existed arrives with none: give them the
+  // book their level has earned and a filled loadout, rather than a mute caster
+  for(const ch of G.party)ensureBook(ch);
   const lv=o.level;
   const traps={};for(const t of lv.traps)traps[t.y*lv.w+t.x]=t;
   const items={};for(const [i,arr] of lv.items)items[i]=arr;
@@ -6157,7 +6581,9 @@ const UI=(()=>{
       if(CLASSES[ch.cls].caster){
         const ab=div.querySelector('[data-act=ability]');
         const slots=charSlots(ch);
-        const left=slots.reduce((s,n,ci)=>s+Math.max(0,n-ch.slotsUsed[ci]),0);
+        const left=preparesSpells(ch)
+          ? (ch.prepared||[]).reduce((s,a)=>s+a.length,0)     // what is still memorised
+          : slots.reduce((s,n,ci)=>s+Math.max(0,n-ch.slotsUsed[ci]),0);
         let badge=ab.querySelector('.slotbadge');
         if(!badge){badge=document.createElement('span');badge.className='slotbadge';ab.appendChild(badge);}
         badge.textContent=left;
@@ -6250,9 +6676,93 @@ const UI=(()=>{
     t.textContent=msg;t.style.opacity=1;
     clearTimeout(toastTimer);
     toastTimer=setTimeout(()=>{t.style.opacity=0;},2200);
+    logAdd('msg',msg);   // a toast is gone in two seconds; the log keeps it
+  }
+  /* ---------- the log ---------- */
+  // Rebuilt on open rather than on every entry: opening any overlay pauses the
+  // game, so nothing can be appended while the panel is on screen.
+  function renderLog(){
+    const box=$('log-list');
+    if(!GLOG.length){box.innerHTML='<div class="empty">Nothing has happened yet.</div>';return;}
+    const esc=(x)=>String(x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    box.innerHTML=GLOG.map(e=>'<div class="le k-'+e.kind+'"><div class="lt">'+esc(e.text)+'</div>'+
+      (e.detail?'<div class="ld">'+esc(e.detail)+'</div>':'')+'</div>').join('');
+    box.scrollTop=box.scrollHeight;   // newest at the bottom, like a running tally
+  }
+  /* ---------- memorising, at camp ---------- */
+  // The wizard sets their loadout here and it holds until the next camp. What
+  // is shown is the book, one block per circle, with the slots for that circle
+  // as the budget. Rebuilt on every change: the whole panel is a dozen rows.
+  let memoCh=null,memoThen=null;
+  function renderMemo(){
+    const ch=memoCh;if(!ch)return;
+    const slots=charSlots(ch);
+    $('memo-title').textContent=ch.name+' — memorise';
+    $('memo-sub').textContent='Chosen now, carried until the next camp. Only what is memorised can be cast.';
+    const body=$('memo-body');
+    body.innerHTML='';
+    let anything=false;
+    for(let c=1;c<=5;c++){
+      if(slots[c-1]<=0)continue;
+      const pool=bookAt(ch,c);
+      const used=ch.memo[c-1].length;
+      const head=document.createElement('div');
+      head.className='mcirc';
+      head.innerHTML=c+ordSuffix(c)+' circle<span class="full">'+used+' / '+slots[c-1]+'</span>';
+      body.appendChild(head);
+      if(!pool.length){
+        const n=document.createElement('div');n.className='none';
+        n.textContent='Nothing of this circle in the book yet.';
+        body.appendChild(n);continue;
+      }
+      anything=true;
+      for(const key of pool){
+        const sp=SPELLS[key];
+        const n=ch.memo[c-1].filter(k=>k===key).length;
+        const row=document.createElement('div');
+        row.className='mrow';
+        row.innerHTML='<button class="mbtn2" data-d="-1">−</button>'+
+          '<span class="mcount">'+n+'</span>'+
+          '<button class="mbtn2" data-d="1">+</button>'+
+          '<span class="mname">'+sp.name+'</span>';
+        row.title=sp.desc;
+        const [minus,plus]=row.querySelectorAll('.mbtn2');
+        minus.disabled=n<=0;
+        plus.disabled=used>=slots[c-1];
+        minus.addEventListener('click',()=>{
+          const i=ch.memo[c-1].indexOf(key);
+          if(i>=0)ch.memo[c-1].splice(i,1);
+          renderMemo();
+        });
+        plus.addEventListener('click',()=>{
+          if(ch.memo[c-1].length<slots[c-1])ch.memo[c-1].push(key);
+          renderMemo();
+        });
+        body.appendChild(row);
+      }
+    }
+    if(!anything&&!body.children.length){
+      body.innerHTML='<div class="none">'+ch.name+' has no spells they can prepare.</div>';
+    }
+  }
+  // `then` is how the rest flow waits for the loadout before it sleeps
+  function openMemo(ch,then){
+    memoCh=ensureBook(ch);memoThen=then||null;
+    ch.memo=trimMemo(ch);
+    renderMemo();show('ovl-memo');
+  }
+  function closeMemo(){
+    const then=memoThen;memoThen=null;memoCh=null;
+    hide('ovl-memo');
+    if(then)then();
+  }
+  function openLog(){
+    renderLog();show('ovl-log');
+    // and again once the panel is on screen: a hidden element has no scrollHeight
+    const b=$('log-list');b.scrollTop=b.scrollHeight;
   }
   function refreshDepthTag(){
-    $('depth-tag').textContent='Depth '+G.depth+' · '+G.L.theme.name+(G.depth%5===0?' ⚔':'');
+    $('depth-tag').textContent='Depth '+G.depth+' · '+G.L.theme.name+(G.depth%3===0&&G.depth>=6?' ⚔':'');
   }
   /* ---------- overlays ---------- */
   function anyOverlayOpen(){return [...document.querySelectorAll('.ovl')].some(o=>o.classList.contains('show')&&o.id!=='ovl-rotate');}
@@ -6335,18 +6845,37 @@ const UI=(()=>{
     const list=$('spell-list');
     list.innerHTML='';
     const slots=charSlots(ch);
-    const known=spellsKnown(ch.cls,ch.level);
-    const sum=slots.map((n,i)=>n>0?`${i+1}${ordSuffix(i+1)} ${Math.max(0,n-ch.slotsUsed[i])}/${n}`:null).filter(Boolean).join(' · ');
+    // A wizard sees what they memorised and nothing else; a cleric sees the
+    // whole list against the slots of each circle. `rows` is what gets drawn.
+    const prep=preparesSpells(ch);
+    let rows,sum;
+    if(prep){
+      ensureBook(ch);
+      const seen=[];
+      for(let c=1;c<=5;c++)for(const k of ch.prepared[c-1])if(seen.indexOf(k)<0)seen.push(k);
+      rows=seen.map(k=>({key:k,left:preparedCount(ch,k)}));
+      sum=ch.prepared.map((a,i)=>slots[i]>0?`${i+1}${ordSuffix(i+1)} ${a.length}/${slots[i]}`:null)
+        .filter(Boolean).join(' · ');
+    }else{
+      rows=spellsKnown(ch.cls,ch.level).map(k=>({key:k,left:slots[SPELLS[k].circle-1]-ch.slotsUsed[SPELLS[k].circle-1]}));
+      sum=slots.map((n,i)=>n>0?`${i+1}${ordSuffix(i+1)} ${Math.max(0,n-ch.slotsUsed[i])}/${n}`:null).filter(Boolean).join(' · ');
+    }
     const hdr=document.createElement('div');
     hdr.className='dim-note';
-    hdr.textContent='Slots left — '+sum+' (rest to recover)';
+    hdr.textContent=(prep?'Memorised — ':'Slots left — ')+(sum||'nothing')+' (camp to prepare)';
     list.appendChild(hdr);
+    if(prep&&!rows.length){
+      const none=document.createElement('div');
+      none.className='dim-note';
+      none.style.padding='8px 2px';
+      none.textContent=ch.name+' has nothing memorised. Camp to prepare spells from their book.';
+      list.appendChild(none);
+    }
     const tip=$('spell-tip');
     const HINT='Tap and hold a spell to read what it does.';
     tip.textContent=HINT;
-    for(const key of known.sort((a,b)=>SPELLS[a].circle-SPELLS[b].circle)){
+    for(const {key,left} of rows.sort((a,b)=>SPELLS[a.key].circle-SPELLS[b.key].circle)){
       const sp=SPELLS[key];
-      const left=slots[sp.circle-1]-ch.slotsUsed[sp.circle-1];
       const row=document.createElement('div');
       row.className='spell-row'+(left<=0?' nosl':'');
       row.innerHTML=`<span class="scircle">${sp.circle}</span><span class="sname">${sp.name}</span><span class="sslots">${Math.max(0,left)} left</span>`;
@@ -6430,6 +6959,13 @@ const UI=(()=>{
   function updateUseBtn(){
     const ref=selRef();
     $('inv-use').disabled=!(ref&&itemUsable(getItem(ref)));
+    // Learn only shows its teeth for a wizard holding an arcane scroll they can
+    // actually read and have not already copied
+    const li=ref&&getItem(ref);
+    $('inv-learn').disabled=!(li&&li.base==='scroll'&&preparesSpells(invChar)&&
+      SPELLS[li.spell]&&SPELLS[li.spell].list==='arcane'&&
+      SPELLS[li.spell].circle<=maxCircle(invChar.level)&&
+      invChar.book.indexOf(li.spell)<0);
   }
   let suppressCardClick=false;
   function renderInvParty(){
@@ -6609,6 +7145,18 @@ const UI=(()=>{
     }
     dnd=null;
   });
+  $('inv-learn').addEventListener('click',()=>{
+    const ref=selRef();if(!ref)return;
+    const it=getItem(ref);
+    if(!it||it.base!=='scroll')return;
+    const ch=invChar;
+    const consume=()=>{
+      if((it.qty||1)>1)it.qty--;
+      else if(ref.type==='grid')ch.inventory[ref.idx]=null;
+      else ch.equip[ref.slot]=null;
+    };
+    if(scribeScroll(ch,it,consume)){renderInv();saveGame();}
+  });
   $('inv-use').addEventListener('click',()=>{
     const ref=selRef();
     if(!ref||!itemUsable(getItem(ref)))return;
@@ -6656,9 +7204,23 @@ const UI=(()=>{
       const dmgd=ch.abilDmg[a]>0?` <span style="color:#a05545">(−${ch.abilDmg[a]})</span>`:'';
       return `${ABIL_LBL[a]} <b>${cur}</b> (${fmtMod(mod(cur))})${dmgd}`;
     }).join(' · ');
+    // Heavy armour eats the nimbleness it is worth, and the number it takes is
+    // invisible inside an AC total: a DEX 18 fighter in full plate carries +1 of
+    // their +4 and nothing on the screen used to say so.
+    const rawDex=abilMod(ch,'dex'), usedDex=dexACBonus(ch), armIt=ch.equip.armor;
+    const armDef=armIt?ITEM_DEFS[armIt.base]:null;
+    const acNote=(armDef&&usedDex<rawDex)
+      ? ` <span class="dim-note">(DEX ${fmtMod(usedDex)} of ${fmtMod(rawDex)} — ${armDef.name} caps it at ${fmtMod(armDef.maxDex)})</span>`
+      : '';
     let extra='';
     const c=CLASSES[ch.cls];
-    if(c.caster)extra+=`<b>Spell slots</b> ${slots.map((n,i)=>`${i+1}:${Math.max(0,n-ch.slotsUsed[i])}/${n}`).filter((_,i)=>slots[i]>0).join(' ')}<br>`;
+    if(c.caster&&preparesSpells(ch)){
+      const per=ch.prepared.map((a,i)=>slots[i]>0?`${i+1}:${a.length}/${slots[i]}`:null).filter(Boolean).join(' ');
+      extra+=`<b>Memorised</b> ${per||'nothing'} <span class="dim-note">(camp to prepare)</span><br>`;
+      extra+=`<b>Spellbook</b> ${ch.book.length} spell${ch.book.length===1?'':'s'} — `+
+        `${ch.book.map(k=>SPELLS[k].name).sort().join(', ')||'empty'}<br>`;
+    }
+    else if(c.caster)extra+=`<b>Spell slots</b> ${slots.map((n,i)=>`${i+1}:${Math.max(0,n-ch.slotsUsed[i])}/${n}`).filter((_,i)=>slots[i]>0).join(' ')}<br>`;
     if(c.rage)extra+=`<b>Rage</b> ${ch.rageUsed?'spent (rest to recover)':'ready'}<br>`;
     if(c.layon)extra+=`<b>Lay on Hands</b> ${ch.layPool} hp pool · <b>Smite</b> ${ch.smiteUsed?'spent':'ready'}<br>`;
     if(c.sneak)extra+=`<b>Sneak attack</b> +${Math.floor((ch.level+1)/2)}d6 vs distracted foes<br>`;
@@ -6669,7 +7231,7 @@ const UI=(()=>{
       <b>${RACES[ch.race].name} ${CLASSES[ch.cls].name}</b>, level ${ch.level}<br>
       <span class="dim-note">${RACES[ch.race].traits}</span><br>
       ${abils}<br>
-      <b>HP</b> ${ch.hp}/${ch.maxHp} · <b>AC</b> ${charAC(ch)} · <b>BAB</b> ${fmtMod(babOf(ch.cls,ch.level))}<br>
+      <b>HP</b> ${ch.hp}/${ch.maxHp} · <b>AC</b> ${charAC(ch)}${acNote} · <b>BAB</b> ${fmtMod(babOf(ch.cls,ch.level))}<br>
       <b>Saves</b> Fort ${fmtMod(s.fort)} · Ref ${fmtMod(s.ref)} · Will ${fmtMod(s.will)}<br>
       ${atkLine}${extra}
       <b>XP</b> ${ch.xp} — next level at ${need}
@@ -6731,6 +7293,11 @@ const UI=(()=>{
     show('ovl-map');
   }
   $('map-close').addEventListener('click',()=>hide('ovl-map'));
+  $('memo-done').addEventListener('click',closeMemo);
+  $('memo-clear').addEventListener('click',()=>{if(memoCh){memoCh.memo=[[],[],[],[],[]];renderMemo();}});
+  $('memo-auto').addEventListener('click',()=>{if(memoCh){autoMemo(memoCh);renderMemo();}});
+  $('log-close').addEventListener('click',()=>hide('ovl-log'));
+  $('log-clear').addEventListener('click',()=>{GLOG.length=0;renderLog();});
   /* ---------- game over ---------- */
   function gameOver(){
     const best=Math.max(G.depth,+(localStorage.getItem('crawl_best')||0));
@@ -6744,7 +7311,7 @@ const UI=(()=>{
     refreshMenu();
   });
   return {buildPartyDom,refreshParty,tickCooldowns,charFlash,float,floatAtMonster,vignette,trapFlash,toast,
-    refreshDepthTag,pickAlly,paladinMenu,clericMenu,openSpells,spellFlash,openInventory,openStats,openMap,gameOver,show,hide,anyOverlayOpen,refreshInv};
+    refreshDepthTag,pickAlly,paladinMenu,clericMenu,openSpells,spellFlash,openInventory,openStats,openMap,openLog,openMemo,gameOver,show,hide,anyOverlayOpen,refreshInv};
 })();
 /* ============================== INPUT ============================== */
 function bindPad(id,fn){
@@ -6771,6 +7338,7 @@ function initInput(){
   bindPad('b-rleft',()=>tryRotate(-1));
   bindPad('b-rright',()=>tryRotate(1));
   document.getElementById('b-map').addEventListener('click',()=>{if(G.started&&!G.over)UI.openMap();});
+  document.getElementById('b-log').addEventListener('click',()=>{if(G.started)UI.openLog();});
   document.getElementById('b-rest').addEventListener('click',()=>tryRest());
   document.getElementById('b-mute').addEventListener('click',(e)=>{
     const m=SFX.toggleMute();
@@ -6787,6 +7355,7 @@ function initInput(){
       case 'q':case 'arrowleft':tryRotate(-1);break;
       case 'e':case 'arrowright':tryRotate(1);break;
       case 'm':if(G.started&&!G.over)UI.openMap();break;
+      case 'l':if(G.started)UI.openLog();break;
       case 'r':tryRest();break;
     }
   });
