@@ -816,6 +816,16 @@ const THEMES=[
   // violet without repainting every texture, and `glow` is the spore colour.
   {name:'Myconid', wall:'#7a6e86', wall2:'#42384f', floor:'#4b4753', ceil:'#5a4670', fog:0x0d0814, moss:'#8a63b8', roomBias:.3,
    glow:'#c88ae8', light:0xc59ae8, fill:0xdfc4f2},
+  // A drow house: small black bricks laid true, a chiselled frieze, and the
+  // only thing in the dungeon that gives off its own light. `glyphs` are the
+  // faerzress colours the inscriptions and the rose windows burn in — the walls
+  // carry an emissive map, so those read as lit rather than merely pale.
+  // The light here is deliberately NOT violet. Retinting the torch the way the
+  // grove does turned black brick lilac; the colour in a drow house has to come
+  // from the things that are actually burning — the frieze and the windows — so
+  // the party's own light stays a cold near-white and the stone stays black.
+  {name:'Drow',    wall:'#2e2c35', wall2:'#151419', floor:'#232128', ceil:'#141319', fog:0x060509, moss:'#2c2440', roomBias:.66,
+   glyphs:['#a86ce8','#3fd6a8','#4fc4e0'], silver:'#8c93a8', light:0xcdd2e6, fill:0xdde2f2},
 ];
 const FIRST_NAMES=['Aldric','Berrin','Cassia','Dorn','Elva','Fenn','Grimm','Hilda','Ivo','Jora','Kelder','Lysa','Mordin','Nessa','Oskar','Petra','Quinn','Rurik','Sable','Torv','Ulma','Vance','Wren','Yorick','Zora','Brakka','Thistle','Marn','Isolde','Garrick'];
 
@@ -2291,13 +2301,22 @@ function tryGen(depth,targetWalk,theme){
   // Caves get the same treatment for the same reason: what lives in the rock
   // is heavily favoured underground and thinned to a stray elsewhere, so a cave
   // reads as its own place without the roster leaking into the brickwork.
-  const undeadBias=theme.name==='Crypt'?4:0.55;
-  const caveBias=theme.name==='Caves'?4:0.55;
-  const duerBias=theme.name==='Duergar'?4:0.55;
-  const mycoBias=theme.name==='Myconid'?4:0.55;
+  // OFF is the off-theme thinning, and it has to get *stronger* as rosters are
+  // added, not stay put: a theme's x4 competes against every foreign roster at
+  // once, so each new one dilutes it. At 0.55 with five rosters a deep cave floor
+  // had fallen to 54% cave; 0.35 puts it back near where 0.55 held it with two,
+  // and costs four creature kinds at depth 40 (33 -> 29), which is nowhere near
+  // the monoculture the thinning exists to prevent.
+  const OFF=0.35;
+  const undeadBias=theme.name==='Crypt'?4:OFF;
+  const caveBias=theme.name==='Caves'?4:OFF;
+  const duerBias=theme.name==='Duergar'?4:OFF;
+  const mycoBias=theme.name==='Myconid'?4:OFF;
+  const drowBias=theme.name==='Drow'?4:OFF;
   const base=spawnPool(depth).map(([k,w])=>[k,
     w*(MONSTERS[k].type==='undead'?undeadBias:1)*(MONSTERS[k].cave?caveBias:1)
-     *(MONSTERS[k].duergar?duerBias:1)*(MONSTERS[k].myconid?mycoBias:1)]);
+     *(MONSTERS[k].duergar?duerBias:1)*(MONSTERS[k].myconid?mycoBias:1)
+     *(MONSTERS[k].drow?drowBias:1)]);
   const weigh=(ek)=>base.map(([k,w])=>{
     const r=Math.log(threatOf(k,depth,ek)/share);
     return [k,w*Math.exp(-(r*r)/sig)];
@@ -2481,8 +2500,25 @@ function tryGen(depth,targetWalk,theme){
       duergar.push({x,y,dx,dy,kind:Math.random()<0.55?'pillar':'torch'});
     }
   }
+  // drow houses: rose windows set into the wall, glazed in faerzress-lit glass.
+  // Occasional, unlike the duergar's torches — this light is a statement, not a
+  // way of seeing, and a wall with one every few paces would be a shopfront.
+  let drow=[];
+  if(theme.name==='Drow'){
+    const nW=3+rnd(4);
+    let wTries=300;
+    while(drow.length<nW&&wTries-->0){
+      const x=1+rnd(W-2),y=1+rnd(H-2);
+      if(g[idx(x,y)]!==T_FLOOR)continue;
+      const wd=DIRS.filter(([dx,dy])=>g[idx(x+dx,y+dy)]===T_WALL);
+      if(!wd.length)continue;
+      if(drow.some(c=>Math.abs(c.x-x)+Math.abs(c.y-y)<4))continue;   // never two on one wall
+      const [dx,dy]=pick(wd);
+      drow.push({x,y,dx,dy,kind:'rose',hue:rnd(3)});
+    }
+  }
   return {w:W,h:H,grid:g,start,stairs,traps,items,monsters,secrets,theme,depth,
-    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,lurkers,duergar};
+    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,lurkers,duergar,drow};
 }
 /* ---------- difficulty curve ----------
    Depth, not party level, drives everything. One documented scalar grows every
@@ -2611,7 +2647,7 @@ function mkMonster(key,x,y,depth){
     xp:Math.round(XP_AWARD(def.cr)*(1+0.12*Math.max(0,depth-1))),
     speed:def.speed,type:def.type,ranged:def.ranged||0,caster:def.caster||null,
     reach:!!def.reach,slot:0, // slot 0-1 front rank of its tile, 2-3 rear rank
-    skeletal:!!def.skeletal,incorporeal:!!def.incorporeal,cave:!!def.cave,lurk:!!def.lurk,duergar:!!def.duergar,myconid:!!def.myconid,
+    skeletal:!!def.skeletal,incorporeal:!!def.incorporeal,cave:!!def.cave,lurk:!!def.lurk,duergar:!!def.duergar,myconid:!!def.myconid,drow:!!def.drow,
     enlarge:!!def.enlarge,vanish:!!def.vanish,grown:false,vanished:0,
     distress:!!def.distress,shriek:!!def.shriek,shrieked:false,
     special:{disease:def.disease,poison:def.poison,paralysis:def.paralysis,energyDrain:def.energyDrain,regen:def.regen,
@@ -3694,6 +3730,232 @@ function myconidCeilCanvas(th){
   }
   return cv;
 }
+/* ---------- drow: a house, not a hall ----------
+   Small black bricks laid dead true, with a chiselled frieze running through
+   them. Everything about the masonry is fine and cold; the only warmth in the
+   place is the faerzress burning in the inscriptions, and that is not warm.
+
+   The base carries the courses, the drafted margins and the frieze channel, and
+   is shared by every variant so two adjacent tiles join texel-for-texel. Only
+   what sits inside the channel changes. */
+function drowBaseCanvas(th){
+  const {cv,ctx}=newCanvas(128);
+  const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
+  // small bricks: eight courses of six, so a tile carries about fifty of them
+  const ROWS=8, RH=128/ROWS, COLS=6, BW=128/COLS;
+  ctx.fillStyle=shade(th.wall,-0.70);ctx.fillRect(0,0,128,128);   // the joints
+  for(let r=0;r<ROWS;r++){
+    const y=r*RH, phase=(r%2)?BW/2:0;
+    for(let k=-1;k<=COLS;k++){
+      const x=phase+k*BW;
+      // the face, then a hairline draft chiselled round it. At this size the
+      // duergar's five-pixel margin would swallow the brick, so it is one pixel
+      // of shadow and one of light and nothing else.
+      // kept genuinely dark. The first pass sat the faces at -0.06 and the wall
+      // came out light grey at torch range: "black brick" has to survive being
+      // stood next to, not only being seen down a corridor.
+      ctx.fillStyle=shade(th.wall,(r%2?-0.20:-0.27)+((k*7+r*3)%5)*0.015);
+      ctx.fillRect(x+0.7,y+0.7,BW-1.4,RH-1.4);
+      ctx.strokeStyle='rgba(206,214,236,0.10)';ctx.lineWidth=0.7;
+      ctx.beginPath();ctx.moveTo(x+1,y+RH-1);ctx.lineTo(x+1,y+1);ctx.lineTo(x+BW-1,y+1);ctx.stroke();
+      ctx.strokeStyle='rgba(0,0,0,0.55)';
+      ctx.beginPath();ctx.moveTo(x+BW-1,y+1);ctx.lineTo(x+BW-1,y+RH-1);ctx.lineTo(x+1,y+RH-1);ctx.stroke();
+    }
+  }
+  // the frieze: a shallow channel cut clean through the third course, with a
+  // silver fillet above and below it. Thin, because a drow band is a line of
+  // script and not a dwarven parade.
+  const FY=RH*2+RH*0.16, FH=RH*0.68;
+  ctx.fillStyle=shade(th.wall,-0.52);ctx.fillRect(0,FY,128,FH);
+  ctx.strokeStyle='rgba(0,0,0,0.6)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(0,FY+0.5);ctx.lineTo(128,FY+0.5);ctx.stroke();
+  ctx.strokeStyle='rgba(206,214,236,0.13)';
+  ctx.beginPath();ctx.moveTo(0,FY+FH-0.5);ctx.lineTo(128,FY+FH-0.5);ctx.stroke();
+  const silver=th.silver||'#8c93a8';
+  for(const sy of [FY-2.5,FY+FH+1.5]){
+    ctx.strokeStyle=silver;ctx.lineWidth=1.1;
+    ctx.beginPath();ctx.moveTo(0,sy);ctx.lineTo(128,sy);ctx.stroke();
+    ctx.strokeStyle='rgba(230,236,255,0.40)';ctx.lineWidth=0.5;
+    ctx.beginPath();ctx.moveTo(0,sy-0.6);ctx.lineTo(128,sy-0.6);ctx.stroke();
+  }
+  // the stone itself is close-grained and takes a cold sheen down the face
+  const gr=ctx.createLinearGradient(0,0,0,128);
+  gr.addColorStop(0,'rgba(190,200,230,0.028)');
+  gr.addColorStop(0.5,'rgba(190,200,230,0.008)');
+  gr.addColorStop(1,'rgba(0,0,0,0.20)');
+  ctx.fillStyle=gr;ctx.fillRect(0,0,128,128);
+  for(let i=0;i<520;i++){                       // fine tooling, kept almost invisible
+    const x=rnd(128),y=rnd(128),len=1+rnd(2);
+    ctx.strokeStyle=Math.random()<0.5?'rgba(220,228,255,0.030)':'rgba(0,0,0,0.08)';
+    ctx.lineWidth=0.6;
+    wrapX(()=>{ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+len,y+(Math.random()-0.5));ctx.stroke();});
+  }
+  return {cv,fy:FY,fh:FH,rh:RH,bw:BW,rows:ROWS,cols:COLS};
+}
+// Espruar is written with a pen, not struck with a chisel, so it is the exact
+// opposite of Dethek: no straight strokes at all. A glyph is a curved spine with
+// a bowl on one side and a flourish trailing off the other.
+function espruarGlyph(ctx,x,y,h,seed){
+  let s=seed>>>0;
+  const rr=()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};
+  const w=h*0.52;
+  ctx.beginPath();
+  // the spine: an S that leans, never a vertical
+  const lean=(rr()-0.5)*w*0.5;
+  ctx.moveTo(x-lean*0.4,y);
+  ctx.bezierCurveTo(x+w*0.42*(rr()-0.2),y+h*0.30,
+                    x-w*0.42*(rr()-0.2),y+h*0.68,
+                    x+lean*0.6,y+h);
+  // the bowl, hung off one side at some height along the spine
+  const side=rr()<0.5?-1:1, at=y+h*(0.16+rr()*0.44), br=h*(0.16+rr()*0.13);
+  ctx.moveTo(x,at);
+  ctx.bezierCurveTo(x+side*br*1.5,at-br*0.5, x+side*br*1.5,at+br*1.3, x,at+br*1.2);
+  // a flourish off the other side, or a closed loop through the spine
+  if(rr()<0.55){
+    const t=y+h*(0.55+rr()*0.35);
+    ctx.moveTo(x,t);
+    ctx.quadraticCurveTo(x-side*w*0.75,t+h*0.10,x-side*w*0.45,t+h*0.28);
+  }else{
+    const t=y+h*(0.30+rr()*0.30),lr=h*0.13;
+    ctx.moveTo(x-lr,t);
+    ctx.bezierCurveTo(x-lr*1.8,t-lr*1.4,x+lr*1.8,t-lr*1.4,x+lr,t);
+  }
+  // and a tick over the head, the way an accent sits over elven script
+  if(rr()<0.4){ctx.moveTo(x-w*0.22,y-h*0.10);ctx.quadraticCurveTo(x,y-h*0.22,x+w*0.24,y-h*0.08);}
+  ctx.stroke();
+}
+/* The inscriptions genuinely glow, which no other theme's do. A colour map can
+   only ever be *pale* in torchlight; light of its own needs an emissive map, so
+   a drow wall canvas comes back as a pair — the stone, and a black sheet with
+   only the burning parts painted on it. buildLevel wires the second one up as
+   `emissiveMap`, which is why this returns {cv,glow} where the others return a
+   canvas. */
+function drowWallCanvas(th,variant,base){
+  const {cv,ctx}=newCanvas(128);
+  const em=newCanvas(128);
+  const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
+  const silver=th.silver||'#8c93a8';
+  const cols=th.glyphs||['#a86ce8','#3fd6a8','#4fc4e0'];
+  const col=cols[variant%cols.length];
+  ctx.drawImage(base.cv,0,0,128,128);
+  em.ctx.fillStyle='#000';em.ctx.fillRect(0,0,128,128);
+  // the inscription: the same channel on every variant, different words in it,
+  // so a long wall reads as one running text and not a repeated stamp
+  {
+    const h=base.fh*0.66, y=base.fy+(base.fh-h)/2;
+    const step=10, off=(variant*3)%step;
+    const draw=(c,lw,dx,dy,alpha,target)=>{
+      const cx=target||ctx;
+      cx.save();cx.globalAlpha=alpha;cx.strokeStyle=c;cx.lineWidth=lw;
+      cx.lineCap='round';cx.lineJoin='round';cx.translate(dx,dy);
+      for(let x=-step;x<=128+step;x+=step)
+        espruarGlyph(cx,x+off+1,y,h,(variant*7919)^(Math.round(x+off)*104729));
+      cx.restore();
+    };
+    draw('rgba(0,0,0,0.70)',2.2,0.4,0.5,1);      // the cut groove
+    draw(col,2.6,0,0,0.22);                       // the bloom around it
+    draw(col,1.1,0,0,0.95);                       // and the burning line itself
+    // the emissive sheet gets the same strokes: a wide dim halo, a bright core
+    draw(col,4.0,0,0,0.16,em.ctx);
+    draw(col,2.2,0,0,0.42,em.ctx);
+    draw('#ffffff',0.7,0,0,0.55,em.ctx);
+  }
+  // per-variant stonework. A drow wall is not decorated so much as punctuated.
+  let sd=(variant*2654435761)>>>0;
+  const rr=()=>{sd=(sd*1664525+1013904223)>>>0;return sd/4294967296;};
+  if(variant%4===1){
+    // a pilaster strip: two silver lines run floor to ceiling past the frieze
+    const px=(variant%8<4?0.30:0.70)*128;
+    wrapX(()=>{
+      for(const d of [-4,4]){
+        ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(px+d+0.6,0);ctx.lineTo(px+d+0.6,128);ctx.stroke();
+        ctx.strokeStyle=silver;ctx.lineWidth=0.9;
+        ctx.beginPath();ctx.moveTo(px+d,0);ctx.lineTo(px+d,128);ctx.stroke();
+      }
+    });
+  }else if(variant%4===2){
+    // a house sigil cut into the lower courses: a ring with radiating legs,
+    // struck in the same curved hand as the script
+    const cx=(variant%8<4?0.34:0.66)*128, cy=base.rh*6.1, R=10;
+    wrapX(()=>{
+      ctx.strokeStyle='rgba(0,0,0,0.55)';ctx.lineWidth=2.4;
+      ctx.beginPath();ctx.arc(cx+0.5,cy+0.5,R,0,7);ctx.stroke();
+      ctx.strokeStyle=silver;ctx.lineWidth=1.1;
+      ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.stroke();
+      for(let a=0;a<8;a++){
+        const t=a*Math.PI/4+0.2;
+        ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=1.8;
+        ctx.beginPath();ctx.moveTo(cx+Math.cos(t)*R*0.3,cy+Math.sin(t)*R*0.3);
+        ctx.quadraticCurveTo(cx+Math.cos(t+0.5)*R*0.9,cy+Math.sin(t+0.5)*R*0.9,
+                             cx+Math.cos(t)*R*1.5,cy+Math.sin(t)*R*1.5);ctx.stroke();
+        ctx.strokeStyle='rgba(206,214,236,0.30)';ctx.lineWidth=0.8;
+        ctx.beginPath();ctx.moveTo(cx+Math.cos(t)*R*0.3,cy+Math.sin(t)*R*0.3);
+        ctx.quadraticCurveTo(cx+Math.cos(t+0.5)*R*0.9,cy+Math.sin(t+0.5)*R*0.9,
+                             cx+Math.cos(t)*R*1.5,cy+Math.sin(t)*R*1.5);ctx.stroke();
+      }
+    });
+  }else if(variant%4===3){
+    // a second, fainter band of script low on the wall — an older hand, worn
+    const h=base.rh*0.46, y=base.rh*6.5;
+    ctx.save();ctx.globalAlpha=0.5;ctx.lineCap='round';
+    for(let x=-9;x<=137;x+=9){
+      ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=1.6;
+      espruarGlyph(ctx,x+((variant*5)%9),y,h,(variant*104729)^(Math.round(x)*7919));
+      ctx.strokeStyle='rgba(206,214,236,0.22)';ctx.lineWidth=0.8;
+      ctx.save();ctx.translate(-0.4,-0.5);
+      espruarGlyph(ctx,x+((variant*5)%9),y,h,(variant*104729)^(Math.round(x)*7919));
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+  // soot never gathers here — nothing burns — but the stone darkens under the
+  // roof all the same, and the faerzress bleeds a little into it
+  const top=ctx.createLinearGradient(0,0,0,30);
+  top.addColorStop(0,`rgba(8,7,12,${0.24+(variant%3)*0.06})`);
+  top.addColorStop(1,'rgba(8,7,12,0)');
+  ctx.fillStyle=top;ctx.fillRect(0,0,128,30);
+  for(let i=0;i<8+((variant*5)%10);i++){        // chips at the arrises
+    const x=rnd(128),y=8+rnd(112),len=2+rnd(6),a=(Math.random()-0.5)*0.9;
+    wrapX(()=>{
+      ctx.strokeStyle='rgba(0,0,0,0.26)';ctx.lineWidth=0.9;
+      ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.cos(a)*len,y+Math.sin(a)*len);ctx.stroke();
+    });
+  }
+  return {cv,glow:em.cv};
+}
+// The floor is the same stone, laid in large slabs and polished until it holds
+// the wall-light. Nothing grows on it.
+function drowFloorCanvas(th){
+  const {cv,ctx}=newCanvas(128);
+  const wrap9f=(fn)=>{for(const oy of [-128,0,128])for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,oy);fn();ctx.restore();}};
+  ctx.fillStyle=shade(th.floor,-0.6);ctx.fillRect(0,0,128,128);
+  const N=2,S=128/N;
+  for(let r=0;r<N;r++)for(let c=0;c<N;c++){
+    const x=c*S,y=r*S;
+    ctx.fillStyle=shade(th.floor,((r+c)%2)?0.04:-0.05);
+    ctx.fillRect(x+1,y+1,S-2,S-2);
+    ctx.strokeStyle='rgba(210,218,240,0.07)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(x+1.5,y+S-1.5);ctx.lineTo(x+1.5,y+1.5);ctx.lineTo(x+S-1.5,y+1.5);ctx.stroke();
+    ctx.strokeStyle='rgba(0,0,0,0.45)';
+    ctx.beginPath();ctx.moveTo(x+S-1.5,y+1.5);ctx.lineTo(x+S-1.5,y+S-1.5);ctx.lineTo(x+1.5,y+S-1.5);ctx.stroke();
+  }
+  for(let i=0;i<30;i++){                        // pale veining in the black stone
+    const x=rnd(128),y=rnd(128);
+    wrap9f(()=>{
+      ctx.strokeStyle=`rgba(200,210,240,${0.015+Math.random()*0.03})`;ctx.lineWidth=0.8;
+      ctx.beginPath();ctx.moveTo(x,y);
+      let px=x,py=y;
+      for(let k=0;k<5;k++){px+=(Math.random()-0.5)*22;py+=(Math.random()-0.5)*22;ctx.lineTo(px,py);}
+      ctx.stroke();
+    });
+  }
+  const sheen=ctx.createLinearGradient(0,0,128,128);
+  sheen.addColorStop(0,'rgba(190,200,235,0.020)');
+  sheen.addColorStop(1,'rgba(0,0,0,0.10)');
+  ctx.fillStyle=sheen;ctx.fillRect(0,0,128,128);
+  return cv;
+}
 function duergarBaseCanvas(th){
   const {cv,ctx}=newCanvas(128);
   const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
@@ -4165,25 +4427,37 @@ function buildLevel(L){
   const cave=th.name==='Caves';
   const duer=th.name==='Duergar';
   const myco=th.name==='Myconid';
-  const NVAR=cave?12:(duer?8:(myco?6:6));
-  const grid=(cave||duer||myco)?null:brickGrid(th); // brick skeleton, masonry themes only
+  const drow=th.name==='Drow';
+  const NVAR=cave?12:(duer?8:(myco?6:(drow?8:6)));
+  const grid=(cave||duer||myco||drow)?null:brickGrid(th); // brick skeleton, masonry themes only
   const baseWall=cave?caveBaseCanvas(th)      // shared earth, so tiles still join invisibly
                 :duer?duergarBaseCanvas(th)   // shared courses, trim and frieze channel
                 :myco?myconidBaseCanvas(th)   // shared stalk boundaries and grain
+                :drow?drowBaseCanvas(th)      // shared courses and the frieze channel
                      :baseWallCanvas(th,grid);
   for(let v=0;v<NVAR;v++){
-    const tex=texFromCanvas(cave?caveWallCanvas(th,v,baseWall)
-                           :duer?duergarWallCanvas(th,v,baseWall)
-                           :myco?myconidWallCanvas(th,v,baseWall)
-                                :wallCanvas(th,v,grid,baseWall));
+    // The drow wall alone comes back as a pair. A colour map can only make the
+    // inscriptions pale in torchlight; light of their own needs an emissive map,
+    // and that is the whole point of faerzress.
+    const built=cave?caveWallCanvas(th,v,baseWall)
+               :duer?duergarWallCanvas(th,v,baseWall)
+               :myco?myconidWallCanvas(th,v,baseWall)
+               :drow?drowWallCanvas(th,v,baseWall)
+                    :wallCanvas(th,v,grid,baseWall);
+    const tex=texFromCanvas(built.glow?built.cv:built);
     tex.wrapS=tex.wrapT=THREE.RepeatWrapping; // displacement samples can wrap at face edges
     // dressed stone is flatter than quarried rock and takes a harder highlight
     // fungal flesh is soft and a touch waxy: gentle relief, a low wide highlight
     const mat=new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,
-      bumpScale:cave?0.05:(duer?0.015:(myco?0.035:0.02)),
-      displacementMap:tex,displacementScale:cave?0.10:(duer?0.025:(myco?0.06:0.05)),
-      specular:duer?0x1c1a14:(myco?0x2a2233:0x191309),
-      shininess:cave?3:(duer?14:(myco?8:5))});
+      bumpScale:cave?0.05:(duer?0.015:(myco?0.035:(drow?0.012:0.02))),
+      displacementMap:tex,displacementScale:cave?0.10:(duer?0.025:(myco?0.06:(drow?0.018:0.05))),
+      specular:duer?0x1c1a14:(myco?0x2a2233:(drow?0x13151b:0x191309)),
+      shininess:cave?3:(duer?14:(myco?8:(drow?9:5)))});
+    if(built.glow){
+      const gt=texFromCanvas(built.glow);
+      gt.wrapS=gt.wrapT=THREE.RepeatWrapping;
+      mat.emissiveMap=gt;mat.emissive=new THREE.Color(0xffffff);mat.emissiveIntensity=1;
+    }
     wallMats.push(weldWallDisp(mat));
   }
   // the ambushers are faced with these same textures, so keep them reachable
@@ -4191,14 +4465,15 @@ function buildLevel(L){
   const floorTex=texFromCanvas(cave?caveFloorCanvas(th)
                               :duer?duergarFloorCanvas(th)
                               :myco?myconidFloorCanvas(th)
+                              :drow?drowFloorCanvas(th)
                                    :noiseCanvas(th.floor,th.wall2,false,th.moss));
   // the only theme that roofs itself with something: caps seen from below
   const ceilTex=texFromCanvas(myco?myconidCeilCanvas(th):noiseCanvas(th.ceil,'#000',false,null));
   floorTex.wrapS=floorTex.wrapT=THREE.RepeatWrapping;floorTex.repeat.set(1,1);
   ceilTex.wrapS=ceilTex.wrapT=THREE.RepeatWrapping;ceilTex.repeat.set(L.w,L.h);
   const floorMat=new THREE.MeshPhongMaterial({map:floorTex,bumpMap:floorTex,
-    bumpScale:cave?0.03:(duer?0.006:(myco?0.035:0.015)),   // gravel has real tooth
-    specular:duer?0x24211a:0x120e08,shininess:cave?3:(duer?18:4)});
+    bumpScale:cave?0.03:(duer?0.006:(myco?0.035:(drow?0.005:0.015))),   // gravel has real tooth
+    specular:duer?0x24211a:(drow?0x262a36:0x120e08),shininess:cave?3:(duer?18:(drow?26:4))});
   const ceilMat=new THREE.MeshPhongMaterial({map:ceilTex,bumpMap:ceilTex,bumpScale:0.012,specular:0x0c0a06,shininess:3});
   // floor: one unit plane per non-wall tile. holes fall out naturally at the
   // stairs shaft and at sewer lake pits.
@@ -4279,7 +4554,9 @@ function buildLevel(L){
   // doors — in the sewers they are iron grates you can see through, so their
   // material honors the grate texture's transparency
   const doorTexB=texFromCanvas(doorCanvas(th,false)),doorTexL=texFromCanvas(doorCanvas(th,true));
-  const grate=th.name==='Sewers';
+  // gates and grates are drawn with holes in them, so their material must honour
+  // the texture's alpha instead of painting the gaps black
+  const grate=th.name==='Sewers'||th.name==='Drow';
   const doorOpts=grate?{transparent:true,alphaTest:0.35,side:THREE.DoubleSide,specular:0x15150f,shininess:10}:{specular:0x1a150c,shininess:8};
   const doorMatBase=new THREE.MeshPhongMaterial(Object.assign({map:doorTexB,bumpMap:doorTexB,bumpScale:0.015},doorOpts));
   const doorMatLocked=new THREE.MeshPhongMaterial(Object.assign({map:doorTexL,bumpMap:doorTexL,bumpScale:0.015},doorOpts));
@@ -4893,6 +5170,122 @@ function buildLevel(L){
     }
     R3.candleFlames=flames;
   }
+  // drow houses: rose windows, and stalactites the builders never bothered to
+  // cut down. A wall tile is a solid box, so the window is the same trick the
+  // sewer culverts and the crypt recesses use — an unlit panel on the wall face
+  // with the tracery and surround standing proud of it — and its glass sits a
+  // hair forward of the wall plane rather than behind it.
+  if(th.name==='Drow'){
+    const HUES=[{c:0xa86ce8,e:0x7a3fc0},{c:0x3fd6a8,e:0x24907a},{c:0x4fc4e0,e:0x2e86a4}];
+    const silver=new THREE.Color(th.silver||'#8c93a8');
+    const stoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.12),
+      specular:0x1a1c24,shininess:14});
+    const voidMat=new THREE.MeshBasicMaterial({color:0x000000});
+    // The lead has to stay matte. Under a torch a shiny dark metal blows out to
+    // white and the tracery reads as a doily rather than as the frame the glass
+    // is set in — which is exactly what happened the first time.
+    const leadMat=new THREE.MeshPhongMaterial({color:0x0e0f13,specular:0x1c1e26,shininess:8});
+    const silverMat=new THREE.MeshPhongMaterial({color:silver,specular:0x6a7088,shininess:28});
+    if(L.drow)for(const f of L.drow){
+      const hue=HUES[(f.hue||0)%HUES.length];
+      // Unlit, on purpose. A lit material adds the torch to its own colour and a
+      // violet pane comes out white; the glass is the one thing here that is a
+      // source rather than a surface, so it is drawn at its own colour flat.
+      const glassMat=new THREE.MeshBasicMaterial({color:hue.c,
+        transparent:true,opacity:0.95,side:THREE.DoubleSide});
+      const g0=new THREE.Group();
+      const Y=WALLH*0.60, R=0.30;
+      // the dead-black panel the window is "cut" into, then the glass over it
+      const back=new THREE.Mesh(new THREE.CircleGeometry(R*0.98,24),voidMat);
+      back.position.set(0,Y,0.006);g0.add(back);
+      const glass=new THREE.Mesh(new THREE.CircleGeometry(R*0.95,24),glassMat);
+      glass.position.set(0,Y,0.012);g0.add(glass);
+      // tracery: an outer ring of lights, a hub, and the mullions between them.
+      // Drawn in lead over the glass so the colour reads as panes, not a disc.
+      const spokes=12;
+      for(let i=0;i<spokes;i++){
+        const a=i*Math.PI*2/spokes;
+        const mull=new THREE.Mesh(new THREE.BoxGeometry(0.012,R*0.86,0.014),leadMat);
+        mull.position.set(Math.cos(a)*R*0.47,Y+Math.sin(a)*R*0.47,0.019);
+        mull.rotation.z=a-Math.PI/2;
+        g0.add(mull);
+        // a foil at the head of each mullion — the petal of the rose
+        const foil=new THREE.Mesh(new THREE.TorusGeometry(R*0.15,0.010,6,12),leadMat);
+        foil.position.set(Math.cos(a)*R*0.70,Y+Math.sin(a)*R*0.70,0.018);
+        g0.add(foil);
+      }
+      for(const rr2 of [R*0.30,R*0.55,R*0.93]){
+        const ring=new THREE.Mesh(new THREE.TorusGeometry(rr2,0.011,6,28),leadMat);
+        ring.position.set(0,Y,0.019);g0.add(ring);
+      }
+      const hub=new THREE.Mesh(new THREE.CircleGeometry(R*0.13,12),glassMat);
+      hub.position.set(0,Y,0.022);g0.add(hub);
+      // the surround: a silver fillet and a stone moulding standing off the wall
+      const fillet=new THREE.Mesh(new THREE.TorusGeometry(R*1.03,0.016,8,30),silverMat);
+      fillet.position.set(0,Y,0.020);g0.add(fillet);
+      const moulding=new THREE.Mesh(new THREE.TorusGeometry(R*1.14,0.030,8,30),stoneMat);
+      moulding.position.set(0,Y,0.016);g0.add(moulding);
+      // a sill under it, the one square thing in the whole assembly
+      const sill=new THREE.Mesh(new THREE.BoxGeometry(R*2.5,0.045,0.07),stoneMat);
+      sill.position.set(0,Y-R*1.20,0.030);g0.add(sill);
+      g0.rotation.y=Math.atan2(-f.dx,-f.dy);
+      g0.position.set(f.x+0.5+f.dx*0.5,0,f.y+0.5+f.dy*0.5);
+      grp.add(g0);
+      // faint: the window colours the wall around it and no more. A rose window
+      // that lit the room would make the party's own torch pointless.
+      const l=new THREE.PointLight(hue.c,0.42,3.0,2);
+      l.position.set(f.x+0.5+f.dx*0.5-f.dx*0.34,Y,f.y+0.5+f.dy*0.5-f.dy*0.34);
+      grp.add(l);
+    }
+    // Stalactites. The house was cut out of living rock and the masons stopped
+    // at the walls, so the roof still hangs. Seeded from tile coordinates like
+    // the cave gems, so nothing about them needs saving and a rebuild puts the
+    // same teeth back. Kept high and thin: they are scenery, not obstacles.
+    // Faced with the CEILING's map, not the walls'. An untextured cone this close
+    // to a point light reads as painted plastic — the first pass hung icicles off
+    // the roof — but the cave ambushers' trick of borrowing the wall map is wrong
+    // here too: these walls are brickwork, and a bricklaid stalactite is worse
+    // than a plain one. The roof is bare rock, and so is what hangs from it.
+    // ...and it must be a CLONE. `ceilTex` carries repeat (L.w, L.h) for the one
+    // big ceiling plane, and repeat lives on the texture, not the material: hand
+    // the same object to a cone a third of a tile across and it samples twenty
+    // copies of the map into it, which averages out to a flat wash. A clone
+    // shares the image and gets its own repeat.
+    const spikeTex=ceilTex.clone();
+    spikeTex.repeat.set(1,1);spikeTex.needsUpdate=true;
+    const spikeMat=(k)=>new THREE.MeshPhongMaterial({map:spikeTex,bumpMap:spikeTex,bumpScale:0.05,
+      color:new THREE.Color(k,k,k),specular:0x0c0d11,shininess:2,flatShading:true});
+    for(let y=1;y<L.h-1;y++)for(let x=1;x<L.w-1;x++){
+      const t=L.grid[y*L.w+x];
+      if(t!==T_FLOOR)continue;
+      let h=((x*2654435761)^(y*40503))>>>0;
+      h=(h^(h>>>13))*1274126177>>>0;
+      if((h>>>8)/16777216>0.055)continue;             // roughly one tile in twenty
+      let seed=h;
+      const rr=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+      const g2=new THREE.Group();
+      const n=1+Math.floor(rr()*3);
+      for(let k=0;k<n;k++){
+        // short: they hang well above a head, and a long one this near the eye
+        // fills the screen every time the party turns round
+        const len=(k?0.10:0.16)+rr()*0.14, rad=(k?0.024:0.040)+rr()*0.020;
+        const mat=spikeMat(k?1.15:1.45);
+        const sp=new THREE.Mesh(new THREE.ConeGeometry(rad,len,7,2),mat);
+        sp.rotation.z=Math.PI;                        // apex down
+        const a=rr()*6.28,d=k?0.16+rr()*0.16:rr()*0.10;
+        const px=Math.cos(a)*d,pz=Math.sin(a)*d;
+        sp.position.set(px,WALLH-len/2,pz);
+        g2.add(sp);
+        // the ceiling is drawn in its own texture, so a spike with no root ends
+        // in mid-air against a surface it shares no colour with
+        const sk=new THREE.Mesh(new THREE.ConeGeometry(rad*1.6,0.05,7,1),spikeMat(0.95));
+        sk.rotation.z=Math.PI;sk.position.set(px,WALLH-0.024,pz);
+        g2.add(sk);
+      }
+      g2.position.set(x+0.5,0,y+0.5);
+      grp.add(g2);
+    }
+  }
   // caves: a seam of crystal here and there, caught in the torchlight. Real
   // geometry rather than paint, because a gem drawn into a variant texture would
   // appear on every one of the ~29 tiles sharing it — wallpaper, not a find.
@@ -5157,6 +5550,66 @@ function doorCanvas(th,locked){
     }else{
       ctx.strokeStyle='#6e6478';ctx.lineWidth=3.4;
       ctx.beginPath();ctx.arc(96,64,8,0,7);ctx.stroke();
+    }
+    return cv;
+  }
+  if(th.name==='Drow'){
+    // A wrought gate, not a door: everything between the ironwork is open air,
+    // so the alpha is left at zero and the material draws it with alphaTest,
+    // exactly as the sewer grate does. Drow bar a corridor with something you
+    // can be seen through.
+    const iron='#191a20',lit='#4d5162',dark='#0a0a0e';
+    const cols=th.glyphs||['#a86ce8','#3fd6a8','#4fc4e0'];
+    const glow=cols[(th.name.length+(locked?1:0))%cols.length];
+    const bar=(x0,y0,w,h)=>{
+      ctx.fillStyle=dark;ctx.fillRect(x0+1,y0+1,w,h);
+      ctx.fillStyle=iron;ctx.fillRect(x0,y0,w,h);
+      ctx.fillStyle=lit;ctx.fillRect(x0,y0,Math.max(1,w*0.28),h);
+    };
+    // the frame
+    bar(0,0,128,10);bar(0,118,128,10);bar(0,0,10,128);bar(118,0,10,128);
+    // uprights, tapering to points at the head like every drow thing does
+    for(let x=26;x<=102;x+=19){
+      bar(x-2.5,10,5,108);
+      ctx.fillStyle=iron;ctx.beginPath();
+      ctx.moveTo(x-4,14);ctx.lineTo(x,4);ctx.lineTo(x+4,14);ctx.closePath();ctx.fill();
+      ctx.fillStyle=lit;ctx.beginPath();
+      ctx.moveTo(x-4,14);ctx.lineTo(x,4);ctx.lineTo(x-1.5,14);ctx.closePath();ctx.fill();
+    }
+    // two rails, and the scrolled tracery hung between them — quadrant scrolls
+    // curling off each upright, which is what wrought iron actually does
+    for(const y of [44,90])bar(8,y-3,112,6);
+    ctx.lineCap='round';
+    for(let x=26;x<=102;x+=19){
+      for(const [y,d] of [[44,1],[90,-1]]){
+        for(const s of [-1,1]){
+          ctx.strokeStyle=dark;ctx.lineWidth=4.4;
+          ctx.beginPath();ctx.moveTo(x+0.8,y+d*4+0.8);
+          ctx.quadraticCurveTo(x+s*11+0.8,y+d*7+0.8,x+s*9+0.8,y+d*17+0.8);ctx.stroke();
+          ctx.strokeStyle=iron;ctx.lineWidth=3.4;
+          ctx.beginPath();ctx.moveTo(x,y+d*4);
+          ctx.quadraticCurveTo(x+s*11,y+d*7,x+s*9,y+d*17);ctx.stroke();
+          ctx.strokeStyle=lit;ctx.lineWidth=1.1;
+          ctx.beginPath();ctx.moveTo(x-0.5,y+d*3.4);
+          ctx.quadraticCurveTo(x+s*10.5,y+d*6.4,x+s*8.5,y+d*16.4);ctx.stroke();
+        }
+      }
+    }
+    // a boss at the centre of the middle panel with a glyph burning in it
+    ctx.fillStyle=dark;ctx.beginPath();ctx.arc(64.8,67.8,13,0,7);ctx.fill();
+    ctx.fillStyle=iron;ctx.beginPath();ctx.arc(64,67,13,0,7);ctx.fill();
+    ctx.strokeStyle=lit;ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(64,67,13,0,7);ctx.stroke();
+    ctx.save();ctx.globalAlpha=0.30;ctx.strokeStyle=glow;ctx.lineWidth=4;ctx.lineJoin='round';
+    espruarGlyph(ctx,64,58,19,0x5eed);ctx.restore();
+    ctx.strokeStyle=glow;ctx.lineWidth=1.4;ctx.lineJoin='round';
+    espruarGlyph(ctx,64,58,19,0x5eed);
+    if(locked){
+      // the lock hangs off the boss, a plate rather than a padlock
+      ctx.fillStyle=dark;ctx.fillRect(56,96,17,20);
+      ctx.fillStyle='#2b2d38';ctx.fillRect(55,95,17,20);
+      ctx.fillStyle=lit;ctx.fillRect(55,95,4,20);
+      ctx.fillStyle='#07070a';ctx.beginPath();ctx.arc(63.5,102,4,0,7);ctx.fill();
+      ctx.fillRect(61.5,103,4,9);
     }
     return cv;
   }
@@ -7348,7 +7801,7 @@ function serializeGame(){
       traps:Object.values(L.traps),items:Object.keys(L.items).map(i=>[+i,L.items[i]]),
       monsters:L.monsters.map(m=>{const c=Object.assign({},m);delete c._sc;delete c._regenT;delete c.dot;return c;}),
       secrets:L.secrets,lockedRoom:L.lockedRoom,restCount:L.restCount||{},restsHere:L.restsHere||0,
-      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,lurkers:L.lurkers||[],duergar:L.duergar||[],
+      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,lurkers:L.lurkers||[],duergar:L.duergar||[],drow:L.drow||[],
     },
   };
 }
@@ -7368,7 +7821,7 @@ function deserializeGame(o){
     w:lv.w,h:lv.h,grid:b64ToU8(lv.grid),explored:b64ToU8(lv.explored),
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
     traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
-    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],
+    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],drow:lv.drow||[],
   };
   clearFx();
   G.L=L;G.over=false;
