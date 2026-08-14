@@ -448,10 +448,19 @@ the dungeon grows:
   Three places must agree on the cadence: `isBossLevel` in `tryGen`, the `/3`
   in `bossSlot`, and the ⚔ in `refreshDepthTag`.
 
-  The arc was **solved against the bestiary rather than asserted**. Thirteen of
-  the fourteen slots are filled by creatures that already existed; only the
-  Dungeon's tier-1 slot at depth 45 needed one written for it, because the
-  stone giant tops out at 4158 against the drider's 4182 three floors above.
+  The arc was **solved against the bestiary rather than asserted**: the table
+  was first filled entirely from creatures that already existed, and only then
+  were five written for the slots where no creature both fitted the window and
+  read as that faction's ruler — a wererat guildmaster and guild lord, a
+  duergar thane, a hobgoblin warlord and a fire giant king. Each was sized to
+  its window *before* a line of the table moved. Depth 45 is the one slot that
+  had no arithmetic answer at all: the stone giant tops out at 4158 against the
+  drider's 4182 three floors above.
+
+  Four slots carry two candidates — depths 6, 9, 12 and 24, all of them inside
+  a normal run — so the boss floors a player actually reaches are the ones that
+  vary. T50 asserts they genuinely draw differently rather than merely being
+  allowed to.
 
   **A boss-only creature with no slot is dead content.** When the table
   replaced the old flat list the myconid sovereign fell out of it entirely —
