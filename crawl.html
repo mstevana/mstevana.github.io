@@ -686,6 +686,44 @@ const MONSTERS={
   mysovereign:{name:'Myconid sovereign',cr:13,hp:96,ac:21,atk:15,dmg:[2,8,8],xp:3900,speed:1.4, type:'plant', spr:'mysovereign',
              myconid:true, distress:true, reach:true, spores:{dc:18,dur:3.5,kind:'hold'},
              caster:{dmg:[5,6,5],ranged:7,cd:5,fx:'#c88ae8',elem:'acid'}},
+  /* ---------- the drow ----------
+     Elves, so the profile is the mirror of the duergar's: less hit points than
+     anything else at this depth, and more armour class and attack bonus than
+     anything else at any depth. A drow line is hard to hit and hits back first;
+     it does not stand and trade.
+
+     Two innate powers, both read by `monsterSpecials`. `drowpoison` is the
+     bolt-venom every raiding party coats its ammunition with — a Fortitude save
+     or asleep, which is the single most dangerous thing in the game to fail,
+     since `canAct` and `charAC` both read `sleep`. `faerie` is faerie fire:
+     it does NOT stop a character acting, and is deliberately the one condition
+     in the game that only `charAC` reads, because being outlined in cold light
+     makes you easier to hit and nothing else.
+
+     Note that an elf in the party shrugs the venom off entirely — `addCond`
+     refuses `sleep` for a sleep-immune race. That is the engine's rule rather
+     than 3.5's, and it is left as it is: the drow's own kin being proof against
+     their signature weapon is a better story than the errata. */
+  drow:      {name:'Drow warrior',cr:7, hp:54, ac:20,atk:13,dmg:[1,8,7], xp:2100,speed:1.3, type:'humanoid', spr:'drow',
+              drow:true},
+  drowbolt:  {name:'Drow raider', cr:7, hp:46, ac:19,atk:13,dmg:[1,8,6], xp:2100,speed:1.4, type:'humanoid', spr:'drowbolt',
+              drow:true, ranged:6, drowpoison:{dc:15,dur:4}},
+  drowblade: {name:'Drow blademaster',cr:9,hp:60,ac:22,atk:16,dmg:[2,6,8],xp:2700,speed:1.2, type:'humanoid', spr:'drowblade',
+              drow:true, drowpoison:{dc:16,dur:3}},
+  drowpriest:{name:'Drow priestess',cr:10,hp:50,ac:21,atk:12,dmg:[2,6,5],xp:3000,speed:1.4, type:'humanoid', spr:'drowpriest',
+              drow:true, reach:true, faerie:{dc:17,dur:7},
+              caster:{dmg:[4,6,3],ranged:6,cd:5,fx:'#a86ce8',elem:'acid'}},
+  drowmage:  {name:'Drow arcanist',cr:10,hp:56,ac:20,atk:11,dmg:[1,8,5],xp:3000,speed:1.4, type:'humanoid', spr:'drowmage',
+              drow:true, faerie:{dc:17,dur:7},
+              caster:{dmg:[5,6,5],ranged:7,cd:4.5,fx:'#4fc4e0',elem:'cold'}},
+  drider:    {name:'Drider', cr:12,hp:62, ac:21,atk:14,dmg:[2,8,5], xp:3600,speed:1.3, type:'aberration', spr:'drider',
+              drow:true, reach:true, poison:{dc:17,abil:'str',dice:[1,6]},
+              caster:{dmg:[3,6,3],ranged:6,cd:6,fx:'#a86ce8',elem:'acid'}},
+  // and the house that owns them. Boss-only, like the two myconid rulers: with
+  // no SPAWN_DEPTH her numbers answer to the boss floor she was written for.
+  drowmatron:{name:'Drow matron',cr:13,hp:33,ac:22,atk:14,dmg:[2,6,5],xp:3900,speed:1.4, type:'humanoid', spr:'drowmatron',
+              drow:true, reach:true, faerie:{dc:18,dur:8}, drowpoison:{dc:18,dur:3},
+              caster:{dmg:[4,6,4],ranged:7,cd:4.5,fx:'#a86ce8',elem:'acid'}},
   purpleworm:{reach:true,name:'Purple worm',cr:16,hp:120,ac:19,atk:17,dmg:[3,8,9],xp:4800,speed:1.7, type:'vermin', spr:'purpleworm',
              cave:true, poison:{dc:18,abil:'con',dice:[2,4]}},
 };
@@ -699,6 +737,7 @@ const SPAWN_DEPTH={
   umberhulk:[18,32],roper:[24,99],purpleworm:[30,99],
   shrieker:[15,24],mysprout:[15,24],violetfungus:[16,28],sporeservant:[17,30],
   myguard:[17,30],mycaster:[20,34],myelder:[24,99],
+  drow:[17,28],drowbolt:[17,28],drowblade:[19,32],drowpriest:[20,34],drowmage:[20,34],drider:[23,99],
   duergar:[12,24],duergarxbow:[12,24],duergarscout:[14,28],
   duergarpriest:[16,30],duergarrune:[19,34],duergarlord:[23,99],
 };
@@ -773,9 +812,13 @@ const BOSSES=[ // every 3rd level from 6: pick by depth
   // ruler. The list is ordered by weight, not by flavour, and the lord was
   // written to fit between Ubbroth and Sinshara rather than the other way round.
   {minD:18,base:'mylord',  name:'Ilhaeryn, the Standing Grove'},
-  {minD:21,base:'ogremage',name:'Sinshara of the Veil'},
-  {minD:24,base:'dragon',  name:'Vermilax the Patient'},
-  {minD:27,base:'mysovereign',name:'Thass-Mor, the Sporecrown'},
+  // Depth 21 is the last floor of the Drow block. Same story as the grove: the
+  // matron is boss-only, so her numbers were written to the window between
+  // Ilhaeryn and Sinshara rather than the list being bent to fit her.
+  {minD:21,base:'drowmatron',name:'Matron Zaeryl of House Vhaeraun'},
+  {minD:24,base:'ogremage',name:'Sinshara of the Veil'},
+  {minD:27,base:'dragon',  name:'Vermilax the Patient'},
+  {minD:30,base:'mysovereign',name:'Thass-Mor, the Sporecrown'},
 ];
 // Past Vermilax the named bosses run out, and every boss floor was handing you
 // the same dragon forever. The list starts over instead, each pass through it
@@ -787,7 +830,7 @@ const BOSSES=[ // every 3rd level from 6: pick by depth
 // -- its damage, its reach, whether it casts -- but its weight class comes from
 // the depth. Taken from the list so adding a named boss keeps it honest.
 const BOSS_BASE_HP=BOSSES.reduce((a,b)=>a+MONSTERS[b.base].hp,0)/BOSSES.length;
-const BOSS_RANKS=['Warlord','Tyrant','Devourer','Sovereign','Archfiend','Herald','Fellmaster','Undying'];
+const BOSS_RANKS=['Warlord','Tyrant','Devourer','Sovereign','Archfiend','Herald','Fellmaster','Undying','Throneless'];
 const BOSS_CIRCLES=['of the Sunken Circle','of the Black Cycle','of the Last Gate','Beyond Counting'];
 function bossFor(depth){
   const lastNamed=BOSSES[BOSSES.length-1].minD;
@@ -1053,6 +1096,147 @@ const MONSTER_ART={
      where a face would be. The cap is the head layer so it tilts and the arm
      layer is a stubby limb, which is as close to telegraphing as a mushroom
      gets. Violet throughout, because the grove lights itself. */
+  /* ---------- the drow ----------
+     Coal-black skin and white hair, which on a dark sprite means the hair has
+     to carry the whole silhouette: every one of these reads by its mane and its
+     spider-motif gear before it reads by its face. Eyes are the one warm thing
+     on them. */
+  drow:()=>({o:{hp:[32,25],ap:[46,38],lit:'#4a4453',mid:'#1d1a24',eye:'#e05a3a',rough:[1,0.22],seed:81},
+    body:`<path d="M20 30 Q17 41 19 53 L24 60 L40 60 L45 53 Q47 41 44 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M21 31 L43 31 L44 46 Q32 51 20 46 Z" fill="#232030"/>`+
+    `<path d="M21 31 L43 31" stroke="#6b6580" stroke-width="1"/>`+
+    `<path d="M26 35 Q32 32 38 35 Q32 40 26 35 Z" fill="#8c93a8"/>`+
+    `<path d="M32 34 L32 41 M28 37 L36 37" stroke="#8c93a8" stroke-width="0.7"/>`+
+    `<path d="M22 47 L42 47" stroke="#5a5470" stroke-width="0.9"/>`+
+    `|H|<path d="M26 18 Q26 11 32 11 Q38 11 38 18 L38 23 Q35 26 30 26 Q26 24 26 18 Z" fill="#3a3444" ${RIM}/>`+
+    `<path d="M24 17 Q24 6 32 6 Q40 6 40 17 Q40 22 38 24 L38 15 Q32 12 26 15 L26 24 Q24 22 24 17 Z" fill="#ddd8e8"/>`+
+    `<path d="M25 20 Q22 30 24 38" stroke="#ddd8e8" stroke-width="2.6" fill="none"/>`+
+    `<path d="M39 20 Q42 30 40 38" stroke="#cfc9dd" stroke-width="2.2" fill="none"/>`+
+    `<path d="M24 16 L20 12 M40 16 L44 12" stroke="#ddd8e8" stroke-width="1.4"/>`+
+    `<circle cx="29" cy="20" r="1.2" fill="#e05a3a"/><circle cx="35" cy="20" r="1.2" fill="#e05a3a"/>`+
+    `<path d="M30 24 Q32 25 34 24" stroke="#6b6580" stroke-width="0.7" fill="none"/>|/H|`+
+    `|A|<path d="M46 38 L53 34" stroke="#3a3444" stroke-width="2.4"/>`+
+    `<path d="M52 35 L62 27" stroke="#b8bece" stroke-width="1.6"/>`+
+    `<path d="M50 36 L54 33" stroke="#8c93a8" stroke-width="3"/>|/A|`}),
+  drowbolt:()=>({o:{hp:[32,25],ap:[44,40],lit:'#4a4453',mid:'#1d1a24',eye:'#e05a3a',rough:[1,0.22],seed:82,ad:0.45,aw:0.32},
+    body:`<path d="M21 31 Q18 41 20 53 L25 60 L40 60 L44 53 Q46 41 43 31 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M22 32 L42 32 L43 45 Q32 50 21 45 Z" fill="#1f1c2a"/>`+
+    `<path d="M23 36 L41 42" stroke="#4a4560" stroke-width="2.4"/>`+
+    `<path d="M25 44 Q32 47 39 44" stroke="#5a5470" stroke-width="0.8" fill="none"/>`+
+    `<circle cx="27" cy="41" r="1.6" fill="#3fd6a8"/><circle cx="31" cy="43" r="1.4" fill="#3fd6a8"/>`+
+    `|H|<path d="M26 18 Q26 11 32 11 Q38 11 38 18 L38 23 Q35 26 30 26 Q26 24 26 18 Z" fill="#3a3444" ${RIM}/>`+
+    `<path d="M23 18 Q23 7 32 7 Q41 7 41 18 L41 21 Q37 13 32 13 Q27 13 23 21 Z" fill="#e4dfef"/>`+
+    `<path d="M24 20 Q21 29 23 35" stroke="#e4dfef" stroke-width="2.2" fill="none"/>`+
+    `<path d="M40 20 Q43 29 41 35" stroke="#d2ccdf" stroke-width="2" fill="none"/>`+
+    `<path d="M26 22 L38 22 L37 25 L27 25 Z" fill="#2a2636"/>`+
+    `<circle cx="29" cy="20" r="1.1" fill="#e05a3a"/><circle cx="35" cy="20" r="1.1" fill="#e05a3a"/>|/H|`+
+    `|A|<path d="M44 40 L52 38" stroke="#3a3444" stroke-width="2.2"/>`+
+    `<path d="M50 34 L50 42 L58 38 Z" fill="#2b2836" ${RIM}/>`+
+    `<path d="M49 33 L49 43" stroke="#7d8496" stroke-width="1.4"/>`+
+    `<path d="M52 38 L62 38" stroke="#3fd6a8" stroke-width="1"/>`+
+    `<path d="M60 36 L64 38 L60 40 Z" fill="#3fd6a8"/>|/A|`}),
+  drowblade:()=>({o:{hp:[32,24],ap:[47,37],lit:'#524b5e',mid:'#201d29',eye:'#e05a3a',rough:[1,0.24],seed:83,ad:0.85,as:1.15},
+    body:`<path d="M19 29 Q16 41 18 54 L23 61 L41 61 L46 54 Q48 41 45 29 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M20 30 L44 30 L45 47 Q32 52 19 47 Z" fill="#26222f"/>`+
+    `<path d="M20 30 L44 30" stroke="#8c93a8" stroke-width="1.2"/>`+
+    `<path d="M24 34 L40 34 M24 38 L40 38 M24 42 L40 42" stroke="#3b364a" stroke-width="1.6"/>`+
+    `<path d="M32 31 L32 48" stroke="#8c93a8" stroke-width="0.8"/>`+
+    `<circle cx="32" cy="37" r="3.4" fill="none" stroke="#a86ce8" stroke-width="1"/>`+
+    `<circle cx="32" cy="37" r="1.2" fill="#a86ce8"/>`+
+    `|H|<path d="M26 17 Q26 10 32 10 Q38 10 38 17 L38 23 Q35 26 30 26 Q26 24 26 17 Z" fill="#403a4c" ${RIM}/>`+
+    `<path d="M23 16 Q23 4 32 4 Q41 4 41 16 Q41 20 39 23 L39 13 Q32 10 25 13 L25 23 Q23 20 23 16 Z" fill="#f0ecf7"/>`+
+    `<path d="M23 18 Q18 30 21 41" stroke="#f0ecf7" stroke-width="2.8" fill="none"/>`+
+    `<path d="M41 18 Q46 30 43 41" stroke="#e0dced" stroke-width="2.6" fill="none"/>`+
+    `<path d="M25 14 L19 8 M39 14 L45 8" stroke="#f0ecf7" stroke-width="1.5"/>`+
+    `<circle cx="29" cy="19" r="1.2" fill="#e05a3a"/><circle cx="35" cy="19" r="1.2" fill="#e05a3a"/>`+
+    `<path d="M28 24 Q32 22 36 24" stroke="#7d7490" stroke-width="0.8" fill="none"/>|/H|`+
+    `|A|<path d="M47 37 L54 33" stroke="#403a4c" stroke-width="2.4"/>`+
+    `<path d="M53 34 L64 22" stroke="#cdd4e6" stroke-width="1.8"/>`+
+    `<path d="M53 34 L60 40" stroke="#b0b7ca" stroke-width="1.4"/>`+
+    `<path d="M51 35 L56 31" stroke="#8c93a8" stroke-width="3.2"/>|/A|`}),
+  drowpriest:()=>({o:{hp:[32,24],ap:[47,37],lit:'#4d3f60',mid:'#1d1628',eye:'#e05a3a',rough:[1,0.26],seed:84,ad:0.7},
+    body:`<path d="M18 29 Q14 43 17 57 L23 63 L41 63 L47 57 Q50 43 46 29 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M19 30 L45 30 L46 50 Q32 56 18 50 Z" fill="#241b33"/>`+
+    `<path d="M19 30 L45 30" stroke="#a86ce8" stroke-width="1.2"/>`+
+    `<path d="M32 32 L32 52" stroke="#8c93a8" stroke-width="0.8"/>`+
+    `<path d="M24 40 Q32 36 40 40 Q32 45 24 40 Z" fill="#a86ce8" opacity="0.55"/>`+
+    `<path d="M32 34 L32 46 M26 38 L38 38 M27 43 L37 43" stroke="#c79cf0" stroke-width="0.8"/>`+
+    `<circle cx="32" cy="40" r="1.8" fill="#e0b0ff"/>`+
+    `|H|<path d="M26 17 Q26 10 32 10 Q38 10 38 17 L38 23 Q35 26 30 26 Q26 24 26 17 Z" fill="#3d3348" ${RIM}/>`+
+    `<path d="M22 16 Q22 5 32 5 Q42 5 42 16 Q42 21 40 24 L40 13 Q32 10 24 13 L24 24 Q22 21 22 16 Z" fill="#efe9f8"/>`+
+    `<path d="M22 18 Q16 32 20 44" stroke="#efe9f8" stroke-width="2.6" fill="none"/>`+
+    `<path d="M42 18 Q48 32 44 44" stroke="#ddd6ec" stroke-width="2.4" fill="none"/>`+
+    `<path d="M27 9 Q32 2 37 9 Q32 6 27 9 Z" fill="#a86ce8"/>`+
+    `<circle cx="32" cy="5" r="2" fill="#e0b0ff"/>`+
+    `<circle cx="29" cy="19" r="1.2" fill="#e05a3a"/><circle cx="35" cy="19" r="1.2" fill="#e05a3a"/>|/H|`+
+    `|A|<path d="M47 37 L54 34" stroke="#3d3348" stroke-width="2.4"/>`+
+    `<path d="M53 34 L57 26" stroke="#5a5470" stroke-width="2"/>`+
+    `<path d="M57 26 Q60 20 57 15 M57 26 Q63 22 62 16 M57 26 Q54 19 49 17" stroke="#c9c3d8" stroke-width="1.2" fill="none"/>`+
+    `<circle cx="57" cy="14" r="1.6" fill="#a86ce8"/><circle cx="62" cy="15" r="1.4" fill="#a86ce8"/>`+
+    `<circle cx="48" cy="16" r="1.4" fill="#a86ce8"/>|/A|`}),
+  drowmage:()=>({o:{hp:[32,24],ap:[47,37],lit:'#3d4a5e',mid:'#161c28',eye:'#e05a3a',rough:[1,0.26],seed:85,ad:0.6},
+    body:`<path d="M18 30 Q14 44 17 58 L23 63 L41 63 L47 58 Q50 44 46 30 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M19 31 L45 31 L46 51 Q32 57 18 51 Z" fill="#182130"/>`+
+    `<path d="M19 31 L45 31" stroke="#4fc4e0" stroke-width="1.1"/>`+
+    `<path d="M23 37 Q32 34 41 37 M22 44 Q32 41 42 44 M22 50 Q32 47 42 50" stroke="#4fc4e0" stroke-width="0.8" fill="none" opacity="0.75"/>`+
+    `<circle cx="32" cy="42" r="2.6" fill="none" stroke="#4fc4e0" stroke-width="0.9"/>`+
+    `|H|<path d="M26 18 Q26 11 32 11 Q38 11 38 18 L38 23 Q35 26 30 26 Q26 24 26 18 Z" fill="#333c4a" ${RIM}/>`+
+    `<path d="M22 17 Q22 6 32 6 Q42 6 42 17 Q42 22 40 25 L40 14 Q32 11 24 14 L24 25 Q22 22 22 17 Z" fill="#e8ecf5"/>`+
+    `<path d="M22 19 Q17 33 21 45" stroke="#e8ecf5" stroke-width="2.4" fill="none"/>`+
+    `<path d="M42 19 Q47 33 43 45" stroke="#d6dbe6" stroke-width="2.2" fill="none"/>`+
+    `<path d="M24 13 Q32 4 40 13 L40 16 Q32 10 24 16 Z" fill="#22303f"/>`+
+    `<circle cx="32" cy="8" r="1.8" fill="#4fc4e0"/>`+
+    `<circle cx="29" cy="20" r="1.1" fill="#e05a3a"/><circle cx="35" cy="20" r="1.1" fill="#e05a3a"/>|/H|`+
+    `|A|<path d="M47 37 L54 34" stroke="#333c4a" stroke-width="2.4"/>`+
+    `<path d="M53 35 L58 12" stroke="#4a4560" stroke-width="2"/>`+
+    `<circle cx="58" cy="9" r="4.6" fill="none" stroke="#8c93a8" stroke-width="1.4"/>`+
+    `<circle cx="58" cy="9" r="2.6" fill="#4fc4e0"/>`+
+    `<circle cx="58" cy="9" r="1" fill="#dff6ff"/>|/A|`}),
+  drider:()=>({o:{hp:[32,26],ap:[44,32],lit:'#4a3f56',mid:'#171320',eye:'#e05a3a',rough:[1,0.3],seed:86},
+    body:`<path d="M13 44 Q2 36 1 26 M15 50 Q4 50 0 42 M51 44 Q62 36 63 26 M49 50 Q60 50 64 42" stroke="#463c5e" stroke-width="2.4" fill="none"/>`+
+    `<path d="M14 41 Q5 31 7 21 M50 41 Q59 31 57 21" stroke="#3b3350" stroke-width="2" fill="none"/>`+
+    `<path d="M18 41 Q9 47 11 57 Q20 64 32 64 Q44 64 53 57 Q55 47 46 41 Z" fill="#1c1726" ${RIM}/>`+
+    `<path d="M21 46 Q32 42 43 46 Q43 56 32 59 Q21 56 21 46 Z" fill="#2a2136"/>`+
+    `<path d="M32 44 L32 58 M25 49 L39 49 M24 54 L40 54" stroke="#6b5a86" stroke-width="0.8"/>`+
+    // the elf half, rising out of the spider half. Without a real torso between
+    // them the sprite reads as a head perched on an abdomen.
+    `<path d="M24 27 Q21 34 22 42 Q32 47 42 42 Q43 34 40 27 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M25 28 L39 28 L40 39 Q32 43 24 39 Z" fill="#241d33"/>`+
+    `<path d="M25 28 L39 28" stroke="#8c93a8" stroke-width="0.9"/>`+
+    `<path d="M28 32 Q32 30 36 32 Q32 36 28 32 Z" fill="#a86ce8" opacity="0.6"/>`+
+    `<path d="M32 30 L32 40" stroke="#6b5a86" stroke-width="0.7"/>`+
+    `|H|<path d="M26 18 Q26 11 32 11 Q38 11 38 18 L38 24 Q35 27 30 27 Q26 25 26 18 Z" fill="#3b3348" ${RIM}/>`+
+    `<path d="M22 17 Q22 5 32 5 Q42 5 42 17 Q42 22 40 25 L40 13 Q32 10 24 13 L24 25 Q22 22 22 17 Z" fill="#ded8ea"/>`+
+    `<path d="M22 19 Q16 30 19 40" stroke="#ded8ea" stroke-width="2.6" fill="none"/>`+
+    `<path d="M42 19 Q48 30 45 40" stroke="#cec8dd" stroke-width="2.4" fill="none"/>`+
+    `<circle cx="28" cy="19" r="1.3" fill="#e05a3a"/><circle cx="36" cy="19" r="1.3" fill="#e05a3a"/>`+
+    `<circle cx="30" cy="15" r="0.9" fill="#e05a3a"/><circle cx="34" cy="15" r="0.9" fill="#e05a3a"/>`+
+    `<path d="M28 24 Q32 28 36 24" stroke="#7a7090" stroke-width="0.9" fill="none"/>|/H|`+
+    `|A|<path d="M43 32 L52 28" stroke="#3b3348" stroke-width="2.4"/>`+
+    `<path d="M51 29 L62 18" stroke="#b8bece" stroke-width="1.6"/>`+
+    `<path d="M49 30 L54 26" stroke="#8c93a8" stroke-width="3"/>|/A|`}),
+  drowmatron:()=>({o:{hp:[32,22],ap:[49,36],lit:'#5a4470',mid:'#1e1430',eye:'#ff6a44',rough:[1,0.3],seed:87,ad:0.8},
+    body:`<path d="M16 28 Q10 45 14 60 L22 66 L42 66 L50 60 Q54 45 48 28 Z" fill="url(#bg)" ${RIM}/>`+
+    `<path d="M17 29 L47 29 L49 53 Q32 60 15 53 Z" fill="#251636"/>`+
+    `<path d="M17 29 L47 29" stroke="#a86ce8" stroke-width="1.4"/>`+
+    `<path d="M22 38 Q32 32 42 38 Q32 46 22 38 Z" fill="#a86ce8" opacity="0.6"/>`+
+    `<path d="M32 30 L32 50 M24 36 L40 36 M23 42 L41 42 M25 48 L39 48" stroke="#cfa2f4" stroke-width="0.9"/>`+
+    `<circle cx="32" cy="40" r="3.6" fill="none" stroke="#e0b0ff" stroke-width="1.1"/>`+
+    `<circle cx="32" cy="40" r="1.6" fill="#ffe0ff"/>`+
+    `|H|<path d="M26 16 Q26 9 32 9 Q38 9 38 16 L38 23 Q35 26 30 26 Q26 24 26 16 Z" fill="#42334f" ${RIM}/>`+
+    `<path d="M20 15 Q20 2 32 2 Q44 2 44 15 Q44 21 42 25 L42 12 Q32 8 22 12 L22 25 Q20 21 20 15 Z" fill="#fbf7ff"/>`+
+    `<path d="M20 18 Q12 34 17 48" stroke="#fbf7ff" stroke-width="3" fill="none"/>`+
+    `<path d="M44 18 Q52 34 47 48" stroke="#ece6f8" stroke-width="2.8" fill="none"/>`+
+    `<path d="M24 8 L18 1 M40 8 L46 1" stroke="#fbf7ff" stroke-width="1.6"/>`+
+    `<path d="M25 7 Q32 -2 39 7 Q32 3 25 7 Z" fill="#a86ce8"/>`+
+    `<circle cx="32" cy="1" r="2.4" fill="#e0b0ff"/>`+
+    `<circle cx="28.5" cy="18" r="1.3" fill="#ff6a44"/><circle cx="35.5" cy="18" r="1.3" fill="#ff6a44"/>`+
+    `<path d="M28 23 Q32 21 36 23" stroke="#8a7ba0" stroke-width="0.8" fill="none"/>|/H|`+
+    `|A|<path d="M49 36 L56 32" stroke="#42334f" stroke-width="2.6"/>`+
+    `<path d="M55 33 L59 24" stroke="#5a5470" stroke-width="2.2"/>`+
+    `<path d="M59 24 Q63 17 60 10 M59 24 Q65 19 64 12 M59 24 Q56 16 51 13 M59 24 Q53 19 50 21" stroke="#d8d2e6" stroke-width="1.3" fill="none"/>`+
+    `<circle cx="60" cy="9" r="1.8" fill="#a86ce8"/><circle cx="64" cy="11" r="1.6" fill="#a86ce8"/>`+
+    `<circle cx="50" cy="12" r="1.6" fill="#a86ce8"/><circle cx="49" cy="21" r="1.5" fill="#a86ce8"/>|/A|`}),
   mysprout:()=>({o:{hp:[32,24],ap:[44,40],lit:'#cfc2d8',mid:'#6a5a78',eye:'#e0b0ff',rough:[1,0.3],seed:61},
     body:`<path d="M27 34 Q25 46 27 56 L30 60 L34 60 L37 56 Q39 46 37 34 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M29 38 L35 38 M29 44 L35 44" stroke="#5a4a68" stroke-width="0.8"/>`+
@@ -2651,7 +2835,7 @@ function mkMonster(key,x,y,depth){
     enlarge:!!def.enlarge,vanish:!!def.vanish,grown:false,vanished:0,
     distress:!!def.distress,shriek:!!def.shriek,shrieked:false,
     special:{disease:def.disease,poison:def.poison,paralysis:def.paralysis,energyDrain:def.energyDrain,regen:def.regen,
-      gaze:def.gaze,hold:def.hold,spores:def.spores},
+      gaze:def.gaze,hold:def.hold,spores:def.spores,drowpoison:def.drowpoison,faerie:def.faerie},
     atkCd:1.5+Math.random()*2,castCd:def.caster?def.caster.cd*(0.5+Math.random()):0,
     moveCd:Math.random(),held:0,slowed:0,sleep:false,shaken:0,stunned:0,awake:false,boss:false,
     id:Math.floor(Math.random()*1e9)};
@@ -2817,6 +3001,11 @@ function charAC(ch){
   if(isRaging(ch))ac-=2;
   for(const b of ch.buffs)if(b.ac)ac+=b.ac;
   if(hasCond(ch,'paralysis')||hasCond(ch,'sleep')||hasCond(ch,'hold'))ac-=4;
+  // Faerie fire is the one condition only this function reads. It does not stop
+  // a character acting -- being outlined in cold light costs you your cover and
+  // nothing else -- so `canAct` deliberately ignores it, and the penalty is two
+  // rather than the four a helpless character takes.
+  if(hasCond(ch,'faerie'))ac-=2;
   return ac;
 }
 function charSaves(ch){
@@ -2945,7 +3134,7 @@ function addCond(ch,cond){
   return true;
 }
 function removeCond(ch,kind){ch.conditions=ch.conditions.filter(c=>c.kind!==kind);}
-const COND_ICONS={poison:'☠',disease:'🦠',paralysis:'⛓',hold:'⛓',sleep:'💤',stunned:'✶',shaken:'😨',bleeding:'🩸',drained:'🕳'};
+const COND_ICONS={poison:'☠',disease:'🦠',paralysis:'⛓',hold:'⛓',sleep:'💤',stunned:'✶',shaken:'😨',bleeding:'🩸',drained:'🕳',faerie:'✧'};
 function canAct(ch){
   return !ch.dead&&ch.hp>0&&!hasCond(ch,'paralysis')&&!hasCond(ch,'sleep')
     &&!hasCond(ch,'stunned')&&!hasCond(ch,'hold');
@@ -5700,7 +5889,7 @@ function addMonsterSprite(m){
   const spr=new THREE.Sprite(mat);
   const sc=m.boss?1.05:(['ogre','troll','minotaur','ogremage','dragon',
     'bonecolossus','deathknight','bonedrake','lich',
-    'umberhulk','purpleworm','roper','otyugh','cavebear','duergarlord','myelder','mylord','mysovereign','shrieker'].includes(m.key)?0.95:0.72);
+    'umberhulk','purpleworm','roper','otyugh','cavebear','duergarlord','myelder','mylord','mysovereign','shrieker','drider','drowmatron'].includes(m.key)?0.95:0.72);
   spr.scale.set(sc,sc,1);
   spr.position.set(m.x+0.5,sc/2+0.02,m.y+0.5);
   spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss,elite:m.elite};
@@ -6724,7 +6913,7 @@ function castSpell(ch,key,opts){
       else {logSpell('unaffected');UI.floatAtMonster(m,'unaffected','#9a9da2');}
       return;
     }
-    if(sp.hold){m.held=Math.max(m.held,sp.hold);UI.floatAtMonster(m,'held!','#9db4d6');}
+  if(sp.hold){m.held=Math.max(m.held,sp.hold);UI.floatAtMonster(m,'held!','#9db4d6');}
     if(sp.slow){m.slowed=Math.max(m.slowed,sp.slow);UI.floatAtMonster(m,'slowed','#9db4d6');}
     if(sp.slowAll){m.slowed=Math.max(m.slowed,sp.slowAll);UI.floatAtMonster(m,'slowed','#9db4d6');}
     if(sp.stun){const s=monsterSave(m,'fort');if(s<dc){m.stunned=sp.stun;UI.floatAtMonster(m,'stunned','#e8c840');}}
@@ -7200,6 +7389,33 @@ function monsterSpecials(m,ch){
       addCond(ch,{kind,dur:sp.spores.dur});
       UI.float(ch,kind==='stunned'?'reeling!':'rooted!','#c88ae8');
       UI.toast('A burst of spores catches '+ch.name+' full in the face!');
+    }
+  }
+  if(sp.drowpoison){
+    // The bolt-venom. A failed Fortitude save is the worst outcome in the game
+    // short of dying: `sleep` is read by canAct AND charAC, so a sleeping
+    // character neither fights nor defends until it wears off.
+    const sv=charSaves(ch).fort+saveBonusVs(ch,'poison'),nat=d20(),made=nat+sv>=sp.drowpoison.dc;
+    logSave(ch.name,m.name+"'s venom",nat,sv,sp.drowpoison.dc,made,made?'':'asleep');
+    if(!made&&!hasCond(ch,'sleep')){
+      // addCond refuses sleep outright for an elf, which is where the drow's own
+      // kin get to be proof against the drow's signature weapon
+      if(addCond(ch,{kind:'sleep',dur:sp.drowpoison.dur})){
+        UI.float(ch,'asleep!','#8a7ad0');
+        UI.toast(ch.name+' slumps where they stand — drow poison.');
+      }else UI.toast(ch.name+' shrugs off the venom.');
+    }
+  }
+  if(sp.faerie){
+    // Faerie fire outlines a character in cold light. It costs AC and nothing
+    // else, which is why it is a Reflex save (you dodge the light) and why
+    // canAct does not read it.
+    const sv=charSaves(ch).ref,nat=d20(),made=nat+sv>=sp.faerie.dc;
+    logSave(ch.name,m.name+"'s faerie fire",nat,sv,sp.faerie.dc,made,made?'':'outlined');
+    if(!made&&!hasCond(ch,'faerie')){
+      addCond(ch,{kind:'faerie',dur:sp.faerie.dur});
+      UI.float(ch,'outlined!','#4fc4e0');
+      UI.toast('Cold light clings to '+ch.name+' — every blow will find them.');
     }
   }
   if(sp.hold){
@@ -7682,7 +7898,11 @@ function openCoffin(ci,slot){
   const roll=Math.random();
   if(roll<0.20){
     // the occupant is still in residence, and drawn from what this floor holds
-    const pool=spawnPool(G.depth).map(([k,w])=>[k,w*(MONSTERS[k].type==='undead'?8:0.25)]);
+    // What climbs out of a grave is a grave's own. The off-weight has to track
+    // the bestiary's width the same way the crypt's placement bias does: at 0.25
+    // it held 87% undead with four rosters competing and 83% once the drow
+    // landed, which is a coffin turning into a lucky dip.
+    const pool=spawnPool(G.depth).map(([k,w])=>[k,w*(MONSTERS[k].type==='undead'?8:0.10)]);
     const spot=freeSlotAt(c.x,c.y,null)>=0?{x:c.x,y:c.y}
       :DIRS.map(([dx,dy])=>({x:c.x+dx,y:c.y+dy}))
            .find(p=>walkableTile(tileAt(p.x,p.y))&&freeSlotAt(p.x,p.y,null)>=0);
