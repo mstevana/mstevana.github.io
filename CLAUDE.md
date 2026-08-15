@@ -222,6 +222,42 @@ settled is that the median is not to be chased by fiddling with
 `depthScale`, `threatBudget` or the bestiary — those are not what is
 holding it.
 
+## Sprites are lit now
+
+`THREE.Sprite` uses `SpriteMaterial`, which **ignores every light in the scene**.
+For a long time that meant a creature ten tiles down a corridor was exactly as
+bright as one standing in the party's torchlight, while the wall beside it fell
+off to black — which is what made monsters read as stickers pasted onto the
+picture rather than things standing in the room.
+
+`shadeSprites()` runs once a frame from the render loop, after the torch has been
+positioned and its flicker applied. A sprite has no normal to shade with, so the
+whole billboard is shaded at once: `lightAt(x,y,z)` evaluates the ambient, the
+torch and the short-range fill at the sprite's own position and the result goes
+into `material.color`, which multiplies the map. Monsters and floor items both
+go through it.
+
+The falloff is three.js r128's own non-physical point attenuation,
+`clamp(1 - d/range, 0, 1) ^ decay`, so a sprite dims on exactly the curve the
+stonework around it does — including the flicker, since it reads
+`light.intensity` live.
+
+Two constants, and both are needed:
+
+- **`SPRITE_GAIN` (0.55).** This shades a flat billboard as though it were a
+  white surface square-on to the light, which is the brightest any real surface
+  could be. Left at 1 the sum clamps to full out to about four tiles and nothing
+  visibly falls off at all. The walls do not have that problem because they are
+  Lambert shaded, mostly oblique, and painted well under white.
+- **`SPRITE_FLOOR` (0.13).** The one deliberate untruth: past the torch's reach a
+  creature would otherwise go pure black, and a monster you cannot see at all is
+  worse than one you can barely make out. It keeps a silhouette.
+
+Known limitation, worth fixing before adding more shading: the tint multiplies
+the *whole* map, so self-luminous parts dim with everything else — glowing eyes,
+the `windup` aura, an elite's aura. Splitting the emissive parts out as a second
+additive sprite is the fix, and the `sharp` layer is the natural seam.
+
 ## Adding a monster
 
 `MONSTERS` is a plain object keyed by id, so ordering does not matter

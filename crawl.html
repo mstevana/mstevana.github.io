@@ -5399,6 +5399,61 @@ function initRenderer(){
   onResize();
   window.addEventListener('resize',onResize);
 }
+/* Monsters and floor items are THREE.Sprite, and SpriteMaterial is UNLIT — it
+   ignores every light in the scene. Before this a creature ten tiles down a
+   corridor was exactly as bright as one standing in your torchlight, while the
+   wall beside it fell off to black, which is what made sprites read as stickers
+   pasted onto the picture rather than things standing in the room.
+
+   A sprite has no normal to shade with, so the whole billboard is shaded at
+   once: evaluate the same lights the walls get at the sprite's own position and
+   push the result into `material.color`, which multiplies the map.
+
+   The falloff is three.js r128's own non-physical point attenuation —
+   `clamp(1 - d/range, 0, 1) ^ decay` — so a monster dims on exactly the curve
+   the stonework around it does. Near the torch the sum clamps to 1 and the art
+   shows at full strength, which is what happens to the walls too.
+
+   SPRITE_GAIN exists because this shades a flat billboard as if it were a white
+   surface square-on to the light, which is the brightest a real surface could
+   ever be. Left at 1 the sum clamps to full out to about four tiles and nothing
+   visibly falls off; the walls do not have that problem because they are Lambert
+   shaded, mostly oblique, and painted well under white. 0.55 is the factor that
+   puts a sprite's falloff back on the same curve as the stone beside it.
+
+   SPRITE_FLOOR is the one deliberate untruth: a creature past the torch's reach
+   would otherwise go completely black, and a monster you cannot see at all is a
+   worse experience than one you can barely make out. It keeps a silhouette. */
+const SPRITE_GAIN=0.55, SPRITE_FLOOR=0.13;
+const _sprC=new THREE.Color();
+function lightAt(x,y,z){
+  const t=R3.torch,f=R3.torchFill,a=R3.ambient;
+  const att=(L)=>{
+    const dx=x-L.position.x,dy=y-L.position.y,dz=z-L.position.z;
+    const d=Math.sqrt(dx*dx+dy*dy+dz*dz);
+    const k=1-d/L.distance;
+    return k<=0?0:k*k*L.intensity;          // decay 2 on both torches
+  };
+  const wt=att(t)*SPRITE_GAIN,wf=att(f)*SPRITE_GAIN;
+  _sprC.setRGB(
+    a.color.r*a.intensity+t.color.r*wt+f.color.r*wf,
+    a.color.g*a.intensity+t.color.g*wt+f.color.g*wf,
+    a.color.b*a.intensity+t.color.b*wt+f.color.b*wf);
+  _sprC.r=Math.min(1,Math.max(SPRITE_FLOOR,_sprC.r));
+  _sprC.g=Math.min(1,Math.max(SPRITE_FLOOR,_sprC.g));
+  _sprC.b=Math.min(1,Math.max(SPRITE_FLOOR,_sprC.b));
+  return _sprC;
+}
+function shadeSprites(){
+  for(const id in R3.monsterSprites){
+    const s=R3.monsterSprites[id];
+    if(s&&s.material)s.material.color.copy(lightAt(s.position.x,s.position.y,s.position.z));
+  }
+  for(const i in R3.itemSprites){
+    const s=R3.itemSprites[i];
+    if(s&&s.material)s.material.color.copy(lightAt(s.position.x,s.position.y,s.position.z));
+  }
+}
 function onResize(){
   const wrap=document.getElementById('view-wrap');
   const w=wrap.clientWidth||1,h=wrap.clientHeight||1;
@@ -6796,6 +6851,7 @@ function updateCamera(now){
   const flicker=Math.sin(now/90)*0.08+Math.sin(now/37)*0.05+Math.random()*0.06;
   R3.torch.intensity=R3.torchBase*(1+flicker);
   R3.torchFill.intensity=0.9*(1+flicker*0.6);
+  shadeSprites();
   // crypt candles guttering, each on its own phase so they don't pulse together
   for(let i=0;i<R3.candleFlames.length;i++){
     const c=R3.candleFlames[i],ph=i*1.7;
