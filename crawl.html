@@ -452,9 +452,10 @@ const TRINKETS={
   ringprot: {name:'Ring of protection', slot:'ring', spr:'ring'},
   amuletnat:{name:'Amulet of natural armor', slot:'amulet', spr:'amulet'},
   // worn stat boosters: `boost` names the ability, and the item's bonus (1–3)
-  // grants +2/+4/+6 to it — the 3.5 enhancement ladder. The boots and circlet
-  // occupy armour slots, so they carry ac:0 and cost the AC that slot could
-  // have held; the two amulets compete with natural armour for the neck.
+  // grants +1/+2/+3 to it (+2/+4/+6 for the amulet of health — see statBoost).
+  // The boots and circlet occupy armour slots, so they carry ac:0 and cost the
+  // AC that slot could have held; the two amulets compete with natural armour
+  // for the neck.
   bootsagi:  {name:'Boots of agility',    slot:'boots',  ac:0, maxDex:99, boost:'dex', spr:'bootsagi'},
   circletint:{name:'Circlet of intellect',slot:'helmet', ac:0, maxDex:99, boost:'int', spr:'circlet'},
   periaptwis:{name:'Periapt of wisdom',   slot:'amulet', boost:'wis', spr:'periapt'},
@@ -2450,9 +2451,14 @@ function mkAutoParty(){
     mkCharacter(pickName(),'dwarf','cleric',autoAssign('cleric',rollSix())),
   ];
 }
-// what a worn stat booster grants: bonus 1/2/3 → +2/+4/+6, capped at the 3.5
-// ceiling however high a hoard rolled the item
-function statBoost(it){return Math.min(6,2*Math.max(1,it.bonus||0));}
+// what a worn stat booster grants: bonus 1/2/3 → +1/+2/+3 to the score, except
+// the amulet of health, which keeps the even 3.5 ladder (+2/+4/+6) so every
+// tier moves the CON modifier and with it the hp it exists to give. Capped at
+// the tier-3 value however high a deep hoard rolled the item.
+function statBoost(it){
+  const step=ITEM_DEFS[it.base].boost==='con'?2:1;
+  return Math.min(3*step,step*Math.max(1,it.bonus||0));
+}
 function equipAbil(ch,a){
   let s=0;
   for(const k in ch.equip){
