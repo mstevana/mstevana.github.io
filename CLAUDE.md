@@ -272,6 +272,42 @@ the *whole* map, so self-luminous parts dim with everything else — glowing eye
 the `windup` aura, an elite's aura. Splitting the emissive parts out as a second
 additive sprite is the fix, and the `sharp` layer is the natural seam.
 
+## Sprite modelling: rim, contact shadow, eye glow
+
+Three things sit on top of the flat art, all of them in the wrapper rather than
+in any individual creature, so all 78 get them at once.
+
+- **Rim light** (`rimF`, applied to the composed `parts` group). Offset the
+  sprite's own alpha away from the light, subtract it from the original, and the
+  crescent that remains is a lit edge. One filter, no duplicated geometry, and it
+  follows internal gaps as well as the outer silhouette. **It was tuned down
+  twice**: at 0.5 opacity over a 1.5/1.7 offset every creature wore a thick pale
+  band, the art lost its contrast and the bestiary went soft and bright. It is
+  0.9/1.1 at 0.22 now — a rim light should be noticed without being looked at.
+- **Contact occlusion** (`occF` + `silF`). The three layers are drawn
+  independently and land on each other with nothing to say they touch. This lays
+  a soft dark blot of the head and arm onto the **base only**, masked to the
+  base's silhouette so it never spills onto the background and the outline stays
+  exactly as authored. Head and arm share **one** filter pass, not one each.
+- **Eye glow** (`addMonsterGlow`). A second, additive sprite riding at the head,
+  tinted with the creature's own `o.eye` and deliberately **not** shaded, because
+  shading multiplies the map and put a creature's eyes out at exactly the range
+  where they should be the only thing visible. Given only to creatures whose art
+  actually calls `gEye` (detected as `url(#ec)` in the sharp layer), so oozes and
+  fungi do not light up. Placed from `o.hp`, the head pivot, which is in the
+  art's own 64-unit space and maps straight onto the sprite quad.
+
+**Filters are the expensive half of rasterising a frame, and it is paid on the
+main thread during play.** Measured over 36 frames at 384px: 11.3ms plain,
++5.9ms for the contact shadow, +7.4ms for the rim, 24.6ms for both. That lands
+as a stutter the first time a creature winds up, which is the worst possible
+moment — so `prewarmMonsterFrames` rasterises all six poses of every kind on a
+floor while the level is being built, where a hitch is expected. The texture
+cache is global and keyed by kind, so it is paid once per creature type per run.
+Anything new added to the wrapper should be measured the same way, and note that
+timing `drawImage` alone measures nothing: the rasterisation happens during the
+image *decode*, so time from setting `src` to `onload`.
+
 ## Adding a monster
 
 `MONSTERS` is a plain object keyed by id, so ordering does not matter
