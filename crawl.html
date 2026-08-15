@@ -1164,6 +1164,108 @@ function occF(id,blur,alpha){       // a soft dark blot from the art's own alpha
     `<feFlood flood-color="#000" flood-opacity="${alpha}" result="c"/>`+
     `<feComposite in="c" in2="b" operator="in"/></filter>`;
 }
+
+/* ---- detail vocabulary ---------------------------------------------------
+   The bestiary averaged about 16 drawing primitives a creature, which is thin
+   for art meant to read as detailed. Rather than hand-surgery on 78 sprite
+   strings, detail is written once as reusable pieces and applied through
+   `MONSTER_DETAIL` below, which `monsterSVG` appends into the right layer — so
+   it inherits that layer's transform and roughness pass, and the authored
+   silhouettes and pivots are never touched.
+
+   Everything is placed off `o.hp`, the head pivot, which sits at the neck: it
+   is the one landmark every humanoid shares, so a belt at "hp + 16" lands
+   correctly on creatures of very different proportions without a coordinate
+   table per creature. Seeded where it needs randomness, because a frame that
+   reshuffles between poses flickers. */
+function _lcg(seed){let s=(seed*2654435761)>>>0;return()=>((s=(s*1664525+1013904223)>>>0)/4294967296);}
+// crossed harness over the chest with a boss where the straps meet, and a belt
+function kitHumanoid(o,c){
+  c=c||{};const [hx,hy]=o.hp||[32,30];
+  const w=c.w||8, top=hy+(c.top||3), bot=hy+(c.bot||14), by=hy+(c.belt||16);
+  const dark=c.dark||'#3a2c16', mid=c.mid||'#4a3a22', metal=c.metal||'#8a7343';
+  /* Straps have to be NARROW and dark-edged. The first pass used a third of the
+     torso width in a mid-brown, and after the roughness displacement that read
+     as a pale smear across the belly of every large creature rather than as
+     leather — worst on the gnoll, minotaur and ogre. Thin, dark, with one lit
+     edge, is what makes a strap look like a strap. */
+  const sw=(w*0.2).toFixed(1);
+  const strap=(x0,y0,x1,y1,c)=>
+    `<path d="M${x0} ${y0} L${x1} ${y1}" stroke="#100c06" stroke-width="${(w*0.28).toFixed(1)}" stroke-linecap="round" opacity="0.55"/>`+
+    `<path d="M${x0} ${y0} L${x1} ${y1}" stroke="${c}" stroke-width="${sw}" stroke-linecap="round"/>`;
+  let g=strap(hx-w*0.7,top,hx+w*0.7,bot,mid)+strap(hx+w*0.7,top,hx-w*0.7,bot,dark)+
+        `<circle cx="${hx}" cy="${((top+bot)/2).toFixed(1)}" r="${(w*0.17).toFixed(1)}" fill="${metal}"/>`+
+        `<circle cx="${hx}" cy="${((top+bot)/2).toFixed(1)}" r="${(w*0.07).toFixed(1)}" fill="#2a2010"/>`;
+  if(c.belt!==null){
+    g+=`<path d="M${hx-w} ${by} L${hx+w} ${by}" stroke="#0d0a05" stroke-width="${(w*0.3).toFixed(1)}" opacity="0.6"/>`+
+       `<path d="M${hx-w} ${(by-0.4).toFixed(1)} L${hx+w} ${(by-0.4).toFixed(1)}" stroke="${c.beltCol||'#3a2c16'}" stroke-width="${(w*0.17).toFixed(1)}"/>`+
+       `<rect x="${(hx-w*0.2).toFixed(1)}" y="${(by-w*0.16).toFixed(1)}" width="${(w*0.4).toFixed(1)}" height="${(w*0.33).toFixed(1)}" rx="0.7" fill="${metal}"/>`;
+  }
+  if(c.pouch!==false)g+=`<path d="M${hx+w*0.75} ${by+1.5} Q${hx+w*1.25} ${by+2.8} ${hx+w*1.1} ${by+6} L${hx+w*0.6} ${by+5.6} Z" fill="${dark}"/>`;
+  return g;
+}
+// brow ridges, nostrils and a cheekbone: the difference between a face and a blob
+function faceDetail(o,c){
+  c=c||{};const [hx,hy]=o.hp||[32,30];
+  const w=c.w||7, ey=hy-(c.eye||13), col=c.col||'#131a0b';
+  return `<path d="M${hx-w*0.85} ${ey-1.4} Q${hx-w*0.35} ${ey-2.6} ${hx-w*0.1} ${ey-1.8}" stroke="${col}" stroke-width="1.1" fill="none"/>`+
+    `<path d="M${hx+w*0.1} ${ey-1.8} Q${hx+w*0.35} ${ey-2.6} ${hx+w*0.85} ${ey-1.4}" stroke="${col}" stroke-width="1.1" fill="none"/>`+
+    `<path d="M${hx-0.8} ${ey+5} L${hx-1.3} ${ey+6.4} M${hx+0.8} ${ey+5} L${hx+1.3} ${ey+6.4}" stroke="${c.dark||'#0d1206'}" stroke-width="0.9"/>`+
+    `<path d="M${hx-w*0.95} ${ey+4} Q${hx-w*0.6} ${ey+7.5} ${hx-w*0.2} ${ey+9}" stroke="${col}" stroke-width="0.85" fill="none" opacity="0.6"/>`;
+}
+// banded plate or segmented mail across a torso, with a riveted gorget
+function plateBands(o,c){
+  c=c||{};const [hx,hy]=o.hp||[32,30];
+  const w=c.w||10, y0=hy+(c.y0||8), n=c.n||3, gap=c.gap||4.2;
+  const dark=c.dark||'#33373b', mid=c.mid||'#3e4348', lit=c.lit||'#6b7178';
+  let g=`<path d="M${hx-w*0.9} ${hy+2} Q${hx} ${hy-1} ${hx+w*0.9} ${hy+2} L${hx+w*0.9} ${hy+4.5} Q${hx} ${hy+1.6} ${hx-w*0.9} ${hy+4.5} Z" fill="${mid}"/>`+
+    `<circle cx="${hx-w*0.55}" cy="${hy+3}" r="0.8" fill="${lit}"/><circle cx="${hx+w*0.55}" cy="${hy+3}" r="0.8" fill="${lit}"/>`;
+  for(let i=0;i<n;i++){const y=y0+i*gap;
+    g+=`<path d="M${hx-w} ${y} Q${hx} ${y+3} ${hx+w} ${y}" stroke="${i%2?dark:mid}" stroke-width="2.4" fill="none"/>`+
+       `<path d="M${hx-w*0.95} ${y-0.5} Q${hx} ${y+2.4} ${hx+w*0.95} ${y-0.5}" stroke="${lit}" stroke-width="0.6" fill="none" opacity="0.7"/>`;}
+  return g;
+}
+// hide: tufts of fur or rows of scale along a beast's back and flank
+function hideDetail(o,c){
+  c=c||{};const r=_lcg(c.seed||7);
+  const x0=c.x0||18,x1=c.x1||46,y0=c.y0||34,y1=c.y1||54,n=c.n||14;
+  const col=c.col||'#1a1208';let g='';
+  for(let i=0;i<n;i++){
+    const x=x0+(x1-x0)*r(), y=y0+(y1-y0)*r(), l=1.6+r()*2.4, a=(-70+r()*40)*Math.PI/180;
+    g+=`<path d="M${x.toFixed(1)} ${y.toFixed(1)} l${(Math.cos(a)*l).toFixed(1)} ${(Math.sin(a)*l).toFixed(1)}" stroke="${col}" stroke-width="0.85" stroke-linecap="round" opacity="0.7"/>`;
+  }
+  return g;
+}
+// an ooze: highlights riding on the surface and things half-digested inside
+function oozeDetail(o,c){
+  c=c||{};const r=_lcg(c.seed||3);
+  const cx=c.cx||32,cy=c.cy||40,rx=c.rx||16,ry=c.ry||14;let g='';
+  for(let i=0;i<7;i++){
+    const a=r()*6.28, d=r()*0.8;
+    const x=cx+Math.cos(a)*rx*d, y=cy+Math.sin(a)*ry*d, s=0.9+r()*2.2;
+    g+=`<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${s.toFixed(1)}" ry="${(s*0.7).toFixed(1)}" fill="${c.col||'#8f9296'}" opacity="${(0.10+r()*0.16).toFixed(2)}"/>`;
+  }
+  g+=`<path d="M${cx-rx*0.55} ${cy-ry*0.5} Q${cx-rx*0.15} ${cy-ry*0.78} ${cx+rx*0.2} ${cy-ry*0.55}" stroke="#e8eef2" stroke-width="1.5" fill="none" opacity="0.30"/>`;
+  return g;
+}
+// fungal: gills under a cap, and pores over the stalk
+function fungalDetail(o,c){
+  c=c||{};const cx=c.cx||32,cy=c.cy||30,rx=c.rx||13,n=c.n||9;
+  /* Gills hang from the rim of the cap and follow its curve. Drawn as a straight
+     row of verticals they landed across the middle of the cap and read as a row
+     of teeth, which is what the first pass did to the shrieker and the guard. */
+  const col=c.col||'#2a1c33';let g='';
+  for(let i=0;i<n;i++){
+    const t=-1+2*(i+0.5)/n, a=t*1.15;                 // sweep across the underside
+    const x=cx+Math.sin(a)*rx*0.92, y=cy-Math.cos(a)*rx*0.16;
+    const l=1.6+Math.cos(a)*1.5;
+    g+=`<path d="M${x.toFixed(1)} ${y.toFixed(1)} L${(x+Math.sin(a)*0.6).toFixed(1)} ${(y+l).toFixed(1)}" stroke="${col}" stroke-width="0.75" opacity="0.6"/>`;}
+  const r=_lcg(c.seed||11);
+  for(let i=0;i<8;i++){const x=cx-rx*0.45+rx*0.9*r(), y=cy+8+18*r();
+    g+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(0.7+r()*1.1).toFixed(1)}" fill="${c.pore||'#1d2a12'}" opacity="0.55"/>`;}
+  return g;
+}
+
 function roughF(id,scale,freq,seed){
   // displace interior detail only: the displaced copy is clipped back to the
   // original alpha and drawn OVER the untouched art, so the silhouette perimeter
@@ -2686,6 +2788,63 @@ function splitLayers(s){
   out[mode]+=s.slice(last);
   return out;
 }
+
+/* Per-creature detail, appended into the layer named. `base` draws over the
+   torso and under the arm; `head` rides with the head so it nods with it.
+   Goblin, orc and hobgoblin are detailed inline in their own entries and are
+   deliberately absent here. */
+const MONSTER_DETAIL={
+  // --- Dungeon, the shallow block ---
+  kobold:      {base:(o)=>kitHumanoid(o,{w:7,belt:15,dark:'#4a2c14',mid:'#5c3a1c'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#3a2412'})},
+  koboldsl:    {base:(o)=>kitHumanoid(o,{w:7,belt:15,dark:'#4a2c14',mid:'#5c3a1c'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#3a2412'})},
+  gobshaman:   {base:(o)=>kitHumanoid(o,{w:8,belt:15,dark:'#2e2414',mid:'#4a3a22'}), head:(o)=>faceDetail(o,{w:6.5,eye:12})},
+  gnoll:       {base:(o)=>kitHumanoid(o,{w:8.5,belt:16,dark:'#3a2a16'})+hideDetail(o,{x0:22,x1:44,y0:36,y1:56,n:12,col:'#2a1c0e',seed:5}),
+                head:(o)=>faceDetail(o,{w:7,eye:12,col:'#2a1c0e'})},
+  bugbear:     {base:(o)=>kitHumanoid(o,{w:10,belt:17,dark:'#3a2a16'})+hideDetail(o,{x0:20,x1:48,y0:34,y1:58,n:16,col:'#241a0c',seed:9}),
+                head:(o)=>faceDetail(o,{w:8,eye:12,col:'#241a0c'})},
+  // --- Sewers ---
+  rat:         {base:(o)=>hideDetail(o,{x0:14,x1:46,y0:32,y1:54,n:16,col:'#241a10',seed:13})},
+  spider:      {base:(o)=>hideDetail(o,{x0:20,x1:44,y0:24,y1:44,n:14,col:'#120c08',seed:17})},
+  ratswarm:    {base:(o)=>hideDetail(o,{x0:10,x1:54,y0:30,y1:56,n:22,col:'#241a10',seed:19})},
+  grayooze:    {base:(o)=>oozeDetail(o,{cx:32,cy:40,rx:17,ry:14,seed:23})},
+  wererat:     {base:(o)=>kitHumanoid(o,{w:8.5,belt:15,dark:'#3a2a16'})+hideDetail(o,{x0:22,x1:44,y0:34,y1:54,n:12,col:'#2a1e12',seed:29}),
+                head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a1e12'})},
+  wererogue:   {base:(o)=>kitHumanoid(o,{w:8,belt:15,dark:'#2a2016'})+hideDetail(o,{x0:22,x1:44,y0:34,y1:54,n:10,col:'#241a10',seed:31}),
+                head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#241a10'})},
+  // --- Crypt: no belts on the dead, but sinew and wrappings ---
+  ghoul:       {base:(o)=>hideDetail(o,{x0:22,x1:40,y0:36,y1:56,n:10,col:'#2b3a1e',seed:37}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#33421f'})},
+  wight:       {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#2b2f34',mid:'#3a3f45',lit:'#5f666e'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2f22'})},
+  wightnec:    {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#2a2436',mid:'#372f47',lit:'#6a5f80'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2f22'})},
+  mummy:       {base:(o)=>hideDetail(o,{x0:20,x1:44,y0:32,y1:58,n:18,col:'#4a3c26',seed:41}), head:(o)=>faceDetail(o,{w:5.5,eye:10,col:'#4a3c26'})},
+  // --- Caves ---
+  ogre:        {base:(o)=>kitHumanoid(o,{w:11,belt:17,dark:'#3a2a16'}), head:(o)=>faceDetail(o,{w:8,eye:12,col:'#2e2414'})},
+  piercer:     {base:(o)=>hideDetail(o,{x0:26,x1:38,y0:14,y1:48,n:12,col:'#1a1610',seed:43})},
+  cavebear:    {base:(o)=>hideDetail(o,{x0:16,x1:50,y0:26,y1:56,n:22,col:'#221709',seed:47})},
+  troglodyte:  {base:(o)=>kitHumanoid(o,{w:8,belt:15,dark:'#26301a'})+hideDetail(o,{x0:22,x1:42,y0:34,y1:54,n:10,col:'#1c2612',seed:53}),
+                head:(o)=>faceDetail(o,{w:6,eye:11,col:'#1c2612'})},
+  minotaur:    {base:(o)=>kitHumanoid(o,{w:11,belt:17,dark:'#3a2a16'})+hideDetail(o,{x0:20,x1:48,y0:34,y1:58,n:16,col:'#241708',seed:59}),
+                head:(o)=>faceDetail(o,{w:7.5,eye:12,col:'#241708'})},
+  crawler:     {base:(o)=>hideDetail(o,{x0:14,x1:50,y0:34,y1:56,n:16,col:'#20180a',seed:61})},
+  cavefisher:  {base:(o)=>hideDetail(o,{x0:22,x1:42,y0:32,y1:56,n:12,col:'#1a1a14',seed:67})},
+  // --- Duergar: built things, so plate rather than straps ---
+  duergar:     {base:(o)=>plateBands(o,{w:10,y0:9,n:3,gap:4.4}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
+  duergarxbow: {base:(o)=>plateBands(o,{w:10,y0:9,n:3,gap:4.4}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
+  duergarscout:{base:(o)=>plateBands(o,{w:9,y0:9,n:2,gap:4.4,dark:'#242830',mid:'#2e333c'}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
+  duergarpriest:{base:(o)=>plateBands(o,{w:10,y0:10,n:3,gap:4.2,dark:'#2e2a22',mid:'#3c372c',lit:'#7a6f52'}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
+  // --- Myconid ---
+  shrieker:    {base:(o)=>fungalDetail(o,{cx:32,cy:37,rx:14,n:11,col:'#3a2418',pore:'#4a2a18',seed:71})},
+  mysprout:    {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:12,n:9,col:'#2a1c33',pore:'#3a2a20',seed:73})},
+  violetfungus:{base:(o)=>fungalDetail(o,{cx:32,cy:31,rx:13,n:10,col:'#2a1433',pore:'#3a1c40',seed:79})},
+  sporeservant:{base:(o)=>fungalDetail(o,{cx:32,cy:26,rx:9,n:7,col:'#2a2418',pore:'#3a3020',seed:83}), head:(o)=>faceDetail(o,{w:5.5,eye:10,col:'#2a2418'})},
+  myguard:     {base:(o)=>fungalDetail(o,{cx:32,cy:31,rx:12,n:9,col:'#2a2418',pore:'#3a3020',seed:89}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2418'})},
+  // --- Drow: fine mail and a house sigil, not leather ---
+  drow:        {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
+  drowbolt:    {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
+  drowblade:   {base:(o)=>plateBands(o,{w:9.5,y0:9,n:3,gap:4,dark:'#1a1c24',mid:'#262935',lit:'#8a90a8'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
+  drowpriest:  {base:(o)=>plateBands(o,{w:10,y0:10,n:2,gap:4.6,dark:'#2a1c33',mid:'#372444',lit:'#a86ce8'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
+  drowmage:    {base:(o)=>plateBands(o,{w:10,y0:10,n:2,gap:4.6,dark:'#221c33',mid:'#2e2444',lit:'#8a7fd0'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
+};
+
 function monsterSVG(key,boss,pose,tint){
   const a=(MONSTER_ART[key]||MONSTER_ART.goblin)();
   const o=a.o;
@@ -2712,6 +2871,10 @@ function monsterSVG(key,boss,pose,tint){
   const flare=pose==='windup'?`<ellipse cx="32" cy="30" rx="26" ry="27" fill="url(#eg)" opacity="0.17"/>`:'';
   const xf=poseXf(pose);
   const B=splitLayers(a.body),S=splitLayers(a.sharp||'');
+  // per-creature detail, appended into the layer it belongs to so it inherits
+  // that layer's transform and roughness pass
+  const D=MONSTER_DETAIL[key];
+  if(D){if(D.base)B.base+=D.base(o);if(D.head)B.head+=D.head(o);if(D.arm)B.arm+=D.arm(o);}
   // each layer keeps its own roughness pass so the displacement stays clipped
   // to that part's own silhouette rather than the whole creature's
   const layer=(bd,sh,tf)=>{

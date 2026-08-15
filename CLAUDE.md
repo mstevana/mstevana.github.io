@@ -308,6 +308,46 @@ Anything new added to the wrapper should be measured the same way, and note that
 timing `drawImage` alone measures nothing: the rasterisation happens during the
 image *decode*, so time from setting `src` to `onload`.
 
+## The detail pass and `MONSTER_DETAIL`
+
+The bestiary averaged about **16 drawing primitives a creature**, which is thin
+for art meant to read as detailed — 40–80 is the range that does. Rather than
+hand-surgery on 78 sprite strings, detail is written once as a vocabulary of
+reusable pieces (`kitHumanoid`, `faceDetail`, `plateBands`, `hideDetail`,
+`oozeDetail`, `fungalDetail`) and applied through **`MONSTER_DETAIL`**, a table
+keyed by `spr`. `monsterSVG` appends each entry into the layer it names, so it
+inherits that layer's transform and roughness pass and **the authored
+silhouettes and pivots are never touched**. `base` draws over the torso and
+under the arm; `head` rides with the head and nods with it.
+
+Everything is placed off **`o.hp`, the head pivot**, which sits at the neck. It
+is the one landmark every humanoid shares, so "a belt at `hp + 16`" lands
+correctly on creatures of very different proportions without a coordinate table
+per creature. Anything random is seeded, because a frame that reshuffles between
+poses flickers.
+
+All 36 shallow-tier creatures carry an entry. The goblin, orc and hobgoblin are
+detailed **inline in their own entries** instead and are deliberately absent
+from the table.
+
+Two things learned by looking rather than reasoning:
+
+- **A strap has to be narrow and dark-edged.** The first `kitHumanoid` used a
+  third of the torso width in a mid-brown; after the roughness displacement that
+  read as a pale smear across the belly of every large creature — worst on the
+  gnoll, minotaur and ogre. Thin, dark, with one lit edge and a small boss is
+  what makes leather look like leather.
+- **Gills hang from the rim of a cap and follow its curve.** Drawn as a straight
+  row of verticals they landed across the middle of the cap and read as a row of
+  teeth on the shrieker and the myconid guard.
+
+Detail is geometry rather than filters, so it is nearly free at raster time:
+24.6ms → 25.7ms per first-raster for the whole pass. Check two things when
+adding more — that it reads at the size it is actually seen (an in-game capture
+at two tiles, not just a large sheet), and that no stroke leaves the 64-unit
+viewBox. Note when checking the latter that `hideDetail` emits relative
+linetos (`l dx dy`), so a naive coordinate scan reports false positives.
+
 ## Adding a monster
 
 `MONSTERS` is a plain object keyed by id, so ordering does not matter
