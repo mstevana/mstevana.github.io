@@ -296,13 +296,6 @@ in any individual creature, so all 78 get them at once.
   the eye would really do, and it puts the shadow entirely behind the creature
   where its own sprite hides it. Geometrically right and invisible. The contact
   patch is the part that grounds it.
-- **Material response** (`metalSheen`, `clothFolds`, applied through
-  `MONSTER_DETAIL`). `bodyGrad` gives every creature one radial ramp, so steel,
-  cloth and bone all catch the light identically — which is much of why the
-  bestiary read as coloured shapes rather than as things made of something. The
-  distinction that carries it is how sharply a surface falls from lit to dark:
-  metal goes in a hair, cloth takes the whole width of a fold. 17 creatures in
-  plate get the specular, 12 in robes or wrappings get the folds.
 - **Eye glow** (`addMonsterGlow`). A second, additive sprite riding at the head,
   tinted with the creature's own `o.eye` and deliberately **not** shaded, because
   shading multiplies the map and put a creature's eyes out at exactly the range
@@ -347,6 +340,12 @@ and are deliberately absent from the table.
 `boneDetail` — ribs, sternum and joint shading, kept low-contrast because the
 creatures are already pale — came in with the deep tier.
 
+Per-material shading (`metalSheen`, `clothFolds` — a hard narrow specular for
+plate, broad soft folds for cloth, through this same table) was also tried and
+**removed**. The gap it addressed is real: `bodyGrad` gives every creature one
+radial ramp, so steel, cloth and bone catch the light identically. It cost
+nothing at raster time. It was simply not wanted.
+
 A strand-based hair generator was tried on the drow and **removed**: it did make
 the hair read as locks rather than as a moulded shell, but it was not wanted.
 Note if anyone revisits it that hair is read from the separations BETWEEN locks
@@ -367,8 +366,8 @@ Two things learned by looking rather than reasoning:
 
 **Detail is geometry rather than filters, and geometry is close to free here.**
 Measured back-to-back on one machine: the build before any detail 48.1ms, after
-the whole shallow tier 46.5ms, and with all 78 plus the material response
-46.8ms — i.e. no measurable cost at all. The expensive half is the filters.
+the whole shallow tier 46.5ms, and with all 78 detailed 46.8ms — i.e. no
+measurable cost at all. The expensive half is the filters.
 
 **Do not compare raster timings taken at different points in a session.** An
 earlier reading of this had detail climbing 24.6 → 25.7 → 31.1ms and concluded
