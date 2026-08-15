@@ -6788,6 +6788,40 @@ function combatNoise(x,y,r){
   }
   return woke;
 }
+/* ---------- what a monster can actually see ----------
+   `losClear` below answers a different question — is there a clean lane
+   straight down a row or column — and that is the right test for SHOOTING,
+   because a bolt travels one. It is the wrong test for NOTICING someone: by
+   it, a monster standing diagonally across a lit room cannot see the party at
+   all, which is why uncapping its range moved almost nothing.
+
+   This walks the real line between two tiles and stops at the first thing that
+   blocks it. Where the line steps diagonally it also refuses to squeeze
+   through the seam between two corners — at least one of the two tiles it
+   passes between has to be open — or a monster sees through a solid diagonal
+   wall, which is the classic way this goes wrong.
+
+   Range is bounded by the caller: the wake check needs a distance-field entry,
+   and that field stops at 22 steps, so nothing sees across a cavern it would
+   take half a minute to walk. */
+function sightClear(x0,y0,x1,y1){
+  if(x0===x1&&y0===y1)return true;
+  const dx=Math.abs(x1-x0),dy=Math.abs(y1-y0);
+  const sx=x0<x1?1:-1,sy=y0<y1?1:-1;
+  let x=x0,y=y0,err=dx-dy;
+  for(let step=0;step<64;step++){
+    const e2=2*err;
+    let mx=0,my=0;
+    if(e2>-dy){err-=dy;x+=sx;mx=1;}
+    if(e2<dx){err+=dx;y+=sy;my=1;}
+    if(x===x1&&y===y1)return true;
+    if(!seesThroughTile(tileAt(x,y)))return false;
+    // a diagonal step passes between two tiles; if both are solid the line is
+    // threading a corner seam and should not get through
+    if(mx&&my&&!seesThroughTile(tileAt(x-sx,y))&&!seesThroughTile(tileAt(x,y-sy)))return false;
+  }
+  return false;
+}
 function losClear(x0,y0,x1,y1){ // straight-line only (same row/col), through see-through tiles
   if(x0!==x1&&y0!==y1)return false;
   const dx=Math.sign(x1-x0),dy=Math.sign(y1-y0);
@@ -7753,7 +7787,7 @@ function updateMonsters(dt){
       // `losClear` is a straight-line test, so sight is already bounded by the
       // corridor or room it is standing in. Within two steps it wakes anyway --
       // that close, it hears and smells them without needing the sight line.
-      if(di>=0&&(di<=2||losClear(m.x,m.y,G.px,G.py))){
+      if(di>=0&&(di<=2||sightClear(m.x,m.y,G.px,G.py))){
         m.awake=true;SFX.growl(di);
         if(m.boss)UI.toast(m.name+' bars the way down!');
       }
@@ -7764,7 +7798,7 @@ function updateMonsters(dt){
       }
     }else{
       // lose interest: far away and out of sight long enough sends it back to its haunts
-      const seen=(di>=0&&di<=10)||losClear(m.x,m.y,G.px,G.py);
+      const seen=(di>=0&&di<=10)||sightClear(m.x,m.y,G.px,G.py);
       if(seen)m.loseT=0;
       else if((m.loseT=(m.loseT||0)+dt)>10){m.awake=false;m.loseT=0;continue;}
     }
@@ -7879,7 +7913,7 @@ function chaseStep(m){
     // how far the quarry is from ME, not from my post: a guard leashes on losing
     // the party, not on the party wandering away from the stairs it watches
     const pdMe=Math.abs(m.x-G.px)+Math.abs(m.y-G.py);
-    const lost=pdMe>m.guard.r+4&&!losClear(m.x,m.y,G.px,G.py);
+    const lost=pdMe>m.guard.r+4&&!sightClear(m.x,m.y,G.px,G.py);
     if(lost&&gd>0){ // quarry lost — slink back to post rather than chase across the level
       // step toward guard point
       let best=null,bd=1e9;
@@ -8514,7 +8548,7 @@ function turnUndead(ch){
     if(m.hp<=0)continue;
     if(MONSTERS[m.key].type!=='undead')continue;
     if(Math.abs(m.x-G.px)+Math.abs(m.y-G.py)>6)continue;
-    if(!losClear(m.x,m.y,G.px,G.py)&&Math.abs(m.x-G.px)+Math.abs(m.y-G.py)>2)continue;
+    if(!sightClear(m.x,m.y,G.px,G.py)&&Math.abs(m.x-G.px)+Math.abs(m.y-G.py)>2)continue;
     const hd=Math.max(1,Math.round(MONSTERS[m.key].cr));
     // a ceiling on what a channel can touch at all: something far above the
     // cleric's power is unmoved however the die falls, so a lich is not routed

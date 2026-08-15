@@ -233,16 +233,33 @@ of the `ELEMENTS` keys so elemental wards can resist it.
 
 Two things, and they are deliberately different shapes.
 
-**Sight** — `losClear` from the monster to the party — wakes it at whatever
-range the sight line reaches, with no distance cap of its own. There used to
-be one at seven steps. Note what this does and does not mean: `losClear` is
-**straight-line only**, same row or column, so "in sight" is really "down the
-corridor or along the rank you are standing in". A monster diagonally across
-a lit room does not see you. That is why uncapping it moved so little —
-measured on depth-14 floors, monsters awake when a fight starts went 2.33 to
-2.40. Anything beyond seven steps was rarely on the party's exact axis in the
-first place. If sight is ever meant to mean real visibility, `losClear` is
-the thing to replace, and it is used for shooting as well.
+**Sight** — `sightClear` from the monster to the party — wakes it at whatever
+range the line reaches, with no distance cap of its own. There used to be one
+at seven steps.
+
+`sightClear` is a **true line**, not `losClear`. The two answer different
+questions and both are still used:
+
+- `losClear` is straight-line only, same row or column. That is the right
+  test for **shooting**, because a bolt travels a lane, and every attack site
+  still uses it.
+- `sightClear` walks the real line between two tiles and is the right test
+  for **noticing** — waking, losing interest, a guard's leash, and whether an
+  undead can be shown a holy symbol.
+
+Where the line steps diagonally `sightClear` also refuses to thread the seam
+between two corners: at least one of the two tiles it passes between has to
+be open. Without that, a monster sees through a solid diagonal wall, which is
+the classic way this goes wrong.
+
+Range is bounded by the caller rather than by a constant — the wake check
+needs a distance-field entry and that field stops at 22 steps, so nothing
+notices the party across a cavern it would take half a minute to walk.
+
+Measured on depth-14 floors, monsters already awake when a fight starts:
+2.42 with the old row-or-column test, **2.85** with a true line. Modest,
+because dungeon floors are mostly corridors and small rooms where a diagonal
+is blocked anyway — the change shows up in open caves and halls.
 
 Within **two steps** a monster wakes regardless of the sight line; that close
 it hears and smells the party.
