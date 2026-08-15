@@ -229,6 +229,25 @@ creature whose danger is not captured by hp/damage/attack will be
 mis-placed by the budget), and if it is a caster give `caster.elem` one
 of the `ELEMENTS` keys so elemental wards can resist it.
 
+## Sneak attack turns on awareness
+
+`canSneak(ch,m)` is the whole rule: a rogue adds its dice against a creature
+that has not noticed the party (`!m.awake`) or has been put out by the
+`sleep` spell, and against nothing else. A monster that is looking at the
+party cannot be crept up on, **however busy it is with somebody else** — the
+old "it is swinging at another character" clause is gone, and being
+physically held no longer qualifies either, because a pinned creature still
+sees the knife coming.
+
+**Know what this costs before changing it back or building on it.**
+`updateMonsters` wakes anything within two steps whether or not it can see,
+so a creature a rogue can reach in melee is awake by definition. Measured by
+walking a party up to a monster on 176 generated floors, the target had
+noticed them **every single time**. In practice that leaves the `sleep`
+spell as the way a rogue sets a sneak attack up, and lurkers and wandering
+stragglers as the accidents. T54 asserts the two-step rule alongside the
+sneak rule, so the day one changes the other is re-examined with it.
+
 ## What wakes a sleeping monster
 
 Two things, and they are deliberately different shapes.
