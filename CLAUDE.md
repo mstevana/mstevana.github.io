@@ -229,24 +229,35 @@ creature whose danger is not captured by hp/damage/attack will be
 mis-placed by the budget), and if it is a caster give `caster.elem` one
 of the `ELEMENTS` keys so elemental wards can resist it.
 
-## Sneak attack turns on awareness
+## Sneak attack: unaware, asleep, or flat-footed
 
-`canSneak(ch,m)` is the whole rule: a rogue adds its dice against a creature
-that has not noticed the party (`!m.awake`) or has been put out by the
-`sleep` spell, and against nothing else. A monster that is looking at the
-party cannot be crept up on, **however busy it is with somebody else** — the
-old "it is swinging at another character" clause is gone, and being
-physically held no longer qualifies either, because a pinned creature still
-sees the knife coming.
+`canSneak(ch,m)` is the whole rule — `!m.awake || m.sleep || !m.acted`. A rogue
+adds its dice against a creature that has not noticed the party, one put out by
+the `sleep` spell, and one that has noticed but **has not yet struck back**.
+Against nothing else: a monster busy swinging at another character does not
+qualify, and neither does one physically held, because a pinned creature still
+sees the knife coming. Both of those clauses used to exist and were deliberately
+removed.
 
-**Know what this costs before changing it back or building on it.**
-`updateMonsters` wakes anything within two steps whether or not it can see,
-so a creature a rogue can reach in melee is awake by definition. Measured by
-walking a party up to a monster on 176 generated floors, the target had
-noticed them **every single time**. In practice that leaves the `sleep`
-spell as the way a rogue sets a sneak attack up, and lurkers and wandering
-stragglers as the accidents. T54 asserts the two-step rule alongside the
-sneak rule, so the day one changes the other is re-examined with it.
+The third clause is 3.5's flat-footed, and it is what makes the ability fire at
+all. Awareness alone could not carry it: `updateMonsters` wakes anything within
+two steps whether or not it can see, so a creature a rogue can reach in melee is
+awake **by definition** — walking a party up to a monster on 176 generated
+floors, the target had noticed them every single time and the dice never landed
+once. Measured the same way with the flat-footed clause, the rogue opens with
+sneak attack on **85% of approaches** (162 sampled).
+
+`m.acted` is set in the six monster attack paths (`monsterMelee`,
+`monsterShoot`, `monsterCast`, `bossSummon`, `bossBarrage`, `bossSweep`),
+immediately before `windupAnim` — **not inside `windupAnim`**, which early-returns
+when the creature has no sprite. Noticing the party is not acting, and neither
+is walking towards them; only committing to a blow is.
+
+The flag is never reset, and does not need to be: a monster that loses the party
+goes back to `!m.awake`, which makes it sneakable again through the first clause.
+
+T54 asserts the truth table, that all six paths set the flag, and the two-step
+waking rule alongside it, so the day one changes the other is re-examined with it.
 
 ## What wakes a sleeping monster
 

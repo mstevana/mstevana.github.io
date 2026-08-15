@@ -398,7 +398,7 @@ const CLASSES={
   paladin:  {name:'Paladin',  hd:10, bab:'full',  fort:1,ref:0,will:0, startWeapon:'shortsword', layon:true, smite:true, grace:true,
              note:'Lay on Hands heal pool, Smite Evil (per rest), CHA to saves.', prio:['str','cha','con','wis','dex','int']},
   rogue:    {name:'Rogue',    hd:6,  bab:'three', fort:0,ref:1,will:0, startWeapon:'shortsword', sneak:true, trapfind:true,
-             note:'Sneak attack vs foes that have not noticed the party. Finds and disarms traps, spots secret doors.', prio:['dex','str','con','int','wis','cha']},
+             note:'Sneak attack vs foes that have not yet struck back. Finds and disarms traps, spots secret doors.', prio:['dex','str','con','int','wis','cha']},
   cleric:   {name:'Cleric',   hd:8,  bab:'three', fort:1,ref:0,will:1, startWeapon:'mace', caster:'divine', turn:true,
              note:'Divine spells (WIS): healing, blessings, holy fire. Turn Undead (per rest).', prio:['wis','con','str','cha','dex','int']},
   wizard:   {name:'Wizard',   hd:4,  bab:'half',  fort:0,ref:0,will:1, startWeapon:'staff', caster:'arcane',
@@ -3495,7 +3495,7 @@ function mkMonster(key,x,y,depth){
     special:{disease:def.disease,poison:def.poison,paralysis:def.paralysis,energyDrain:def.energyDrain,regen:def.regen,
       gaze:def.gaze,hold:def.hold,spores:def.spores,drowpoison:def.drowpoison,faerie:def.faerie},
     atkCd:1.5+Math.random()*2,castCd:def.caster?def.caster.cd*(0.5+Math.random()):0,
-    moveCd:Math.random(),held:0,slowed:0,sleep:false,shaken:0,stunned:0,awake:false,boss:false,inRange:false,
+    moveCd:Math.random(),held:0,slowed:0,sleep:false,shaken:0,stunned:0,awake:false,boss:false,inRange:false,acted:false,
     id:Math.floor(Math.random()*1e9)};
 }
 /* ============================== CHARACTERS ============================== */
@@ -7426,13 +7426,21 @@ function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
    being physically held no longer qualifies either, because a pinned creature
    still sees the knife coming.
 
-   Be aware of what this costs, because it is not small: `updateMonsters` wakes
-   anything within two steps whether or not it can see, so a creature the rogue
-   can reach in melee is awake by definition. Measured by walking a party up to
-   a monster on 176 real floors, it had noticed them every single time. In
-   practice this leaves `sleep` — the spell — as the way a rogue sets one up. */
+   Awareness alone was not enough to hang it on. `updateMonsters` wakes anything
+   within two steps whether or not it can see, so a creature a rogue can reach
+   in melee is awake by definition — walking a party up to a monster on 176 real
+   floors, it had noticed them every single time, and the ability never fired.
+
+   So the third clause is 3.5's flat-footed: a monster is sneakable until it has
+   actually ACTED against the party, which is the moment it commits to a blow in
+   one of the six attack paths. Noticing the party is not acting; neither is
+   walking towards them. That gives the rogue the opening strike and nothing
+   after it, which is the thing the ability is meant to be.
+
+   `acted` is never reset, and does not need to be: a monster that loses the
+   party goes back to `!awake`, which makes it sneakable again on its own. */
 function canSneak(ch,m){
-  return !!CLASSES[ch.cls].sneak&&(!m.awake||!!m.sleep);
+  return !!CLASSES[ch.cls].sneak&&(!m.awake||!!m.sleep||!m.acted);
 }
 function damageMonster(m,dmg,byChar,crit){
   m.awake=true;m.sleep=false;
@@ -8079,6 +8087,7 @@ function duergarReveal(m){
 function monsterMelee(m){
   const ch=pickPartyTarget(m);
   if(!ch)return;
+  m.acted=true;   // no longer flat-footed: it has committed to a blow
   windupAnim(m);
   setTimeout(()=>{
     if(m.hp<=0||G.over||G.paused||!G.L.monsters.includes(m))return;
@@ -8203,6 +8212,7 @@ function monsterSpecials(m,ch){
 }
 function monsterShoot(m){
   if(!pickPartyTarget(m))return;
+  m.acted=true;   // no longer flat-footed: it has committed to a blow
   windupAnim(m);
   setTimeout(()=>{
     if(m.hp<=0||G.over||G.paused||!G.L.monsters.includes(m))return;
@@ -8257,6 +8267,7 @@ function fireSpellOrb(m){
 }
 function monsterCast(m){
   if(!G.party.some(ch=>!isDown(ch)))return;
+  m.acted=true;   // no longer flat-footed: it has committed to a blow
   windupAnim(m);
   setTimeout(()=>{
     if(m.hp<=0||G.over||G.paused||!G.L.monsters.includes(m))return;
@@ -8274,6 +8285,7 @@ function bossSignature(m){
 }
 function bossSummon(m){ // undead bosses drag skeletons out of the ground
   if(G.L.monsters.filter(x=>x.minion&&x.hp>0).length>=3){m.bossCd=6;return;}
+  m.acted=true;   // no longer flat-footed: it has committed to a blow
   windupAnim(m);
   setTimeout(()=>{
     if(m.hp<=0||G.over||G.paused||!G.L.monsters.includes(m))return;
@@ -8292,6 +8304,7 @@ function bossSummon(m){ // undead bosses drag skeletons out of the ground
   },700);
 }
 function bossBarrage(m){ // caster bosses hurl three bolts in a volley
+  m.acted=true;   // no longer flat-footed: it has committed to a blow
   windupAnim(m);
   UI.toast(m.name+' gathers power!');
   setTimeout(()=>{
@@ -8305,6 +8318,7 @@ function bossBarrage(m){ // caster bosses hurl three bolts in a volley
 }
 function bossSweep(m){ // bruiser bosses wind up a slow sweeping blow that hits the whole front row
   if(Math.abs(m.x-G.px)+Math.abs(m.y-G.py)!==1){m.bossCd=2;return;}
+  m.acted=true;   // no longer flat-footed: it has committed to a blow
   windupAnim(m);
   UI.toast(m.name+' rears back for a massive blow!');
   setTimeout(()=>{
@@ -9761,7 +9775,7 @@ const UI=(()=>{
     else if(c.caster)extra+=`<b>Spell slots</b> ${slots.map((n,i)=>`${i+1}:${Math.max(0,n-ch.slotsUsed[i])}/${n}`).filter((_,i)=>slots[i]>0).join(' ')}<br>`;
     if(c.rage)extra+=`<b>Rage</b> ${ch.rageUsed?'spent (rest to recover)':'ready'}<br>`;
     if(c.layon)extra+=`<b>Lay on Hands</b> ${ch.layPool} hp pool · <b>Smite</b> ${ch.smiteUsed?'spent':'ready'}<br>`;
-    if(c.sneak)extra+=`<b>Sneak attack</b> +${Math.floor((ch.level+1)/2)}d6 vs foes unaware of the party<br>`;
+    if(c.sneak)extra+=`<b>Sneak attack</b> +${Math.floor((ch.level+1)/2)}d6 vs foes that have not yet acted<br>`;
     if(c.favored)extra+=`<b>Favored enemies</b> +2 damage vs beasts and humanoids<br>`;
     if(ch.negLevels)extra+=`<b style="color:#b48ae0">Negative levels</b> ${ch.negLevels} (Restoration cures)<br>`;
     if(ch.conditions.length)extra+=`<b style="color:#a05545">Afflictions</b> ${ch.conditions.map(x=>x.kind+(x.name?' ('+x.name+')':'')).join(', ')}<br>`;
