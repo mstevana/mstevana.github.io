@@ -1267,42 +1267,6 @@ function fungalDetail(o,c){
 }
 
 
-/* Hair. Drow hair was one flat pale fill with two thick strokes for the fall —
-   at any size it read as a moulded helmet rather than as hair, because hair is
-   read almost entirely from the separations BETWEEN locks, not from its outline.
-   These lay strands over whatever mass the art already draws: mostly darker
-   partings with a few bright ones catching the light, seeded so they do not
-   reshuffle between poses. */
-function hairCrown(c){
-  const cx=c.cx,cy=c.cy,rx=c.rx,ry=c.ry,n=c.n||11,r=_lcg(c.seed||5);
-  const dark=c.dark||'#a49dba', lit=c.lit||'#f7f3ff';
-  let g='';
-  for(let i=0;i<n;i++){
-    /* Strands start already spread across the top of the band, not gathered at
-       a point: fanning them from the centre swept them across the face, which
-       on a drow is a cut-out in the middle of the hair mass rather than more
-       hair. `ry` is the drop to the hairline, so they stay in the band. */
-    const t=-1+2*(i+0.5)/n, j=(r()-0.5)*1.1;
-    const ex=cx+t*rx, ey=cy+ry*(0.82+0.28*Math.abs(t));
-    g+=`<path d="M${(cx+t*rx*0.38).toFixed(1)} ${cy.toFixed(1)} Q${(cx+t*rx*0.78+j).toFixed(1)} ${(cy+ry*0.45).toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}"`+
-       ` stroke="${r()<0.7?dark:lit}" stroke-width="${(0.45+r()*0.4).toFixed(2)}" fill="none" opacity="${(0.4+r()*0.4).toFixed(2)}" stroke-linecap="round"/>`;
-  }
-  return g;
-}
-function hairFall(c){
-  const r=_lcg(c.seed||9), n=c.n||7, w=c.w||2.6;
-  const dark=c.dark||'#a49dba', lit=c.lit||'#f7f3ff';
-  let g='';
-  for(let i=0;i<n;i++){
-    const t=(i+0.5)/n-0.5, o=t*w, j=(r()-0.5)*1.3;
-    const ext=1+ (r()-0.35)*0.18;                     // locks end at slightly different lengths
-    g+=`<path d="M${(c.x0+o).toFixed(1)} ${c.y0.toFixed(1)} Q${(c.cx+o*1.25+j).toFixed(1)} ${c.cy.toFixed(1)} `+
-       `${(c.x1+o*0.9+j).toFixed(1)} ${(c.y0+(c.y1-c.y0)*ext).toFixed(1)}"`+
-       ` stroke="${r()<0.68?dark:lit}" stroke-width="${(0.55+r()*0.5).toFixed(2)}" fill="none" opacity="${(0.6+r()*0.35).toFixed(2)}" stroke-linecap="round"/>`;
-  }
-  return g;
-}
-
 
 // ribs, sternum and joint knobs: what makes a skeleton read as bone rather than
 // as a pale humanoid. Kept low-contrast, because these creatures are already light.
@@ -2889,11 +2853,11 @@ const MONSTER_DETAIL={
   sporeservant:{base:(o)=>fungalDetail(o,{cx:32,cy:26,rx:9,n:7,col:'#2a2418',pore:'#3a3020',seed:83}), head:(o)=>faceDetail(o,{w:5.5,eye:10,col:'#2a2418'})},
   myguard:     {base:(o)=>fungalDetail(o,{cx:32,cy:31,rx:12,n:9,col:'#2a2418',pore:'#3a3020',seed:89}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2418'})},
   // --- Drow: fine mail and a house sigil, not leather ---
-  drow:        {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})+hairCrown({cx:32,cy:7,rx:7.5,ry:9,n:11,seed:5})+hairFall({x0:25,y0:20,cx:22,cy:30,x1:24,y1:38,w:2.4,n:6,seed:7})+hairFall({x0:39,y0:20,cx:42,cy:30,x1:40,y1:38,w:2.2,n:6,seed:11})},
-  drowbolt:    {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})+hairCrown({cx:32,cy:8,rx:8,ry:8,n:10,seed:13})+hairFall({x0:24,y0:20,cx:21,cy:29,x1:23,y1:35,w:2.1,n:5,seed:17})+hairFall({x0:40,y0:20,cx:43,cy:29,x1:41,y1:35,w:2,n:5,seed:19})},
-  drowblade:   {base:(o)=>plateBands(o,{w:9.5,y0:9,n:3,gap:4,dark:'#1a1c24',mid:'#262935',lit:'#8a90a8'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})+hairFall({x0:41,y0:18,cx:46,cy:30,x1:43,y1:41,w:2.5,n:7,seed:23})},
-  drowpriest:  {base:(o)=>plateBands(o,{w:10,y0:10,n:2,gap:4.6,dark:'#2a1c33',mid:'#372444',lit:'#6b4a90'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})+hairCrown({cx:32,cy:6,rx:9,ry:10,n:12,seed:29})+hairFall({x0:22,y0:18,cx:16,cy:32,x1:20,y1:44,w:2.5,n:7,seed:31})+hairFall({x0:42,y0:18,cx:48,cy:32,x1:44,y1:44,w:2.3,n:7,seed:37})},
-  drowmage:    {base:(o)=>plateBands(o,{w:10,y0:10,n:2,gap:4.6,dark:'#221c33',mid:'#2e2444',lit:'#5f5790'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})+hairCrown({cx:32,cy:7,rx:9,ry:10,n:12,seed:41})+hairFall({x0:22,y0:19,cx:17,cy:33,x1:21,y1:45,w:2.3,n:7,seed:43})+hairFall({x0:42,y0:19,cx:47,cy:33,x1:43,y1:45,w:2.2,n:7,seed:47})},
+  drow:        {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
+  drowbolt:    {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
+  drowblade:   {base:(o)=>plateBands(o,{w:9.5,y0:9,n:3,gap:4,dark:'#1a1c24',mid:'#262935',lit:'#8a90a8'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
+  drowpriest:  {base:(o)=>plateBands(o,{w:10,y0:10,n:2,gap:4.6,dark:'#2a1c33',mid:'#372444',lit:'#6b4a90'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
+  drowmage:    {base:(o)=>plateBands(o,{w:10,y0:10,n:2,gap:4.6,dark:'#221c33',mid:'#2e2444',lit:'#5f5790'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
 
   // --- deep tier -------------------------------------------------------------
   skeleton:    {base:(o)=>boneDetail(o,{w:8,y0:6,n:4}), head:(o)=>faceDetail(o,{w:5.5,eye:11,col:'#4a4232'})},
@@ -2918,8 +2882,8 @@ const MONSTER_DETAIL={
   scrag:       {base:(o)=>kitHumanoid(o,{w:10,belt:17,dark:'#1e3230',pouch:false})+hideDetail(o,{x0:18,x1:48,y0:34,y1:60,n:16,col:'#152a26',seed:149}), head:(o)=>faceDetail(o,{w:7,eye:11,col:'#152a26'})},
   ochrejelly:  {base:(o)=>oozeDetail(o,{cx:32,cy:42,rx:19,ry:15,col:'#e0b46a',seed:151})},
   blackpud:    {base:(o)=>oozeDetail(o,{cx:32,cy:42,rx:22,ry:17,col:'#6a6a70',seed:157})},
-  drider:      {base:(o)=>plateBands(o,{w:9,y0:8,n:2,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'})+hideDetail(o,{x0:14,x1:50,y0:38,y1:58,n:14,col:'#14161c',seed:163}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})+hairCrown({cx:32,cy:5,rx:9,ry:10,n:12,seed:167})},
-  drowmatron:  {base:(o)=>plateBands(o,{w:10,y0:9,n:2,gap:4.6,dark:'#2a1c33',mid:'#372444',lit:'#6b4a90'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})+hairFall({x0:44,y0:18,cx:52,cy:34,x1:47,y1:48,w:2.8,n:8,seed:173})},
+  drider:      {base:(o)=>plateBands(o,{w:9,y0:8,n:2,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'})+hideDetail(o,{x0:14,x1:50,y0:38,y1:58,n:14,col:'#14161c',seed:163}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
+  drowmatron:  {base:(o)=>plateBands(o,{w:10,y0:9,n:2,gap:4.6,dark:'#2a1c33',mid:'#372444',lit:'#6b4a90'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
   mycaster:    {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:14,n:10,col:'#2a1c33',pore:'#3a2a20',seed:179})},
   myelder:     {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:16,n:12,col:'#2a1c33',pore:'#3a2a20',seed:181})},
   mylord:      {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:18,n:13,col:'#2a1433',pore:'#3a1c40',seed:191})},
@@ -2953,9 +2917,14 @@ function monsterSVG(key,boss,pose,tint){
     (boss?glowGrad('bossg','#c01a10'):'')+
     (tint?`<radialGradient id="elag"><stop offset="0%" stop-color="${tint}" stop-opacity="0.92"/><stop offset="22%" stop-color="${tint}" stop-opacity="0.6"/><stop offset="55%" stop-color="${tint}" stop-opacity="0.22"/><stop offset="100%" stop-color="${tint}" stop-opacity="0"/></radialGradient>`:'')+
     (o.extra||'')+'</defs>';
-  const ground=boss
-    ?`<ellipse cx="32" cy="60" rx="23" ry="5" fill="url(#bossg)" opacity="0.7"/><ellipse cx="32" cy="60.5" rx="16" ry="3.2" fill="#000" opacity="0.55"/>`
-    :`<ellipse cx="32" cy="60.5" rx="16" ry="3.2" fill="#000" opacity="0.55"/>`;
+  /* The contact shadow used to be an ellipse drawn HERE, inside the billboard —
+     a vertical ellipse pretending to lie on the floor, which holds up down a
+     corridor and falls apart the moment you stand next to something. It is a
+     real floor-aligned quad now (`addMonsterShadow` in the engine), so it takes
+     the room's perspective and leans away from the torch. Only the boss's own
+     red ground glow is still drawn in the sprite, because that is a halo around
+     the creature rather than a shadow under it. */
+  const ground=boss?`<ellipse cx="32" cy="60" rx="23" ry="5" fill="url(#bossg)" opacity="0.7"/>`:'';
   const crown=boss
     ?`<path d="M24 7 L25.5 1 L28.5 5 L32 0 L35.5 5 L38.5 1 L40 7 L38 9 L26 9 Z" fill="#2c3034" stroke="#101314" stroke-width="1"/><circle cx="32" cy="5.5" r="1.5" fill="#d82a20"/>`
     :'';
@@ -5776,7 +5745,7 @@ function disposeLevel(){
   if(R3.levelGroup){R3.scene.remove(R3.levelGroup);R3.levelGroup.traverse(o=>{if(o.geometry)o.geometry.dispose();});R3.levelGroup=null;}
   for(const f of R3.liquidFlows)f.tex.dispose();
   R3.liquidFlows=[];R3.liquidShaders=[];
-  R3.doorMeshes={};R3.secretMeshes={};R3.trapDecals={};R3.itemSprites={};R3.monsterSprites={};R3.monsterGlows={};R3.prewarmQ=[];R3.prewarmT=0;R3.stairsGroup=null;
+  R3.doorMeshes={};R3.secretMeshes={};R3.trapDecals={};R3.itemSprites={};R3.monsterSprites={};R3.monsterGlows={};R3.monsterShadows={};R3.prewarmQ=[];R3.prewarmT=0;R3.stairsGroup=null;
   R3.candleFlames=[];R3.cryptGroups=[];R3.lurkerMeshes={};R3.wallMats=null;
 }
 function buildLevel(L){
@@ -7115,6 +7084,7 @@ function addMonsterSprite(m){
   spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss,elite:m.elite};
   R3.levelGroup.add(spr);R3.monsterSprites[m.id]=spr;
   addMonsterGlow(m,sprKey,sc);
+  addMonsterShadow(m,sc);
   m._sc=sc;
 }
 function removeMonsterSprite(m){
@@ -7122,6 +7092,8 @@ function removeMonsterSprite(m){
   if(s){R3.levelGroup.remove(s);delete R3.monsterSprites[m.id];}
   const g=R3.monsterGlows[m.id];
   if(g){R3.levelGroup.remove(g);delete R3.monsterGlows[m.id];}
+  const sh=R3.monsterShadows[m.id];
+  if(sh){R3.levelGroup.remove(sh);delete R3.monsterShadows[m.id];}
 }
 /* Eyes are the one part of a creature that makes its own light, and shading the
    billboard multiplies them down with everything else — so at six tiles a
@@ -7145,6 +7117,34 @@ function eyeGlowTex(){
   g.addColorStop(1,'rgba(255,255,255,0)');
   ctx.fillStyle=g;ctx.fillRect(0,0,64,64);
   return _glowTex=texFromCanvas(cv,{mipmap:false});
+}
+/* A shadow on the floor, not on the sprite. Drawn as a quad lying flat in the
+   room, so it takes the same perspective the flagstones do and reads as
+   something the creature is standing on rather than a smudge painted at the
+   bottom of its picture.
+
+   The party carries the only light, so a creature's shadow always points
+   directly away from the viewer; it lengthens with distance from the torch the
+   way a real one does, and fades as the light that casts it runs out. */
+let _shadowTex=null;
+function shadowTex(){
+  if(_shadowTex)return _shadowTex;
+  const c=newCanvas(64),ctx=c.ctx;
+  const g=ctx.createRadialGradient(32,32,0,32,32,32);
+  g.addColorStop(0,'rgba(0,0,0,0.62)');
+  g.addColorStop(0.55,'rgba(0,0,0,0.34)');
+  g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g;ctx.fillRect(0,0,64,64);
+  return _shadowTex=texFromCanvas(c.cv,{mipmap:false});
+}
+function addMonsterShadow(m,sc){
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),
+    new THREE.MeshBasicMaterial({map:shadowTex(),transparent:true,depthWrite:false,opacity:0.9}));
+  mesh.rotation.x=-Math.PI/2;
+  mesh.position.set(m.x+0.5,0.02,m.y+0.5);
+  mesh.renderOrder=2;
+  mesh.userData={sc};
+  R3.levelGroup.add(mesh);R3.monsterShadows[m.id]=mesh;
 }
 function addMonsterGlow(m,sprKey,sc){
   const a=(MONSTER_ART[sprKey]||MONSTER_ART.goblin)();
@@ -9567,6 +9567,24 @@ function updateSprites(now){
     else s.material.color.setRGB(lr,gb*lg,gb*lb);
     // the eye glow rides along unshaded — a sleeping creature's eyes are shut,
     // and a dying one's burn lower, but neither dims with the torch
+    /* the shadow leans away from the torch and stretches as the light that
+       casts it falls behind — a creature at your feet has a tight pool under it
+       and one at the edge of the light throws a long smear */
+    const sh=R3.monsterShadows[m.id];
+    if(sh){
+      const dx=s.position.x-R3.camera.position.x, dz=s.position.z-R3.camera.position.z;
+      const d=Math.hypot(dx,dz)||1, ux=dx/d, uz=dz/d;
+      /* The pool stays UNDER the feet and only the tail leans away. Offsetting
+         the whole thing is what a torch at the eye would really do, and it puts
+         the shadow entirely behind the creature where its own sprite hides it —
+         geometrically right and invisible. The contact patch is the part that
+         does the work of grounding it. */
+      const stretch=1+Math.min(1.2,d*0.17);
+      sh.position.set(s.position.x+ux*m._sc*0.05*stretch, 0.02, s.position.z+uz*m._sc*0.05*stretch);
+      sh.scale.set(m._sc*1.18, m._sc*1.18*stretch, 1);
+      sh.rotation.z=Math.atan2(ux,uz);          // long axis points away from the eye
+      sh.material.opacity=clamp(1.05-d*0.07,0.14,1);
+    }
     const gl=R3.monsterGlows[m.id];
     if(gl){
       gl.position.set(s.position.x+gl.userData.dx,s.position.y+gl.userData.dy,s.position.z);

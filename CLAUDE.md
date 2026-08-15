@@ -289,6 +289,13 @@ in any individual creature, so all 78 get them at once.
   a soft dark blot of the head and arm onto the **base only**, masked to the
   base's silhouette so it never spills onto the background and the outline stays
   exactly as authored. Head and arm share **one** filter pass, not one each.
+- **Ground shadow** (`addMonsterShadow`). A quad lying flat in the room rather
+  than an ellipse painted at the bottom of the billboard — it takes the same
+  perspective the flagstones do. The pool stays **under** the feet and only the
+  tail leans away from the torch: offsetting the whole thing is what a light at
+  the eye would really do, and it puts the shadow entirely behind the creature
+  where its own sprite hides it. Geometrically right and invisible. The contact
+  patch is the part that grounds it.
 - **Eye glow** (`addMonsterGlow`). A second, additive sprite riding at the head,
   tinted with the creature's own `o.eye` and deliberately **not** shaded, because
   shading multiplies the map and put a creature's eyes out at exactly the range
@@ -330,15 +337,15 @@ poses flickers.
 goblin, orc and hobgoblin are detailed **inline in their own entries** instead
 and are deliberately absent from the table.
 
-`boneDetail` (ribs, sternum, low contrast because the creatures are already
-pale) and the two hair generators came in with the deep tier. **`hairCrown` and
-`hairFall` exist because hair is read from the separations BETWEEN locks, not
-from its outline** — drow hair was one flat pale fill with two thick strokes and
-read as a moulded helmet at any size. Two things to know if you touch them: the
-crown strands must start already spread across the top of the band rather than
-gathered at a point, because a drow's face is a cut-out in the middle of the
-hair mass and a fan from the centre sweeps strands across it; and `ry` is the
-drop to the hairline, not to the chin.
+`boneDetail` — ribs, sternum and joint shading, kept low-contrast because the
+creatures are already pale — came in with the deep tier.
+
+A strand-based hair generator was tried on the drow and **removed**: it did make
+the hair read as locks rather than as a moulded shell, but it was not wanted.
+Note if anyone revisits it that hair is read from the separations BETWEEN locks
+rather than from its outline, that a drow's face is a cut-out in the middle of
+the hair mass (so a fan of strands from the crown sweeps across the face), and
+that the drop wanted is to the hairline, not to the chin.
 
 Two things learned by looking rather than reasoning:
 
