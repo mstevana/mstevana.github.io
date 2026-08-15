@@ -1002,15 +1002,19 @@ const THEMES=[
   {name:'Myconid', wall:'#7a6e86', wall2:'#42384f', floor:'#4b4753', ceil:'#5a4670', fog:0x0d0814, moss:'#8a63b8', roomBias:.3,
    glow:'#c88ae8', light:0xc59ae8, fill:0xdfc4f2},
   // A drow house: small black bricks laid true, a chiselled frieze, and the
-  // only thing in the dungeon that gives off its own light. `glyphs` are the
-  // faerzress colours the inscriptions and the rose windows burn in — the walls
-  // carry an emissive map, so those read as lit rather than merely pale.
+  // only thing in the dungeon that gives off its own light. The walls carry an
+  // emissive map, so both read as lit rather than merely pale.
+  // Two palettes, deliberately: `frieze` is the single colour ALL drow script
+  // burns in — the wall inscription and the glyph on a gate — because a running
+  // text that changes colour every tile reads as decoration rather than as one
+  // hand writing one thing. `glyphs` is the glazing, and stays three colours,
+  // because a rose window is stained glass and is meant to be varied.
   // The light here is deliberately NOT violet. Retinting the torch the way the
   // grove does turned black brick lilac; the colour in a drow house has to come
   // from the things that are actually burning — the frieze and the windows — so
   // the party's own light stays a cold near-white and the stone stays black.
   {name:'Drow',    wall:'#2e2c35', wall2:'#151419', floor:'#232128', ceil:'#141319', fog:0x060509, moss:'#2c2440', roomBias:.66,
-   glyphs:['#a86ce8','#3fd6a8','#4fc4e0'], silver:'#8c93a8', light:0xcdd2e6, fill:0xdde2f2},
+   frieze:'#a86ce8', glyphs:['#a86ce8','#3fd6a8','#4fc4e0'], silver:'#8c93a8', light:0xcdd2e6, fill:0xdde2f2},
 ];
 const FIRST_NAMES=['Aldric','Berrin','Cassia','Dorn','Elva','Fenn','Grimm','Hilda','Ivo','Jora','Kelder','Lysa','Mordin','Nessa','Oskar','Petra','Quinn','Rurik','Sable','Torv','Ulma','Vance','Wren','Yorick','Zora','Brakka','Thistle','Marn','Isolde','Garrick'];
 
@@ -4682,8 +4686,10 @@ function drowWallCanvas(th,variant,base){
   const em=newCanvas(128);
   const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
   const silver=th.silver||'#8c93a8';
-  const cols=th.glyphs||['#a86ce8','#3fd6a8','#4fc4e0'];
-  const col=cols[variant%cols.length];
+  // Every variant burns the same colour. The frieze is one running text across a
+  // whole wall, and cycling the colour per variant made it read as eight
+  // separate decorations rather than as one hand writing one thing.
+  const col=th.frieze||'#a86ce8';
   ctx.drawImage(base.cv,0,0,128,128);
   em.ctx.fillStyle='#000';em.ctx.fillRect(0,0,128,128);
   // the inscription: the same channel on every variant, different words in it,
@@ -6458,8 +6464,7 @@ function doorCanvas(th,locked){
     // exactly as the sewer grate does. Drow bar a corridor with something you
     // can be seen through.
     const iron='#191a20',lit='#4d5162',dark='#0a0a0e';
-    const cols=th.glyphs||['#a86ce8','#3fd6a8','#4fc4e0'];
-    const glow=cols[(th.name.length+(locked?1:0))%cols.length];
+    const glow=th.frieze||'#a86ce8';   // script, so the same colour as the walls'
     const bar=(x0,y0,w,h)=>{
       ctx.fillStyle=dark;ctx.fillRect(x0+1,y0+1,w,h);
       ctx.fillStyle=iron;ctx.fillRect(x0,y0,w,h);

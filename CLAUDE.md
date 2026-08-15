@@ -472,6 +472,13 @@ three themes carry real machinery:
   S-spine with a bowl hung off one side and a flourish or a closed loop off the
   other.
 
+  **The theme carries two palettes and they are not interchangeable.** `frieze`
+  is the single violet that *all drow script* burns in — the wall inscription
+  and the glyph on a gate. It used to cycle `th.glyphs` per variant, which made
+  one running text read as eight separate decorations. `glyphs` is now the
+  glazing only, and stays three colours, because a rose window is stained glass
+  and is meant to be varied. T46 asserts both.
+
   **`drowWallCanvas` is the only wall builder that returns a pair**, `{cv,glow}`
   — the stone, and a black sheet carrying only the burning parts — and
   `buildLevel` wires the second up as `emissiveMap`. A colour map can only make
