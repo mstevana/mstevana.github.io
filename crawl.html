@@ -5444,11 +5444,10 @@ function lightAt(x,y,z){
   _sprC.b=Math.min(1,Math.max(SPRITE_FLOOR,_sprC.b));
   return _sprC;
 }
+/* Items only. Monsters are shaded in `updateSprites`, which runs after this in
+   the frame and multiplies the same `lightAt` by the bloodied / sleeping tint —
+   anything written here would simply be overwritten a moment later. */
 function shadeSprites(){
-  for(const id in R3.monsterSprites){
-    const s=R3.monsterSprites[id];
-    if(s&&s.material)s.material.color.copy(lightAt(s.position.x,s.position.y,s.position.z));
-  }
   for(const i in R3.itemSprites){
     const s=R3.itemSprites[i];
     if(s&&s.material)s.material.color.copy(lightAt(s.position.x,s.position.y,s.position.z));
@@ -9160,14 +9159,21 @@ function updateSprites(now){
       s.position.x+=dx/dl*lunge*0.07;s.position.z+=dz/dl*lunge*0.07;
     }
     s.position.y=m._sc/2+0.02+yb;
-    // torch attenuation: monsters darken with distance and loom out of the gloom
-    const ddx=s.position.x-R3.camera.position.x,ddz=s.position.z-R3.camera.position.z;
-    const att=clamp(1.5/(1+0.55*Math.hypot(ddx,ddz)),0.22,1);
-    // bloodied tint
+    /* Lighting and gameplay tint are multiplied together, and this is the only
+       place a monster's colour is written — `shadeSprites` deliberately leaves
+       monsters alone, because whatever it set here would overwrite.
+
+       The light used to be `clamp(1.5/(1+0.55*d), 0.22, 1)`: a made-up curve,
+       flat compared with the real falloff, pure greyscale, with a floor of 0.22
+       and no flicker. `lightAt` is the same attenuation the stonework gets, so a
+       creature now carries the torch's warmth, guts with its flicker, and sinks
+       into the dark on the corridor's own curve. */
+    const lit=lightAt(s.position.x,s.position.y,s.position.z);
+    const lr=lit.r,lg=lit.g,lb=lit.b;   // lightAt reuses one Color; read it now
     const r=m.hp/m.maxHp;
-    const gb=0.35+r*0.65;
-    if(m.sleep||m.held>0)s.material.color.setRGB(0.6*att,0.7*att,att);
-    else s.material.color.setRGB(att,gb*att,gb*att);
+    const gb=0.35+r*0.65;               // bloodied: green and blue drain away
+    if(m.sleep||m.held>0)s.material.color.setRGB(0.6*lr,0.7*lg,lb);
+    else s.material.color.setRGB(lr,gb*lg,gb*lb);
   }
 }
 /* ============================== AUDIO ============================== */

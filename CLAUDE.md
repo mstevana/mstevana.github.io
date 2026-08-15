@@ -230,12 +230,26 @@ bright as one standing in the party's torchlight, while the wall beside it fell
 off to black — which is what made monsters read as stickers pasted onto the
 picture rather than things standing in the room.
 
-`shadeSprites()` runs once a frame from the render loop, after the torch has been
-positioned and its flicker applied. A sprite has no normal to shade with, so the
-whole billboard is shaded at once: `lightAt(x,y,z)` evaluates the ambient, the
-torch and the short-range fill at the sprite's own position and the result goes
-into `material.color`, which multiplies the map. Monsters and floor items both
-go through it.
+A sprite has no normal to shade with, so the whole billboard is shaded at once:
+`lightAt(x,y,z)` evaluates the ambient, the torch and the short-range fill at the
+sprite's own position, and the result is multiplied into `material.color`.
+
+**Two call sites, and the split is not optional.** `shadeSprites()` runs from the
+render loop after the torch is positioned, and handles **floor items only**.
+Monsters are shaded at the end of `updateSprites` in `07_game.js`, because that
+function runs *later in the same frame* and writes `material.color` itself — it
+carries the bloodied tint (green and blue drain as hit points fall) and the
+sleeping tint. Anything the render loop wrote for a monster would simply be
+overwritten a moment later, silently. That is exactly what happened on the first
+attempt: the shading looked like it worked, and the apparent difference between
+two screenshots was the torch flicker between captures. **Pin
+`R3.torch.intensity` before comparing frames.**
+
+What monsters had before was not nothing, but it was invented:
+`clamp(1.5/(1+0.55*d), 0.22, 1)` — flat next to the real falloff, pure
+greyscale, floored at 0.22, and static. The visible win is less the falloff than
+the **colour temperature**: a creature now carries the torch's warmth and guts
+with its flicker, so it belongs to the same room as the stone.
 
 The falloff is three.js r128's own non-physical point attenuation,
 `clamp(1 - d/range, 0, 1) ^ decay`, so a sprite dims on exactly the curve the
