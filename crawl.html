@@ -451,6 +451,14 @@ const ARMORS={ // slot:armor
 const TRINKETS={
   ringprot: {name:'Ring of protection', slot:'ring', spr:'ring'},
   amuletnat:{name:'Amulet of natural armor', slot:'amulet', spr:'amulet'},
+  // worn stat boosters: `boost` names the ability, and the item's bonus (1–3)
+  // grants +2/+4/+6 to it — the 3.5 enhancement ladder. The boots and circlet
+  // occupy armour slots, so they carry ac:0 and cost the AC that slot could
+  // have held; the two amulets compete with natural armour for the neck.
+  bootsagi:  {name:'Boots of agility',    slot:'boots',  ac:0, maxDex:99, boost:'dex', spr:'bootsagi'},
+  circletint:{name:'Circlet of intellect',slot:'helmet', ac:0, maxDex:99, boost:'int', spr:'circlet'},
+  periaptwis:{name:'Periapt of wisdom',   slot:'amulet', boost:'wis', spr:'periapt'},
+  amuhealth: {name:'Amulet of health',    slot:'amulet', boost:'con', spr:'amuhealth'},
 };
 const RATION={name:'Trail rations', spr:'ration'};
 const POTIONS={
@@ -830,6 +838,23 @@ const ITEM_ART={
   hshield:()=>`<path d="M32 4 Q48 6 50 12 Q50 42 32 60 Q14 42 14 12 Q16 6 32 4 Z" fill="#6f7276"/><path d="M32 8 L32 54 M18 24 L46 24" stroke="#4a4d50" stroke-width="2.6"/><circle cx="32" cy="24" r="5" fill="#8f9296"/>`,
   ring:()=>`<circle cx="32" cy="36" r="15" fill="none" stroke="#a8894a" stroke-width="6"/><path d="M26 18 L32 8 L38 18 L32 24 Z" fill="#7aa0c0"/>`,
   amulet:()=>`<path d="M14 10 Q32 30 50 10" fill="none" stroke="#8a7343" stroke-width="3.4"/><circle cx="32" cy="34" r="10" fill="#5a4a70"/><circle cx="32" cy="34" r="4.5" fill="#9a86c8"/>`,
+  // stat gear: winged boots, a gemmed circlet, and two amulets whose stones
+  // name their stat — a clear eye for wisdom, a red heart for health
+  bootsagi:()=>`<path d="M22 12 L34 12 L34 38 L46 38 L48 50 L22 50 Z" fill="#8a7343"/>`+
+    `<path d="M22 44 L48 44" stroke="#5c4a28" stroke-width="2.2"/>`+
+    `<path d="M22 16 Q12 10 8 18 Q15 19 22 24 Z" fill="#d8cfae"/>`+
+    `<path d="M22 26 Q13 22 10 29 Q16 30 22 34 Z" fill="#c9bd96"/>`,
+  circlet:()=>`<path d="M14 36 Q32 20 50 36" fill="none" stroke="#a8894a" stroke-width="4.5"/>`+
+    `<path d="M14 36 Q32 46 50 36" fill="none" stroke="#8a7040" stroke-width="3.5"/>`+
+    `<path d="M28 28 L32 20 L36 28 L32 33 Z" fill="#7aa0c0"/>`,
+  periapt:()=>`<path d="M16 8 Q32 26 48 8" fill="none" stroke="#8a7343" stroke-width="3.4"/>`+
+    `<path d="M32 24 L32 29" stroke="#8a7343" stroke-width="3"/>`+
+    `<circle cx="32" cy="39" r="11" fill="#3e5a74"/>`+
+    `<path d="M23 39 Q32 31 41 39 Q32 47 23 39 Z" fill="#cfe4f2"/><circle cx="32" cy="39" r="3.4" fill="#26404e"/>`,
+  amuhealth:()=>`<path d="M16 8 Q32 26 48 8" fill="none" stroke="#8a7343" stroke-width="3.4"/>`+
+    `<path d="M32 24 L32 29" stroke="#8a7343" stroke-width="3"/>`+
+    `<path d="M32 33 Q36 26 42 30 Q47 35 32 50 Q17 35 22 30 Q28 26 32 33 Z" fill="#a83030"/>`+
+    `<path d="M26 32 Q28 29 31 31" stroke="#d87a7a" stroke-width="2" fill="none"/>`,
   potion:(tint)=>`<path d="M28 8 L36 8 L36 20 Q46 26 46 40 Q46 54 32 54 Q18 54 18 40 Q18 26 28 20 Z" fill="#3a4a52"/><path d="M22 38 Q22 30 30 25 L34 25 Q42 30 42 38 Q42 49 32 49 Q22 49 22 38 Z" fill="${tint||'#a33'}"/><rect x="27" y="4" width="10" height="6" rx="2" fill="#6a5432"/>`,
   scroll:()=>`<rect x="18" y="10" width="28" height="44" rx="3" fill="#c9b98a"/><rect x="14" y="6" width="36" height="8" rx="4" fill="#8a7040"/><rect x="14" y="50" width="36" height="8" rx="4" fill="#8a7040"/><path d="M24 22 L40 22 M24 30 L40 30 M24 38 L36 38" stroke="#5a4a28" stroke-width="2"/>`,
   wand:()=>`<rect x="28" y="10" width="7" height="46" rx="3" fill="#5a3c60" transform="rotate(20 32 32)"/><circle cx="24" cy="12" r="5" fill="#b48ae0"/><path d="M14 6 L18 10 M30 2 L28 8 M12 18 L18 16" stroke="#b48ae0" stroke-width="2"/>`,
@@ -1638,7 +1663,9 @@ function itemName(it){
   else{
     n=def.name;
     if(it.affix&&AFFIXES[it.affix])n=AFFIXES[it.affix].name+' '+n[0].toLowerCase()+n.slice(1);
-    if(it.bonus)n+=' +'+it.bonus;
+    // stat gear is named by what it grants (+2/+4/+6), not its internal tier
+    if(def.boost)n+=' +'+statBoost(it);
+    else if(it.bonus)n+=' +'+it.bonus;
   }
   if((it.qty||1)>1)n+=' ×'+it.qty;
   return n;
@@ -1671,6 +1698,15 @@ function itemDesc(it){
     return s+dtypeNote(def)+affixDesc(it);
   }
   if(def.kind==='shield')return `Shield: +${def.ac+it.bonus} AC (off hand).`+affixDesc(it);
+  if(def.boost){
+    const tail={
+      dex:" Feeds AC (within the armour's DEX cap), Reflex saves and ranged attacks.",
+      int:' Feeds arcane spell DCs, spell slots and searching.',
+      wis:' Feeds divine spell DCs, spell slots and Will saves.',
+      con:' Hit points rise while it is worn and fall away with it.',
+    }[def.boost]||'';
+    return `Worn: +${statBoost(it)} ${def.boost.toUpperCase()}.`+tail+affixDesc(it);
+  }
   if(['armor','helmet','boots'].includes(def.kind)){
     let s=`${def.kind[0].toUpperCase()+def.kind.slice(1)}: +${def.ac+it.bonus} AC.`;
     if(def.maxDex<9)s+=` Max DEX bonus ${def.maxDex}.`;
@@ -1765,9 +1801,12 @@ function randLoot(depth,rich,noPotion,noRation){
     return mkItem('scroll',{spell:pick(SCROLLABLE())});
   }
   if(kind==='wand')return mkItem('wand',{spell:pick(WANDABLE),charges:roll(2,6,3)});
-  // trinket: ring of protection or amulet of natural armor
-  return mkItem(Math.random()<0.5?'ringprot':'amuletnat',
-    {bonus:Math.max(1,gbon()),affix:rollAffix(depth,rich,ARMOR_AFFIXES)});
+  // trinket: an AC piece or one of the worn stat boosters. Stat tiers stop at
+  // bonus 3 (+6, the 3.5 ceiling) even where the deep hoard ladder rolls higher
+  const t=pick(['ringprot','amuletnat','bootsagi','circletint','periaptwis','amuhealth']);
+  const tb=Math.max(1,gbon());
+  return mkItem(t,{bonus:ITEM_DEFS[t].boost?Math.min(3,tb):tb,
+    affix:rollAffix(depth,rich,ARMOR_AFFIXES)});
 }
 
 /* ============================== DUNGEON GENERATION ============================== */
@@ -2411,8 +2450,23 @@ function mkAutoParty(){
     mkCharacter(pickName(),'dwarf','cleric',autoAssign('cleric',rollSix())),
   ];
 }
+// what a worn stat booster grants: bonus 1/2/3 → +2/+4/+6, capped at the 3.5
+// ceiling however high a hoard rolled the item
+function statBoost(it){return Math.min(6,2*Math.max(1,it.bonus||0));}
+function equipAbil(ch,a){
+  let s=0;
+  for(const k in ch.equip){
+    const it=ch.equip[k];
+    if(it&&ITEM_DEFS[it.base].boost===a)s+=statBoost(it);
+  }
+  return s;
+}
+// the character's effective score: base less damage, plus what they wear.
+// Transient pushes (rage, buffs) stay in abilMod — hp and slot counts are
+// meant to follow gear but not a 30-second rage.
+function abilScore(ch,a){return ch.abil[a]-ch.abilDmg[a]+equipAbil(ch,a);}
 function abilMod(ch,a){
-  let s=ch.abil[a]-ch.abilDmg[a];
+  let s=abilScore(ch,a);
   if(a==='str'&&isRaging(ch))s+=4;
   if(a==='con'&&isRaging(ch))s+=4;
   for(const b of ch.buffs)if(b[a])s+=b[a];
@@ -2421,7 +2475,7 @@ function abilMod(ch,a){
 function isRaging(ch){return ch.rageUntil>G.time;}
 function casterAbil(ch){return ch.cls==='wizard'?'int':'wis';}
 function recalcHp(ch,full){
-  const conM=mod(ch.abil.con-ch.abilDmg.con);
+  const conM=mod(abilScore(ch,'con'));
   let max=0;
   for(let l=1;l<=ch.level;l++)max+=hpGainAt(ch.cls,l,conM);
   max-=ch.negLevels*5;
@@ -2496,7 +2550,7 @@ function spendPrepared(ch,key){
   if(i<0)return false;
   row.splice(i,1);return true;
 }
-function charSlots(ch){return slotsFor(ch.cls,ch.level,ch.abil[casterAbil(ch)]-ch.abilDmg[casterAbil(ch)]);}
+function charSlots(ch){return slotsFor(ch.cls,ch.level,abilScore(ch,casterAbil(ch)));}
 function dexACBonus(ch){
   let maxDex=99;
   const ar=ch.equip.armor;if(ar)maxDex=Math.min(maxDex,ITEM_DEFS[ar.base].maxDex);
@@ -2504,7 +2558,9 @@ function dexACBonus(ch){
 }
 function charAC(ch){
   let ac=10+dexACBonus(ch);
-  for(const s of ['armor','helmet','boots']){const it=ch.equip[s];if(it)ac+=ITEM_DEFS[it.base].ac+it.bonus;}
+  // a stat booster's bonus is its ability tier, not an armour plus — it gives
+  // the slot's base ac (zero) and nothing more
+  for(const s of ['armor','helmet','boots']){const it=ch.equip[s];if(it)ac+=ITEM_DEFS[it.base].ac+(ITEM_DEFS[it.base].boost?0:it.bonus);}
   for(const s of ['lhand','rhand']){const it=ch.equip[s];if(it&&ITEM_DEFS[it.base].kind==='shield')ac+=ITEM_DEFS[it.base].ac+it.bonus;}
   for(const s of ['ring1','ring2']){const it=ch.equip[s];if(it&&it.base==='ringprot')ac+=Math.max(1,it.bonus);}
   if(ch.equip.amulet&&ch.equip.amulet.base==='amuletnat')ac+=Math.max(1,ch.equip.amulet.bonus);
@@ -2652,7 +2708,7 @@ function grantXp(ch,amount){
   ch.xp+=amount;
   while(ch.level<MAX_LEVEL&&ch.xp>=XP_FOR_LEVEL(ch.level+1)){
     ch.level++;
-    const conM=mod(ch.abil.con-ch.abilDmg.con);
+    const conM=mod(abilScore(ch,'con'));
     const gain=hpGainAt(ch.cls,ch.level,conM);
     ch.maxHp+=gain;ch.hp=Math.max(ch.hp,0)+gain;
     if(CLASSES[ch.cls].layon)ch.layPool+=Math.max(0,mod(ch.abil.cha));
@@ -6072,7 +6128,7 @@ function resolveRest(fed,rests){
 // A cleric's signature, once per rest. Every undead within six tiles rolls
 // against the cleric's level and Charisma: the weakest are destroyed outright,
 // the rest are routed — shaken and driven off for a while. The strong ignore it.
-function turnUndeadPower(ch){return ch.level+Math.max(0,mod(ch.abil.cha-ch.abilDmg.cha));}
+function turnUndeadPower(ch){return ch.level+Math.max(0,mod(abilScore(ch,'cha')));}
 function turnUndead(ch){
   if(!CLASSES[ch.cls].turn){UI.toast(ch.name+' has no power over the dead.');return false;}
   if(ch.turnUsed){UI.toast('Already channelled. Rest to recover.');return false;}
@@ -7074,6 +7130,7 @@ const UI=(()=>{
     if(s<0){toast(target.name+"'s pack is full.");return;}
     setItem(from,null);
     target.inventory[s]=it;
+    if(from.type==='equip')recalcHp(invChar,false); // giving worn CON away costs the hp
     if(target!==invChar)toast(invChar.name+' hands the '+itemName(it)+' to '+target.name+'.');
     SFX.turn();
     renderInv();refreshParty();saveGame();
@@ -7147,6 +7204,8 @@ const UI=(()=>{
       toast('The '+itemName(it)+' needs both hands — off-hand item stowed in the pack.');
     }
     setItem(to,it);
+    // worn CON changes move max hp with them, proportionally
+    if(from.type==='equip'||to.type==='equip')recalcHp(invChar,false);
     SFX.turn();
     renderInv();refreshParty();saveGame();
   }
@@ -7265,9 +7324,10 @@ const UI=(()=>{
     }
     if(prof.dual)atkLine=`<span class="dim-note">Two-weapon fighting${CLASSES[ch.cls].twf?'':' — untrained (−4)'}</span><br>`+atkLine;
     const abils=ABILITIES.map(a=>{
-      const cur=ch.abil[a]-ch.abilDmg[a]+((a==='str'||a==='con')&&isRaging(ch)?4:0);
+      const cur=abilScore(ch,a)+((a==='str'||a==='con')&&isRaging(ch)?4:0);
       const dmgd=ch.abilDmg[a]>0?` <span style="color:#a05545">(−${ch.abilDmg[a]})</span>`:'';
-      return `${ABIL_LBL[a]} <b>${cur}</b> (${fmtMod(mod(cur))})${dmgd}`;
+      const worn=equipAbil(ch,a)>0?` <span style="color:#7aa0c0">(+${equipAbil(ch,a)})</span>`:'';
+      return `${ABIL_LBL[a]} <b>${cur}</b> (${fmtMod(mod(cur))})${dmgd}${worn}`;
     }).join(' · ');
     // Heavy armour eats the nimbleness it is worth, and the number it takes is
     // invisible inside an AC total: a DEX 18 fighter in full plate carries +1 of
