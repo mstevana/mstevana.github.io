@@ -417,6 +417,13 @@ function saveOf(good,lvl){return good?2+Math.floor(lvl/2):Math.floor(lvl/3);}
 /* ---------- items ---------- */
 // kind: weapon|armor|helmet|boots|shield|amulet|ring|potion|scroll|wand|key|ammoNone
 const WEAPONS={
+  // `finesse` lets the wielder attack with DEX when it beats STR (damage stays
+  // STR, as 3.5 has it)
+  dagger:    {name:'Dagger',      dmg:[1,4], crit:[19,2], hands:1, light:true, finesse:true, dtype:'p', spr:'dagger'},
+  rapier:    {name:'Rapier',      dmg:[1,6], crit:[18,2], hands:1, finesse:true, dtype:'p', spr:'rapier'},
+  battleaxe: {name:'Battleaxe',   dmg:[1,8], crit:[20,3], hands:1, dtype:'s', spr:'battleaxe'},
+  greataxe:  {name:'Greataxe',    dmg:[1,12],crit:[20,3], hands:2, dtype:'s', spr:'greataxe'},
+  halberd:   {name:'Halberd',     dmg:[1,10],crit:[20,3], hands:2, reach:true, dtype:'s', spr:'halberd'},
   shortsword:{name:'Short sword', dmg:[1,6], crit:[19,2], hands:1, light:true, dtype:'p', spr:'shortsword'},
   longsword: {name:'Long sword',  dmg:[1,8], crit:[19,2], hands:1, dtype:'s', spr:'longsword'},
   mace:      {name:'Mace',        dmg:[1,8], crit:[20,2], hands:1, dtype:'b', spr:'mace'},
@@ -447,6 +454,8 @@ const ARMORS={ // slot:armor
   hboots:   {name:'Heavy boots',  ac:2, maxDex:99, slot:'boots', spr:'hboots'},
   lshield:  {name:'Light shield', ac:1, maxDex:99, slot:'hand', shield:true, spr:'lshield'},
   hshield:  {name:'Heavy shield', ac:2, maxDex:99, slot:'hand', shield:true, spr:'hshield'},
+  // the only shield that caps DEX — dexACBonus folds shield caps in with the armour's
+  towershield:{name:'Tower shield',ac:3, maxDex:2, slot:'hand', shield:true, spr:'towershield'},
 };
 const TRINKETS={
   ringprot: {name:'Ring of protection', slot:'ring', spr:'ring'},
@@ -460,6 +469,12 @@ const TRINKETS={
   circletint:{name:'Circlet of intellect',slot:'helmet', ac:0, maxDex:99, boost:'int', spr:'circlet'},
   periaptwis:{name:'Periapt of wisdom',   slot:'amulet', boost:'wis', spr:'periapt'},
   amuhealth: {name:'Amulet of health',    slot:'amulet', boost:'con', spr:'amuhealth'},
+  // `luck` rides the item's bonus (+1/+2/+3 on every save); the other three are
+  // flat properties, dropped at bonus 0 so no misleading plus appears in the name
+  ringfort:  {name:'Ring of fortune',     slot:'ring',   luck:true, spr:'ringfort'},
+  ringfree:  {name:'Ring of free action', slot:'ring',   freedom:true, spr:'ringfree'},
+  periaptproof:{name:'Periapt of proof',  slot:'amulet', proof:true, spr:'periaptproof'},
+  sunstone:  {name:'Sunstone amulet',     slot:'amulet', light:2, spr:'sunstone'},
 };
 const RATION={name:'Trail rations', spr:'ration'};
 const POTIONS={
@@ -786,6 +801,11 @@ const ITEM_ART={
     `<path d="M18 34 Q32 28 46 34" stroke="#4a3a22" stroke-width="2.2" fill="none"/>`+
     `<path d="M27 20 Q32 12 37 20 Q32 17 27 20 Z" fill="#5a4830"/>`+
     `<circle cx="24" cy="42" r="2.4" fill="#6b5330"/><circle cx="40" cy="44" r="2" fill="#6b5330"/>`,
+  dagger:()=>`<path d="M32 16 L35 21 L35 38 L32 44 L29 38 L29 21 Z" fill="#9a9da2"/><path d="M32 18 L32 42" stroke="#c8cace" stroke-width="1"/><rect x="25" y="38" width="14" height="4" rx="2" fill="#5a4a2a"/><rect x="29.5" y="42" width="5" height="9" fill="#3c2f1c"/><circle cx="32" cy="53" r="2.6" fill="#7a6335"/>`,
+  rapier:()=>`<path d="M32 2 L33.6 8 L33.6 40 L32 44 L30.4 40 L30.4 8 Z" fill="#a8abaf"/><path d="M32 4 L32 42" stroke="#d8dade" stroke-width="0.9"/><path d="M24 42 Q32 52 40 42" fill="none" stroke="#8a7343" stroke-width="2.6"/><path d="M25 42 L39 42" stroke="#8a7343" stroke-width="2.4"/><rect x="30" y="44" width="4" height="10" fill="#3c2f1c"/><circle cx="32" cy="56" r="2.6" fill="#8a7343"/>`,
+  battleaxe:()=>`<rect x="30" y="8" width="5" height="50" rx="2" fill="#5c4728"/><path d="M35 10 Q52 12 50 30 Q42 24 35 26 Z" fill="#8f9296"/><path d="M35 12 Q46 14 46 24" fill="none" stroke="#c4c6ca" stroke-width="1.4"/><path d="M30 14 L24 12 L24 22 L30 20 Z" fill="#6f7276"/>`,
+  greataxe:()=>`<rect x="30" y="4" width="5" height="56" rx="2" fill="#4a3a20"/><path d="M35 6 Q56 8 54 30 Q44 23 35 26 Z" fill="#8b8e93"/><path d="M30 6 Q9 8 11 30 Q21 23 30 26 Z" fill="#7c7f83"/><path d="M35 9 Q49 11 49 24 M30 9 Q16 11 16 24" fill="none" stroke="#c4c6ca" stroke-width="1.3"/>`,
+  halberd:()=>`<rect x="30" y="10" width="4.5" height="52" rx="2" fill="#5c4728"/><path d="M34.5 14 Q50 16 48 32 Q41 26 34.5 28 Z" fill="#8f9296"/><path d="M32 2 L36 12 L32 10 L28 12 Z" fill="#9a9da2"/><path d="M30 18 L23 15 L23 26 L30 23 Z" fill="#6f7276"/>`,
   shortsword:()=>`<path d="M32 8 L36 14 L36 40 L32 46 L28 40 L28 14 Z" fill="#8f9296"/><path d="M32 10 L32 44" stroke="#c8cace" stroke-width="1.2"/><rect x="22" y="40" width="20" height="5" rx="2" fill="#5a4a2a"/><rect x="29" y="45" width="6" height="12" fill="#3c2f1c"/><circle cx="32" cy="58" r="3.4" fill="#7a6335"/>`,
   longsword:()=>`<path d="M32 3 L36 9 L36 42 L32 48 L28 42 L28 9 Z" fill="#9a9da2"/><path d="M32 5 L32 46" stroke="#d0d2d6" stroke-width="1.2"/><rect x="20" y="42" width="24" height="5" rx="2" fill="#4a3a20"/><rect x="29" y="47" width="6" height="11" fill="#33281a"/><circle cx="32" cy="60" r="3.2" fill="#8a7343"/>`,
   greatsword:()=>`<path d="M32 1 L38 8 L37 40 L32 47 L27 40 L26 8 Z" fill="#8b8e93"/><path d="M32 3 L32 45" stroke="#c4c6ca" stroke-width="1.4"/><rect x="17" y="41" width="30" height="6" rx="2" fill="#4a3a20"/><rect x="29" y="47" width="6" height="13" fill="#2e2416"/><circle cx="32" cy="61" r="3" fill="#8a7343"/>`,
@@ -837,6 +857,10 @@ const ITEM_ART={
   hboots:()=>`<path d="M18 8 L34 8 L34 36 L46 36 L50 52 L18 52 Z" fill="#75787c"/><path d="M18 44 L50 44" stroke="#4a4d50" stroke-width="3"/><path d="M20 16 L32 16 M20 26 L32 26" stroke="#4a4d50" stroke-width="2.6"/>`,
   lshield:()=>`<path d="M32 6 Q46 8 48 14 Q48 40 32 56 Q16 40 16 14 Q18 8 32 6 Z" fill="#6b4a2c"/><circle cx="32" cy="26" r="6" fill="#8a7343"/>`,
   hshield:()=>`<path d="M32 4 Q48 6 50 12 Q50 42 32 60 Q14 42 14 12 Q16 6 32 4 Z" fill="#6f7276"/><path d="M32 8 L32 54 M18 24 L46 24" stroke="#4a4d50" stroke-width="2.6"/><circle cx="32" cy="24" r="5" fill="#8f9296"/>`,
+  towershield:()=>`<path d="M18 4 L46 4 L48 50 Q40 60 32 60 Q24 60 16 50 Z" fill="#75787c"/>`+
+    `<path d="M22 4 L22 56 M42 4 L42 56" stroke="#4a4d50" stroke-width="2.2"/>`+
+    `<path d="M18 16 L46 16 M17 34 L47 34" stroke="#4a4d50" stroke-width="2.6"/>`+
+    `<circle cx="32" cy="25" r="4.5" fill="#8f9296"/><circle cx="26" cy="9" r="1.6" fill="#3a3d40"/><circle cx="38" cy="9" r="1.6" fill="#3a3d40"/>`,
   ring:()=>`<circle cx="32" cy="36" r="15" fill="none" stroke="#a8894a" stroke-width="6"/><path d="M26 18 L32 8 L38 18 L32 24 Z" fill="#7aa0c0"/>`,
   amulet:()=>`<path d="M14 10 Q32 30 50 10" fill="none" stroke="#8a7343" stroke-width="3.4"/><circle cx="32" cy="34" r="10" fill="#5a4a70"/><circle cx="32" cy="34" r="4.5" fill="#9a86c8"/>`,
   // stat gear: winged boots, a gemmed circlet, and two amulets whose stones
@@ -856,6 +880,21 @@ const ITEM_ART={
     `<path d="M32 24 L32 29" stroke="#8a7343" stroke-width="3"/>`+
     `<path d="M32 33 Q36 26 42 30 Q47 35 32 50 Q17 35 22 30 Q28 26 32 33 Z" fill="#a83030"/>`+
     `<path d="M26 32 Q28 29 31 31" stroke="#d87a7a" stroke-width="2" fill="none"/>`,
+  // fortune wears a clover-green stone, free action an unbroken silver band,
+  // proof a stoppered charm, and the sunstone its own little sun
+  ringfort:()=>`<circle cx="32" cy="36" r="15" fill="none" stroke="#a8894a" stroke-width="6"/>`+
+    `<circle cx="32" cy="14" r="6.5" fill="#4a9a50"/><path d="M29 12 Q32 9 35 12 Q32 16 29 12 Z" fill="#7fd17f"/>`,
+  ringfree:()=>`<circle cx="32" cy="34" r="16" fill="none" stroke="#b9c2cc" stroke-width="6"/>`+
+    `<circle cx="32" cy="34" r="9.5" fill="none" stroke="#7d8794" stroke-width="2"/>`+
+    `<path d="M20 15 Q26 8 32 12 M44 15 Q38 8 32 12" fill="none" stroke="#d8dee6" stroke-width="2.4"/>`,
+  periaptproof:()=>`<path d="M16 8 Q32 26 48 8" fill="none" stroke="#8a7343" stroke-width="3.4"/>`+
+    `<path d="M32 24 L32 29" stroke="#8a7343" stroke-width="3"/>`+
+    `<path d="M32 29 Q42 31 42 41 Q42 52 32 54 Q22 52 22 41 Q22 31 32 29 Z" fill="#3e6a4a"/>`+
+    `<path d="M27 37 L37 37 M32 32 L32 48" stroke="#9adf9a" stroke-width="2.4"/>`,
+  sunstone:()=>`<path d="M16 8 Q32 26 48 8" fill="none" stroke="#8a7343" stroke-width="3.4"/>`+
+    `<path d="M32 24 L32 29" stroke="#8a7343" stroke-width="3"/>`+
+    `<circle cx="32" cy="40" r="8.5" fill="#e8b83a"/><circle cx="32" cy="40" r="4" fill="#ffe9a8"/>`+
+    `<path d="M32 26 L32 30 M32 50 L32 54 M18 40 L22 40 M42 40 L46 40 M22 30 L25 33 M42 50 L39 47 M22 50 L25 47 M42 30 L39 33" stroke="#e8b83a" stroke-width="2.2"/>`,
   potion:(tint)=>`<path d="M28 8 L36 8 L36 20 Q46 26 46 40 Q46 54 32 54 Q18 54 18 40 Q18 26 28 20 Z" fill="#3a4a52"/><path d="M22 38 Q22 30 30 25 L34 25 Q42 30 42 38 Q42 49 32 49 Q22 49 22 38 Z" fill="${tint||'#a33'}"/><rect x="27" y="4" width="10" height="6" rx="2" fill="#6a5432"/>`,
   scroll:()=>`<rect x="18" y="10" width="28" height="44" rx="3" fill="#c9b98a"/><rect x="14" y="6" width="36" height="8" rx="4" fill="#8a7040"/><rect x="14" y="50" width="36" height="8" rx="4" fill="#8a7040"/><path d="M24 22 L40 22 M24 30 L40 30 M24 38 L36 38" stroke="#5a4a28" stroke-width="2"/>`,
   wand:()=>`<rect x="28" y="10" width="7" height="46" rx="3" fill="#5a3c60" transform="rotate(20 32 32)"/><circle cx="24" cy="12" r="5" fill="#b48ae0"/><path d="M14 6 L18 10 M30 2 L28 8 M12 18 L18 16" stroke="#b48ae0" stroke-width="2"/>`,
@@ -1694,11 +1733,20 @@ function itemDesc(it){
     let s=`Weapon: ${def.dmg[0]}d${def.dmg[1]}${it.bonus?'+'+it.bonus:''} dmg, crit ${def.crit[0]===20?'20':def.crit[0]+'–20'}/×${def.crit[1]}.`;
     if(def.ranged)s+=` Ranged (${def.ranged} tiles).`;
     if(def.reach)s+=' Reach: strikes from the back row.';
+    if(def.finesse)s+=' Finesse: attacks with DEX when it is the better hand.';
     if(def.hands===2)s+=' Two-handed.';
     if(it.bonus)s+=` +${it.bonus} to attack and damage.`;
     return s+dtypeNote(def)+affixDesc(it);
   }
-  if(def.kind==='shield')return `Shield: +${def.ac+it.bonus} AC (off hand).`+affixDesc(it);
+  if(def.kind==='shield'){
+    let s=`Shield: +${def.ac+it.bonus} AC (off hand).`;
+    if(def.maxDex<99)s+=` Max DEX bonus ${def.maxDex}.`;
+    return s+affixDesc(it);
+  }
+  if(def.luck)return `Worn: +${Math.min(3,Math.max(1,it.bonus||0))} luck on every saving throw.`+affixDesc(it);
+  if(def.freedom)return 'Worn: the wearer cannot be paralysed or held.'+affixDesc(it);
+  if(def.proof)return 'Worn: proof against poison and disease.'+affixDesc(it);
+  if(def.light)return 'Worn: the torchlight reaches farther while anyone carries it.'+affixDesc(it);
   if(def.boost){
     const tail={
       dex:" Feeds AC (within the armour's DEX cap), Reflex saves and ranged attacks.",
@@ -1725,7 +1773,8 @@ function itemDesc(it){
   if(def.kind==='key')return 'Opens a locked door somewhere on this level.';
   return '';
 }
-const MELEE_KEYS=['shortsword','longsword','mace','warhammer','staff','greatsword','sledge','spear'];
+const MELEE_KEYS=['shortsword','longsword','mace','warhammer','staff','greatsword','sledge','spear',
+  'dagger','rapier','battleaxe','greataxe','halberd'];
 const RANGED_KEYS=['shortbow','longbow','crossbow','sling'];
 const SCROLLABLE=()=>Object.keys(SPELLS).filter(k=>SPELLS[k].circle<=3);
 const WANDABLE=['magicmissile','burninghands','scorchingray','clw','cmw','searinglight','acidarrow'];
@@ -1792,7 +1841,7 @@ function randLoot(depth,rich,noPotion,noRation){
     // earns a drop slot only where the bonus ladder usually enchants it.
     const pool=depth<3?['padded','lightarmor','studded','lhelm','lboots','lshield']:
       depth<7?['padded','lightarmor','studded','chainshirt','hide','scalemail','medarmor','lhelm','hhelm','lboots','hboots','lshield','hshield']:
-      ['robe','studded','chainshirt','scalemail','medarmor','heavyarmor','hhelm','hboots','hshield'];
+      ['robe','studded','chainshirt','scalemail','medarmor','heavyarmor','hhelm','hboots','hshield','towershield'];
     return mkItem(pick(pool),{bonus:gbon(),affix:rollAffix(depth,rich,ARMOR_AFFIXES)});
   }
   if(kind==='scroll'){
@@ -1802,11 +1851,15 @@ function randLoot(depth,rich,noPotion,noRation){
     return mkItem('scroll',{spell:pick(SCROLLABLE())});
   }
   if(kind==='wand')return mkItem('wand',{spell:pick(WANDABLE),charges:roll(2,6,3)});
-  // trinket: an AC piece or one of the worn stat boosters. Stat tiers stop at
-  // bonus 3 (+6, the 3.5 ceiling) even where the deep hoard ladder rolls higher
-  const t=pick(['ringprot','amuletnat','bootsagi','circletint','periaptwis','amuhealth']);
+  // trinket: an AC piece, a stat booster, luck, light, or — from depth 8, where
+  // ghouls and ropers live — the immunity prizes. Stat and luck tiers stop at
+  // bonus 3 even where the deep hoard ladder rolls higher; the flat-property
+  // pieces (freedom, proof, sunstone) carry no plus at all.
+  const tpool=['ringprot','amuletnat','bootsagi','circletint','periaptwis','amuhealth','ringfort','sunstone'];
+  if(depth>=8)tpool.push('ringfree','periaptproof');
+  const t=pick(tpool),td=ITEM_DEFS[t];
   const tb=Math.max(1,gbon());
-  return mkItem(t,{bonus:ITEM_DEFS[t].boost?Math.min(3,tb):tb,
+  return mkItem(t,{bonus:(td.boost||td.luck)?Math.min(3,tb):(td.freedom||td.proof||td.light)?0:tb,
     affix:rollAffix(depth,rich,ARMOR_AFFIXES)});
 }
 
@@ -2557,10 +2610,22 @@ function spendPrepared(ch,key){
   row.splice(i,1);return true;
 }
 function charSlots(ch){return slotsFor(ch.cls,ch.level,abilScore(ch,casterAbil(ch)));}
+// the worn piece whose DEX cap is actually biting — body armour or a shield
+// (only the tower shield carries a cap). Null when nothing caps.
+function dexCapItem(ch){
+  let capDef=null;
+  for(const s of ['armor','lhand','rhand']){
+    const it=ch.equip[s];
+    if(!it)continue;
+    const d=ITEM_DEFS[it.base];
+    if(s!=='armor'&&d.kind!=='shield')continue;
+    if((d.maxDex??99)<99&&(!capDef||d.maxDex<capDef.maxDex))capDef=d;
+  }
+  return capDef;
+}
 function dexACBonus(ch){
-  let maxDex=99;
-  const ar=ch.equip.armor;if(ar)maxDex=Math.min(maxDex,ITEM_DEFS[ar.base].maxDex);
-  return clamp(abilMod(ch,'dex'),-5,maxDex);
+  const cap=dexCapItem(ch);
+  return clamp(abilMod(ch,'dex'),-5,cap?cap.maxDex:99);
 }
 function charAC(ch){
   let ac=10+dexACBonus(ch);
@@ -2581,7 +2646,12 @@ function charSaves(ch){
   let f=saveOf(c.fort,ch.level)+abilMod(ch,'con'),
       rf=saveOf(c.ref,ch.level)+abilMod(ch,'dex'),
       w=saveOf(c.will,ch.level)+abilMod(ch,'wis');
-  const all=(r.allSaves||0)+(c.grace?Math.max(0,mod(ch.abil.cha)):0)-ch.negLevels;
+  let all=(r.allSaves||0)+(c.grace?Math.max(0,mod(ch.abil.cha)):0)-ch.negLevels;
+  // a worn luck bonus (ring of fortune) rides on every save, tier capped like stat gear
+  for(const s of ['ring1','ring2']){
+    const it=ch.equip[s];
+    if(it&&ITEM_DEFS[it.base].luck)all+=Math.min(3,Math.max(1,it.bonus||0));
+  }
   for(const b of ch.buffs)if(b.saves){f+=b.saves;rf+=b.saves;w+=b.saves;}
   if(isRaging(ch))w+=2;
   return {fort:f+all,ref:rf+all,will:w+all};
@@ -2611,7 +2681,11 @@ function weaponOf(ch,slot){
 }
 function attackBonus(ch,wDef,wIt,offhand){
   let b=babOf(ch.cls,ch.level)-ch.negLevels;
-  b+=wDef.ranged?abilMod(ch,'dex'):abilMod(ch,'str');
+  // a finesse blade is worked with DEX when that is the better hand; damage
+  // stays STR in damageMod, as 3.5 has it
+  b+=wDef.ranged?abilMod(ch,'dex')
+    :wDef.finesse?Math.max(abilMod(ch,'str'),abilMod(ch,'dex'))
+    :abilMod(ch,'str');
   if(RACES[ch.race].small)b+=1;
   if(wIt)b+=wIt.bonus;
   for(const bf of ch.buffs)if(bf.atk)b+=bf.atk;
@@ -2693,9 +2767,14 @@ function attackCooldown(ch,wDef){
   return cd;
 }
 function hasCond(ch,kind){return ch.conditions.some(c=>c.kind===kind);}
+function equipHas(ch,prop){
+  for(const k in ch.equip){const it=ch.equip[k];if(it&&ITEM_DEFS[it.base][prop])return true;}
+  return false;
+}
 function addCond(ch,cond){
   if(cond.kind==='sleep'&&RACES[ch.race].sleepImmune)return false;
-  if((cond.kind==='paralysis'||cond.kind==='hold')&&ch.buffs.some(b=>b.freedom))return false;
+  if((cond.kind==='paralysis'||cond.kind==='hold')&&(ch.buffs.some(b=>b.freedom)||equipHas(ch,'freedom')))return false;
+  if((cond.kind==='poison'||cond.kind==='disease')&&equipHas(ch,'proof'))return false;
   const ex=ch.conditions.find(c=>c.kind===cond.kind);
   if(ex){ex.dur=Math.max(ex.dur||0,cond.dur||0);return true;}
   ch.conditions.push(cond);
@@ -4467,7 +4546,15 @@ function updateCamera(now){
   R3.torch.position.set(tx,EYE+0.1,tz);
   R3.torchFill.position.set(R3.camera.position.x+shx,EYE-0.05,R3.camera.position.z);
   const flicker=Math.sin(now/90)*0.08+Math.sin(now/37)*0.05+Math.random()*0.06;
-  R3.torch.intensity=R3.torchBase*(1+flicker);
+  // a worn sunstone pushes the light out further and lifts it a little;
+  // strongest stone in the party counts, they do not stack
+  let lb=0;
+  if(G.party)for(const ch of G.party)if(!ch.dead)for(const k in ch.equip){
+    const it=ch.equip[k];
+    if(it&&ITEM_DEFS[it.base].light)lb=Math.max(lb,ITEM_DEFS[it.base].light);
+  }
+  R3.torch.distance=11+lb*2;
+  R3.torch.intensity=R3.torchBase*(1+flicker)*(1+lb*0.12);
   R3.torchFill.intensity=0.9*(1+flicker*0.6);
   // crypt candles guttering, each on its own phase so they don't pulse together
   for(let i=0;i<R3.candleFlames.length;i++){
@@ -4943,6 +5030,9 @@ function checkPartyWipe(){
   }
 }
 function applyPoison(ch,p){
+  // a worn proof (the periapt) turns the venom before it ever drains anything —
+  // this path pushes its condition directly, so addCond's gate can't cover it
+  if(equipHas(ch,'proof')){UI.float(ch,'proof!','#7fd17f');return;}
   const rolled=roll(p.dice[0],p.dice[1]);
   const before=ch.abilDmg[p.abil];
   // an ability can never be driven below 1, so the amount that actually sticks
@@ -5749,8 +5839,8 @@ function monsterSpecials(m,ch){
     const sv=charSaves(ch).fort,nat=d20(),made=nat+sv>=sp.disease.dc;
     logSave(ch.name,m.name+"'s "+sp.disease.name,nat,sv,sp.disease.dc,made,made?'':'diseased');
     if(!made&&!hasCond(ch,'disease')){
-      addCond(ch,{kind:'disease',name:sp.disease.name});
-      UI.toast(ch.name+' contracts '+sp.disease.name+'!');
+      if(addCond(ch,{kind:'disease',name:sp.disease.name}))UI.toast(ch.name+' contracts '+sp.disease.name+'!');
+      else UI.float(ch,'proof!','#7fd17f');
     }
   }
   if(sp.paralysis){
@@ -5779,9 +5869,10 @@ function monsterSpecials(m,ch){
     const sv=charSaves(ch).ref,nat=d20(),made=nat+sv>=sp.hold.dc;
     logSave(ch.name,m.name+"'s tendrils",nat,sv,sp.hold.dc,made,made?'':'held');
     if(!made&&!hasCond(ch,'hold')){
-      addCond(ch,{kind:'hold',dur:sp.hold.dur});
-      UI.float(ch,'snared!','#c8b070');
-      UI.toast('Tendrils cinch tight around '+ch.name+'!');
+      if(addCond(ch,{kind:'hold',dur:sp.hold.dur})){
+        UI.float(ch,'snared!','#c8b070');
+        UI.toast('Tendrils cinch tight around '+ch.name+'!');
+      }else UI.float(ch,'slips free!','#7fd1c0');
     }
   }
   if(sp.energyDrain){
@@ -7338,10 +7429,9 @@ const UI=(()=>{
     // Heavy armour eats the nimbleness it is worth, and the number it takes is
     // invisible inside an AC total: a DEX 18 fighter in full plate carries +1 of
     // their +4 and nothing on the screen used to say so.
-    const rawDex=abilMod(ch,'dex'), usedDex=dexACBonus(ch), armIt=ch.equip.armor;
-    const armDef=armIt?ITEM_DEFS[armIt.base]:null;
-    const acNote=(armDef&&usedDex<rawDex)
-      ? ` <span class="dim-note">(DEX ${fmtMod(usedDex)} of ${fmtMod(rawDex)} — ${armDef.name} caps it at ${fmtMod(armDef.maxDex)})</span>`
+    const rawDex=abilMod(ch,'dex'), usedDex=dexACBonus(ch), capDef=dexCapItem(ch);
+    const acNote=(capDef&&usedDex<rawDex)
+      ? ` <span class="dim-note">(DEX ${fmtMod(usedDex)} of ${fmtMod(rawDex)} — ${capDef.name} caps it at ${fmtMod(capDef.maxDex)})</span>`
       : '';
     let extra='';
     const c=CLASSES[ch.cls];
