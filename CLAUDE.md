@@ -326,9 +326,19 @@ correctly on creatures of very different proportions without a coordinate table
 per creature. Anything random is seeded, because a frame that reshuffles between
 poses flickers.
 
-All 36 shallow-tier creatures carry an entry. The goblin, orc and hobgoblin are
-detailed **inline in their own entries** instead and are deliberately absent
-from the table.
+**All 78 creatures are covered**: 75 carry a `MONSTER_DETAIL` entry, and the
+goblin, orc and hobgoblin are detailed **inline in their own entries** instead
+and are deliberately absent from the table.
+
+`boneDetail` (ribs, sternum, low contrast because the creatures are already
+pale) and the two hair generators came in with the deep tier. **`hairCrown` and
+`hairFall` exist because hair is read from the separations BETWEEN locks, not
+from its outline** — drow hair was one flat pale fill with two thick strokes and
+read as a moulded helmet at any size. Two things to know if you touch them: the
+crown strands must start already spread across the top of the band rather than
+gathered at a point, because a drow's face is a cut-out in the middle of the
+hair mass and a fan from the centre sweeps strands across it; and `ry` is the
+drop to the hairline, not to the chin.
 
 Two things learned by looking rather than reasoning:
 
@@ -341,8 +351,13 @@ Two things learned by looking rather than reasoning:
   row of verticals they landed across the middle of the cap and read as a row of
   teeth on the shrieker and the myconid guard.
 
-Detail is geometry rather than filters, so it is nearly free at raster time:
-24.6ms → 25.7ms per first-raster for the whole pass. Check two things when
+Detail is geometry rather than filters, so it is cheap but not free: 24.6ms
+plain → 25.7ms after the shallow tier → **31.1ms** with the deep tier on top.
+At six creature kinds a floor that is about a second of rasterising, which is
+why `prewarmMonsterFrames` no longer does it in one block — only `idle0` is
+forced up front and the other five poses drain a couple at a time through
+`requestIdleCallback`. Anything the player reaches before its turn comes up
+still rasterises lazily on first use, exactly as it always did. Check two things when
 adding more — that it reads at the size it is actually seen (an in-game capture
 at two tiles, not just a large sheet), and that no stroke leaves the 64-unit
 viewBox. Note when checking the latter that `hideDetail` emits relative
