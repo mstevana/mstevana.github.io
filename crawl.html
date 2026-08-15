@@ -5814,6 +5814,40 @@ function fxHailTex(){
   R3.texCache[key]=tex;return tex;
 }
 
+
+/* the flame-strike pillar: tongues of fire drawn tall, wrapped around a
+   cylinder. Edge columns stay transparent so the wrap seam reads as a gap
+   between flame sheets rather than a cut tongue. */
+function fxPillarTex(core){
+  const key='fx_pillar'+(core?'_c':'');
+  if(R3.texCache[key])return R3.texCache[key];
+  const cv=document.createElement('canvas');cv.width=256;cv.height=256;
+  const ctx=cv.getContext('2d');
+  const tongue=(x0,w,top,c0,c1)=>{
+    const g=ctx.createLinearGradient(0,250,0,top);
+    g.addColorStop(0,c0);g.addColorStop(1,c1);
+    ctx.fillStyle=g;
+    ctx.beginPath();ctx.moveTo(x0-w,252);
+    ctx.bezierCurveTo(x0-w*1.1,170,x0-w*0.3,110,x0+(w*0.2),top);
+    ctx.bezierCurveTo(x0+w*0.55,116,x0+w*1.05,180,x0+w,252);
+    ctx.closePath();ctx.fill();
+  };
+  if(core){
+    for(const [x,w,t] of [[70,42,26],[128,50,10],[188,42,30]]){
+      tongue(x,w,t,'rgba(255,250,225,0.95)','rgba(255,240,190,0.05)');
+      tongue(x,w*0.55,t+34,'#fffdf2','rgba(255,252,235,0.3)');
+    }
+  }else{
+    for(const [x,w,t] of [[52,34,40],[98,40,16],[150,44,8],[204,34,34]]){
+      tongue(x,w,t,'rgba(196,53,16,0.9)','rgba(196,53,16,0)');
+      tongue(x,w*0.7,t+28,'#ff8c26','rgba(255,140,38,0.06)');
+      tongue(x,w*0.4,t+58,'#ffd23a','rgba(255,210,58,0.12)');
+    }
+  }
+  const tex=texFromCanvas(cv,{mipmap:false});
+  R3.texCache[key]=tex;return tex;
+}
+
 function initRenderer(){
   const cv=document.getElementById('view3d');
   R3.renderer=new THREE.WebGLRenderer({canvas:cv,antialias:false});
@@ -9296,6 +9330,36 @@ function bolt2dDraw(f,op){
   }
   ctx.globalAlpha=1;
 }
+/* PHB: flame strike — "a vertical column of divine fire roars downward." Two
+   counter-rotating open cylinders, orange tongues outside and a white sacred
+   core inside, descending from the ceiling to fill the tile in a sixth of a
+   second, roaring for half of one, then dying to a scorch ring. */
+function spawnFlameStrike(at,tiles){
+  const H=1.28;
+  const mk=(r,core)=>{
+    const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r*0.92,H,14,1,true),
+      new THREE.MeshBasicMaterial({map:fxPillarTex(core),transparent:true,depthWrite:false,
+        blending:THREE.AdditiveBlending,side:THREE.DoubleSide}));
+    m.position.set(at.x,H,at.z);
+    m.scale.y=0.01;
+    m.userData={kind:'fx'};
+    m.renderOrder=6;
+    R3.levelGroup.add(m);
+    return m;
+  };
+  const outer=mk(0.52,false),inner=mk(0.28,true);
+  G.fx.push({kind:'column',outer,inner,t:0,dur:0.9,H});
+  // the scorch: the fireball's racing disk, held to the column's one-tile reach
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),
+    new THREE.MeshBasicMaterial({map:fxFireDiskTex(),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+  mesh.rotation.x=-Math.PI/2;
+  mesh.position.set(at.x,0.04,at.z);
+  mesh.renderOrder=5;
+  mesh.userData={kind:'fx'};
+  R3.levelGroup.add(mesh);
+  G.fx.push({kind:'disk',spr:mesh,t:0,dur:0.8,s1:SPELLS.flamestrike.area.r*2+1.2});
+  if(tiles&&tiles.size)spawnFlameTiles(tiles,6);
+}
 /* PHB: ice storm — "great magical hailstones pound down", a cylinder of hail
    over the whole disc. Conjured from above: storm-mist gathers at the ceiling,
    thirty-odd hailstones hammer down across the footprint over half a second,
@@ -9504,6 +9568,22 @@ function updateFx(dt){
         const k=f.t/f.dur;
         wedge2dDraw(f,k<0.35?1:1-(k-0.35)/0.65);
       }
+    }else if(f.kind==='column'){
+      f.t+=dt;
+      if(f.t>=f.dur){R3.levelGroup.remove(f.outer);R3.levelGroup.remove(f.inner);G.fx.splice(G.fx.indexOf(f),1);}
+      else{
+        const k=f.t/f.dur;
+        const e=Math.min(1,f.t/0.16);                 // the descent
+        const puls=1+Math.sin(f.t*26)*0.05;
+        for(const m of [f.outer,f.inner]){
+          if(!m.scale)break;                          // node harness
+          m.scale.y=Math.max(0.01,e);
+          m.scale.x=m.scale.z=puls;
+          m.position.y=f.H-(f.H*e)/2;
+          if(m.rotation)m.rotation.y+=(m===f.inner?-2.2:1.4)*dt;
+          if(m.material)m.material.opacity=k<0.6?1:1-(k-0.6)/0.4;
+        }
+      }
     }else if(f.kind==='hail'){
       f.t+=dt;
       if(f.t>=f.T){R3.levelGroup.remove(f.spr);G.fx.splice(G.fx.indexOf(f),1);}
@@ -9624,6 +9704,16 @@ const SPELL_IMPACT={
       spawnBurst({x:p.x+dx/d*0.4,y:p.y,z:p.z+dz/d*0.4},'#bfe8ff',1.3);
     }
   },
+  flamestrike:(at,tiles,color,foes)=>{
+    spawnFlameStrike(at,tiles);
+    spawnFlash(at,'#ffd890',3.2,0.7);
+    R3.shake=Math.max(R3.shake,0.22);
+    if(foes)for(const m of foes){
+      const p=monsterAim(m),cp=R3.camera.position;
+      const ddx=cp.x-p.x,ddz=cp.z-p.z,d=Math.hypot(ddx,ddz)||1;
+      spawnBurst({x:p.x+ddx/d*0.4,y:p.y,z:p.z+ddz/d*0.4},'#ffcf70',1.2,0.12);
+    }
+  },
   icestorm:(at,tiles,color,foes)=>{
     spawnIceStorm(at,tiles);
     spawnFlash(at,'#bfe8ff',3,0.8);
@@ -9645,7 +9735,7 @@ const SPELL_IMPACT={
   },
 };
 // spells that resolve the instant they are cast, with no projectile at all
-const SPELL_INSTANT={lightning:true,conecold:true,icestorm:true};
+const SPELL_INSTANT={lightning:true,conecold:true,icestorm:true,flamestrike:true};
 /* ---------- conditions & buffs tick ---------- */
 let bleedTimer=0,poisonTimer=0;
 function updateParty(dt){
