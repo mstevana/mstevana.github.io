@@ -498,6 +498,19 @@ three themes carry real machinery:
   - **A stalactite handed `ceilTex` directly gets a flat wash.** `repeat` lives
     on the texture, not the material, and `ceilTex` carries `(L.w, L.h)` for
     the one big ceiling plane. It needs a clone with `repeat` back at 1.
+  - **Painting the emissive map is a second, separate job.** `em` is its own
+    canvas, so anything drawn over the frieze on the colour map does *not* hide
+    the frieze's light: the first pilaster had the inscription burning straight
+    through the column. Whatever covers the frieze band has to punch `em` black
+    at the same three `wrapX` offsets — and **fade rather than cut**, because a
+    glyph clipped mid-stroke leaves a bright vertical sliver just outside the
+    punched rectangle.
+  - **A thing that stands out of a wall is read by its body, not its highlight.**
+    The `variant%4===1` pilaster was two silver hairlines eight pixels apart with
+    no shaft between them, no capital and no plinth, run full height straight
+    through the frieze. It read as two stray scratches in the texture — which is
+    exactly how it was reported. It needs a shaded shaft, a shadow thrown onto
+    the brick beside it, mouldings top and bottom, and the frieze stopping at it.
 
 Search for `theme.name==='Sewers'`, `th.name==='Crypt'`, `th.name==='Caves'`,
 `th.name==='Duergar'`, `th.name==='Myconid'` and `th.name==='Drow'`

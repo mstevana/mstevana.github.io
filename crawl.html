@@ -4711,16 +4711,68 @@ function drowWallCanvas(th,variant,base){
   let sd=(variant*2654435761)>>>0;
   const rr=()=>{sd=(sd*1664525+1013904223)>>>0;return sd/4294967296;};
   if(variant%4===1){
-    // a pilaster strip: two silver lines run floor to ceiling past the frieze
-    const px=(variant%8<4?0.30:0.70)*128;
+    /* An engaged pilaster: a shallow shaft standing proud of the wall, with a
+       spread capital under the roof and a plinth at the floor.
+
+       This was two silver hairlines four pixels either side of a centre line and
+       nothing else — no shaft between them, no capital, no base — so it read as
+       a pair of stray vertical scratches in the texture rather than as a column.
+       A thing that stands out of a wall is recognised by the body that throws
+       the shadow, not by the highlight down its arris. */
+    const px=(variant%8<4?0.30:0.70)*128, W=15, x0=px-W/2, x1=px+W/2;
     wrapX(()=>{
-      for(const d of [-4,4]){
-        ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=2;
-        ctx.beginPath();ctx.moveTo(px+d+0.6,0);ctx.lineTo(px+d+0.6,128);ctx.stroke();
-        ctx.strokeStyle=silver;ctx.lineWidth=0.9;
-        ctx.beginPath();ctx.moveTo(px+d,0);ctx.lineTo(px+d,128);ctx.stroke();
+      // the shadow the shaft throws onto the brick beside it
+      const sh=ctx.createLinearGradient(x1,0,x1+7,0);
+      sh.addColorStop(0,'rgba(0,0,0,0.55)');sh.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=sh;ctx.fillRect(x1,0,7,128);
+      // the shaft, lit from the left the way every brick on this wall is. It
+      // covers the frieze course outright, which is correct: a channel cannot
+      // run through a column, so the inscription stops either side of it.
+      const sg=ctx.createLinearGradient(x0,0,x1,0);
+      sg.addColorStop(0,shade(th.wall,-0.34));
+      sg.addColorStop(0.28,shade(th.wall,-0.15));
+      sg.addColorStop(1,shade(th.wall,-0.48));
+      ctx.fillStyle=sg;ctx.fillRect(x0,0,W,128);
+      // capital and plinth: stacked fillets, each a little wider than the shaft
+      const block=(y,h,g)=>{
+        ctx.fillStyle=shade(th.wall,-0.21);ctx.fillRect(x0-g,y,W+g*2,h);
+        ctx.fillStyle='rgba(206,214,236,0.13)';ctx.fillRect(x0-g,y,W+g*2,0.8);
+        ctx.fillStyle='rgba(0,0,0,0.45)';ctx.fillRect(x0-g,y+h-0.9,W+g*2,0.9);
+      };
+      block(5,3.2,1.8);block(0,5,3.6);            // capital, widening into the roof
+      block(116.8,3.2,1.8);block(120,8,3.6);      // plinth, widening onto the floor
+      // silver fillets down the two arrises: the flourish the old strip was
+      for(const fx of [x0+1.6,x1-1.6]){
+        ctx.save();ctx.globalAlpha=0.7;ctx.strokeStyle=silver;ctx.lineWidth=0.9;
+        ctx.beginPath();ctx.moveTo(fx,8.5);ctx.lineTo(fx,116.5);ctx.stroke();ctx.restore();
       }
+      // and a boss set on the shaft where the frieze meets it, so the line of
+      // script arrives somewhere rather than simply stopping
+      const by=base.fy+base.fh/2;
+      ctx.strokeStyle='rgba(0,0,0,0.55)';ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(px+0.5,by+0.5,3.7,0,7);ctx.stroke();
+      ctx.strokeStyle=silver;ctx.lineWidth=1;
+      ctx.beginPath();ctx.arc(px,by,3.7,0,7);ctx.stroke();
     });
+    /* The emissive sheet is a separate canvas, so painting the shaft onto the
+       colour map does not hide the frieze's glow: without this the inscription
+       goes on burning straight through the column. Punch it back to black under
+       the shaft, at the same three offsets wrapX used. */
+    for(const ox of [-128,0,128]){
+      em.ctx.fillStyle='#000';em.ctx.fillRect(x0+ox-2,0,W+4,128);
+      /* A hard edge is not enough on its own: the glyph the column lands on is
+         cut mid-stroke, and whatever survives outside the shaft is left as a
+         bright vertical sliver — the very thing this branch is being fixed for.
+         So the light dies off over a few pixels either side instead. */
+      for(const [fx,a0,a1] of [[x1+ox+2,1,0],[x0+ox-9,0,1]]){
+        const g=em.ctx.createLinearGradient(fx,0,fx+7,0);
+        g.addColorStop(0,`rgba(0,0,0,${a0})`);g.addColorStop(1,`rgba(0,0,0,${a1})`);
+        em.ctx.fillStyle=g;em.ctx.fillRect(fx,0,7,128);
+      }
+      const by=base.fy+base.fh/2;                 // the boss catches a little of it
+      em.ctx.save();em.ctx.globalAlpha=0.5;em.ctx.strokeStyle=col;em.ctx.lineWidth=1.6;
+      em.ctx.beginPath();em.ctx.arc(px+ox,by,3.7,0,7);em.ctx.stroke();em.ctx.restore();
+    }
   }else if(variant%4===2){
     // a house sigil cut into the lower courses: a ring with radiating legs,
     // struck in the same curved hand as the script
