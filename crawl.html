@@ -588,7 +588,12 @@ const MONSTERS={
              paralysis:{dc:12,dur:6}},
   gnoll:    {dungeon:true, reach:true, name:'Gnoll',         cr:1,  hp:11, ac:15,atk:3, dmg:[1,8,2], xp:300, speed:1.3, type:'humanoid', spr:'gnoll'},
   bugbear:  {dungeon:true, name:'Bugbear',       cr:2,  hp:16, ac:17,atk:5, dmg:[1,8,2], xp:600, speed:1.3, type:'humanoid', spr:'bugbear'},
-  ogre:     {reach:true, name:'Ogre',          cr:3,  hp:29, ac:16,atk:8, dmg:[2,8,7], xp:900, speed:1.6, type:'giant', spr:'ogre'},
+  // The last unflagged creature in the bestiary, and it could not stay that way:
+  // a theme fields its own roster now, so a creature belonging to no roster would
+  // simply never be placed. Caves is the right home — an ogre dens in the rock —
+  // and the band is widened by two so it covers the whole of the Caves block at
+  // 10-12 rather than only touching its first floor.
+  ogre:     {reach:true, cave:true, name:'Ogre',cr:3,  hp:29, ac:16,atk:8, dmg:[2,8,7], xp:900, speed:1.6, type:'giant', spr:'ogre'},
   wight:    {name:'Wight',         cr:3,  hp:26, ac:15,atk:4, dmg:[1,4,1], xp:900, speed:1.4, type:'undead', spr:'wight',
              energyDrain:1},
   wightnec: {name:'Wight necromancer',cr:4,hp:30,ac:15,atk:4, dmg:[1,4,1], xp:1200,speed:1.5, type:'undead', spr:'wightnec',
@@ -836,7 +841,7 @@ const MONSTERS={
 const SPAWN_DEPTH={
   rat:[1,6],kobold:[1,2],koboldsl:[1,3],goblin:[1,3],skeleton:[1,4],skelarcher:[2,5],zombie:[2,5],
   hobgoblin:[2,5],orc:[2,5],gobshaman:[3,6],spider:[3,7],ghoul:[3,7],gnoll:[3,7],bugbear:[3,8],
-  ogre:[6,10],wight:[6,11],wightnec:[8,13],minotaur:[8,13],troll:[10,28],ogremage:[13,99],dragon:[15,99],
+  ogre:[6,12],wight:[6,11],wightnec:[8,13],minotaur:[8,13],troll:[10,28],ogremage:[13,99],dragon:[15,99],
   mummy:[10,20],wraith:[12,24],barrowwight:[13,26],bonecolossus:[16,32],deathknight:[20,99],lich:[22,99],bonedrake:[26,99],
   piercer:[8,18],cavebear:[8,18],troglodyte:[8,18],crawler:[9,20],cavefisher:[12,26],otyugh:[14,28],
   umberhulk:[18,32],roper:[24,99],purpleworm:[30,99],
@@ -848,8 +853,12 @@ const SPAWN_DEPTH={
   ochrejelly:[17,28],scrag:[20,32],blackpud:[22,34],wereblade:[23,34],
   // the legion, built for the deep Dungeon block at 22-24
   worgrider:[13,24],hobcaptain:[14,26],hobpriest:[17,29],ettin:[18,30],hillgiant:[20,32],stonegiant:[23,34],
-  duergar:[12,24],duergarxbow:[12,24],duergarscout:[14,28],
-  duergarpriest:[16,30],duergarrune:[19,34],duergarlord:[23,99],
+  // The duergar own depths 13-15, and only the warrior and the arbalest used to
+  // debut before 14, so with the roster restricted to its own floors those three
+  // levels were a two-creature floor repeated. The shadowblade and the stonepriest
+  // are pulled forward to open the block properly.
+  duergar:[12,24],duergarxbow:[12,24],duergarscout:[12,28],
+  duergarpriest:[14,30],duergarrune:[19,34],duergarlord:[23,99],
 };
 /* Elite templates. The bestiary runs out around depth 20, so past that the
    descent keeps escalating by hardening ordinary monsters rather than by
@@ -3127,7 +3136,30 @@ function tryGen(depth,targetWalk,theme){
   // of them should be, by favouring pool members whose threat sits near the
   // per-monster share. So a tight budget fills a floor with lesser creatures
   // rather than leaving it empty, and a generous one sends the big ones.
-  const nMon=Math.round(targetCount(depth))+rnd(3)-1;
+  /* ...but a floor cannot spend less than its lightest creature, and once each
+     theme fields only its own roster that stopped being a technicality. The
+     whole bestiary always held something cheap enough to pad a floor out with;
+     a single roster does not. Depth 12 is a cave whose lightest creature is
+     worth 48, and depth 13 opens the duergar block where the lightest thing
+     alive is 155 against a per-monster share of 60 — that floor was placing
+     twenty bodies for THREE TIMES its budget.
+
+     So the count gives way instead: work out how many of the lightest creature
+     the budget actually buys, and take that if it is fewer than the target. A
+     hall of duergar holds fewer of them, which is exactly what `rawBudget`'s
+     own comment has always claimed the design does. Where the roster has
+     something near the share — most floors — this buys more than the target
+     and changes nothing at all.
+
+     The floor under it stops a heavy roster from emptying a level out: below
+     this a big floor plan reads as abandoned rather than as dangerous. It also
+     bounds how much XP the rule can cost the party, which is the mechanism
+     that actually moves the descent. */
+  const COUNT_MIN_FRAC=0.55;
+  const lightest=themedPool(depth).reduce((a,[k])=>Math.min(a,threatOf(k,depth,null)),Infinity);
+  const afford=Math.round(threatBudget(depth)/Math.max(1e-6,lightest));
+  const target=Math.round(targetCount(depth));
+  const nMon=Math.max(Math.round(target*COUNT_MIN_FRAC),Math.min(target,afford))+rnd(3)-1;
   const share=threatBudget(depth)/Math.max(1,nMon);
   const ec=eliteChance(depth);
   // How closely a floor sticks to its per-monster share. Loosening it with
@@ -3145,24 +3177,11 @@ function tryGen(depth,targetWalk,theme){
   // Caves get the same treatment for the same reason: what lives in the rock
   // is heavily favoured underground and thinned to a stray elsewhere, so a cave
   // reads as its own place without the roster leaking into the brickwork.
-  // OFF is the off-theme thinning, and it has to get *stronger* as rosters are
-  // added, not stay put: a theme's x4 competes against every foreign roster at
-  // once, so each new one dilutes it. At 0.55 with five rosters a deep cave floor
-  // had fallen to 54% cave; 0.35 puts it back near where 0.55 held it with two,
-  // and costs four creature kinds at depth 40 (33 -> 29), which is nowhere near
-  // the monoculture the thinning exists to prevent.
-  const OFF=0.35;
-  const undeadBias=theme.name==='Crypt'?4:OFF;
-  const caveBias=theme.name==='Caves'?4:OFF;
-  const duerBias=theme.name==='Duergar'?4:OFF;
-  const mycoBias=theme.name==='Myconid'?4:OFF;
-  const drowBias=theme.name==='Drow'?4:OFF;
-  const sewBias=theme.name==='Sewers'?4:OFF;
-  const dunBias=theme.name==='Dungeon'?4:OFF;
-  const base=spawnPool(depth).map(([k,w])=>[k,
-    w*(MONSTERS[k].type==='undead'?undeadBias:1)*(MONSTERS[k].cave?caveBias:1)
-     *(MONSTERS[k].duergar?duerBias:1)*(MONSTERS[k].myconid?mycoBias:1)
-     *(MONSTERS[k].drow?drowBias:1)*(MONSTERS[k].sewers?sewBias:1)*(MONSTERS[k].dungeon?dunBias:1)]);
+  // A floor fields its own theme's roster and nothing else — see `themedPool`.
+  // This was seven bias constants, a x4 for the home roster against an OFF of
+  // 0.35 for every foreign one, which left every floor a majority of its own
+  // theme with a minority of everybody else's wandering through it.
+  const base=themedPool(depth);
   const weigh=(ek)=>base.map(([k,w])=>{
     const r=Math.log(threatOf(k,depth,ek)/share);
     return [k,w*Math.exp(-(r*r)/sig)];
@@ -3410,6 +3429,47 @@ function threatOf(key,depth,elite){ // the same score, without building the mons
 }
 // how many bodies a floor should hold, before strength is considered
 function targetCount(depth){return Math.min(30,11+depth*0.7);}
+/* ---- who belongs on a floor -----------------------------------------------
+   A theme fields its own roster and nothing else. This used to be a weighting
+   rather than a rule: a theme's creatures were multiplied by 4 and everybody
+   else's by OFF, so a crypt was mostly undead with a scattering of drow and
+   duergar wandering through it. `themeRoster` replaces the whole arrangement.
+
+   `THEME_FLAG` is the single place a theme's membership is defined, and it is
+   read by name. Undead are `type:'undead'` rather than a flag of their own —
+   the same test Turn Undead and the loot faucets use — and the rest carry a
+   boolean set on the definition.
+
+   `rawBudget` and `poolCeiling` deliberately do NOT read this. They keep
+   reading the whole `spawnPool`, so the difficulty curve stays the smooth,
+   authored, depth-only function it has always been. That was tried the other
+   way round first and it is worse: `threatBudget` is a CHAIN — each floor is
+   clamped to a step off the one above — so feeding it a pool that jumps every
+   three floors lets whichever theme happens to sit at depth 5 depress every
+   budget below it. Measured, the party arrived at depth 15 two levels short
+   (14.1 against 16.1) because the shallow floors it had been levelling on were
+   lighter, and the lower quartile of the descent fell from 24 to 21.
+
+   The budget says how hard a depth should be; the roster says who is on it;
+   and `nMon` below is what reconciles the two. */
+const THEME_FLAG={
+  Dungeon:m=>!!m.dungeon, Sewers:m=>!!m.sewers, Crypt:m=>m.type==='undead',
+  Caves:m=>!!m.cave, Duergar:m=>!!m.duergar, Myconid:m=>!!m.myconid, Drow:m=>!!m.drow,
+};
+function themeAt(depth){return THEMES[Math.floor((depth-1)/3)%THEMES.length];}
+function themedPool(depth){
+  const all=spawnPool(depth);
+  const f=THEME_FLAG[themeAt(depth).name];
+  if(!f)return all;
+  const own=all.filter(([k])=>f(MONSTERS[k]));
+  /* The fallback is a backstop and not a design: every theme's roster reaches
+     every floor that theme owns, because `spawnPool` never drops a creature
+     once its band has opened — past the band it lingers at a floor of 0.05
+     forever. A theme could only come up empty here at a depth *below* its
+     shallowest debut, which no theme has. If this ever fires, the roster has a
+     hole in it and the fix is in `SPAWN_DEPTH`, not here. */
+  return own.length?own:all;
+}
 // A floor's threat budget is stated relative to what its own pool contains, so
 // a floor of ogres holds fewer of them rather than three lonely giants. Total
 // threat still climbs steeply, because both the average monster and the body
@@ -8746,12 +8806,14 @@ function openCoffin(ci,slot){
   refreshCryptFeature(ci);
   const roll=Math.random();
   if(roll<0.20){
-    // the occupant is still in residence, and drawn from what this floor holds
-    // What climbs out of a grave is a grave's own. The off-weight has to track
-    // the bestiary's width the same way the crypt's placement bias does: at 0.25
-    // it held 87% undead with four rosters competing and 83% once the drow
-    // landed, which is a coffin turning into a lucky dip.
-    const pool=spawnPool(G.depth).map(([k,w])=>[k,w*(MONSTERS[k].type==='undead'?8:0.10)]);
+    /* The occupant is still in residence. What climbs out of a grave is a
+       grave's own, so this is a filter and not a weighting — it used to be an
+       8-against-0.10 bias that still let a live drow crawl out of a sarcophagus
+       one time in six. Coffins only exist on crypt floors, whose roster is now
+       undead outright, but the filter is kept explicit here rather than left to
+       `themedPool`: a coffin holds a corpse whatever floor it is standing on. */
+    const undead=spawnPool(G.depth).filter(([k])=>MONSTERS[k].type==='undead');
+    const pool=undead.length?undead:[['skeleton',1]];
     const spot=freeSlotAt(c.x,c.y,null)>=0?{x:c.x,y:c.y}
       :DIRS.map(([dx,dy])=>({x:c.x+dx,y:c.y+dy}))
            .find(p=>walkableTile(tileAt(p.x,p.y))&&freeSlotAt(p.x,p.y,null)>=0);
@@ -8816,7 +8878,8 @@ function summonHuntingPack(){
   const [hx,hy]=pick(spots);
   const n=2+rnd(2);
   for(let i=0;i<n&&i<TILE_CAP;i++){
-    const m=mkMonster(pickWeighted(spawnPool(G.depth)),hx,hy,G.depth);
+    // what comes for the camp is what lives on the floor, not the whole bestiary
+    const m=mkMonster(pickWeighted(themedPool(G.depth)),hx,hy,G.depth);
     if(Math.random()<eliteChance(G.depth))makeElite(m,pick(ELITE_KEYS));
     m.slot=i;m.awake=true;
     L.monsters.push(m);addMonsterSprite(m);

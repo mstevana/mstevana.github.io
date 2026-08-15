@@ -113,13 +113,23 @@ middle half 24–30**; moving boss floors to every third level took it to
 at **median 27, middle half 26–30**, the drow at **median 28, middle half
 25–29**, and the sewers roster at **median 27, middle half 24–29**.
 
-**26–30 is the band. Do not treat it as a shortfall.** CLAUDE.md carried an
-intended 30–40 for a long time and the game has never once hit it, which
+Restricting each theme to its own roster is the one change that has moved
+it: **median 26, middle half 21–28**, measured over 2000 descents against
+2000 on the version before it. That is a real cost and it is not a tuning
+error — see *A theme fields its own roster and nothing else* for what was
+tried. Most of it was recovered there (the first attempt read median 26 with
+the party arriving at depth 15 two levels short); what is left is that
+`threatOf` cannot see what makes a floor of nothing but drow harder than its
+score — AC, sleep poison, a line of casters — which is the same blind spot
+that hid the myconid speed bug.
+
+**Around 26 is the band. Do not treat it as a shortfall.** CLAUDE.md carried
+an intended 30–40 for a long time and the game has never once hit it, which
 kept inviting sessions to retune a curve that is working.
 
-No content pass has moved it, and each was checked the same way: removing
+No *content* pass has moved it, and each was checked the same way: removing
 coffin and ossuary fights from the simulation leaves the median unchanged,
-and so does skipping every ambush or flattening the cave bias to 1.
+and so does skipping every ambush.
 
 **Run the descent after adding a roster, not just the threat ratios.** The
 myconids measured 0.69–1.35 of their per-monster share — a clean roster by
@@ -154,9 +164,9 @@ Two rules fall out of it, and neither is the ratio-to-share guideline:
   the ratio at the band centre. Share is roughly the mean, so 2–3× share
   at a shallow depth is 2–3× the mean, and four such creatures move it.
 - **A themed roster's *mean* ratio matters more than any one creature's**,
-  because the ×4 bias makes it about half the bodies on its own floor. The
-  sewers' deep four averaged 1.20× share and put a depth-26 floor 22% over
-  budget against a 12% baseline; trimmed to a mean of 1.0 it came back.
+  because that roster is now *every* body on its own floor. The sewers' deep
+  four averaged 1.20× share and put a depth-26 floor 22% over budget against
+  a 12% baseline; trimmed to a mean of 1.0 it came back.
 
 Also worth knowing: **`poolCeiling` is a separate trap in the same area.**
 It reads the single heaviest creature a depth allows, so a new roster's top
@@ -415,26 +425,16 @@ three themes carry real machinery:
   position. The other themes keep the instanced per-tile plane, which shows
   the whole texture on every tile — fine for flagstones, but it restarts the
   pattern at each tile edge and prints a grid onto bare ground. Caves also
-  carry a ×4 spawn bias on `cave:true` creatures (×0.55 elsewhere) applied
-  **at placement only**, exactly like the crypt's, and an array of
-  **ambushers** in `L.lurkers`.
+  field `cave:true` creatures and nothing else (see *A theme fields its own
+  roster*), and carry an array of **ambushers** in `L.lurkers`.
 - **`Crypt`** — the most machinery of the three. Wall furniture in
   `L.crypts` (burial nooks with an anthropoid sarcophagus, a stacked pair,
   a 3×3 grid of inscribed tomb plaques, a candle on an iron bracket, an
   empty recess); an ossuary chamber in `L.ossuary` with bone-stacked walls
-  and a blocking bier; non-blocking floor dressing; and a ×4 undead spawn
-  bias applied **at placement only** (see the curve section — putting it
-  in `spawnPool` would taint `threatBudget`'s depth-keyed memo).
-
-  The counterweight is `OFF` in `tryGen`, the weight a roster gets on
-  somebody else's floor, and **it has to get stronger as rosters are added,
-  not stay put**: a theme's ×4 competes against every foreign roster at
-  once, so each new one dilutes it. At 0.55 with five rosters a deep cave
-  floor had fallen to 54% cave. It is 0.35 now, which puts that back where
-  0.55 held it with two, at a cost of four creature kinds at depth 40
-  (33 → 29). `openCoffin` carries its own version of the same constant and
-  needs the same treatment — it went 0.25 → 0.10 when the drow landed,
-  because at 0.25 a grave had become a lucky dip (83% undead).
+  and a blocking bier; non-blocking floor dressing; and a floor that fields
+  the undead and nobody else. `openCoffin` filters to `type:'undead'` on its
+  own account rather than leaning on the theme, because a coffin holds a
+  corpse whatever floor it is standing on.
 
 - **`Duergar`** — halls, not caves: the highest `roomBias` of any theme,
   because they are built. Eight wall variants over one shared base that
@@ -453,8 +453,7 @@ three themes carry real machinery:
   floor is gravel. The light is purple — `THEMES` carries `light` and `fill`
   for it, and `buildLevel` tints `R3.torch` from `th.light`, so a theme can
   now recolour the party's own lantern. Doors are dried stalks, roughly cut
-  and bolted. A ×4 `myconid:true` spawn bias, at placement only, like the
-  crypt's and the cave's.
+  and bolted. A floor of `myconid:true` creatures and nothing else.
 
   The stalks are drawn by sampling a wandering edge every 4 pixels with a
   per-stalk phase. At 16 the kinks landed at the same height in every stalk
@@ -530,9 +529,11 @@ tests that had depths hardcoded. They now ask by name — `depthOf(name)` and
 Two statistical checks were also sitting near their tolerances and had to
 be widened rather than relaxed (T22's packing, T29's crypt undead share);
 the crypt's share genuinely falls with each roster added, because each one
-widens the off-theme draw the 0.55 bias has to beat: with five rosters it
-measures 75–78% at depths 7–9 and 60–63% at 25–27, where the myconid bands
-sit right on top of it. Each writes an array onto the level (`rivers`/`pipes`,
+widened the off-theme draw the bias had to beat. Both are exact now — a
+theme fields its own roster and nothing else — so they assert 100% and 0%
+rather than a band, and cannot drift as rosters are added.
+
+Each theme with machinery writes an array onto the level (`rivers`/`pipes`,
 `crypts`/`ossuary`, `lurkers`) in `tryGen` and reads it back in
 `buildLevel`; anything you add that way must also be carried through
 `serializeGame` and `loadGame`, or a reloaded floor comes back stripped
@@ -898,38 +899,71 @@ through) and offensive spells resolve when their bolt arrives (set
 `G.fx=[]` and call `updateFx(10)`, which lands everything in flight via
 the `f.t>6` branch). T37 covers the whole of this.
 
-## Every theme owns a roster now
+## A theme fields its own roster and nothing else
 
-This section used to record that the *ordinary* roster — everything with no
-theme flag — had collapsed to two creatures past depth 16, so that a Dungeon
-or Sewers floor was mostly other people's furniture thinned to `OFF`. That
-is fixed. Dungeon and Sewers were the only two settings without a faction of
-their own, and both now have one: a hobgoblin legion with giants for muscle,
-and a wererat guild keeping oozes and an otyugh as livestock.
+`themedPool(depth)` is the whole rule, and `THEME_FLAG` is the one place a
+theme's membership is defined. A floor draws only from creatures that belong
+to the theme standing on it. Undead are `type:'undead'` — the same test Turn
+Undead and the loot faucets use — and the other six carry a boolean on the
+definition (`cave`, `duergar`, `myconid`, `drow`, `sewers`, `dungeon`).
 
-Seven themes, seven rosters, and **exactly one creature left unflagged** —
-plain `ogre`, which is banded 6–10 and can reach neither Dungeon block
-(1–3 and 22–24) without either brutalising depth 3 or littering depth 22
-with weaklings. It is deliberately left as the last piece of wildlife.
+This replaced a weighting: a theme's own creatures were multiplied by 4 and
+everybody else's by an `OFF` of 0.35, so floors ran 48–94% their own theme
+with the rest wandering through. `OFF` had to be re-tuned every time a roster
+was added, because a single ×4 competes against every foreign roster at once.
+That whole mechanism is gone — with it the seven bias constants in `tryGen`,
+`openCoffin`'s separate off-weight, and the tuning treadmill.
 
-| depth | in band | spread |
-|---|---|---|
-| 3 | 15 | dungeon 7, sewers 4, undead 4 |
-| 13 | 17 | cave 6, undead 4, sewers 3, dungeon 2, duergar 2 |
-| 20 | 35 | myconid 6, dungeon 6, drow 5, duergar 5, undead 5, cave 4, sewers 4 |
-| 24 | 41 | dungeon 7, myconid 7, drow 6, duergar 6, sewers 6, undead 5, cave 4 |
-| 31 | 22 | cave 4, undead 4, drow 4, dungeon 3, sewers 3 |
-| 40 | 10 | cave 3, undead 3, and one each of the rest |
+Three consequences, all measured, none of them a bug to be fixed later:
 
-Two rules came out of building the last two, and they apply to anything
-added from here:
+- **Every creature must belong to a roster.** An unflagged creature used to
+  spawn everywhere at weight 1; now it is never placed at all. `ogre` was the
+  last unflagged one and is `cave:true` now, banded 6–12 so it covers the
+  Caves block at 10–12 rather than only touching its first floor. T55 fails
+  if any banded creature is an orphan.
+- **A roster must reach every floor its theme owns.** `spawnPool` never drops
+  a creature once its band opens — past it, it lingers at a floor of 0.05 —
+  so this can only fail below a roster's shallowest debut. The duergar own
+  13–15 and only two of their six debuted before 14, which made those three
+  floors a two-creature floor repeated; the shadowblade and stonepriest were
+  pulled forward to 12 and 14. T55 asserts three kinds minimum on all 60
+  floors of every theme.
+- **Variety per floor is the price.** A floor drew on 5–16 distinct kinds
+  when four foreign rosters were thinned into it, and fields 3.9–6.8 of its
+  own now. That is the trade, and the bar in the tests moved from "8 kinds"
+  to "not one creature repeated".
 
-- **A flag must reach a floor of its own theme.** Otherwise it is 0.35
-  everywhere and ×4 nowhere — a pure penalty. That is why the bugbear's
-  band was stretched to touch depth 3 and why the ogre is not flagged at
-  all. T48 and T49 both assert it.
+**The count now gives way where the roster cannot match the budget.** The
+whole bestiary always held something cheap enough to pad a floor out; one
+roster does not. Depth 12 is a cave whose lightest creature scores 48, depth
+13 opens the duergar block where the lightest thing alive is 155 against a
+per-monster share of 60 — that floor was placing twenty bodies for **three
+times its budget**. So `nMon` is now `min(targetCount, budget / lightest)`,
+floored at `COUNT_MIN_FRAC` (0.55) of the target so a heavy roster cannot
+empty a level out. Where the roster has anything near the share — most floors
+— it buys more than the target and nothing changes.
+
+**`rawBudget` and `poolCeiling` deliberately still read the whole
+`spawnPool`.** This was tried the other way round first and it is worse:
+`threatBudget` is a *chain*, each floor clamped to a step off the one above,
+so a pool that jumps every three floors lets whichever theme sits at depth 5
+depress every budget below it. Measured, the party reached depth 15 two
+levels short (14.1 against 16.1) because the shallow floors it had been
+levelling on were lighter. The budget says how hard a depth should be; the
+roster says who is on it; `nMon` reconciles them.
+
+Two rules from building the last two rosters still apply:
+
+- **A flag must reach a floor of its own theme.** Under the old weighting a
+  flag that never reached its own theme was a pure penalty — 0.35 everywhere
+  and ×4 nowhere. Under the rule it is worse than a penalty: the creature
+  cannot spawn anywhere at all. That is why the bugbear's band was stretched
+  to touch depth 3. T48, T49 and T55 all assert it.
 - **Dungeon and Sewers are bimodal by construction.** Their blocks sit at
   1–3 / 22–24 and 4–6 / 25–27, twenty floors apart with nothing between, so
   their rosters need a shallow tier and a deep tier and nothing in the
   middle. Every other theme's two blocks are 21 floors apart too, but their
   creatures' bands are wide enough to cover both.
+
+The one place rosters still touch each other is `rawBudget`, which is why the
+warning in *Adding a roster moves the budget for everybody* is still live.
