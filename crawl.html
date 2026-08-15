@@ -1282,37 +1282,6 @@ function boneDetail(o,c){
 }
 
 
-/* ---- material response ---------------------------------------------------
-   `bodyGrad` gives every creature ONE radial ramp, so steel, leather, cloth and
-   bone all catch the light identically — which is most of why the bestiary read
-   as coloured shapes rather than as things made of something. These add the
-   response the material would actually have, applied through MONSTER_DETAIL
-   like everything else, so no creature's art has to be rewritten.
-
-   The distinction that matters is how sharply a surface falls from lit to dark:
-   metal goes in a hair, cloth takes the whole width of a fold, and bone barely
-   changes at all. */
-function metalSheen(o,c){        // a hard, narrow specular down polished plate
-  c=c||{};const hp=o.hp||[32,30],hx=hp[0],hy=hp[1];
-  const w=c.w||9, y0=hy+(c.y0||4), y1=hy+(c.y1||24), x=hx-w*(c.at===undefined?0.42:c.at);
-  const lit=c.lit||'#cdd3de';
-  return `<path d="M${x.toFixed(1)} ${y0.toFixed(1)} Q${(x-w*0.1).toFixed(1)} ${((y0+y1)/2).toFixed(1)} ${(x+w*0.06).toFixed(1)} ${y1.toFixed(1)}"`+
-    ` stroke="${lit}" stroke-width="${(w*0.1).toFixed(2)}" fill="none" opacity="${c.op||0.34}" stroke-linecap="round"/>`+
-    `<path d="M${(x+w*0.16).toFixed(1)} ${(y0+1).toFixed(1)} Q${(x+w*0.06).toFixed(1)} ${((y0+y1)/2).toFixed(1)} ${(x+w*0.22).toFixed(1)} ${(y1-1).toFixed(1)}"`+
-    ` stroke="#0a0c10" stroke-width="${(w*0.08).toFixed(2)}" fill="none" opacity="0.3" stroke-linecap="round"/>`;
-}
-function clothFolds(o,c){        // broad soft folds; cloth has no hard highlight
-  c=c||{};const hp=o.hp||[32,30],hx=hp[0],hy=hp[1];
-  const w=c.w||10, y0=hy+(c.y0||8), y1=hy+(c.y1||30), n=c.n||4, r=_lcg(c.seed||3);
-  const dk=c.dark||'#0d0a12';let g='';
-  for(let i=0;i<n;i++){
-    const t=-1+2*(i+0.5)/n, x=hx+t*w*0.72, bow=(r()-0.5)*2.2;
-    g+=`<path d="M${x.toFixed(1)} ${y0.toFixed(1)} Q${(x+bow).toFixed(1)} ${((y0+y1)/2).toFixed(1)} ${(x+t*1.8).toFixed(1)} ${y1.toFixed(1)}"`+
-       ` stroke="${dk}" stroke-width="${(1.1+r()*0.9).toFixed(2)}" fill="none" opacity="${(0.2+r()*0.16).toFixed(2)}" stroke-linecap="round"/>`;
-  }
-  return g;
-}
-
 function roughF(id,scale,freq,seed){
   // displace interior detail only: the displaced copy is clipped back to the
   // original alpha and drawn OVER the untouched art, so the silhouette perimeter
@@ -2844,7 +2813,7 @@ const MONSTER_DETAIL={
   // --- Dungeon, the shallow block ---
   kobold:      {base:(o)=>kitHumanoid(o,{w:7,belt:15,dark:'#4a2c14',mid:'#5c3a1c'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#3a2412'})},
   koboldsl:    {base:(o)=>kitHumanoid(o,{w:7,belt:15,dark:'#4a2c14',mid:'#5c3a1c'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#3a2412'})},
-  gobshaman:   {base:(o)=>kitHumanoid(o,{w:8,belt:15,dark:'#2e2414',mid:'#4a3a22'})+clothFolds(o,{w:8}), head:(o)=>faceDetail(o,{w:6.5,eye:12})},
+  gobshaman:   {base:(o)=>kitHumanoid(o,{w:8,belt:15,dark:'#2e2414',mid:'#4a3a22'}), head:(o)=>faceDetail(o,{w:6.5,eye:12})},
   gnoll:       {base:(o)=>kitHumanoid(o,{w:8.5,belt:16,dark:'#3a2a16'})+hideDetail(o,{x0:22,x1:44,y0:36,y1:56,n:12,col:'#2a1c0e',seed:5}),
                 head:(o)=>faceDetail(o,{w:7,eye:12,col:'#2a1c0e'})},
   bugbear:     {base:(o)=>kitHumanoid(o,{w:10,belt:17,dark:'#3a2a16'})+hideDetail(o,{x0:20,x1:48,y0:34,y1:58,n:16,col:'#241a0c',seed:9}),
@@ -2860,9 +2829,9 @@ const MONSTER_DETAIL={
                 head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#241a10'})},
   // --- Crypt: no belts on the dead, but sinew and wrappings ---
   ghoul:       {base:(o)=>hideDetail(o,{x0:22,x1:40,y0:36,y1:56,n:10,col:'#2b3a1e',seed:37}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#33421f'})},
-  wight:       {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#2b2f34',mid:'#3a3f45',lit:'#5f666e'})+metalSheen(o,{w:8}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2f22'})},
-  wightnec:    {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#2a2436',mid:'#372f47',lit:'#6a5f80'})+clothFolds(o,{w:8}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2f22'})},
-  mummy:       {base:(o)=>hideDetail(o,{x0:20,x1:44,y0:32,y1:58,n:18,col:'#4a3c26',seed:41})+clothFolds(o,{w:8}), head:(o)=>faceDetail(o,{w:5.5,eye:10,col:'#4a3c26'})},
+  wight:       {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#2b2f34',mid:'#3a3f45',lit:'#5f666e'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2f22'})},
+  wightnec:    {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#2a2436',mid:'#372f47',lit:'#6a5f80'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2f22'})},
+  mummy:       {base:(o)=>hideDetail(o,{x0:20,x1:44,y0:32,y1:58,n:18,col:'#4a3c26',seed:41}), head:(o)=>faceDetail(o,{w:5.5,eye:10,col:'#4a3c26'})},
   // --- Caves ---
   ogre:        {base:(o)=>kitHumanoid(o,{w:11,belt:17,dark:'#3a2a16'}), head:(o)=>faceDetail(o,{w:8,eye:12,col:'#2e2414'})},
   piercer:     {base:(o)=>hideDetail(o,{x0:26,x1:38,y0:14,y1:48,n:12,col:'#1a1610',seed:43})},
@@ -2874,10 +2843,10 @@ const MONSTER_DETAIL={
   crawler:     {base:(o)=>hideDetail(o,{x0:14,x1:50,y0:34,y1:56,n:16,col:'#20180a',seed:61})},
   cavefisher:  {base:(o)=>hideDetail(o,{x0:22,x1:42,y0:32,y1:56,n:12,col:'#1a1a14',seed:67})},
   // --- Duergar: built things, so plate rather than straps ---
-  duergar:     {base:(o)=>plateBands(o,{w:10,y0:9,n:3,gap:4.4})+metalSheen(o,{w:9}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
-  duergarxbow: {base:(o)=>plateBands(o,{w:10,y0:9,n:3,gap:4.4})+metalSheen(o,{w:9}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
-  duergarscout:{base:(o)=>plateBands(o,{w:9,y0:9,n:2,gap:4.4,dark:'#242830',mid:'#2e333c'})+metalSheen(o,{w:8}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
-  duergarpriest:{base:(o)=>plateBands(o,{w:10,y0:10,n:3,gap:4.2,dark:'#2e2a22',mid:'#3c372c',lit:'#7a6f52'})+clothFolds(o,{w:9}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
+  duergar:     {base:(o)=>plateBands(o,{w:10,y0:9,n:3,gap:4.4}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
+  duergarxbow: {base:(o)=>plateBands(o,{w:10,y0:9,n:3,gap:4.4}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
+  duergarscout:{base:(o)=>plateBands(o,{w:9,y0:9,n:2,gap:4.4,dark:'#242830',mid:'#2e333c'}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
+  duergarpriest:{base:(o)=>plateBands(o,{w:10,y0:10,n:3,gap:4.2,dark:'#2e2a22',mid:'#3c372c',lit:'#7a6f52'}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
   // --- Myconid ---
   shrieker:    {base:(o)=>fungalDetail(o,{cx:32,cy:37,rx:14,n:11,col:'#3a2418',pore:'#4a2a18',seed:71})},
   mysprout:    {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:12,n:9,col:'#2a1c33',pore:'#3a2a20',seed:73})},
@@ -2885,11 +2854,11 @@ const MONSTER_DETAIL={
   sporeservant:{base:(o)=>fungalDetail(o,{cx:32,cy:26,rx:9,n:7,col:'#2a2418',pore:'#3a3020',seed:83}), head:(o)=>faceDetail(o,{w:5.5,eye:10,col:'#2a2418'})},
   myguard:     {base:(o)=>fungalDetail(o,{cx:32,cy:31,rx:12,n:9,col:'#2a2418',pore:'#3a3020',seed:89}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2418'})},
   // --- Drow: fine mail and a house sigil, not leather ---
-  drow:        {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'})+metalSheen(o,{w:8}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
-  drowbolt:    {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'})+metalSheen(o,{w:8}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
-  drowblade:   {base:(o)=>plateBands(o,{w:9.5,y0:9,n:3,gap:4,dark:'#1a1c24',mid:'#262935',lit:'#8a90a8'})+metalSheen(o,{w:8.5}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
-  drowpriest:  {base:(o)=>plateBands(o,{w:10,y0:10,n:2,gap:4.6,dark:'#2a1c33',mid:'#372444',lit:'#6b4a90'})+clothFolds(o,{w:9}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
-  drowmage:    {base:(o)=>plateBands(o,{w:10,y0:10,n:2,gap:4.6,dark:'#221c33',mid:'#2e2444',lit:'#5f5790'})+clothFolds(o,{w:9}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
+  drow:        {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
+  drowbolt:    {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
+  drowblade:   {base:(o)=>plateBands(o,{w:9.5,y0:9,n:3,gap:4,dark:'#1a1c24',mid:'#262935',lit:'#8a90a8'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
+  drowpriest:  {base:(o)=>plateBands(o,{w:10,y0:10,n:2,gap:4.6,dark:'#2a1c33',mid:'#372444',lit:'#6b4a90'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
+  drowmage:    {base:(o)=>plateBands(o,{w:10,y0:10,n:2,gap:4.6,dark:'#221c33',mid:'#2e2444',lit:'#5f5790'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
 
   // --- deep tier -------------------------------------------------------------
   skeleton:    {base:(o)=>boneDetail(o,{w:8,y0:6,n:4}), head:(o)=>faceDetail(o,{w:5.5,eye:11,col:'#4a4232'})},
@@ -2898,34 +2867,34 @@ const MONSTER_DETAIL={
   wereratboss: {base:(o)=>kitHumanoid(o,{w:9,belt:16,dark:'#3a2a16'})+hideDetail(o,{x0:22,x1:46,y0:34,y1:56,n:12,col:'#2a1e12',seed:103}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a1e12'})},
   wereratlord: {base:(o)=>kitHumanoid(o,{w:10,belt:16,dark:'#2e2216'})+hideDetail(o,{x0:20,x1:48,y0:34,y1:58,n:14,col:'#241a10',seed:107}), head:(o)=>faceDetail(o,{w:7,eye:11,col:'#241a10'})},
   wereblade:   {base:(o)=>kitHumanoid(o,{w:9,belt:16,dark:'#2a2016'})+hideDetail(o,{x0:22,x1:44,y0:34,y1:56,n:11,col:'#241a10',seed:109}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#241a10'})},
-  duergarthane:{base:(o)=>plateBands(o,{w:10,y0:9,n:3,gap:4.4,lit:'#8a7f5e'})+metalSheen(o,{w:9}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
-  duergarrune: {base:(o)=>plateBands(o,{w:10,y0:10,n:3,gap:4.2,dark:'#2e2a22',mid:'#3c372c',lit:'#7a6f52'})+clothFolds(o,{w:9}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
-  duergarlord: {base:(o)=>plateBands(o,{w:11,y0:9,n:3,gap:4.6,lit:'#8a7f5e'})+metalSheen(o,{w:10}), head:(o)=>faceDetail(o,{w:7,eye:11,col:'#2a2018'})},
-  hobwarlord:  {base:(o)=>plateBands(o,{w:11,y0:9,n:3,gap:4.6,dark:'#2e2529',mid:'#3a3036',lit:'#7a6a5e'})+metalSheen(o,{w:10}), head:(o)=>faceDetail(o,{w:7,eye:11,col:'#3a2013'})},
-  hobcaptain:  {base:(o)=>plateBands(o,{w:10,y0:9,n:3,gap:4.4,dark:'#2e2529',mid:'#3a3036',lit:'#7a6a5e'})+metalSheen(o,{w:9}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#3a2013'})},
-  hobpriest:   {base:(o)=>plateBands(o,{w:10,y0:10,n:2,gap:4.6,dark:'#33282e',mid:'#42343c',lit:'#8a7052'})+clothFolds(o,{w:9}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#3a2013'})},
-  worgrider:   {base:(o)=>plateBands(o,{w:9,y0:8,n:2,gap:4.2,dark:'#2e2529',mid:'#3a3036',lit:'#7a6a5e'})+metalSheen(o,{w:8}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#3a2013'})},
+  duergarthane:{base:(o)=>plateBands(o,{w:10,y0:9,n:3,gap:4.4,lit:'#8a7f5e'}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
+  duergarrune: {base:(o)=>plateBands(o,{w:10,y0:10,n:3,gap:4.2,dark:'#2e2a22',mid:'#3c372c',lit:'#7a6f52'}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
+  duergarlord: {base:(o)=>plateBands(o,{w:11,y0:9,n:3,gap:4.6,lit:'#8a7f5e'}), head:(o)=>faceDetail(o,{w:7,eye:11,col:'#2a2018'})},
+  hobwarlord:  {base:(o)=>plateBands(o,{w:11,y0:9,n:3,gap:4.6,dark:'#2e2529',mid:'#3a3036',lit:'#7a6a5e'}), head:(o)=>faceDetail(o,{w:7,eye:11,col:'#3a2013'})},
+  hobcaptain:  {base:(o)=>plateBands(o,{w:10,y0:9,n:3,gap:4.4,dark:'#2e2529',mid:'#3a3036',lit:'#7a6a5e'}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#3a2013'})},
+  hobpriest:   {base:(o)=>plateBands(o,{w:10,y0:10,n:2,gap:4.6,dark:'#33282e',mid:'#42343c',lit:'#8a7052'}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#3a2013'})},
+  worgrider:   {base:(o)=>plateBands(o,{w:9,y0:8,n:2,gap:4.2,dark:'#2e2529',mid:'#3a3036',lit:'#7a6a5e'}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#3a2013'})},
   ettin:       {base:(o)=>kitHumanoid(o,{w:12,belt:18,dark:'#3a2a16'})+hideDetail(o,{x0:18,x1:50,y0:36,y1:60,n:16,col:'#241a0c',seed:113})},
   hillgiant:   {base:(o)=>kitHumanoid(o,{w:12,belt:18,dark:'#3a2a16'})+hideDetail(o,{x0:16,x1:52,y0:36,y1:62,n:18,col:'#241a0c',seed:127}), head:(o)=>faceDetail(o,{w:8,eye:12,col:'#2e2414'})},
   stonegiant:  {base:(o)=>hideDetail(o,{x0:14,x1:52,y0:34,y1:62,n:20,col:'#1e2126',seed:131}), head:(o)=>faceDetail(o,{w:8,eye:12,col:'#242a30'})},
-  giantking:   {base:(o)=>plateBands(o,{w:12,y0:9,n:3,gap:5,dark:'#3a2118',mid:'#4a2c1e',lit:'#9a6a3a'})+metalSheen(o,{w:11,op:0.2}), head:(o)=>faceDetail(o,{w:8,eye:12,col:'#3a2118'})},
+  giantking:   {base:(o)=>plateBands(o,{w:12,y0:9,n:3,gap:5,dark:'#3a2118',mid:'#4a2c1e',lit:'#9a6a3a'}), head:(o)=>faceDetail(o,{w:8,eye:12,col:'#3a2118'})},
   troll:       {base:(o)=>kitHumanoid(o,{w:8,belt:16,dark:'#2a3a1c',pouch:false})+hideDetail(o,{x0:16,x1:42,y0:32,y1:58,n:14,col:'#1e2c12',seed:137}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#1e2c12'})},
-  ogremage:    {base:(o)=>kitHumanoid(o,{w:11,belt:16,dark:'#2a2436'})+hideDetail(o,{x0:20,x1:46,y0:36,y1:58,n:12,col:'#221c2e',seed:139})+clothFolds(o,{w:10}), head:(o)=>faceDetail(o,{w:7.5,eye:12,col:'#221c2e'})},
+  ogremage:    {base:(o)=>kitHumanoid(o,{w:11,belt:16,dark:'#2a2436'})+hideDetail(o,{x0:20,x1:46,y0:36,y1:58,n:12,col:'#221c2e',seed:139}), head:(o)=>faceDetail(o,{w:7.5,eye:12,col:'#221c2e'})},
   scrag:       {base:(o)=>kitHumanoid(o,{w:10,belt:17,dark:'#1e3230',pouch:false})+hideDetail(o,{x0:18,x1:48,y0:34,y1:60,n:16,col:'#152a26',seed:149}), head:(o)=>faceDetail(o,{w:7,eye:11,col:'#152a26'})},
   ochrejelly:  {base:(o)=>oozeDetail(o,{cx:32,cy:42,rx:19,ry:15,col:'#e0b46a',seed:151})},
   blackpud:    {base:(o)=>oozeDetail(o,{cx:32,cy:42,rx:22,ry:17,col:'#6a6a70',seed:157})},
-  drider:      {base:(o)=>plateBands(o,{w:9,y0:8,n:2,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'})+hideDetail(o,{x0:14,x1:50,y0:38,y1:58,n:14,col:'#14161c',seed:163})+metalSheen(o,{w:8}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
-  drowmatron:  {base:(o)=>plateBands(o,{w:10,y0:9,n:2,gap:4.6,dark:'#2a1c33',mid:'#372444',lit:'#6b4a90'})+clothFolds(o,{w:9}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
-  mycaster:    {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:14,n:10,col:'#2a1c33',pore:'#3a2a20',seed:179})+clothFolds(o,{w:9})},
+  drider:      {base:(o)=>plateBands(o,{w:9,y0:8,n:2,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'})+hideDetail(o,{x0:14,x1:50,y0:38,y1:58,n:14,col:'#14161c',seed:163}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
+  drowmatron:  {base:(o)=>plateBands(o,{w:10,y0:9,n:2,gap:4.6,dark:'#2a1c33',mid:'#372444',lit:'#6b4a90'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
+  mycaster:    {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:14,n:10,col:'#2a1c33',pore:'#3a2a20',seed:179})},
   myelder:     {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:16,n:12,col:'#2a1c33',pore:'#3a2a20',seed:181})},
   mylord:      {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:18,n:13,col:'#2a1433',pore:'#3a1c40',seed:191})},
   mysovereign: {base:(o)=>fungalDetail(o,{cx:32,cy:34,rx:20,n:14,col:'#2a1433',pore:'#3a1c40',seed:193})},
   dragon:      {base:(o)=>hideDetail(o,{x0:12,x1:48,y0:24,y1:56,n:22,col:'#1a2412',seed:197})},
   bonedrake:   {base:(o)=>hideDetail(o,{x0:12,x1:48,y0:24,y1:56,n:18,col:'#4a4232',seed:199})+boneDetail(o,{w:7,y0:8,n:3,gap:3.4})},
   bonecolossus:{base:(o)=>boneDetail(o,{w:11,y0:6,n:5,gap:3.8}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#4a4232'})},
-  deathknight: {base:(o)=>plateBands(o,{w:10,y0:8,n:3,gap:4.4,dark:'#22252b',mid:'#2e3238',lit:'#6a7280'})+metalSheen(o,{w:9}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#242a30'})},
-  lich:        {base:(o)=>boneDetail(o,{w:8,y0:6,n:4,gap:3.4,col:'#cfd8c4',dark:'#33422e'})+clothFolds(o,{w:8}), head:(o)=>faceDetail(o,{w:5.5,eye:10,col:'#33422e'})},
-  barrowwight: {base:(o)=>plateBands(o,{w:9,y0:8,n:3,gap:4,dark:'#2b2f34',mid:'#3a3f45',lit:'#5f666e'})+metalSheen(o,{w:8}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2f22'})},
+  deathknight: {base:(o)=>plateBands(o,{w:10,y0:8,n:3,gap:4.4,dark:'#22252b',mid:'#2e3238',lit:'#6a7280'}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#242a30'})},
+  lich:        {base:(o)=>boneDetail(o,{w:8,y0:6,n:4,gap:3.4,col:'#cfd8c4',dark:'#33422e'}), head:(o)=>faceDetail(o,{w:5.5,eye:10,col:'#33422e'})},
+  barrowwight: {base:(o)=>plateBands(o,{w:9,y0:8,n:3,gap:4,dark:'#2b2f34',mid:'#3a3f45',lit:'#5f666e'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2f22'})},
   wraith:      {base:(o)=>hideDetail(o,{x0:20,x1:44,y0:34,y1:60,n:12,col:'#5a6a80',seed:211})},
   roper:       {base:(o)=>hideDetail(o,{x0:16,x1:44,y0:16,y1:54,n:20,col:'#1c1a14',seed:223})},
   otyugh:      {base:(o)=>hideDetail(o,{x0:12,x1:50,y0:26,y1:56,n:20,col:'#221c10',seed:227})},
