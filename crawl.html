@@ -54,6 +54,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 .pbtn svg{width:18px;height:18px;}
 .pbtn:active{background:#332a1c;}
 .pbtn.spellbtn{color:#9db4d6;}
+.pbtn.spellbtn.recovering{opacity:.4;color:#5f6b7a;filter:grayscale(.6);}
 /* on-view controls */
 .padbtn{position:absolute;width:60px;height:60px;border-radius:10px;background:var(--btn);border:1px solid var(--btn-line);
   color:var(--ink);display:flex;align-items:center;justify-content:center;z-index:5;}
@@ -185,6 +186,10 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 .spell-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border:1px solid var(--btn-line);border-radius:5px;background:var(--btn);}
 .spell-row:active{background:#332a1c;}
 .spell-row.nosl{opacity:.35;}
+.spell-row.chan .scircle{color:#ffe9a8;}
+.spell-row.chan .sslots{color:#ffe9a8;}
+.spell-row.chan.spent{opacity:.4;}
+.spell-sec{font-size:10px;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.06em;margin:4px 0 -1px;}
 .spell-row .sname{flex:1;font-size:14px;}
 .spell-row .scircle{font-size:10px;color:var(--ink-dim);width:14px;text-align:center;}
 .spell-row .sslots{font-size:11px;color:#9db4d6;}
@@ -5352,9 +5357,8 @@ function ordSuffix(n){return n===1?'st':n===2?'nd':n===3?'rd':'th';}
 /* ---------- class abilities ---------- */
 function useClassAbility(ch){
   const c=CLASSES[ch.cls];
-  // a cleric has two things to offer now, so it opens a choice rather than
-  // going straight to the spell list the way the wizard does
-  if(c.turn){UI.clericMenu(ch);return;}
+  // every caster goes to the same spell window; a cleric's Turn Undead rides
+  // at the top of it as its own section rather than in a separate menu
   if(c.caster){UI.openSpells(ch);return;}
   if(c.rage){
     if(isRaging(ch)){UI.toast(ch.name+' is already raging.');return;}
@@ -6614,6 +6618,12 @@ const UI=(()=>{
         const cd=h.querySelector('.cd');
         if(cd)cd.style.transform=`scaleY(${frac})`;
       });
+      // a caster still recovering from a cast can't cast again yet: grey the
+      // spell button so it reads as unavailable while the cooldown runs
+      if(CLASSES[ch.cls].caster){
+        const ab=div.querySelector('[data-act=ability]');
+        if(ab)ab.classList.toggle('recovering',anyHandCd(ch)>0);
+      }
     });
     // low hp heartbeat
     lowHpTimer-=0.016;
@@ -6822,31 +6832,38 @@ const UI=(()=>{
     list.appendChild(sm);
     show('ovl-target');
   }
-  // the cleric picks between the spell list and channelling
-  function clericMenu(ch){
-    $('tg-title').textContent=ch.name+' — divine power';
-    const list=$('tg-list');
-    list.innerHTML='';
-    const sp=document.createElement('button');
-    sp.className='mbtn';
-    sp.textContent='Spells';
-    sp.addEventListener('click',()=>{hide('ovl-target');openSpells(ch);});
-    list.appendChild(sp);
-    const tu=document.createElement('button');
-    tu.className='mbtn';
-    tu.textContent=ch.turnUsed?'Turn Undead (spent — rest to recover)'
-      :`Turn Undead (rout or destroy the dead nearby, power ${turnUndeadPower(ch)})`;
-    tu.disabled=ch.turnUsed||!canAct(ch);
-    tu.addEventListener('click',()=>{hide('ovl-target');turnUndead(ch);});
-    list.appendChild(tu);
-    show('ovl-target');
-  }
   /* spells */
   function openSpells(ch){
     $('sp-title').textContent=ch.name+' — spells';
     const list=$('spell-list');
     list.innerHTML='';
     const slots=charSlots(ch);
+    // a cleric channels from the same window: Turn Undead sits in its own
+    // section above the spell list rather than behind a separate menu
+    if(CLASSES[ch.cls].turn){
+      const sec=document.createElement('div');
+      sec.className='spell-sec';
+      sec.textContent='Channelling';
+      list.appendChild(sec);
+      const spent=ch.turnUsed;
+      const tu=document.createElement('div');
+      tu.className='spell-row chan'+(spent?' spent':'');
+      tu.innerHTML=`<span class="scircle">☨</span><span class="sname">Turn Undead</span>`+
+        `<span class="sslots">${spent?'spent':'power '+turnUndeadPower(ch)}</span>`;
+      tu.title=spent?'Already channelled — rest to recover.'
+        :'Rout or destroy the undead within six tiles.';
+      tu.addEventListener('click',()=>{
+        if(spent){toast('Already channelled. Rest to recover.');return;}
+        if(!canAct(ch))return;
+        hide('ovl-spells');
+        turnUndead(ch);
+      });
+      list.appendChild(tu);
+      const sec2=document.createElement('div');
+      sec2.className='spell-sec';
+      sec2.textContent='Spells';
+      list.appendChild(sec2);
+    }
     // A wizard sees what they memorised and nothing else; a cleric sees the
     // whole list against the slots of each circle. `rows` is what gets drawn.
     const prep=preparesSpells(ch);
@@ -6864,7 +6881,8 @@ const UI=(()=>{
     }
     const hdr=document.createElement('div');
     hdr.className='dim-note';
-    hdr.textContent=(prep?'Memorised — ':'Slots left — ')+(sum||'nothing')+' (camp to prepare)';
+    hdr.textContent=(prep?'Memorised — ':'Slots left — ')+(sum||'nothing')
+      +(anyHandCd(ch)>0?' · still recovering…':' (camp to prepare)');
     list.appendChild(hdr);
     if(prep&&!rows.length){
       const none=document.createElement('div');
@@ -7313,7 +7331,7 @@ const UI=(()=>{
     refreshMenu();
   });
   return {buildPartyDom,refreshParty,tickCooldowns,charFlash,float,floatAtMonster,vignette,trapFlash,toast,
-    refreshDepthTag,pickAlly,paladinMenu,clericMenu,openSpells,spellFlash,openInventory,openStats,openMap,openLog,openMemo,gameOver,show,hide,anyOverlayOpen,refreshInv};
+    refreshDepthTag,pickAlly,paladinMenu,openSpells,spellFlash,openInventory,openStats,openMap,openLog,openMemo,gameOver,show,hide,anyOverlayOpen,refreshInv};
 })();
 /* ============================== INPUT ============================== */
 function bindPad(id,fn){
