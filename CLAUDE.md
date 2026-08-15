@@ -296,6 +296,13 @@ in any individual creature, so all 78 get them at once.
   the eye would really do, and it puts the shadow entirely behind the creature
   where its own sprite hides it. Geometrically right and invisible. The contact
   patch is the part that grounds it.
+- **Material response** (`metalSheen`, `clothFolds`, applied through
+  `MONSTER_DETAIL`). `bodyGrad` gives every creature one radial ramp, so steel,
+  cloth and bone all catch the light identically — which is much of why the
+  bestiary read as coloured shapes rather than as things made of something. The
+  distinction that carries it is how sharply a surface falls from lit to dark:
+  metal goes in a hair, cloth takes the whole width of a fold. 17 creatures in
+  plate get the specular, 12 in robes or wrappings get the folds.
 - **Eye glow** (`addMonsterGlow`). A second, additive sprite riding at the head,
   tinted with the creature's own `o.eye` and deliberately **not** shaded, because
   shading multiplies the map and put a creature's eyes out at exactly the range
@@ -358,13 +365,23 @@ Two things learned by looking rather than reasoning:
   row of verticals they landed across the middle of the cap and read as a row of
   teeth on the shrieker and the myconid guard.
 
-Detail is geometry rather than filters, so it is cheap but not free: 24.6ms
-plain → 25.7ms after the shallow tier → **31.1ms** with the deep tier on top.
-At six creature kinds a floor that is about a second of rasterising, which is
-why `prewarmMonsterFrames` no longer does it in one block — only `idle0` is
-forced up front and the other five poses drain a couple at a time through
-`requestIdleCallback`. Anything the player reaches before its turn comes up
-still rasterises lazily on first use, exactly as it always did. Check two things when
+**Detail is geometry rather than filters, and geometry is close to free here.**
+Measured back-to-back on one machine: the build before any detail 48.1ms, after
+the whole shallow tier 46.5ms, and with all 78 plus the material response
+46.8ms — i.e. no measurable cost at all. The expensive half is the filters.
+
+**Do not compare raster timings taken at different points in a session.** An
+earlier reading of this had detail climbing 24.6 → 25.7 → 31.1ms and concluded
+it was getting expensive; re-measuring those same commits later gave 48.1, 46.5
+and 46.8. The machine had slowed under load, and the "trend" was entirely that.
+Any timing claim here has to come from checking out both builds and measuring
+them one after the other.
+
+`prewarmMonsterFrames` still spreads the work: `idle0` is forced up front and
+the other five poses drain a couple at a time through `requestIdleCallback`,
+which is worth doing regardless of the absolute number because the filters
+genuinely cost tens of milliseconds a frame. Anything the player reaches before
+its turn comes up still rasterises lazily on first use, exactly as it always did. Check two things when
 adding more — that it reads at the size it is actually seen (an in-game capture
 at two tiles, not just a large sheet), and that no stroke leaves the 64-unit
 viewBox. Note when checking the latter that `hideDetail` emits relative
