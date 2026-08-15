@@ -5745,6 +5745,61 @@ function fxFlameTex(){
   R3.texCache[key]=tex;return tex;
 }
 
+
+/* frost on stone: a rime patch with needle crystals, laid tile by tile over
+   the cone's real footprint */
+function fxFrostTex(){
+  const key='fx_frost';
+  if(R3.texCache[key])return R3.texCache[key];
+  const cv=document.createElement('canvas');cv.width=cv.height=128;
+  const ctx=cv.getContext('2d');
+  const g=ctx.createRadialGradient(64,64,4,64,64,60);
+  g.addColorStop(0,'rgba(225,240,250,0.85)');g.addColorStop(0.45,'rgba(170,208,232,0.55)');
+  g.addColorStop(0.8,'rgba(120,165,200,0.22)');g.addColorStop(1,'rgba(100,150,190,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(64,64,60,0,7);ctx.fill();
+  // needle crystals radiating at fixed angles, so the patch is deterministic
+  for(let i=0;i<14;i++){
+    const a=i*0.449+0.2, l=24+((i*29)%5)*8;
+    ctx.strokeStyle=i%3?'rgba(235,248,255,0.7)':'rgba(190,225,245,0.8)';
+    ctx.lineWidth=i%2?1.2:2;
+    ctx.beginPath();ctx.moveTo(64+Math.cos(a)*6,64+Math.sin(a)*6);
+    ctx.lineTo(64+Math.cos(a)*l,64+Math.sin(a)*l);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(64+Math.cos(a)*l*0.55,64+Math.sin(a)*l*0.55);
+    ctx.lineTo(64+Math.cos(a+0.35)*l*0.72,64+Math.sin(a+0.35)*l*0.72);ctx.stroke();
+  }
+  const tex=texFromCanvas(cv,{mipmap:false});
+  R3.texCache[key]=tex;return tex;
+}
+function fxShardTex(){
+  const key='fx_shard';
+  if(R3.texCache[key])return R3.texCache[key];
+  const cv=document.createElement('canvas');cv.width=cv.height=64;
+  const ctx=cv.getContext('2d');
+  const g=ctx.createLinearGradient(8,32,56,32);
+  g.addColorStop(0,'rgba(190,225,248,0)');g.addColorStop(0.35,'#cfe8fa');
+  g.addColorStop(0.55,'#ffffff');g.addColorStop(0.8,'#9fd0ec');g.addColorStop(1,'rgba(140,190,225,0)');
+  ctx.fillStyle=g;
+  ctx.beginPath();ctx.moveTo(6,32);ctx.lineTo(30,24);ctx.lineTo(58,32);ctx.lineTo(30,40);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.85)';
+  ctx.beginPath();ctx.moveTo(20,31);ctx.lineTo(46,29);ctx.lineTo(48,33);ctx.lineTo(22,34);ctx.closePath();ctx.fill();
+  const tex=texFromCanvas(cv,{mipmap:false});
+  R3.texCache[key]=tex;return tex;
+}
+function fxMistTex(){
+  const key='fx_mist';
+  if(R3.texCache[key])return R3.texCache[key];
+  const cv=document.createElement('canvas');cv.width=cv.height=128;
+  const ctx=cv.getContext('2d');
+  // two soft offset lobes, so the puff is a cloud rather than a disc
+  for(const [cx,cy,r,a] of [[52,68,46,0.5],[80,58,40,0.4],[64,76,34,0.35]]){
+    const g=ctx.createRadialGradient(cx,cy,2,cx,cy,r);
+    g.addColorStop(0,'rgba(205,228,242,'+a+')');g.addColorStop(1,'rgba(205,228,242,0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.fill();
+  }
+  const tex=texFromCanvas(cv,{mipmap:false});
+  R3.texCache[key]=tex;return tex;
+}
+
 function initRenderer(){
   const cv=document.getElementById('view3d');
   R3.renderer=new THREE.WebGLRenderer({canvas:cv,antialias:false});
@@ -7164,7 +7219,12 @@ function addMonsterSprite(m){
   // only the resting frame up front; walk/windup/strike rasterize lazily on first
   // use (the global texture cache still shares frames across same-type monsters)
   const frames={idle0:monsterFrameTex(sprKey,m.boss,'idle0',m.elite)};
-  const mat=new THREE.SpriteMaterial({map:frames.idle0,transparent:true});
+  /* alphaTest matters beyond looks: without it the sprite's transparent margins
+     write depth across the whole quad, and every effect behind a monster — a
+     lightning stroke, frost on the floor, another monster's impact splash —
+     gets a rectangular hole punched through it. 0.08 discards only pixels that
+     were nearly invisible anyway. */
+  const mat=new THREE.SpriteMaterial({map:frames.idle0,transparent:true,alphaTest:0.08});
   const spr=new THREE.Sprite(mat);
   const sc=m.boss?1.05:(['ogre','troll','minotaur','ogremage','dragon',
     'bonecolossus','deathknight','bonedrake','lich',
@@ -9219,6 +9279,57 @@ function bolt2dDraw(f,op){
   }
   ctx.globalAlpha=1;
 }
+/* PHB: cone of cold "creates an area of extreme cold, originating at your hand
+   and extending outward in a cone" — freezing air and ice, instantly. The wedge
+   is the cone's REAL flood-filled footprint painted tile by tile in rime, each
+   tile's patch delayed by its distance so the frost visibly races out of the
+   caster's hands, with a fan of ice shards flying ahead of it and cold mist
+   hanging where it settled. */
+function spawnFrostCone(tiles){
+  if(!tiles||!tiles.size)return;
+  const arr=[...tiles],far=[];
+  for(const t of arr){
+    const x=(t%G.L.w),y=Math.floor(t/G.L.w);
+    const d=Math.hypot(x+0.5-(G.px+0.5),y+0.5-(G.py+0.5));
+    if(d>2.5)far.push(t);
+    const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1.15,1.15),
+      new THREE.MeshBasicMaterial({map:fxFrostTex(),transparent:true,depthWrite:false,opacity:0}));
+    mesh.rotation.x=-Math.PI/2;
+    mesh.rotation.z=(x*7+y*13)%6;                 // varied, but stable per tile
+    mesh.position.set(x+0.5,0.03,y+0.5);
+    mesh.renderOrder=4;
+    mesh.userData={kind:'fx'};
+    R3.levelGroup.add(mesh);
+    // the sweep: rime appears at ~20 tiles/s outward, lingers, then thaws
+    G.fx.push({kind:'frost',spr:mesh,t:-d*0.05,dur:1.05});
+  }
+  // shards fan out ahead of the frost, aimed at the far half of the cone
+  const mz=partyMuzzle(),pool=far.length?far:arr;
+  for(let i=0;i<12;i++){
+    const t=pool[Math.floor(Math.random()*pool.length)];
+    const tx=(t%G.L.w)+0.5+(Math.random()-0.5)*0.6, tz=Math.floor(t/G.L.w)+0.5+(Math.random()-0.5)*0.6;
+    const ty=0.25+Math.random()*0.55;
+    const T=0.26+Math.random()*0.14;
+    const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:fxShardTex(),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,rotation:Math.random()*6}));
+    const sc=0.11+Math.random()*0.08;
+    spr.scale.set(sc*1.8,sc,1);
+    spr.position.set(mz.x,mz.y,mz.z);
+    spr.userData={kind:'fx'};
+    R3.levelGroup.add(spr);
+    G.fx.push({kind:'shard',spr,t:0,dur:T,vx:(tx-mz.x)/T,vy:(ty-mz.y)/T,vz:(tz-mz.z)/T});
+  }
+  // cold mist hangs in the near half and drifts with the blast
+  const [dx,dy]=DIRS[G.facing];
+  for(let i=0;i<4;i++){
+    const d=1.6+Math.random()*2.8, side=(Math.random()-0.5)*(d*0.8);
+    const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:fxMistTex(),transparent:true,depthWrite:false,opacity:0}));
+    spr.scale.set(0.8,0.6,1);
+    spr.position.set(G.px+0.5+dx*d-dy*side,0.3+Math.random()*0.2,G.py+0.5+dy*d+dx*side);
+    spr.userData={kind:'fx'};
+    R3.levelGroup.add(spr);
+    G.fx.push({kind:'mist',spr,t:-Math.random()*0.12,dur:1.15,vx:dx*0.5,vz:dy*0.5});
+  }
+}
 function updateFx(dt){
   for(const f of G.fx.slice()){
     if(f.kind==='proj'){
@@ -9252,6 +9363,30 @@ function updateFx(dt){
         if(f.flick>=0.07){f.flick=0;f.seed=1+Math.floor(Math.random()*1e9);}
         const k=f.t/f.dur;
         bolt2dDraw(f,k<0.55?1:1-(k-0.55)/0.45);
+      }
+    }else if(f.kind==='frost'){
+      f.t+=dt;
+      if(f.t>=f.dur){R3.levelGroup.remove(f.spr);G.fx.splice(G.fx.indexOf(f),1);}
+      else if(f.t>=0&&f.spr.material){
+        const k=f.t/f.dur;
+        f.spr.material.opacity=Math.min(1,f.t/0.1)*0.85*(k<0.6?1:1-(k-0.6)/0.4);
+      }
+    }else if(f.kind==='shard'){
+      f.t+=dt;
+      if(f.t>=f.dur){R3.levelGroup.remove(f.spr);G.fx.splice(G.fx.indexOf(f),1);}
+      else{
+        f.spr.position.x+=f.vx*dt;f.spr.position.y+=f.vy*dt;f.spr.position.z+=f.vz*dt;
+        if(f.spr.material){f.spr.material.rotation+=dt*7;
+          const k=f.t/f.dur;f.spr.material.opacity=k<0.7?1:1-(k-0.7)/0.3;}
+      }
+    }else if(f.kind==='mist'){
+      f.t+=dt;
+      if(f.t>=f.dur){R3.levelGroup.remove(f.spr);G.fx.splice(G.fx.indexOf(f),1);}
+      else if(f.t>=0){
+        f.spr.position.x+=f.vx*dt*Math.max(0,1-f.t);f.spr.position.z+=f.vz*dt*Math.max(0,1-f.t);
+        const k=f.t/f.dur,g=0.8+k*0.7;
+        f.spr.scale.set(g,g*0.75,1);
+        if(f.spr.material)f.spr.material.opacity=Math.min(1,f.t/0.15)*0.16*(k<0.55?1:1-(k-0.55)/0.45);
       }
     }else if(f.kind==='flash'){
       f.t+=dt;
@@ -9341,9 +9476,19 @@ const SPELL_IMPACT={
       spawnBurst({x:p.x+dx/d*0.4,y:p.y,z:p.z+dz/d*0.4},'#bfe8ff',1.3);
     }
   },
+  conecold:(at,tiles,color,foes)=>{
+    spawnFrostCone(tiles);
+    const [dx,dy]=DIRS[G.facing];
+    spawnFlash({x:G.px+0.5+dx*2.5,z:G.py+0.5+dy*2.5},'#bfe8ff',2.4,0.45);
+    if(foes)for(const m of foes){
+      const p=monsterAim(m),cp=R3.camera.position;
+      const ddx=cp.x-p.x,ddz=cp.z-p.z,d=Math.hypot(ddx,ddz)||1;
+      spawnBurst({x:p.x+ddx/d*0.4,y:p.y,z:p.z+ddz/d*0.4},'#cfe8ff',1.2);
+    }
+  },
 };
 // spells that resolve the instant they are cast, with no projectile at all
-const SPELL_INSTANT={lightning:true};
+const SPELL_INSTANT={lightning:true,conecold:true};
 /* ---------- conditions & buffs tick ---------- */
 let bleedTimer=0,poisonTimer=0;
 function updateParty(dt){
