@@ -5358,8 +5358,13 @@ function ordSuffix(n){return n===1?'st':n===2?'nd':n===3?'rd':'th';}
 function useClassAbility(ch){
   const c=CLASSES[ch.cls];
   // every caster goes to the same spell window; a cleric's Turn Undead rides
-  // at the top of it as its own section rather than in a separate menu
-  if(c.caster){UI.openSpells(ch);return;}
+  // at the top of it as its own section rather than in a separate menu. A
+  // caster still recovering from a cast can do neither, so the window (and
+  // the Turn Undead inside it) is gated shut, matching the greyed button.
+  if(c.caster){
+    if(anyHandCd(ch)>0){UI.toast(ch.name+' is still recovering.');return;}
+    UI.openSpells(ch);return;
+  }
   if(c.rage){
     if(isRaging(ch)){UI.toast(ch.name+' is already raging.');return;}
     if(ch.rageUsed){UI.toast('Rage is spent. Rest to recover.');return;}
@@ -6031,6 +6036,7 @@ function turnUndeadPower(ch){return ch.level+Math.max(0,mod(ch.abil.cha-ch.abilD
 function turnUndead(ch){
   if(!CLASSES[ch.cls].turn){UI.toast(ch.name+' has no power over the dead.');return false;}
   if(ch.turnUsed){UI.toast('Already channelled. Rest to recover.');return false;}
+  if(anyHandCd(ch)>0){UI.toast(ch.name+' is still recovering.');return false;}
   if(!canAct(ch))return false;
   ch.turnUsed=true;
   armBoth(ch,1.6);
@@ -6881,8 +6887,7 @@ const UI=(()=>{
     }
     const hdr=document.createElement('div');
     hdr.className='dim-note';
-    hdr.textContent=(prep?'Memorised — ':'Slots left — ')+(sum||'nothing')
-      +(anyHandCd(ch)>0?' · still recovering…':' (camp to prepare)');
+    hdr.textContent=(prep?'Memorised — ':'Slots left — ')+(sum||'nothing')+' (camp to prepare)';
     list.appendChild(hdr);
     if(prep&&!rows.length){
       const none=document.createElement('div');
