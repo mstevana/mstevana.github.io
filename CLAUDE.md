@@ -611,6 +611,23 @@ the dungeon grows:
   above it. The creature still decides how the fight goes — its damage, its
   reach, whether it casts — but its weight class comes from the depth.
 
+  **Attack is not protected the same way, and the threat arc will not catch
+  it.** A boss gets a flat `+2` on top of its creature's attack and nothing
+  else, so it inherits whatever that creature was written with. `threatOf`
+  multiplies hp, damage and attack together, which means a boss can clear its
+  threat window comfortably on bulk and spells while swinging like something
+  three CR below it. Sinshara of the Veil did: the ogre mage carried `atk:7`,
+  the lowest base attack in the whole Dungeon roster and below creatures three
+  CR beneath it, so her depth-24 boss came out at **+18 on a floor where the
+  ordinary stone giant swings at +22 and her co-boss at +24**. Since AC climbs
+  faster than the party's attack by design, four points there is the difference
+  between a fight and a formality. It is `atk:11` now.
+
+  T50 asserts every boss reaches within 3 of the best ordinary attacker on its
+  own floor. Three sit at exactly −2 and are meant to — the two wights at depth
+  9, the lich at 30, the roper at 33 — because their danger is drain, paralysis
+  or hold rather than the swing.
+
 - **`trapDice` / `trapDC`** — damage keeps climbing with depth; the spot
   DC deliberately stops just short of a maxed rogue's take-10, so finding
   traps stays the rogue's job at any depth. Do not let the DC past that.

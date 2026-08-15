@@ -600,7 +600,16 @@ const MONSTERS={
              energyDrain:1, caster:{dmg:[3,6,0],ranged:6,cd:5,fx:'#b48ae0'}},
   minotaur: {cave:true, reach:true, name:'Minotaur',      cr:4,  hp:39, ac:14,atk:9, dmg:[3,6,4], xp:1200,speed:1.4, type:'giant', spr:'minotaur'},
   troll:    {reach:true, sewers:true, name:'Troll',cr:5,hp:63, ac:16,atk:9, dmg:[1,6,6], xp:1500,speed:1.4, type:'giant', spr:'troll', regen:3},
-  ogremage: {dungeon:true, reach:true, name:'Ogre mage',     cr:8,  hp:37, ac:18,atk:7, dmg:[2,6,7], xp:2400,speed:1.5, type:'giant', spr:'ogremage',
+  // The ogre mage carried atk 7 — the LOWEST base attack in the whole Dungeon
+  // roster, below creatures three CR beneath it (the worg rider is cr 7 at +12).
+  // Being a caster is a reason for thin hit points, which it still has; it is not
+  // a reason to be unable to land the greatsword, and it broke its own boss:
+  // Sinshara of the Veil came out at +18 on a depth-24 floor where the ordinary
+  // stone giant swings at +22 and her co-boss at +24. It is 11 now, which seats
+  // her between the war priest and the ettin and gives the boss +22 — level with
+  // the best thing on her floor and still under the warlord, who ought to be the
+  // better fighter of the two.
+  ogremage: {dungeon:true, reach:true, name:'Ogre mage',     cr:8,  hp:37, ac:18,atk:11,dmg:[2,6,7], xp:2400,speed:1.5, type:'giant', spr:'ogremage',
              caster:{dmg:[5,6,0],ranged:7,cd:6,fx:'#8ad0e0',elem:'cold'}},
   dragon:   {cave:true, reach:true, name:'Young dragon',  cr:7,  hp:66, ac:19,atk:11,dmg:[1,8,4], xp:2100,speed:1.4, type:'dragon', spr:'dragon',
              caster:{dmg:[6,6,0],ranged:6,cd:7,fx:'#e08a3a',elem:'fire'}},
