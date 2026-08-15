@@ -3234,7 +3234,18 @@ function tryGen(depth,targetWalk,theme){
     // those take the list's mean instead.
     const bossBase=bossDef.cycle>0?BOSS_BASE_HP*depthScale(depth):bm.maxHp;
     bm.maxHp=Math.round(bossBase*(2.5+0.6*bossDef.cycle))+depth*4; bm.hp=bm.maxHp;
-    bm.atk+=2+2*bossDef.cycle; bm.ac+=2+bossDef.cycle; bm.xp*=3;
+    /* A boss swings at least as well as the best ordinary warrior on its own
+       floor, and better where its own creature already does. The flat +2 alone
+       was not enough: a boss inherits its creature's attack, and `threatOf`
+       multiplies hp, damage and attack together, so one could clear its threat
+       window on bulk and spells while swinging like something three CR below
+       the things standing next to it. Sinshara of the Veil came out at +18 on a
+       depth-24 floor where the stone giant swings at +22; the two wights, the
+       lich and the roper were all short of their own floors by two. Since AC
+       climbs faster than the party's attack by design, being short there is the
+       difference between a fight and a formality. */
+    bm.atk+=2+2*bossDef.cycle;   // and see the attack floor applied at the end
+    bm.ac+=2+bossDef.cycle; bm.xp*=3;
     bm.guard={x:sx,y:sy,r:3};
     monsters.push(bm);
   }
@@ -3390,6 +3401,19 @@ function tryGen(depth,targetWalk,theme){
       const [dx,dy]=pick(wd);
       drow.push({x,y,dx,dy,kind:'rose',hue:rnd(3)});
     }
+  }
+  /* A boss swings at least as well as the best warrior standing on its own
+     floor. This has to run LAST, after every other monster is placed: a boss
+     inherits its creature's attack plus a flat bonus, and `threatOf` multiplies
+     hp, damage and attack together, so one can clear its threat window on bulk
+     and spells while being out-swung by the mooks around it — Sinshara of the
+     Veil came out four points under an ordinary stone giant. Elites are why the
+     pool cannot answer this (`makeElite` adds attack), and the ossuary guardian
+     is why it cannot be done where the boss is built: that one is an elite
+     undead placed afterwards, and it out-swung the crypt bosses by up to four. */
+  {
+    const bm=monsters.find(m=>m.boss);
+    if(bm)bm.atk=Math.max(bm.atk,monsters.reduce((a,m)=>m.boss?a:Math.max(a,m.atk),0));
   }
   return {w:W,h:H,grid:g,start,stairs,traps,items,monsters,secrets,theme,depth,
     explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,lurkers,duergar,drow};
@@ -3625,10 +3649,16 @@ function mkAutoParty(){
   const names=[];
   const pickName=()=>{let n;do{n=pick(FIRST_NAMES);}while(names.includes(n));names.push(n);return n;};
   return [
+    /* Order is position: `charRank` puts indices 0-1 in the front rank and 2-3
+       behind, and that is the only thing a monster's target picker reads. The
+       cleric stands in front and the rogue behind — d8 hit dice, armour and a
+       mace belong in the line, and a d6 rogue does not. Nothing else moves with
+       them: `canSneak` has no positional clause, so the rogue still opens with
+       sneak attack from the back rank. */
     mkCharacter(pickName(),'human','fighter',autoAssign('fighter',rollSix())),
-    mkCharacter(pickName(),'halfling','rogue',autoAssign('rogue',rollSix())),
-    mkCharacter(pickName(),'elf','wizard',autoAssign('wizard',rollSix())),
     mkCharacter(pickName(),'dwarf','cleric',autoAssign('cleric',rollSix())),
+    mkCharacter(pickName(),'elf','wizard',autoAssign('wizard',rollSix())),
+    mkCharacter(pickName(),'halfling','rogue',autoAssign('rogue',rollSix())),
   ];
 }
 function abilMod(ch,a){

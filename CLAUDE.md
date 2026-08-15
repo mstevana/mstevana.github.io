@@ -103,7 +103,18 @@ the gear share and leaves those tuned rates alone.
 If you change any of this, sanity-check the whole curve rather than the
 floor you were looking at. A Monte-Carlo descent (`sim_body.js` in the
 scratch harness — auto-party, geared from plausible drops, fighting every
-pack until it wipes) is the tool. It read **median death depth 31, middle
+pack until it wipes) is the tool.
+
+**Know what the gear model does and does not cover before quoting it.** It
+draws 6 open-floor rolls plus 3 hoard rolls a floor (3 more every fifth floor),
+cumulative, best-in-slot kept forever, and equips weapon / armour / helmet /
+boots / shield / amulet / both rings. It still ignores **wands and scrolls
+entirely** (~40 and ~42 per descent, dropped on the floor), non-healing potions,
+and ranged weapons; casters are modelled as a flat `level × 1.4` while slots
+last. Gear also goes to the *first* character in party order who would improve,
+not the one who gains most, and class is never consulted — which is why the
+wizard ends up in full plate. Two of these gaps were fixed (see the band below);
+the rest are live and make the model pessimistic on capability. It read **median death depth 31, middle
 half 25–35** when the curve was authored; after the crypt work (seven new
 heavy undead filling the deep bands, plus the undead damage rules) it
 reads **median 26, middle half 22–29**. After the cave work (nine cave
@@ -113,9 +124,8 @@ middle half 24–30**; moving boss floors to every third level took it to
 at **median 27, middle half 26–30**, the drow at **median 28, middle half
 25–29**, and the sewers roster at **median 27, middle half 24–29**.
 
-Restricting each theme to its own roster is the one change that has moved
-it: **median 26, middle half 21–28**, measured over 2000 descents against
-2000 on the version before it. That is a real cost and it is not a tuning
+Restricting each theme to its own roster moved it to **median 26, middle half
+21–28**, measured over 2000 descents against 2000 on the version before it. That is a real cost and it is not a tuning
 error — see *A theme fields its own roster and nothing else* for what was
 tried. Most of it was recovered there (the first attempt read median 26 with
 the party arriving at depth 15 two levels short); what is left is that
@@ -123,9 +133,30 @@ the party arriving at depth 15 two levels short); what is left is that
 score — AC, sleep poison, a line of casters — which is the same blind spot
 that hid the myconid speed bug.
 
-**Around 26 is the band. Do not treat it as a shortfall.** CLAUDE.md carried
-an intended 30–40 for a long time and the game has never once hit it, which
-kept inviting sessions to retune a curve that is working.
+Then two things landed together and both of them moved it a long way.
+
+**The harness had been understating the party, and every number above is
+affected.** `equipFromFloor` refused shields outright (`betterFor` demanded
+`kind==='weapon'` for either hand, so every shield routed to the off hand was
+rejected) and mapped every ring to `ring1`, leaving `ring2` empty for the whole
+descent. Fixing those two took the measured band from **median 26 to median 33,
+middle half 30–40** — the party had been walking around missing up to +7 of
+shield and a whole ring. Treat 33 as the honest baseline and everything
+measured before it as a floor, not a reading.
+
+**Then bosses were made to swing at least as well as the best warrior on their
+own floor, and that cost eleven depths: median 33 → 22, middle half 20–27.**
+Almost all of it is one detail — the clamp reads the *placed* monsters, so it
+matches an **elite**. Clamping to the best non-elite instead measures **median
+33**, indistinguishable from no clamp at all, because after the ogre mage fix
+the bosses already beat every unmodified creature on their floors. So the whole
+cost is bosses being pulled up to the top of the elite distribution, on a floor
+every third level. It is a deliberate design choice and not a tuning error, but
+know which of the two readings is in force before blaming a dial.
+
+**Do not treat a number in the twenties as a shortfall on its own.** CLAUDE.md
+carried an intended 30–40 for a long time on a harness that was under-gearing
+the party, which kept inviting sessions to retune a curve that was working.
 
 No *content* pass has moved it, and each was checked the same way: removing
 coffin and ossuary fights from the simulation leaves the median unchanged,
@@ -611,22 +642,30 @@ the dungeon grows:
   above it. The creature still decides how the fight goes — its damage, its
   reach, whether it casts — but its weight class comes from the depth.
 
-  **Attack is not protected the same way, and the threat arc will not catch
-  it.** A boss gets a flat `+2` on top of its creature's attack and nothing
-  else, so it inherits whatever that creature was written with. `threatOf`
-  multiplies hp, damage and attack together, which means a boss can clear its
-  threat window comfortably on bulk and spells while swinging like something
-  three CR below it. Sinshara of the Veil did: the ogre mage carried `atk:7`,
-  the lowest base attack in the whole Dungeon roster and below creatures three
-  CR beneath it, so her depth-24 boss came out at **+18 on a floor where the
-  ordinary stone giant swings at +22 and her co-boss at +24**. Since AC climbs
-  faster than the party's attack by design, four points there is the difference
-  between a fight and a formality. It is `atk:11` now.
+  **Attack is guaranteed, not inherited — and the guarantee runs last.**
+  A boss takes its creature's attack plus a flat `+2`, and `threatOf` multiplies
+  hp, damage and attack together, so a boss can clear its threat window
+  comfortably on bulk and spells while being out-swung by the mooks around it.
+  Sinshara of the Veil did: the ogre mage carried `atk:7`, the lowest in the
+  whole Dungeon roster, so her depth-24 boss came out at **+18 on a floor where
+  the ordinary stone giant swings at +22**. Since AC climbs faster than the
+  party's attack by design, being short there is the difference between a fight
+  and a formality.
 
-  T50 asserts every boss reaches within 3 of the best ordinary attacker on its
-  own floor. Three sit at exactly −2 and are meant to — the two wights at depth
-  9, the lich at 30, the roper at 33 — because their danger is drain, paralysis
-  or hold rather than the swing.
+  So the last thing `tryGen` does is raise the boss's attack to the best on its
+  own floor. Two reasons it has to be *there* and read the **placed monsters**
+  rather than the pool:
+
+  - `makeElite` adds attack, so a floor can field an elite that out-swings every
+    unmodified creature the depth allows. Reading the pool left ten of the
+    fourteen bosses short.
+  - The **ossuary guardian is placed after the boss**, and it is an elite undead
+    — it out-swung the crypt bosses by up to four even after the pool fix.
+
+  The ogre mage was also fixed at the source (`atk:11`, seating it between the
+  war priest and the ettin), because a creature that cannot hit is wrong whether
+  or not it is wearing a boss's name that day. T50 generates 364 boss floors and
+  fails if anything standing on one out-swings the boss.
 
 - **`trapDice` / `trapDC`** — damage keeps climbing with depth; the spot
   DC deliberately stops just short of a maxed rogue's take-10, so finding
