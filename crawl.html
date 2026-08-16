@@ -8138,7 +8138,7 @@ function computeDistField(){
 
    The early-out matters: this runs on every blow struck in either direction,
    and the fill is pure waste on a floor with nothing left asleep. */
-const COMBAT_NOISE=10;
+const COMBAT_NOISE=5;
 function combatNoise(x,y,r){
   const L=G.L;
   if(!L||!L.monsters.some(m=>m.hp>0&&!m.awake&&!m.guard))return 0;
@@ -8846,7 +8846,7 @@ function canSneak(ch,m){
 function damageMonster(m,dmg,byChar,crit){
   m.awake=true;m.sleep=false;
   m.hp-=dmg;
-  combatNoise(m.x,m.y);   // the fight is heard ten steps off, walls or no
+  combatNoise(m.x,m.y);   // the fight is heard five steps off, rounding corners but stopped by walls
   myconidDistress(m);   // a hurt myconid tells the grove, before it worries about dying
   UI.floatAtMonster(m,(crit?'CRIT ':'-')+dmg,crit?'#e8c840':'#e05545');
   if(m.hp<=0){killMonster(m,byChar);return;}

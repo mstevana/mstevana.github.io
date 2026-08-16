@@ -499,9 +499,9 @@ is blocked anyway — the change shows up in open caves and halls.
 Within **two steps** a monster wakes regardless of the sight line; that close
 it hears and smells the party.
 
-**Noise** — `combatNoise(x,y,r)` with `COMBAT_NOISE` at 10 — is the one that
+**Noise** — `combatNoise(x,y,r)` with `COMBAT_NOISE` at 5 — is the one that
 matters, and it is a **flood fill, not a radius**. Sound rounds corners and
-does not pass through stone, so a monster ten steps away down a passage hears
+does not pass through stone, so a monster five steps away down a passage hears
 a fight and one three tiles away through a wall does not. Closed doors stop
 it, on the same terms the party's own distance field uses. It fires from
 `damageMonster` and from `hurtChar`, so a blow taken is as loud as one dealt,
