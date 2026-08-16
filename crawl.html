@@ -3549,6 +3549,33 @@ function tryGen(depth,targetWalk,theme){
   if(best<10)return null;
   g[idx(sx,sy)]=T_STAIRS;
   const stairs={x:sx,y:sy};
+  // 6b. The party begins in a sealed antechamber: every way out of the first
+  // room is a door, so a fight is something it opens onto rather than something
+  // it spawns inside. Seal the room's outer ring, re-cut one framed door per
+  // opening (the live grid read makes a wide opening alternate wall/door rather
+  // than sit two doors abreast), then confirm nothing was walled off.
+  {
+    const r=rooms[0];
+    const ring=[];
+    for(let x=r.x;x<r.x+r.w;x++){ring.push([x,r.y-1]);ring.push([x,r.y+r.h]);}
+    for(let y=r.y;y<r.y+r.h;y++){ring.push([r.x-1,y]);ring.push([r.x+r.w,y]);}
+    const wasOpen=ring.filter(([x,y])=>inb(x,y)&&walkableTile(g[idx(x,y)]));
+    for(const [x,y] of wasOpen)g[idx(x,y)]=T_WALL;                 // seal the ring
+    let doors=0;
+    for(const [x,y] of wasOpen){                                  // re-cut framed doors
+      const horiz=(y===r.y-1||y===r.y+r.h);                       // horizontal edge -> flanks left/right
+      const wa=g[idx(x-(horiz?1:0),y-(horiz?0:1))];
+      const wb=g[idx(x+(horiz?1:0),y+(horiz?0:1))];
+      const out=horiz?g[idx(x,y===r.y-1?y-1:y+1)]:g[idx(x===r.x-1?x-1:x+1,y)];
+      if(wa===T_WALL&&wb===T_WALL&&out!==T_WALL&&out!==T_PIT){g[idx(x,y)]=T_DOOR;doors++;}
+    }
+    if(!doors)return null;                                        // no valid exit -> retry the level
+    const seen=new Uint8Array(W*H),q=[[start.x,start.y]];seen[idx(start.x,start.y)]=1;let qi=0;
+    while(qi<q.length){const [cx,cy]=q[qi++];
+      for(const [dx,dy] of DIRS){const nx=cx+dx,ny=cy+dy,t=g[idx(nx,ny)];
+        if(t&&t!==T_PIT&&!seen[idx(nx,ny)]){seen[idx(nx,ny)]=1;q.push([nx,ny]);}}}
+    for(let i=0;i<W*H;i++)if(g[i]&&g[i]!==T_PIT&&!seen[i])return null; // sealing broke the level -> retry
+  }
   // 7. secret pockets: pick walls with exactly one floor neighbor, carve pocket behind
   const secrets=[];
   let secTries=30;
@@ -3601,6 +3628,11 @@ function tryGen(depth,targetWalk,theme){
     return null;
   };
   const inLocked=(x,y)=>lockedRoom&&x>=lockedRoom.x&&x<lockedRoom.x+lockedRoom.w&&y>=lockedRoom.y&&y<lockedRoom.y+lockedRoom.h;
+  // the starting antechamber stays empty: the party never opens its eyes onto a
+  // monster already in the room with it (distance alone kept them out of small
+  // rooms, but this is the guarantee)
+  const sr=rooms[0];
+  const inStartRoom=(x,y)=>x>=sr.x&&x<sr.x+sr.w&&y>=sr.y&&y<sr.y+sr.h;
   // floor loot is scarce: most goes to dead ends as exploration rewards,
   // with only a couple of strays in the open (kills are the main loot source)
   const deadEnds=[];
@@ -3710,7 +3742,7 @@ function tryGen(depth,targetWalk,theme){
   };
   let mTries=900;
   while(monsters.length<nMon&&mTries-->0){
-    const p=randFloor(8,(x,y,i)=>!monsters.some(m=>m.x===x&&m.y===y)&&!inLocked(x,y));
+    const p=randFloor(8,(x,y,i)=>!monsters.some(m=>m.x===x&&m.y===y)&&!inLocked(x,y)&&!inStartRoom(x,y));
     if(!p)break;
     const room=Math.min(TILE_CAP,nMon-monsters.length);
     const packed=Math.random()<packChance?1+rnd(Math.max(1,room)):1;
