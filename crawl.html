@@ -6203,6 +6203,7 @@ function initRenderer(){
    worse experience than one you can barely make out. It keeps a silhouette. */
 const SPRITE_GAIN=0.55, SPRITE_FLOOR=0.13;
 const _sprC=new THREE.Color();
+const WEB_BASE=new THREE.Color(0xbfc4ca); // a cobweb's own pale colour, before the torch dims it
 function lightAt(x,y,z){
   const t=R3.torch,f=R3.torchFill,a=R3.ambient;
   const att=(L)=>{
@@ -6232,6 +6233,11 @@ function shadeSprites(){
     const s=R3.itemSprites[i];
     if(s&&s.material)s.material.color.copy(lightAt(s.position.x,s.position.y,s.position.z));
   }
+  // cobwebs are unlit line geometry, so without this a web ten tiles off is as
+  // bright as one overhead; multiply their pale colour by the same torch falloff
+  if(R3.webMeshes)for(const w of R3.webMeshes){
+    if(w.material)w.material.color.copy(WEB_BASE).multiply(lightAt(w.position.x,w.position.y,w.position.z));
+  }
 }
 function onResize(){
   const wrap=document.getElementById('view-wrap');
@@ -6244,7 +6250,7 @@ function disposeLevel(){
   for(const f of R3.liquidFlows)f.tex.dispose();
   R3.liquidFlows=[];R3.liquidShaders=[];
   R3.doorMeshes={};R3.secretMeshes={};R3.trapDecals={};R3.itemSprites={};R3.monsterSprites={};R3.monsterGlows={};R3.monsterShadows={};R3.prewarmQ=[];R3.prewarmT=0;R3.stairsGroup=null;
-  R3.candleFlames=[];R3.cryptGroups=[];R3.lurkerMeshes={};R3.wallMats=null;
+  R3.candleFlames=[];R3.cryptGroups=[];R3.lurkerMeshes={};R3.wallMats=null;R3.webMeshes=[];
 }
 function buildLevel(L){
   disposeLevel();
@@ -6786,6 +6792,40 @@ function buildLevel(L){
         specular:0x141018,shininess:5});
       const webMat=new THREE.MeshBasicMaterial({color:0x9aa0a6,transparent:true,opacity:0.13,
         side:THREE.DoubleSide,depthWrite:false});
+      const webLineMat=new THREE.LineBasicMaterial({color:0xbfc4ca,transparent:true,opacity:0.32,depthWrite:false});
+      // a corner cobweb built from real threads rather than a flat pane: an apex
+      // at the top, radial spokes fanning down, sagging cross-threads webbing
+      // them together, and a couple of broken strands trailing off
+      const cobwebGeo=(rnd,size)=>{
+        const v=[],add=(ax,ay,bx,by)=>v.push(ax,ay,0,bx,by,0);
+        const hy=size*0.52;                        // apex, top-centre
+        const n=6+Math.floor(rnd()*3),span=1.25;   // spokes fan downward from it
+        const tips=[];
+        for(let i=0;i<n;i++){
+          const a=-span+2*span*(i/(n-1))+(rnd()-0.5)*0.08, r=size*(0.9+rnd()*0.25);
+          const tx=Math.sin(a)*r,ty=hy-Math.cos(a)*r;
+          tips.push([tx,ty]);add(0,hy,tx,ty);       // radial spoke
+        }
+        const rings=4+Math.floor(rnd()*2);          // concentric cross-threads
+        for(let k=1;k<=rings;k++){
+          const f=k/(rings+1);
+          for(let i=0;i<tips.length-1;i++){
+            const ax=tips[i][0]*f,ay=hy+(tips[i][1]-hy)*f;
+            const bx=tips[i+1][0]*f,by=hy+(tips[i+1][1]-hy)*f;
+            const mx=(ax+bx)/2,my=(ay+by)/2;         // sag the chord toward the apex
+            const dx=-mx,dy=hy-my,dl=Math.hypot(dx,dy)||1,s=size*0.12*(0.6+rnd()*0.7);
+            const cx=mx+dx/dl*s,cy=my+dy/dl*s;
+            add(ax,ay,cx,cy);add(cx,cy,bx,by);
+          }
+        }
+        for(let i=0;i<2+Math.floor(rnd()*3);i++){    // stray broken threads
+          const t=tips[Math.floor(rnd()*tips.length)];
+          add(t[0],t[1],t[0]+(rnd()-0.5)*size*0.35,t[1]-rnd()*size*0.5);
+        }
+        const g=new THREE.BufferGeometry();
+        g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));
+        return g;
+      };
       const boneG=new THREE.CylinderGeometry(0.018,0.018,0.17,5);
       const skullG=new THREE.SphereGeometry(0.045,7,6);
       for(let y=1;y<L.h-1;y++)for(let x=1;x<L.w-1;x++){
@@ -6822,10 +6862,12 @@ function buildLevel(L){
             litter.add(sk);
           }
         }else if(roll<0.19){ // a cobweb strung across a high corner
-          const w=new THREE.Mesh(new THREE.PlaneGeometry(0.55,0.55),webMat);
-          w.position.set(x+0.5,WALLH-0.3,y+0.5);
-          w.rotation.set(-Math.PI/3,rr()*Math.PI,0);
+          // its own material so shadeSprites can dim it by distance each frame
+          const w=new THREE.LineSegments(cobwebGeo(rr,0.5+rr()*0.28),webLineMat.clone());
+          w.position.set(x+0.5,WALLH-0.18,y+0.5);
+          w.rotation.set((rr()-0.5)*0.5,rr()*Math.PI*2,(rr()-0.5)*0.4);
           litter.add(w);
+          (R3.webMeshes||(R3.webMeshes=[])).push(w);
         }
       }
       grp.add(litter);
@@ -9194,7 +9236,19 @@ function pickPartyTarget(m){
   if(!alive.length)return null;
   if(!m)return pick(alive);
   const at=(side,rank)=>alive.find(ch=>charSide(ch)===side&&charRank(ch)===rank);
-  const s=monsterSide(m),r=monsterRank(m);
+  // A monster's lane is its place in the WHOLE line pressing the party —
+  // nearest first — not its slot on its own tile. `m.slot` only distinguishes
+  // monsters sharing one tile; every monster alone on its tile is slot 0, so
+  // reading it directly made every lone attacker converge on one file. Ranking
+  // the combined line instead (still slot-ordered within a tile, so a packed
+  // faced tile keeps its clean one-to-one) fans lone attackers out across the
+  // party. eff%4 reuses the same slot->side/rank mapping as monsterSide/Rank.
+  const d=o=>Math.abs(o.x-G.px)+Math.abs(o.y-G.py);
+  const line=G.L.monsters.filter(o=>o.hp>0&&o.awake)
+    .sort((a,b)=>d(a)-d(b)||a.y-b.y||a.x-b.x||a.slot-b.slot);
+  let idx=line.indexOf(m);
+  if(idx<0)idx=m.slot||0; // not in the line (an edge case): fall back to slot
+  const eff=idx%4, s=(eff%2)?SIDE_L:SIDE_R, r=eff<2?RANK_F:RANK_B;
   // its own lane, own rank first; whoever can still hold it, else whoever is left
   for(const holding of [true,false])
     for(const rr of [r,1-r]){
