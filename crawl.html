@@ -7284,40 +7284,58 @@ function buildLevel(L){
         g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));
         return g;
       };
-      const boneG=new THREE.CylinderGeometry(0.018,0.018,0.17,5);
-      const skullG=new THREE.SphereGeometry(0.045,7,6);
+      // Dressing is built as instanced primitives — one draw call per shape
+      // however many tiles carry it — so the detail below stays cheap. Each
+      // feature composes a base transform (tile position + a seeded yaw) and
+      // multiplies in the local transform of every piece, so a slab's carving
+      // and a skull's sockets turn with it.
+      const slabRimMat  =new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.floor,0.30)),specular:0x14110b,shininess:6});
+      const slabCarveMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.floor,-0.12)),specular:0x100c14,shininess:4});
+      const socketMat   =new THREE.MeshBasicMaterial({color:0x0c0a07}); // unlit: eye sockets stay dark hollows
+      const boxU=new THREE.BoxGeometry(1,1,1);
+      const cylU=new THREE.CylinderGeometry(1,1,1,6);                 // unit bone shaft, along Y
+      const sphU=new THREE.SphereGeometry(1,7,6);                     // unit knob / cranium / socket
+      const ribU=new THREE.TorusGeometry(0.075,0.011,5,9,Math.PI*0.8);// a rib arc, in the XY plane
+      const QID=new THREE.Quaternion();
+      const QLAY=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,0,Math.PI/2));  // stand a shaft down onto X
+      const QFLAT=new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI/2,0,0)); // lay a rib flat
+      const yawQ=(a)=>new THREE.Quaternion().setFromEuler(new THREE.Euler(0,a,0));
+      const loc=(px,py,pz,q,sx,sy,sz)=>new THREE.Matrix4().compose(new THREE.Vector3(px,py,pz),q,new THREE.Vector3(sx,sy,sz));
+      const frames=[],panels=[],carves=[],lines=[],shafts=[],knobs=[],boneBoxes=[],sockets=[],ribs=[];
+      const put=(arr,base,l)=>arr.push(new THREE.Matrix4().multiplyMatrices(base,l));
       for(let y=1;y<L.h-1;y++)for(let x=1;x<L.w-1;x++){
         if(L.grid[y*L.w+x]!==T_FLOOR)continue;
         // one deterministic draw per tile, so nothing shuffles on a rebuild
         let hsh=((x*374761393)^(y*668265263))>>>0;
         const rr=()=>{hsh=(hsh*1664525+1013904223)>>>0;return hsh/4294967296;};
         const roll=rr();
-        if(roll<0.07){ // a grave slab set flush into the floor
-          const w=0.62+rr()*0.2,d=0.78+rr()*0.16;
-          const sl=new THREE.Mesh(new THREE.BoxGeometry(w,0.02,d),slabMat);
-          sl.position.set(x+0.5+(rr()-0.5)*0.12,0.011,y+0.5+(rr()-0.5)*0.12);
-          sl.rotation.y=(rr()-0.5)*0.25;
-          litter.add(sl);
-          for(let k=0;k<2;k++){ // a crack across it
-            const cr=new THREE.Mesh(new THREE.BoxGeometry(w*0.9,0.006,0.014),boneMat2);
-            cr.material=webMat;
-            cr.position.set(x+0.5,0.023,y+0.5+(k?0.12:-0.14));
-            cr.rotation.y=(rr()-0.5)*0.7;
-            litter.add(cr);
-          }
-        }else if(roll<0.15){ // scattered bone
+        if(roll<0.07){ // a carved grave slab set into the floor
+          const w=0.6+rr()*0.2,d=0.76+rr()*0.16;
+          const base=new THREE.Matrix4().compose(
+            new THREE.Vector3(x+0.5+(rr()-0.5)*0.12,0,y+0.5+(rr()-0.5)*0.12),yawQ((rr()-0.5)*0.25),new THREE.Vector3(1,1,1));
+          put(frames,base,loc(0,0.011,0,QID,w,0.022,d));                    // outer frame
+          put(panels,base,loc(0,0.019,0,QID,w-0.1,0.03,d-0.1));             // panel raised proud of it
+          const cz=-d*0.16;
+          put(carves,base,loc(0,0.033,cz,QID,0.03,0.02,0.22));              // a cross: upright
+          put(carves,base,loc(0,0.033,cz-0.02,QID,0.14,0.02,0.03));         //          and arms
+          for(let li=0;li<3;li++)put(lines,base,loc(0,0.03,d*0.05+li*0.07,QID,w*0.46,0.008,0.012)); // inscription rows
+          for(let k=0;k<2;k++)put(lines,base,loc((rr()-0.5)*0.12,0.034,(k?0.13:-0.28),yawQ((rr()-0.5)*0.9),w*0.8,0.006,0.014)); // cracks
+        }else if(roll<0.15){ // scattered bones — more than a stick apiece
           const n=2+Math.floor(rr()*3);
           for(let k=0;k<n;k++){
-            const b=new THREE.Mesh(boneG,boneMat2);
-            b.rotation.set(Math.PI/2,0,rr()*Math.PI);
-            b.position.set(x+0.2+rr()*0.6,0.022,y+0.2+rr()*0.6);
-            litter.add(b);
+            const base=new THREE.Matrix4().compose(new THREE.Vector3(x+0.2+rr()*0.6,0.02,y+0.2+rr()*0.6),yawQ(rr()*Math.PI),new THREE.Vector3(1,1,1));
+            if(rr()<0.75){ // a long bone: a shaft knobbed at each end
+              const len=0.14+rr()*0.1,rad=0.016+rr()*0.006;
+              put(shafts,base,loc(0,0,0,QLAY,rad,len,rad));
+              for(const s of [-1,1])put(knobs,base,loc(s*len/2,0,0,QID,rad*1.9,rad*2.2,rad*2.2));
+            }else put(ribs,base,loc(0,0,0,QFLAT,1,1,1)); // a rib fragment
           }
-          if(rr()<0.4){
-            const sk=new THREE.Mesh(skullG,boneMat2);
-            sk.scale.set(1,0.8,1.1);
-            sk.position.set(x+0.3+rr()*0.4,0.04,y+0.3+rr()*0.4);
-            litter.add(sk);
+          if(rr()<0.5){ // a skull, with a jaw and dark sockets
+            const base=new THREE.Matrix4().compose(new THREE.Vector3(x+0.3+rr()*0.4,0.05,y+0.3+rr()*0.4),yawQ(rr()*Math.PI*2),new THREE.Vector3(1,1,1));
+            put(knobs,base,loc(0,0,0,QID,0.05,0.043,0.058));                // cranium
+            put(boneBoxes,base,loc(0,-0.03,0.04,QID,0.055,0.024,0.04));     // jaw
+            for(const s of [-1,1])put(sockets,base,loc(s*0.021,0.006,0.05,QID,0.016,0.017,0.012)); // eye sockets
+            put(sockets,base,loc(0,-0.012,0.056,QID,0.01,0.014,0.01));      // nasal cavity
           }
         }else if(roll<0.19){ // a cobweb strung across a high corner
           // its own material so shadeSprites can dim it by distance each frame
@@ -7328,6 +7346,13 @@ function buildLevel(L){
           (R3.webMeshes||(R3.webMeshes=[])).push(w);
         }
       }
+      const mkInst=(mats,geo,mat)=>{ if(!mats.length)return;
+        const inst=new THREE.InstancedMesh(geo,mat,mats.length);
+        mats.forEach((m,i)=>inst.setMatrixAt(i,m)); inst.instanceMatrix.needsUpdate=true; litter.add(inst); };
+      mkInst(frames,boxU,slabRimMat); mkInst(panels,boxU,slabMat);
+      mkInst(carves,boxU,slabCarveMat); mkInst(lines,boxU,webMat);
+      mkInst(shafts,cylU,boneMat2); mkInst(knobs,sphU,boneMat2);
+      mkInst(boneBoxes,boxU,boneMat2); mkInst(sockets,sphU,socketMat); mkInst(ribs,ribU,boneMat2);
       grp.add(litter);
     }
     // the ossuary: a chamber given over wholly to the dead. Its walls are
@@ -8540,7 +8565,13 @@ function tryMove(kind){ // 'fwd','back','sleft','sright'
   const t=tileAt(nx,ny);
   if(t===T_WALL){SFX.bump();return;}
   if(t===T_SECRET){SFX.bump();return;}
-  if(t===T_PIT){SFX.bump();UI.toast('A pit of putrid sewage blocks the way.');return;}
+  if(t===T_PIT){
+    // the crypt bier is an unwalkable pit too; walking into it should rob it,
+    // not report a sewer lake
+    const os=G.L.ossuary;
+    if(os&&nx===os.bx&&ny===os.by){openBier();return;}
+    SFX.bump();UI.toast('A pit of putrid sewage blocks the way.');return;
+  }
   if(t===T_SECRET_FOUND){openSecretAt(nx,ny);return;}
   if(t===T_DOOR){openDoorAt(nx,ny);return;}
   if(t===T_DOOR_LOCKED){tryUnlock(nx,ny);return;}
