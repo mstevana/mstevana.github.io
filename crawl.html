@@ -7038,6 +7038,51 @@ function buildLevel(L){
         grp.add(pud);
       }
     }
+    // spillways: where a corridor channel reaches a walkable tile that also
+    // touches the pool, carry the sewage across that tile into the lake and cap
+    // it with a small fluted stone lip, so the pool reads as something the
+    // channels were built to drain into rather than an unrelated hole
+    if(pitCells.length&&L.rivers&&L.rivers.length){
+      const riverSet=new Set(L.rivers);
+      const spillZ=[],spillX=[],lips=[],seenC=new Set();
+      for(const [px,py] of pitCells)for(const [dx,dy] of DIRS){
+        const cx=px+dx,cy=py+dy,ci=cy*L.w+cx;
+        // a walkable ring tile that is not itself a channel...
+        if(seenC.has(ci)||riverSet.has(ci)||!walkableTile(L.grid[ci]))continue;
+        // ...and borders a channel tile
+        let touchesRiver=false;
+        for(const [rx,ry] of DIRS)if(riverSet.has((cy+ry)*L.w+(cx+rx))){touchesRiver=true;break;}
+        if(!touchesRiver)continue;
+        seenC.add(ci);
+        const pdx=-dx,pdy=-dy;                       // the pool lies this way; flow into it
+        (pdy!==0?spillZ:spillX).push([cx,cy]);
+        lips.push([cx,cy,pdx,pdy]);
+      }
+      const addSpill=(cells,gw,gd,mat,h)=>{
+        if(!cells.length)return;
+        const geo=new THREE.PlaneGeometry(gw,gd);geo.rotateX(-Math.PI/2);
+        const inst=new THREE.InstancedMesh(geo,mat,cells.length);
+        cells.forEach(([x,y],i)=>{m4b.makeTranslation(x+0.5,h,y+0.5);inst.setMatrixAt(i,m4b);});
+        grp.add(inst);
+      };
+      addSpill(spillZ,0.44,1,bedMat,0.008);addSpill(spillX,1,0.44,bedMat,0.012);
+      addSpill(spillZ,0.34,1,riverMatZ,0.018);addSpill(spillX,1,0.34,riverMatX,0.022);
+      if(lips.length){
+        const lipMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,-0.28)),specular:0x14110b,shininess:5});
+        for(const [cx,cy,pdx,pdy] of lips){
+          const g0=new THREE.Group();
+          const base=new THREE.Mesh(new THREE.BoxGeometry(0.42,0.12,0.28),lipMat);
+          g0.add(base);                                // a shelf overhanging the water
+          for(let k=-1;k<=1;k++){                       // three ridges, grooves between: a fluted chute
+            const rdg=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.07,0.32),lipMat);
+            rdg.position.set(k*0.13,0.06,0.01);g0.add(rdg);
+          }
+          g0.rotation.y=Math.atan2(pdx,pdy);            // local +Z points into the pool
+          g0.position.set(cx+0.5+pdx*0.46,0.01,cy+0.5+pdy*0.46);
+          grp.add(g0);
+        }
+      }
+    }
   }
   // crypt: the walls are given over to the dead. Every feature is built in a
   // local frame where +X runs along the wall, +Y is up and +Z points out into
