@@ -9564,8 +9564,26 @@ function applySpellToAlly(caster,t,sp,cl){
   if(sp.cures)for(const c of sp.cures)cureCond(t,c);
   if(sp.restoreAbility){
     let left=sp.restoreAbility===99?999:roll(1,4);
-    for(const a of ABILITIES){const heal=Math.min(left,t.abilDmg[a]);t.abilDmg[a]-=heal;left-=heal;}
+    /* The poison badge carries a ledger of what IT drained, and a cure gives
+       back exactly that. So healing ability damage has to settle up with the
+       ledger as it goes, or two things go wrong: the badge outlives everything
+       it was doing (Restoration undoes the drain and leaves the mark), and a
+       cure later hands the same points back a second time on top of whatever a
+       fresh poison has since taken. */
+    const px=t.conditions.find(c=>c.kind==='poison');
+    for(const a of ABILITIES){
+      const heal=Math.min(left,t.abilDmg[a]);
+      t.abilDmg[a]-=heal;left-=heal;
+      if(heal&&px&&px.drain&&px.drain[a]){
+        px.drain[a]=Math.max(0,px.drain[a]-heal);
+        if(!px.drain[a])delete px.drain[a];
+      }
+    }
+    // nothing of the poison is left to undo, so the mark goes with it — a badge
+    // that no longer stands for anything is exactly what this game does not want
+    if(px&&px.drain&&!Object.keys(px.drain).length)removeCond(t,'poison');
     recalcHp(t,false);
+    UI.refreshParty();
     UI.toast(t.name+' feels vigour return.');
   }
   if(sp.restoreLevels&&t.negLevels>0){t.negLevels=0;removeCond(t,'drained');recalcHp(t,false);UI.toast('Lost life-force floods back into '+t.name+'.');}
