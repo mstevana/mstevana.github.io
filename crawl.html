@@ -402,7 +402,7 @@ const CLASSES={
              note:'Favored enemies (+2 dmg vs beasts & goblinoids). Lighter two-weapon penalties.', prio:['str','dex','con','wis','int','cha']},
   paladin:  {name:'Paladin',  hd:10, bab:'full',  fort:1,ref:0,will:0, startWeapon:'shortsword', layon:true, smite:true, grace:true, weaponProf:'martial',
              note:'Lay on Hands heal pool, Smite Evil (per rest), CHA to saves.', prio:['str','cha','con','wis','dex','int']},
-  rogue:    {name:'Rogue',    hd:6,  bab:'three', fort:0,ref:1,will:0, startWeapon:'shortsword', sneak:true, trapfind:true, armorMax:'medium', weaponProf:'simple', weaponAlso:['rapier','shortsword','shortbow'],
+  rogue:    {name:'Rogue',    hd:6,  bab:'three', fort:0,ref:1,will:0, startWeapon:'shortbow', sneak:true, trapfind:true, armorMax:'medium', weaponProf:'simple', weaponAlso:['rapier','shortsword','shortbow'],
              note:'Sneak attack vs foes that have not yet struck back. Finds and disarms traps, spots secret doors. Wears up to medium armour.', prio:['dex','str','con','int','wis','cha']},
   cleric:   {name:'Cleric',   hd:8,  bab:'three', fort:1,ref:0,will:1, startWeapon:'mace', caster:'divine', turn:true, weaponProf:'simple',
              note:'Divine spells (WIS): healing, blessings, holy fire. Turn Undead (per rest).', prio:['wis','con','str','cha','dex','int']},
@@ -3633,6 +3633,33 @@ function tryGen(depth,targetWalk,theme){
   if(best<10)return null;
   g[idx(sx,sy)]=T_STAIRS;
   const stairs={x:sx,y:sy};
+  // 6b. The party begins in a sealed antechamber: every way out of the first
+  // room is a door, so a fight is something it opens onto rather than something
+  // it spawns inside. Seal the room's outer ring, re-cut one framed door per
+  // opening (the live grid read makes a wide opening alternate wall/door rather
+  // than sit two doors abreast), then confirm nothing was walled off.
+  {
+    const r=rooms[0];
+    const ring=[];
+    for(let x=r.x;x<r.x+r.w;x++){ring.push([x,r.y-1]);ring.push([x,r.y+r.h]);}
+    for(let y=r.y;y<r.y+r.h;y++){ring.push([r.x-1,y]);ring.push([r.x+r.w,y]);}
+    const wasOpen=ring.filter(([x,y])=>inb(x,y)&&walkableTile(g[idx(x,y)]));
+    for(const [x,y] of wasOpen)g[idx(x,y)]=T_WALL;                 // seal the ring
+    let doors=0;
+    for(const [x,y] of wasOpen){                                  // re-cut framed doors
+      const horiz=(y===r.y-1||y===r.y+r.h);                       // horizontal edge -> flanks left/right
+      const wa=g[idx(x-(horiz?1:0),y-(horiz?0:1))];
+      const wb=g[idx(x+(horiz?1:0),y+(horiz?0:1))];
+      const out=horiz?g[idx(x,y===r.y-1?y-1:y+1)]:g[idx(x===r.x-1?x-1:x+1,y)];
+      if(wa===T_WALL&&wb===T_WALL&&out!==T_WALL&&out!==T_PIT){g[idx(x,y)]=T_DOOR;doors++;}
+    }
+    if(!doors)return null;                                        // no valid exit -> retry the level
+    const seen=new Uint8Array(W*H),q=[[start.x,start.y]];seen[idx(start.x,start.y)]=1;let qi=0;
+    while(qi<q.length){const [cx,cy]=q[qi++];
+      for(const [dx,dy] of DIRS){const nx=cx+dx,ny=cy+dy,t=g[idx(nx,ny)];
+        if(t&&t!==T_PIT&&!seen[idx(nx,ny)]){seen[idx(nx,ny)]=1;q.push([nx,ny]);}}}
+    for(let i=0;i<W*H;i++)if(g[i]&&g[i]!==T_PIT&&!seen[i])return null; // sealing broke the level -> retry
+  }
   // 7. secret pockets: pick walls with exactly one floor neighbor, carve pocket behind
   const secrets=[];
   let secTries=30;
@@ -3685,6 +3712,11 @@ function tryGen(depth,targetWalk,theme){
     return null;
   };
   const inLocked=(x,y)=>lockedRoom&&x>=lockedRoom.x&&x<lockedRoom.x+lockedRoom.w&&y>=lockedRoom.y&&y<lockedRoom.y+lockedRoom.h;
+  // the starting antechamber stays empty: the party never opens its eyes onto a
+  // monster already in the room with it (distance alone kept them out of small
+  // rooms, but this is the guarantee)
+  const sr=rooms[0];
+  const inStartRoom=(x,y)=>x>=sr.x&&x<sr.x+sr.w&&y>=sr.y&&y<sr.y+sr.h;
   // floor loot is scarce: most goes to dead ends as exploration rewards,
   // with only a couple of strays in the open (kills are the main loot source)
   const deadEnds=[];
@@ -3794,7 +3826,7 @@ function tryGen(depth,targetWalk,theme){
   };
   let mTries=900;
   while(monsters.length<nMon&&mTries-->0){
-    const p=randFloor(8,(x,y,i)=>!monsters.some(m=>m.x===x&&m.y===y)&&!inLocked(x,y));
+    const p=randFloor(8,(x,y,i)=>!monsters.some(m=>m.x===x&&m.y===y)&&!inLocked(x,y)&&!inStartRoom(x,y));
     if(!p)break;
     const room=Math.min(TILE_CAP,nMon-monsters.length);
     const packed=Math.random()<packChance?1+rnd(Math.max(1,room)):1;
@@ -7084,6 +7116,47 @@ function buildLevel(L){
         grp.add(pud);
       }
     }
+    // spillways: where a corridor channel reaches a walkable tile that also
+    // touches the pool, carry the sewage across that tile into the lake and cap
+    // it with a small stone lip, so the pool reads as something the channels
+    // were built to drain into rather than an unrelated hole
+    if(pitCells.length&&L.rivers&&L.rivers.length){
+      const riverSet=new Set(L.rivers);
+      const spillZ=[],spillX=[],lips=[],seenC=new Set();
+      for(const [px,py] of pitCells)for(const [dx,dy] of DIRS){
+        const cx=px+dx,cy=py+dy,ci=cy*L.w+cx;
+        // a walkable ring tile that is not itself a channel...
+        if(seenC.has(ci)||riverSet.has(ci)||!walkableTile(L.grid[ci]))continue;
+        // ...and borders a channel tile
+        let touchesRiver=false;
+        for(const [rx,ry] of DIRS)if(riverSet.has((cy+ry)*L.w+(cx+rx))){touchesRiver=true;break;}
+        if(!touchesRiver)continue;
+        seenC.add(ci);
+        const pdx=-dx,pdy=-dy;                       // the pool lies this way; flow into it
+        (pdy!==0?spillZ:spillX).push([cx,cy]);
+        lips.push([cx,cy,pdx,pdy]);
+      }
+      const addSpill=(cells,gw,gd,mat,h)=>{
+        if(!cells.length)return;
+        const geo=new THREE.PlaneGeometry(gw,gd);geo.rotateX(-Math.PI/2);
+        const inst=new THREE.InstancedMesh(geo,mat,cells.length);
+        cells.forEach(([x,y],i)=>{m4b.makeTranslation(x+0.5,h,y+0.5);inst.setMatrixAt(i,m4b);});
+        grp.add(inst);
+      };
+      addSpill(spillZ,0.44,1,bedMat,0.008);addSpill(spillX,1,0.44,bedMat,0.012);
+      addSpill(spillZ,0.34,1,riverMatZ,0.018);addSpill(spillX,1,0.34,riverMatX,0.022);
+      if(lips.length){
+        const lipMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,-0.28)),specular:0x14110b,shininess:5});
+        for(const [cx,cy,pdx,pdy] of lips){
+          const g0=new THREE.Group();
+          const base=new THREE.Mesh(new THREE.BoxGeometry(0.42,0.12,0.28),lipMat);
+          g0.add(base);                                // a shelf overhanging the water
+          g0.rotation.y=Math.atan2(pdx,pdy);            // local +Z points into the pool
+          g0.position.set(cx+0.5+pdx*0.46,0.01,cy+0.5+pdy*0.46);
+          grp.add(g0);
+        }
+      }
+    }
   }
   // crypt: the walls are given over to the dead. Every feature is built in a
   // local frame where +X runs along the wall, +Y is up and +Z points out into
@@ -8371,7 +8444,7 @@ function computeDistField(){
 
    The early-out matters: this runs on every blow struck in either direction,
    and the fill is pure waste on a floor with nothing left asleep. */
-const COMBAT_NOISE=10;
+const COMBAT_NOISE=5;
 function combatNoise(x,y,r){
   const L=G.L;
   if(!L||!L.monsters.some(m=>m.hp>0&&!m.awake&&!m.guard))return 0;
@@ -8627,8 +8700,14 @@ function passiveSearch(){
   // sharpest-eyed companion still gets a single notice roll on the tile just ahead
   const trapAlive=G.party.filter(ch=>!isDown(ch));
   const trapfinder=trapAlive.find(ch=>CLASSES[ch.cls].trapfind);
+  // the rogue scouts two tiles ahead, but only reaches the second if the first
+  // is see-through: a trap or an ambusher behind a wall or a shut door has no
+  // line of sight and must not be spotted through it
+  const a1=aheadTile(1);
+  const scout=[{x:G.px,y:G.py},a1];
+  if(seesThroughTile(tileAt(a1.x,a1.y)))scout.push(aheadTile(2));
   if(trapfinder){
-    for(const c of [ {x:G.px,y:G.py}, aheadTile(1), aheadTile(2) ]){
+    for(const c of scout){
       const i=c.y*L.w+c.x;
       const tr=L.traps[i];
       if(tr&&tr.armed&&!tr.found&&10+searchBonus(trapfinder)>=tr.dc){
@@ -8656,7 +8735,7 @@ function passiveSearch(){
   if(L.lurkers&&L.lurkers.length){
     const seen=[];
     if(trapfinder){
-      for(const c of [ {x:G.px,y:G.py}, aheadTile(1), aheadTile(2) ]){
+      for(const c of scout){
         const li=lurkerIndexAt(c.x,c.y);
         if(li>=0&&10+searchBonus(trapfinder)>=L.lurkers[li].dc)seen.push([li,trapfinder]);
       }
@@ -9079,7 +9158,7 @@ function canSneak(ch,m){
 function damageMonster(m,dmg,byChar,crit){
   m.awake=true;m.sleep=false;
   m.hp-=dmg;
-  combatNoise(m.x,m.y);   // the fight is heard ten steps off, walls or no
+  combatNoise(m.x,m.y);   // the fight is heard five steps off, rounding corners but stopped by walls
   myconidDistress(m);   // a hurt myconid tells the grove, before it worries about dying
   UI.floatAtMonster(m,(crit?'CRIT ':'-')+dmg,crit?'#e8c840':'#e05545');
   if(m.hp<=0){killMonster(m,byChar);return;}
@@ -12837,11 +12916,15 @@ const UI=(()=>{
     for(let y=0;y<L.h;y++)for(let x=0;x<L.w;x++){
       const t=L.grid[y*L.w+x];
       if(!L.explored[y*L.w+x]){
-        // hint at passable tiles bordering explored ground, without revealing what they hold
+        // hint at passable tiles bordering explored GROUND — floor you've stood
+        // on or seen, not a wall. Walking a corridor marks the flanking walls
+        // explored (the 3x3 around the party); without the walkable check a
+        // passage running parallel behind one of those walls, with no line of
+        // sight to it, would border that explored wall and be hinted anyway.
         if(t&&t!==T_SECRET){
           for(const [dx,dy] of DIRS){
             const nx=x+dx,ny=y+dy;
-            if(nx>=0&&ny>=0&&nx<L.w&&ny<L.h&&L.explored[ny*L.w+nx]){
+            if(nx>=0&&ny>=0&&nx<L.w&&ny<L.h&&L.explored[ny*L.w+nx]&&walkableTile(L.grid[ny*L.w+nx])){
               ctx.fillStyle='#3c3c3c';ctx.fillRect(x*cs,y*cs,cs,cs);
               break;
             }
