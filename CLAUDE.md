@@ -58,7 +58,19 @@ increasing. Breaking that is the main way to accidentally make a floor
 easier than the one above it.
 
 - `depthScale(depth)` — monster hp multiplier, `1 + 0.07·(depth−1)`.
-- `depthAtkBonus(depth)` — flat attack bonus; half of it also goes to AC.
+- `depthAtkBonus(depth)` — flat attack bonus, `+1 a floor` but **capped at
+  +20**, so it stops growing at depth 21. AC is **no longer** this curve
+  halved: `depthACBonus` keeps the old, gentler `⌊⌊(depth−1)/2.5⌋/2⌋`, so
+  making monsters land blows does not also quietly make them harder to kill
+  and drag every fight out.
+
+  **The cap has a consequence worth knowing before touching the deep end.**
+  `threatOf` multiplies hp, damage and attack together, so past depth 21 the
+  attack term is constant and only `depthScale` still lifts a creature's
+  score. A deep slot is therefore carried by the creature's own stats, and
+  the boss arc stops being automatically monotonic: the depth-33 roper came
+  out 0.5% under the depth-30 lich and had to be given the bulk to clear it.
+  Check T21 after any change to the deep table or to these dials.
 - `targetCount(depth)` — how many monsters a floor holds, capped at 30.
 - `monsterThreat(m)` / `threatOf(key,depth,elite)` — one scalar score for
   a creature, from hp, average damage, attack, and a multiplier for
