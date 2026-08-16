@@ -170,6 +170,32 @@ know which of the two readings is in force before blaming a dial.
 carried an intended 30–40 for a long time on a harness that was under-gearing
 the party, which kept inviting sessions to retune a curve that was working.
 
+**And the number now reads 8–9, which is a decision rather than a bug.** It was
+bisected commit by commit against the same harness, so only the game changes:
+
+| after | median |
+|---|---|
+| before the weapons/armour/trinket expansion | **33** |
+| after it | **21** |
+| after `depthAtkBonus` was recut to `min(20, depth−1)` | **8** |
+
+Isolated on the current build, the attack curve is nearly the whole of the
+second drop: restoring the old `⌊(depth−1)/2.5⌋` measures **19**, while
+restoring the halved ration faucet alone measures **9**. Softer slopes were
+measured too — 0.75/floor gives 11, 0.6 and 0.5 both give 14.
+
+**The curve was left as it is on purpose.** The judgement is that the harness
+understates the party badly enough that the absolute figure cannot carry a
+retune: it still ignores wands and scrolls entirely, non-healing potions and
+ranged weapons, and flattens casters to `level × 1.4` — and monsters landing
+blows far more often is exactly the axis a party's unused consumables answer.
+So **do not chase this median**, and do not read the first drop as proof the
+gear expansion was wrong either; adding item kinds dilutes the loot table, so
+some of that 33 → 21 is the harness finding fewer slot upgrades rather than the
+party being poorer. What the table is good for is *relative* checks — run it
+before and after your own change and compare the two, which is the only way it
+has ever been trustworthy.
+
 No *content* pass has moved it, and each was checked the same way: removing
 coffin and ossuary fights from the simulation leaves the median unchanged,
 and so does skipping every ambush.
