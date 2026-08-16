@@ -8415,8 +8415,10 @@ function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
   if(isRangedShot){
     SFX.arrow();
     // an arrow receding from the eye reads as a sideways smudge when drawn
-    // horizontal; stood upright — tip up, fletching down — it reads as an arrow
-    spawnProjectile({from:partyMuzzle(),toFn:()=>monsterAim(m),
+    // horizontal; stood upright — tip up, fletching down — it reads as an arrow.
+    // It launches from the low bow muzzle so it enters at the bottom of the frame
+    // and climbs toward the target, shrinking as it goes.
+    spawnProjectile({from:bowMuzzle(),toFn:()=>monsterAim(m),
       tex:wDef.spr==='sling'?fxStoneTex():fxArrowTex(),scale:wDef.spr==='sling'?0.12:0.24,speed:8,
       rot:wDef.spr==='sling'?0:Math.PI/2-0.18,
       onHit:deliver});
@@ -10043,6 +10045,15 @@ function clearFx(){
 function partyMuzzle(){
   const [dx,dy]=DIRS[G.facing];
   return {x:R3.camera.position.x+dx*0.3,y:EYE-0.08,z:R3.camera.position.z+dy*0.3};
+}
+// A drawn arrow leaves the archer's hands low and near, so it wants to enter the
+// frame at the bottom edge and climb toward the target near the centre — reading
+// as a shot loosed by the party rather than a mote appearing at eye level. The
+// origin sits well below the eye and barely ahead of it: constant world scale
+// then does the rest, the shaft largest as it leaves and dwindling as it recedes.
+function bowMuzzle(){
+  const [dx,dy]=DIRS[G.facing];
+  return {x:R3.camera.position.x+dx*0.22,y:EYE-0.46,z:R3.camera.position.z+dy*0.22};
 }
 function monsterAim(m){
   const s=R3.monsterSprites[m.id];
