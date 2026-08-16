@@ -9999,6 +9999,29 @@ function spawnDeathTouch(at){
   spawnBurst({x:at.x,y:at.y,z:at.z},'#c0e896',1.2,dur,true);   // sickly light at the touch
   R3.shake=Math.max(R3.shake,0.16);
 }
+/* PHB: vampiric touch — "you must succeed on a touch attack. You gain
+   temporary hit points equal to the damage you deal". The one drain spell, so
+   the stolen life is the point: a crimson tendril lances to the wound, then
+   red motes stream back through the air to the caster's own hands. */
+function spawnVampiricDrain(at){
+  spawnBeam2d(at,'150,26,30','214,44,54',4.5,1);      // the crimson link
+  spawnFlash({x:at.x,z:at.z},'#c0303a',1.6,0.4);
+  spawnBurst({x:at.x,y:at.y,z:at.z},'#8a1820',1.4);
+  const [fdx,fdy]=DIRS[G.facing];
+  const dst={x:R3.camera.position.x+fdx*0.3,y:EYE-0.2,z:R3.camera.position.z+fdy*0.3};
+  for(let i=0;i<8;i++){
+    const dur=0.34+Math.random()*0.14;
+    const sx=at.x+(Math.random()-0.5)*0.5, sy=at.y+(Math.random()-0.2)*0.6, sz=at.z+(Math.random()-0.5)*0.5;
+    const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:fxGlowTex('#e0404c'),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+    const sc=0.08+Math.random()*0.05;
+    spr.scale.set(sc,sc,1);
+    spr.position.set(sx,sy,sz);
+    spr.userData={kind:'fx'};
+    R3.levelGroup.add(spr);
+    G.fx.push({kind:'shard',spr,t:0,dur,vx:(dst.x-sx)/dur,vy:(dst.y-sy)/dur,vz:(dst.z-sz)/dur});
+  }
+  spawnBurst(dst,'#e05058',0.7,0.36,true);            // life returning to the hands
+}
 function updateFx(dt){
   for(const f of G.fx.slice()){
     if(f.kind==='proj'){
@@ -10246,6 +10269,7 @@ const SPELL_IMPACT={
     for(let i=0;i<3;i++)spawnBurst({x:at.x,y:at.y-0.12*i,z:at.z},'#3a1466',0.7,0.12+i*0.1);
   },
   slayliving:(at)=>spawnDeathTouch(at),
+  vampirictouch:(at)=>spawnVampiricDrain(at),
   wavesfatigue:(at,tiles,color,foes)=>{
     const [dx,dy]=DIRS[G.facing];
     const a=SPELLS.wavesfatigue.area, L=a.len+0.4, halfW=(a.len+1.2)/2;
@@ -10306,7 +10330,8 @@ const SPELL_IMPACT={
 };
 // spells that resolve the instant they are cast, with no projectile at all
 const SPELL_INSTANT={lightning:true,conecold:true,icestorm:true,flamestrike:true,wavesfatigue:true,
-  scorchingray:true,searinglight:true,rayfrost:true,burninghands:true,enervation:true,slayliving:true};
+  scorchingray:true,searinglight:true,rayfrost:true,burninghands:true,enervation:true,slayliving:true,
+  vampirictouch:true};
 /* ---------- conditions & buffs tick ---------- */
 let bleedTimer=0,poisonTimer=0;
 function updateParty(dt){
