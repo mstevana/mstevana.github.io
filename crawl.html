@@ -12471,11 +12471,15 @@ const UI=(()=>{
     for(let y=0;y<L.h;y++)for(let x=0;x<L.w;x++){
       const t=L.grid[y*L.w+x];
       if(!L.explored[y*L.w+x]){
-        // hint at passable tiles bordering explored ground, without revealing what they hold
+        // hint at passable tiles bordering explored GROUND — floor you've stood
+        // on or seen, not a wall. Walking a corridor marks the flanking walls
+        // explored (the 3x3 around the party); without the walkable check a
+        // passage running parallel behind one of those walls, with no line of
+        // sight to it, would border that explored wall and be hinted anyway.
         if(t&&t!==T_SECRET){
           for(const [dx,dy] of DIRS){
             const nx=x+dx,ny=y+dy;
-            if(nx>=0&&ny>=0&&nx<L.w&&ny<L.h&&L.explored[ny*L.w+nx]){
+            if(nx>=0&&ny>=0&&nx<L.w&&ny<L.h&&L.explored[ny*L.w+nx]&&walkableTile(L.grid[ny*L.w+nx])){
               ctx.fillStyle='#3c3c3c';ctx.fillRect(x*cs,y*cs,cs,cs);
               break;
             }
