@@ -951,13 +951,31 @@ const AFFIXES={
 // epitaphs: a name, what they were, and how long they have lain here. Read off
 // a tomb plaque, generated from the plaque's own position so it never changes.
 const EPI_NAMES=['Aldric','Maeve','Orrin','Sable','Corwin','Elspeth','Garrick','Rowan',
-  'Thessaly','Bram','Isolde','Halvard','Nesta','Ulric','Ferrin','Marisol','Dain','Ysolde'];
+  'Thessaly','Bram','Isolde','Halvard','Nesta','Ulric','Ferrin','Marisol','Dain','Ysolde',
+  'Vesper','Alaric','Brenna','Doran','Fenwick','Gilda','Hollis','Merrow','Perrin','Quill',
+  'Tamsin','Wick','Odell','Sorsha','Enver','Yorick','Petra','Cade'];
 const EPI_STYLES=['of the Ninth Watch','Stonewright','the Unmourned','Keybearer','the Lesser',
-  'of Ash Hollow','Bellringer','the Quiet','Gravewarden','of the Broken Oath','Lampwright','the Patient'];
+  'of Ash Hollow','Bellringer','the Quiet','Gravewarden','of the Broken Oath','Lampwright','the Patient',
+  'the Overconfident','the Curious','the Thirsty','Ratcatcher','the Twice-Buried','the Unlucky',
+  'Tunnelwright','the Forgetful','Oathbreaker','the Last to Leave','Coffinmaker','the Bold'];
+// the witty part: a darkly comic cause of death. Each a short clause, no period
+// (added at the seam), kept well under length so the whole toast stays < 140.
+const EPI_CAUSES=['Opened the coffin marked do not open','Read the warning aloud, then ignored it',
+  'Swore it was only the wind','Volunteered to check the noise','Lit a torch to find the gas',
+  'Tested the trap himself','Drank the unlabelled potion','Sampled the cave mushrooms',
+  'Told the lich to lighten up','Counted the stairs down, not up','Trusted a map drawn by the dead',
+  'Kept the ring. The ring kept him','Picked the lock mid-earthquake','Insisted the rope held two',
+  'Corrected a duergar on his sums','Petted the thing with many eyes','Rested a third time on one floor',
+  'Skipped the ration to save weight','Took the shortcut through the ossuary','Haggled with something faceless',
+  'Stepped back to admire the drop','Bet he could outrun it','Held the door for the horde',
+  'Sneezed mid-incantation','Named the wizard aloud','Won the duel, forgot the pit',
+  'Poked it to see if it was dead','Split the party, then the difference'];
 const EPI_LINES=['Laid down willingly.','He asked not to be woken.','She kept the lower gate.',
   'Interred without rites.','The debt is paid.','Do not open. Do not open. Do not open.',
   'Rest, and let rest.','Died as the lamps went out.','Nothing was left to bury but this.',
-  'Remembered by no one living.','The seal held.','Went down and did not come up.'];
+  'Remembered by no one living.','The seal held.','Went down and did not come up.',
+  'We did tell him.','Would do it again.','Still owes three rations.','It was funny at the time.',
+  'No one checked twice.','The seal did not hold.','Buried with the map, just in case.'];
 const WEAPON_AFFIXES=Object.keys(AFFIXES).filter(k=>AFFIXES[k].on==='weapon');
 const ARMOR_AFFIXES=Object.keys(AFFIXES).filter(k=>AFFIXES[k].on==='armor');
 // affixed gear turns up on the same schedule as the +4/+5 ladder — deep, and
@@ -10955,11 +10973,12 @@ function turnUndead(ch){
 function epitaphAt(x,y,n){
   let h=((x*73856093)^(y*19349663)^((n+1)*83492791))>>>0;
   const nxt=()=>{h=(h*1664525+1013904223)>>>0;return h/4294967296;};
-  const name=EPI_NAMES[Math.floor(nxt()*EPI_NAMES.length)];
-  const style=EPI_STYLES[Math.floor(nxt()*EPI_STYLES.length)];
+  const pk=a=>a[Math.floor(nxt()*a.length)];
+  const name=pk(EPI_NAMES), style=pk(EPI_STYLES);
   const years=40+Math.floor(nxt()*900);
-  const line=nxt()<0.45?' '+EPI_LINES[Math.floor(nxt()*EPI_LINES.length)]:'';
-  return name+' '+style+', dead these '+years+' years.'+line;
+  const cause=pk(EPI_CAUSES);                   // always a cause of death — the joke
+  const tail=nxt()<0.55?' '+pk(EPI_LINES):'';   // and more often a wry last word
+  return name+' '+style+', dead these '+years+' years. '+cause+'.'+tail;
 }
 function readEpitaph(x,y,n){
   if(Math.abs(x-G.px)+Math.abs(y-G.py)>1){UI.toast('Too far to read the inscription.');return;}
