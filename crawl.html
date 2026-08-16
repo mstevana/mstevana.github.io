@@ -6778,9 +6778,16 @@ function buildLevel(L){
     tex.wrapS=tex.wrapT=THREE.RepeatWrapping; // displacement samples can wrap at face edges
     // dressed stone is flatter than quarried rock and takes a harder highlight
     // fungal flesh is soft and a touch waxy: gentle relief, a low wide highlight
+    /* Cave displacement used to be 0.10 — twice the dungeon's and, more to the
+       point, wider than a door is thick (DOORTH is 0.07). The bulge on the wall
+       faces flanking a doorway therefore reached clean through the door slab and
+       swallowed its edges. It is 0.05 now, in family with the other themes, and
+       the roughness it gave up is paid back on the BUMP map, which is a lie
+       about the surface rather than real geometry and so cannot collide with
+       anything. */
     const mat=new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,
-      bumpScale:cave?0.05:(duer?0.015:(myco?0.035:(drow?0.012:0.02))),
-      displacementMap:tex,displacementScale:cave?0.10:(duer?0.025:(myco?0.06:(drow?0.018:0.05))),
+      bumpScale:cave?0.075:(duer?0.015:(myco?0.035:(drow?0.012:0.02))),
+      displacementMap:tex,displacementScale:cave?0.05:(duer?0.025:(myco?0.06:(drow?0.018:0.05))),
       specular:duer?0x1c1a14:(myco?0x2a2233:(drow?0x13151b:0x191309)),
       shininess:cave?3:(duer?14:(myco?8:(drow?9:5)))});
     if(built.glow){
@@ -6886,10 +6893,13 @@ function buildLevel(L){
   const doorTexB=texFromCanvas(doorCanvas(th,false)),doorTexL=texFromCanvas(doorCanvas(th,true));
   // gates and grates are drawn with holes in them, so their material must honour
   // the texture's alpha instead of painting the gaps black
-  const grate=th.name==='Sewers'||th.name==='Drow';
+  // Caves join these: their doors are planks knocked together with daylight
+  // between them, and a gap only reads as a gap if you can see through it
+  const grate=th.name==='Sewers'||th.name==='Drow'||th.name==='Caves';
   const doorOpts=grate?{transparent:true,alphaTest:0.35,side:THREE.DoubleSide,specular:0x15150f,shininess:10}:{specular:0x1a150c,shininess:8};
-  const doorMatBase=new THREE.MeshPhongMaterial(Object.assign({map:doorTexB,bumpMap:doorTexB,bumpScale:0.015},doorOpts));
-  const doorMatLocked=new THREE.MeshPhongMaterial(Object.assign({map:doorTexL,bumpMap:doorTexL,bumpScale:0.015},doorOpts));
+  const dBump=th.name==='Caves'?0.05:0.015;   // sawn planks have tooth; a fitted door does not
+  const doorMatBase=new THREE.MeshPhongMaterial(Object.assign({map:doorTexB,bumpMap:doorTexB,bumpScale:dBump},doorOpts));
+  const doorMatLocked=new THREE.MeshPhongMaterial(Object.assign({map:doorTexL,bumpMap:doorTexL,bumpScale:dBump},doorOpts));
   R3.doorMatBase=doorMatBase;
   for(let y=0;y<L.h;y++)for(let x=0;x<L.w;x++){
     const t=L.grid[y*L.w+x];
@@ -8055,6 +8065,84 @@ function doorCanvas(th,locked){
       ctx.fillStyle=lit;ctx.fillRect(55,95,4,20);
       ctx.fillStyle='#07070a';ctx.beginPath();ctx.arc(63.5,102,4,0,7);ctx.fill();
       ctx.fillRect(61.5,103,4,9);
+    }
+    return cv;
+  }
+  /* Caves: nobody dressed this timber. Planks of uneven width stood side by
+     side, cut square-ish at neither end, nailed to two crooked braces, with the
+     dark showing between them where they do not meet. Everything is stained
+     near-black by damp and rot, so the wood reads as old rather than merely
+     brown — the light comes from the few edges that still catch it.
+
+     Seeded from the tile so a door does not reshuffle when the level rebuilds,
+     and the gaps are genuinely transparent (Caves is in the `grate` set), which
+     is the whole difference between a gap and a painted dark line. */
+  if(th.name==='Caves'){
+    let s=0x9e3779b9;
+    const rr=()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};
+    ctx.clearRect(0,0,128,128);                       // start from the gaps
+    const planks=[];
+    for(let x=2;x<126;){
+      const w=13+Math.floor(rr()*9);                  // uneven widths
+      planks.push({x,w:Math.min(w,126-x)});
+      x+=w+2+Math.floor(rr()*3);                      // and uneven gaps between
+    }
+    for(const p of planks){
+      const top=1+rr()*7, bot=127-rr()*7;             // cut square at neither end
+      const lean=(rr()-0.5)*2.4;                      // stood a little crooked
+      const base=9+rr()*6;                            // each plank its own darkness
+      const body='rgb('+Math.round(base*1.5)+','+Math.round(base*1.05)+','+Math.round(base*0.72)+')';
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(p.x+lean,top);ctx.lineTo(p.x+p.w+lean,top-rr()*3);
+      ctx.lineTo(p.x+p.w,bot+rr()*3);ctx.lineTo(p.x,bot);
+      ctx.closePath();ctx.clip();
+      ctx.fillStyle=body;ctx.fillRect(p.x-3,0,p.w+6,128);
+      // grain: long dark fibres down the plank, a couple of them splitting
+      for(let g=0;g<5;g++){
+        const gx=p.x+2+rr()*(p.w-4);
+        ctx.strokeStyle='rgba(0,0,0,'+(0.16+rr()*0.24).toFixed(2)+')';
+        ctx.lineWidth=0.7+rr()*1.1;
+        ctx.beginPath();ctx.moveTo(gx,top);
+        ctx.bezierCurveTo(gx+(rr()-0.5)*5,44,gx+(rr()-0.5)*5,88,gx+(rr()-0.5)*4,bot);
+        ctx.stroke();
+      }
+      // a knot or two, and rot creeping up from the foot
+      if(rr()<0.55){
+        const kx=p.x+3+rr()*(p.w-6),ky=18+rr()*92,kr=1.6+rr()*2.2;
+        const kg=ctx.createRadialGradient(kx,ky,0.4,kx,ky,kr);
+        kg.addColorStop(0,'rgba(0,0,0,0.75)');kg.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.fillStyle=kg;ctx.beginPath();ctx.arc(kx,ky,kr,0,7);ctx.fill();
+      }
+      const rot=ctx.createLinearGradient(0,128,0,128-(40+rr()*44));
+      rot.addColorStop(0,'rgba(9,13,8,0.78)');rot.addColorStop(1,'rgba(9,13,8,0)');
+      ctx.fillStyle=rot;ctx.fillRect(p.x-3,0,p.w+6,128);
+      // the one lit edge: without it the plank is a flat dark stripe
+      ctx.fillStyle='rgba(196,168,116,0.13)';ctx.fillRect(p.x+lean,top,1.4,bot-top);
+      ctx.fillStyle='rgba(0,0,0,0.42)';ctx.fillRect(p.x+p.w-1.6,top,1.6,bot-top);
+      ctx.restore();
+    }
+    // two braces nailed across, neither of them level
+    for(const [by,tilt] of [[30,-2.5],[95,3]]){
+      ctx.save();
+      ctx.translate(64,by);ctx.rotate(tilt*Math.PI/180);ctx.translate(-64,-by);
+      ctx.fillStyle='rgb(22,16,11)';ctx.fillRect(0,by-6,128,13);
+      ctx.fillStyle='rgba(150,126,86,0.13)';ctx.fillRect(0,by-6,128,1.6);
+      ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(0,by+5.4,128,1.8);
+      for(const p of planks){                          // a nail per plank, roughly
+        const nx=p.x+p.w*0.5+(rr()-0.5)*3;
+        ctx.fillStyle='#15161a';ctx.beginPath();ctx.arc(nx,by+(rr()-0.5)*3,1.5,0,7);ctx.fill();
+        ctx.fillStyle='rgba(178,168,150,0.30)';ctx.beginPath();ctx.arc(nx-0.5,by-0.5+(rr()-0.5)*2,0.7,0,7);ctx.fill();
+      }
+      ctx.restore();
+    }
+    if(locked){ // a hasp and a heavy padlock, the only worked iron on it
+      ctx.fillStyle='#1b1d22';ctx.fillRect(54,58,22,9);
+      ctx.fillStyle='rgba(170,162,148,0.22)';ctx.fillRect(54,58,22,1.6);
+      ctx.strokeStyle='#23262c';ctx.lineWidth=3.2;
+      ctx.beginPath();ctx.arc(65,68,5,Math.PI,0);ctx.stroke();
+      ctx.fillStyle='#2a2d34';ctx.fillRect(60,68,10,11);
+      ctx.fillStyle='#0a0b0d';ctx.beginPath();ctx.arc(65,73,1.7,0,7);ctx.fill();
     }
     return cv;
   }
