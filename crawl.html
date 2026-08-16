@@ -3146,6 +3146,25 @@ const TRAP_ART={
     `<path d="M41 60 L59 60 L57.5 66 L42.5 66 Z" fill="#14260d"/>`+
     `<path d="M45 60 L44.5 66 M50 60 L50 66 M55 60 L55.5 66" stroke="#e6ead2" stroke-width="1.5"/>`+
     `</g></svg>`,
+  // a wall-launched needle tipped with venom. The venom colour is what tells the
+  // two apart: cold teal locks the limbs, drowsy violet closes the eyes.
+  pdart:()=>`<svg xmlns="${SVGNS}" viewBox="0 0 100 100"><g stroke="#0d0b08" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round">`+
+    `<path d="M4 50 L30 50 M8 41 L28 42 M8 59 L28 58" stroke="#4fbfd0" stroke-width="4" opacity="0.6" fill="none"/>`+ // motion streaks
+    `<rect x="28" y="46" width="44" height="8" rx="2" fill="#6a5636"/>`+                                                // shaft
+    `<path d="M28 41 L17 50 L28 59 Z M39 41 L28 50 L39 59 Z" fill="#356b74"/>`+                                          // dyed fletching
+    `<path d="M70 39 L97 50 L70 61 Z" fill="#c2d6dc"/><path d="M76 47 L91 50 L76 53 Z" fill="#7f9aa2"/>`+                // steel needle
+    `<circle cx="66" cy="42" r="4.5" fill="#59e6cf"/>`+                                                                 // venom bead
+    `<path d="M93 53 Q99 62 93 69 Q87 62 93 53 Z" fill="#59e6cf"/>`+                                                    // venom drip
+    `</g></svg>`,
+  sleepdart:()=>`<svg xmlns="${SVGNS}" viewBox="0 0 100 100"><g stroke="#0d0b08" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round">`+
+    `<path d="M4 50 L30 50 M8 41 L28 42 M8 59 L28 58" stroke="#a884d8" stroke-width="4" opacity="0.6" fill="none"/>`+
+    `<rect x="28" y="46" width="44" height="8" rx="2" fill="#6a5636"/>`+
+    `<path d="M28 41 L17 50 L28 59 Z M39 41 L28 50 L39 59 Z" fill="#4a3a6a"/>`+
+    `<path d="M70 39 L97 50 L70 61 Z" fill="#c8c2dc"/><path d="M76 47 L91 50 L76 53 Z" fill="#8a7fa2"/>`+
+    `<circle cx="66" cy="42" r="4.5" fill="#b48ae0"/>`+
+    `<path d="M93 53 Q99 62 93 69 Q87 62 93 53 Z" fill="#b48ae0"/>`+
+    `<path d="M60 27 L72 27 L60 37 L72 37 M75 15 L83 15 L75 22 L83 22" stroke="#b48ae0" stroke-width="2.6" fill="none" opacity="0.9"/>`+ // drowsy Z's
+    `</g></svg>`,
 };
 const STAIRS_SVG=`<svg xmlns="${SVGNS}" viewBox="0 0 64 64"><g stroke="#080706" stroke-width="1.6"><rect x="8" y="8" width="48" height="48" fill="#12100c"/><path d="M8 8 L56 8 L56 20 L44 20 L44 32 L32 32 L32 44 L20 44 L20 56 L8 56 Z" fill="#3a352c"/><path d="M56 20 L44 20 L44 32 L32 32 L32 44 L20 44 L20 56 L56 56 Z" fill="#1e1b15"/></g></svg>`;
 /* ============================== ITEM REGISTRY & LOOT ============================== */
@@ -3539,9 +3558,16 @@ function tryGen(depth,targetWalk,theme){
   while(placedTraps<nTraps&&tTries-->0){
     const x=1+rnd(W-2),y=1+rnd(H-2),i=idx(x,y);
     if(g[i]!==T_FLOOR||dist[i]<6||traps[i]||(x===sx&&y===sy))continue;
-    const kind=pick(['dart','spike','gas']);
+    // venom darts join the roster a little deeper: a paralysis or sleep dart on
+    // the tank at level 1 is a wipe waiting to happen, so they wait until the
+    // party has the levels and the cures to answer them
+    const kind=pick(depth>=4?['dart','spike','gas','pdart','sleepdart']:['dart','spike','gas']);
+    const venom=kind==='pdart'||kind==='sleepdart';
     traps[i]={kind,found:false,armed:true,dc:trapDC(depth),
-      dmg:kind==='gas'?null:[trapDice(depth),6],x,y};
+      // a venom dart wounds lightly — the toxin is the threat, not the puncture
+      dmg:kind==='gas'?null:venom?[1,4]:[trapDice(depth),6],
+      dur:kind==='pdart'?4:kind==='sleepdart'?5:0,
+      x,y};
     placedTraps++;
   }
   // 9. items
@@ -8266,6 +8292,24 @@ function triggerTrap(tr){
     const dmg=roll(tr.dmg[0],tr.dmg[1]);
     if(d20()+sv>=tr.dc){hurtChar(ch,Math.floor(dmg/2),'spike trap');UI.toast(ch.name+' twists aside — half damage!');}
     else {hurtChar(ch,dmg,'spike trap');UI.toast('Spikes lance up from the floor!');}
+  }else if(tr.kind==='pdart'||tr.kind==='sleepdart'){
+    // the dart must hit (dodge it by AC), and then the venom must take (resist
+    // it by Fortitude) — two layers, because paralysis and sleep are that bad
+    const ch=pick(alive);
+    const atk=d20()+8+Math.floor(G.depth/2);
+    if(atk>=charAC(ch)+foundBonus){
+      hurtChar(ch,roll(tr.dmg[0],tr.dmg[1]),'venom dart');
+      const cond=tr.kind==='pdart'?'paralysis':'sleep';
+      const sv=charSaves(ch).fort+saveBonusVs(ch,'poison')+foundBonus;
+      if(d20()+sv>=tr.dc){
+        UI.toast('A venom dart hits '+ch.name+', who shakes off the toxin.');
+      }else if(addCond(ch,{kind:cond,dur:tr.dur})){
+        UI.float(ch,cond==='paralysis'?'paralyzed!':'asleep!','#9db4d6');
+        UI.toast(cond==='paralysis'
+          ? 'A venom dart strikes '+ch.name+' — their limbs lock rigid!'
+          : 'A venom dart strikes '+ch.name+' — they slump into sudden sleep!');
+      }else UI.toast('A venom dart hits '+ch.name+', but the toxin finds no hold.'); // elf / freedom
+    }else UI.toast('A venom dart splinters against the wall.');
   }else{ // gas
     UI.toast('Green vapour hisses from the floor!');
     for(const ch of alive){
@@ -11518,8 +11562,11 @@ const UI=(()=>{
     const el=$('trap-flash');
     if(!TRAP_ART[kind])return;
     el.innerHTML=TRAP_ART[kind]();
-    // hazard tint (physical red / poison green) over a dark backdrop so the drawing always pops
-    const tint=kind==='gas'?'rgba(120,200,80,0.22)':'rgba(200,45,30,0.20)';
+    // hazard tint (physical red / poison green / venom teal / sleep violet) over a dark backdrop so the drawing always pops
+    const tint=kind==='gas'?'rgba(120,200,80,0.22)'
+      :kind==='pdart'?'rgba(80,220,200,0.22)'
+      :kind==='sleepdart'?'rgba(165,125,220,0.22)'
+      :'rgba(200,45,30,0.20)';
     el.style.background='radial-gradient(circle at center, '+tint+', transparent 60%),'
       +'radial-gradient(circle at center, rgba(0,0,0,0.30), rgba(0,0,0,0.52) 78%)';
     el.classList.remove('show');void el.offsetWidth;el.classList.add('show');
