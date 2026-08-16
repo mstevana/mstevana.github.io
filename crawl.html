@@ -7044,7 +7044,11 @@ function buildLevel(L){
     // were built to drain into rather than an unrelated hole
     if(pitCells.length&&L.rivers&&L.rivers.length){
       const riverSet=new Set(L.rivers);
-      const spillZ=[],spillX=[],lips=[],seenC=new Set();
+      // grouped by which way the pool lies, so each spill's sewage can be made
+      // to flow into it (world +Z is grid +y, and the surface drifts toward
+      // -uFlow — measured — so uFlow points away from the pool) rather than in a
+      // fixed corridor direction
+      const dirCells={N:[],S:[],E:[],W:[]},lips=[],seenC=new Set();
       for(const [px,py] of pitCells)for(const [dx,dy] of DIRS){
         const cx=px+dx,cy=py+dy,ci=cy*L.w+cx;
         // a walkable ring tile that is not itself a channel...
@@ -7055,7 +7059,7 @@ function buildLevel(L){
         if(!touchesRiver)continue;
         seenC.add(ci);
         const pdx=-dx,pdy=-dy;                       // the pool lies this way; flow into it
-        (pdy!==0?spillZ:spillX).push([cx,cy]);
+        dirCells[pdy<0?'N':pdy>0?'S':pdx>0?'E':'W'].push([cx,cy]);
         lips.push([cx,cy,pdx,pdy]);
       }
       const addSpill=(cells,gw,gd,mat,h)=>{
@@ -7065,8 +7069,14 @@ function buildLevel(L){
         cells.forEach(([x,y],i)=>{m4b.makeTranslation(x+0.5,h,y+0.5);inst.setMatrixAt(i,m4b);});
         grp.add(inst);
       };
-      addSpill(spillZ,0.44,1,bedMat,0.008);addSpill(spillX,1,0.44,bedMat,0.012);
-      addSpill(spillZ,0.34,1,riverMatZ,0.018);addSpill(spillX,1,0.34,riverMatX,0.022);
+      addSpill([...dirCells.N,...dirCells.S],0.44,1,bedMat,0.008);
+      addSpill([...dirCells.E,...dirCells.W],1,0.44,bedMat,0.012);
+      // a flow material per pool direction: uFlow points away, so the drift is
+      // into the lake — pool to the north (-Z) flows off +uFlow.z, and so on
+      if(dirCells.N.length)addSpill(dirCells.N,0.34,1,mkLiquid(0.005, 0.06,true,1,0),0.018);
+      if(dirCells.S.length)addSpill(dirCells.S,0.34,1,mkLiquid(0.005,-0.06,true,1,0),0.018);
+      if(dirCells.E.length)addSpill(dirCells.E,1,0.34,mkLiquid(-0.06,0.005,true,0,1),0.022);
+      if(dirCells.W.length)addSpill(dirCells.W,1,0.34,mkLiquid( 0.06,0.005,true,0,1),0.022);
       if(lips.length){
         const lipMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,-0.28)),specular:0x14110b,shininess:5});
         for(const [cx,cy,pdx,pdy] of lips){
