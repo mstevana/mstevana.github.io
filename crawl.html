@@ -8394,8 +8394,14 @@ function passiveSearch(){
   // sharpest-eyed companion still gets a single notice roll on the tile just ahead
   const trapAlive=G.party.filter(ch=>!isDown(ch));
   const trapfinder=trapAlive.find(ch=>CLASSES[ch.cls].trapfind);
+  // the rogue scouts two tiles ahead, but only reaches the second if the first
+  // is see-through: a trap or an ambusher behind a wall or a shut door has no
+  // line of sight and must not be spotted through it
+  const a1=aheadTile(1);
+  const scout=[{x:G.px,y:G.py},a1];
+  if(seesThroughTile(tileAt(a1.x,a1.y)))scout.push(aheadTile(2));
   if(trapfinder){
-    for(const c of [ {x:G.px,y:G.py}, aheadTile(1), aheadTile(2) ]){
+    for(const c of scout){
       const i=c.y*L.w+c.x;
       const tr=L.traps[i];
       if(tr&&tr.armed&&!tr.found&&10+searchBonus(trapfinder)>=tr.dc){
@@ -8423,7 +8429,7 @@ function passiveSearch(){
   if(L.lurkers&&L.lurkers.length){
     const seen=[];
     if(trapfinder){
-      for(const c of [ {x:G.px,y:G.py}, aheadTile(1), aheadTile(2) ]){
+      for(const c of scout){
         const li=lurkerIndexAt(c.x,c.y);
         if(li>=0&&10+searchBonus(trapfinder)>=L.lurkers[li].dc)seen.push([li,trapfinder]);
       }
