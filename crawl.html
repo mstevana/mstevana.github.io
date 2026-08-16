@@ -3584,7 +3584,7 @@ function tryGen(depth,targetWalk,theme){
   }
   // 7. secret pockets: pick walls with exactly one floor neighbor, carve pocket behind
   const secrets=[];
-  let secTries=30;
+  let secTries=90;
   while(secrets.length<2+rnd(2)&&secTries-->0){
     const x=2+rnd(W-4),y=2+rnd(H-4);
     if(g[idx(x,y)]!==T_WALL)continue;
@@ -3599,7 +3599,8 @@ function tryGen(depth,targetWalk,theme){
     for(const [dx,dy] of DIRS){const t=g[idx(px+dx,py+dy)];if(t&&!(px+dx===x&&py+dy===y)){clear=false;}}
     if(!clear)continue;
     g[idx(x,y)]=T_SECRET; g[idx(px,py)]=T_FLOOR;
-    secrets.push({x,y,pocket:{x:px,y:py}});
+    // hidden on the same DC ladder as a trap, so the rogue is its reliable finder
+    secrets.push({x,y,pocket:{x:px,y:py},dc:trapDC(depth)});
   }
   // 8. traps
   const traps={};
@@ -8647,19 +8648,32 @@ function stepOnTile(){
 }
 function passiveSearch(){
   const L=G.L;
-  // secrets: check walls adjacent to party (facing tile always; elves check all sides)
-  const anyElfish=G.party.some(ch=>!isDown(ch)&&RACES[ch.race].autoSearch);
-  const bestSearch=Math.max(...G.party.filter(ch=>!isDown(ch)).map(searchBonus),-99);
-  const checks=[];
-  const ah=aheadTile(1);checks.push(ah);
-  if(anyElfish)for(const [dx,dy] of DIRS)checks.push({x:G.px+dx,y:G.py+dy});
-  for(const c of checks){
+  const alive=G.party.filter(ch=>!isDown(ch));
+  const anyElfish=alive.some(ch=>RACES[ch.race].autoSearch);
+  // secrets: found on exactly a trap's terms. A rogue (who "spots secret
+  // doors") reliably searches the adjacent walls with take 10; without one,
+  // the sharpest-eyed companion gets a single notice roll per secret. A rogue
+  // or an elf scans all four sides — otherwise only the wall straight ahead is
+  // examined, so a plain party walks past a door on its flank.
+  const secFinder=alive.find(ch=>CLASSES[ch.cls].trapfind);
+  const secTiles=[aheadTile(1)];
+  if(anyElfish||secFinder)for(const [dx,dy] of DIRS)secTiles.push({x:G.px+dx,y:G.py+dy});
+  for(const c of secTiles){
     if(tileAt(c.x,c.y)!==T_SECRET)continue;
-    if(10+bestSearch>=20){
+    const sec=L.secrets.find(s=>s.x===c.x&&s.y===c.y);
+    if(!sec)continue;
+    const dc=sec.dc||20;
+    let finder=null;
+    if(secFinder){ if(10+searchBonus(secFinder)>=dc)finder=secFinder; }
+    else if(alive.length&&!sec.noticeTried){
+      sec.noticeTried=true; // one glance per secret, so pacing back and forth never guarantees it
+      const eyes=alive.reduce((a,b)=>noticeBonus(b)>noticeBonus(a)?b:a);
+      if(d20()+noticeBonus(eyes)>=dc)finder=eyes;
+    }
+    if(finder){
       setTile(c.x,c.y,T_SECRET_FOUND);
-      const sec=L.secrets.find(s=>s.x===c.x&&s.y===c.y);
-      if(sec)revealSecret(L,sec);
-      UI.toast('You notice a seam in the wall…');SFX.found();
+      revealSecret(L,sec);
+      UI.toast(finder.name+' finds a hidden passage!');SFX.found();
     }
   }
   // traps: a rogue reliably scouts two tiles ahead (take 10); without one, the
