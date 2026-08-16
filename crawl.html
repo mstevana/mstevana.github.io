@@ -6723,6 +6723,40 @@ function buildLevel(L){
         specular:0x141018,shininess:5});
       const webMat=new THREE.MeshBasicMaterial({color:0x9aa0a6,transparent:true,opacity:0.13,
         side:THREE.DoubleSide,depthWrite:false});
+      const webLineMat=new THREE.LineBasicMaterial({color:0xbfc4ca,transparent:true,opacity:0.32,depthWrite:false});
+      // a corner cobweb built from real threads rather than a flat pane: an apex
+      // at the top, radial spokes fanning down, sagging cross-threads webbing
+      // them together, and a couple of broken strands trailing off
+      const cobwebGeo=(rnd,size)=>{
+        const v=[],add=(ax,ay,bx,by)=>v.push(ax,ay,0,bx,by,0);
+        const hy=size*0.52;                        // apex, top-centre
+        const n=6+Math.floor(rnd()*3),span=1.25;   // spokes fan downward from it
+        const tips=[];
+        for(let i=0;i<n;i++){
+          const a=-span+2*span*(i/(n-1))+(rnd()-0.5)*0.08, r=size*(0.9+rnd()*0.25);
+          const tx=Math.sin(a)*r,ty=hy-Math.cos(a)*r;
+          tips.push([tx,ty]);add(0,hy,tx,ty);       // radial spoke
+        }
+        const rings=4+Math.floor(rnd()*2);          // concentric cross-threads
+        for(let k=1;k<=rings;k++){
+          const f=k/(rings+1);
+          for(let i=0;i<tips.length-1;i++){
+            const ax=tips[i][0]*f,ay=hy+(tips[i][1]-hy)*f;
+            const bx=tips[i+1][0]*f,by=hy+(tips[i+1][1]-hy)*f;
+            const mx=(ax+bx)/2,my=(ay+by)/2;         // sag the chord toward the apex
+            const dx=-mx,dy=hy-my,dl=Math.hypot(dx,dy)||1,s=size*0.12*(0.6+rnd()*0.7);
+            const cx=mx+dx/dl*s,cy=my+dy/dl*s;
+            add(ax,ay,cx,cy);add(cx,cy,bx,by);
+          }
+        }
+        for(let i=0;i<2+Math.floor(rnd()*3);i++){    // stray broken threads
+          const t=tips[Math.floor(rnd()*tips.length)];
+          add(t[0],t[1],t[0]+(rnd()-0.5)*size*0.35,t[1]-rnd()*size*0.5);
+        }
+        const g=new THREE.BufferGeometry();
+        g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));
+        return g;
+      };
       const boneG=new THREE.CylinderGeometry(0.018,0.018,0.17,5);
       const skullG=new THREE.SphereGeometry(0.045,7,6);
       for(let y=1;y<L.h-1;y++)for(let x=1;x<L.w-1;x++){
@@ -6759,9 +6793,9 @@ function buildLevel(L){
             litter.add(sk);
           }
         }else if(roll<0.19){ // a cobweb strung across a high corner
-          const w=new THREE.Mesh(new THREE.PlaneGeometry(0.55,0.55),webMat);
-          w.position.set(x+0.5,WALLH-0.3,y+0.5);
-          w.rotation.set(-Math.PI/3,rr()*Math.PI,0);
+          const w=new THREE.LineSegments(cobwebGeo(rr,0.5+rr()*0.28),webLineMat);
+          w.position.set(x+0.5,WALLH-0.18,y+0.5);
+          w.rotation.set((rr()-0.5)*0.5,rr()*Math.PI*2,(rr()-0.5)*0.4);
           litter.add(w);
         }
       }
