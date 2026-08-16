@@ -9471,13 +9471,6 @@ function monsterSpecials(m,ch){
     }
   }
 }
-/* How far the party must have moved, since the shot was loosed, for an arrow or
-   a bolt to miss them entirely. It was 0.75 — less than one tile — so a single
-   step in any direction made every ranged attack and every spell in flight whiff
-   outright, and a party that kept walking was simply immune to both. A step is
-   1.0, so the tolerance now sits above it: sustained repositioning still dodges,
-   one sidestep no longer grants immunity. */
-const DODGE_DIST=1.35;
 function monsterShoot(m){
   if(!pickPartyTarget(m))return;
   m.acted=true;   // no longer flat-footed: it has committed to a blow
@@ -9495,7 +9488,7 @@ function monsterShoot(m){
         if(G.over)return;
         const off=Math.hypot(R3.camera.position.x-aim.x,R3.camera.position.z-aim.z);
         const ch=pickPartyTarget(m);
-        if(off>DODGE_DIST||!ch){SFX.whiff();return;} // the party stepped aside
+        if(off>0.75||!ch){SFX.whiff();return;} // the party stepped aside
         const nat=d20();
         if(nat!==1&&(nat===20||nat+m.atk>=charAC(ch))){
           const dmg=roll(m.dmg[0],m.dmg[1],Math.max(0,m.dmg[2]));
@@ -9518,7 +9511,7 @@ function fireSpellOrb(m){
       if(G.over)return;
       const off=Math.hypot(R3.camera.position.x-aim.x,R3.camera.position.z-aim.z);
       spawnBurst(aim,m.caster.fx,1.2);
-      if(off>DODGE_DIST){SFX.whiff();return;} // dodged the bolt
+      if(off>0.75){SFX.whiff();return;} // dodged the bolt
       const alive=G.party.filter(ch=>!isDown(ch));
       if(!alive.length)return;
       const ch=pickPartyTarget(m)||pick(alive);   // a bolt keeps its lane like everything else
