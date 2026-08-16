@@ -3293,7 +3293,7 @@ function randLoot(depth,rich,noPotion,noRation){
   // rolled those on its own adaptive schedule and is only after gear here
   const W=[
     ['potion', noPotion?0:(rich?6:22)],
-    ['ration', noRation?0:(rich?4:12)],
+    ['ration', noRation?0:(rich?2:6)],
     ['weapon', rich?18:22],
     ['armor',  rich?16:20],
     ['scroll', 14],
@@ -3881,8 +3881,21 @@ function tryGen(depth,targetWalk,theme){
 function depthScale(depth){        // hp multiplier: +7% a floor, compounding slowly
   return 1+0.07*Math.max(0,depth-1);
 }
-function depthAtkBonus(depth){     // to-hit and damage creep, deliberately slower
-  return Math.floor(Math.max(0,depth-1)/2.5);
+/* To-hit creep. This has to track the party's AC, and the party's AC climbs far
+   faster than a floor-per-2.5 trickle: gear fills six slots and every one of
+   them takes an enchantment, so a measured party runs AC 14 at depth 1, 29 by
+   depth 8 and ~41 from depth 20 on. Against that the old slope left monsters
+   hitting 10-17% of the time — they effectively could not land a blow. Growing
+   a point a floor, capped where the party's own AC plateaus, puts the measured
+   hit rate back in the 40-55% band. */
+function depthAtkBonus(depth){
+  return Math.min(20,Math.floor(Math.max(0,depth-1)));
+}
+/* Monster AC creep is deliberately NOT the attack curve halved any more: it
+   keeps the old, gentler schedule, so making monsters land blows does not also
+   quietly make them harder to kill and drag every fight out. */
+function depthACBonus(depth){
+  return Math.floor(Math.floor(Math.max(0,depth-1)/2.5)/2);
 }
 // what one monster is worth as a threat: staying power times what it deals out
 function monsterThreat(m){
@@ -4037,7 +4050,7 @@ function mkMonster(key,x,y,depth){
   const def=MONSTERS[key];
   const hp=Math.max(1,Math.round(def.hp*depthScale(depth)));
   const ab=depthAtkBonus(depth);
-  return {key,name:def.name,x,y,hp,maxHp:hp,ac:def.ac+Math.floor(ab/2),atk:def.atk+ab,dmg:def.dmg,
+  return {key,name:def.name,x,y,hp,maxHp:hp,ac:def.ac+depthACBonus(depth),atk:def.atk+ab,dmg:def.dmg,
     xp:Math.round(XP_AWARD(def.cr)*(1+0.12*Math.max(0,depth-1))),
     speed:def.speed,type:def.type,ranged:def.ranged||0,caster:def.caster||null,
     reach:!!def.reach,slot:0, // slot 0-1 front rank of its tile, 2-3 rear rank
@@ -8664,7 +8677,7 @@ function monsterLoot(depth){
   // pulls healing. Taken from the gear share, so the healing and scroll bands
   // above keep the rates they were tuned to.
   const foodNeed=clamp(1-countRations()/3,0,1);
-  if(Math.random()<0.10+0.32*foodNeed)return mkItem('ration',{qty:1+rnd(2)});
+  if(Math.random()<0.05+0.16*foodNeed)return mkItem('ration',{qty:1+rnd(2)});
   // gear only — potions and rations are both handled by their own adaptive rolls
   // above, so suppress them here rather than let the table double up the food rate
   return randLoot(depth,false,true,true);
@@ -9458,6 +9471,13 @@ function monsterSpecials(m,ch){
     }
   }
 }
+/* How far the party must have moved, since the shot was loosed, for an arrow or
+   a bolt to miss them entirely. It was 0.75 — less than one tile — so a single
+   step in any direction made every ranged attack and every spell in flight whiff
+   outright, and a party that kept walking was simply immune to both. A step is
+   1.0, so the tolerance now sits above it: sustained repositioning still dodges,
+   one sidestep no longer grants immunity. */
+const DODGE_DIST=1.35;
 function monsterShoot(m){
   if(!pickPartyTarget(m))return;
   m.acted=true;   // no longer flat-footed: it has committed to a blow
@@ -9475,7 +9495,7 @@ function monsterShoot(m){
         if(G.over)return;
         const off=Math.hypot(R3.camera.position.x-aim.x,R3.camera.position.z-aim.z);
         const ch=pickPartyTarget(m);
-        if(off>0.75||!ch){SFX.whiff();return;} // the party stepped aside
+        if(off>DODGE_DIST||!ch){SFX.whiff();return;} // the party stepped aside
         const nat=d20();
         if(nat!==1&&(nat===20||nat+m.atk>=charAC(ch))){
           const dmg=roll(m.dmg[0],m.dmg[1],Math.max(0,m.dmg[2]));
@@ -9498,13 +9518,15 @@ function fireSpellOrb(m){
       if(G.over)return;
       const off=Math.hypot(R3.camera.position.x-aim.x,R3.camera.position.z-aim.z);
       spawnBurst(aim,m.caster.fx,1.2);
-      if(off>0.75){SFX.whiff();return;} // dodged the bolt
+      if(off>DODGE_DIST){SFX.whiff();return;} // dodged the bolt
       const alive=G.party.filter(ch=>!isDown(ch));
       if(!alive.length)return;
       const ch=pickPartyTarget(m)||pick(alive);   // a bolt keeps its lane like everything else
       const dmg=roll(m.caster.dmg[0],m.caster.dmg[1],m.caster.dmg[2]);
       const sv=charSaves(ch).ref+saveBonusVs(ch,'spell');
-      const dc=12+Math.floor(MONSTERS[m.key].cr);
+      // party Reflex climbs with level and gear; a flat 12+CR left even deep
+      // casters saved against half the time, so the DC tracks CR harder
+      const dc=13+Math.floor(MONSTERS[m.key].cr*1.3);
       const el=m.caster.elem;
       const nat=d20(),made=nat+sv>=dc,took=made?Math.floor(dmg/2):dmg;
       logAdd('spell',m.name+"'s "+(el?ELEMENTS[el].name+' ':'')+'bolt strikes '+ch.name+' for '+took,
