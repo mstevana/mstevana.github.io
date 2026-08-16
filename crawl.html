@@ -7040,8 +7040,8 @@ function buildLevel(L){
     }
     // spillways: where a corridor channel reaches a walkable tile that also
     // touches the pool, carry the sewage across that tile into the lake and cap
-    // it with a small fluted stone lip, so the pool reads as something the
-    // channels were built to drain into rather than an unrelated hole
+    // it with a small stone lip, so the pool reads as something the channels
+    // were built to drain into rather than an unrelated hole
     if(pitCells.length&&L.rivers&&L.rivers.length){
       const riverSet=new Set(L.rivers);
       const spillZ=[],spillX=[],lips=[],seenC=new Set();
@@ -7073,10 +7073,6 @@ function buildLevel(L){
           const g0=new THREE.Group();
           const base=new THREE.Mesh(new THREE.BoxGeometry(0.42,0.12,0.28),lipMat);
           g0.add(base);                                // a shelf overhanging the water
-          for(let k=-1;k<=1;k++){                       // three ridges, grooves between: a fluted chute
-            const rdg=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.07,0.32),lipMat);
-            rdg.position.set(k*0.13,0.06,0.01);g0.add(rdg);
-          }
           g0.rotation.y=Math.atan2(pdx,pdy);            // local +Z points into the pool
           g0.position.set(cx+0.5+pdx*0.46,0.01,cy+0.5+pdy*0.46);
           grp.add(g0);
