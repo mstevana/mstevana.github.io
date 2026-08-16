@@ -983,6 +983,28 @@ legacy blob-and-bursts:
 - **`SPELL_IMPACT`** — the shaped impact itself, keyed like `SPELL_FX`,
   called with `(at, areaTiles, color, foes, casterLevel)`.
 
+**Every foe-targeted spell now has a bespoke impact**, not just the area
+blasts. The single-target damage spells route through `SPELL_INSTANT` +
+`SPELL_IMPACT` too: burning hands is a screen-space fire fan (`firefan2d`,
+sharing the cold cone's wedge geometry), flaming sphere a low spinning
+projectile that *rolls* to the foe's feet (its own cast block, distinct from
+the fireball bead), enervation/slay-living/vampiric-touch build on the ray and
+converging-`shard` machinery, sound burst is expanding `rings2d` shells, and
+phantasmal killer looms `fxPhantomTex` up off the floor via the `phantom` kind.
+The control spells (sleep, web, hold, slow, doom, dispel) are shaped the same
+way — web is `fxWebTex` on a `decal` kind, hold is converging gold `shard`s,
+slow reuses `rings2d` (now colour-parametrised), the rest are tinted
+`shard`/`mist`/`flash`.
+
+**Friendly spells have no target sprite** — the party is the camera — so they
+wash the whole view instead. `friendlyFx(sp)` (called from `castSpell`'s
+self/ally/allies branches) classifies by the spell's own fields
+(`healFn`/`raise`/`buff` shape) and picks a `flourish2d` overlay: a green heal
+bloom, a cool cleanse shimmer, a gold blessing (cyan for haste), an edge-dome
+ward, or a golden raise radiance — each paired with a party-position light
+flash. `spawnPartyFlash` guards on `R3.camera` so the node harness is safe, and
+the capture rig overrides `UI.pickAlly` to auto-resolve ally-targeted casts.
+
 **The screen-space rule, paid for three times before it was learned:** any
 shape that extends away from the first-person camera — the bolt's lane, a
 cone's wedge, a ray's beam — must be drawn as a 2D overlay (`fx2dBegin`, a
