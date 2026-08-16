@@ -9340,7 +9340,14 @@ function pickPartyTarget(m){
     .sort((a,b)=>d(a)-d(b)||a.y-b.y||a.x-b.x||a.slot-b.slot);
   let idx=line.indexOf(m);
   if(idx<0)idx=m.slot||0; // not in the line (an edge case): fall back to slot
-  const eff=idx%4, s=(eff%2)?SIDE_L:SIDE_R, r=eff<2?RANK_F:RANK_B;
+  // ...but index 0 always mapped to (right, front), so the nearest attacker —
+  // and a lone enemy, always first in a line of one — fell on that one file
+  // every time. Rotate the whole line by the lead monster's id: shared across
+  // the line, so several attackers still fan out one-to-one (just rotated),
+  // while a lone enemy's lane becomes its own id and no longer lands on the
+  // same character every fight.
+  const rot=((line[0]&&line[0].id)||m.id||0)>>>0;
+  const eff=(idx+rot)%4, s=(eff%2)?SIDE_L:SIDE_R, r=eff<2?RANK_F:RANK_B;
   // its own lane, own rank first; whoever can still hold it, else whoever is left
   for(const holding of [true,false])
     for(const rr of [r,1-r]){
