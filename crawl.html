@@ -9101,7 +9101,19 @@ function pickPartyTarget(m){
   if(!alive.length)return null;
   if(!m)return pick(alive);
   const at=(side,rank)=>alive.find(ch=>charSide(ch)===side&&charRank(ch)===rank);
-  const s=monsterSide(m),r=monsterRank(m);
+  // A monster's lane is its place in the WHOLE line pressing the party —
+  // nearest first — not its slot on its own tile. `m.slot` only distinguishes
+  // monsters sharing one tile; every monster alone on its tile is slot 0, so
+  // reading it directly made every lone attacker converge on one file. Ranking
+  // the combined line instead (still slot-ordered within a tile, so a packed
+  // faced tile keeps its clean one-to-one) fans lone attackers out across the
+  // party. eff%4 reuses the same slot->side/rank mapping as monsterSide/Rank.
+  const d=o=>Math.abs(o.x-G.px)+Math.abs(o.y-G.py);
+  const line=G.L.monsters.filter(o=>o.hp>0&&o.awake)
+    .sort((a,b)=>d(a)-d(b)||a.y-b.y||a.x-b.x||a.slot-b.slot);
+  let idx=line.indexOf(m);
+  if(idx<0)idx=m.slot||0; // not in the line (an edge case): fall back to slot
+  const eff=idx%4, s=(eff%2)?SIDE_L:SIDE_R, r=eff<2?RANK_F:RANK_B;
   // its own lane, own rank first; whoever can still hold it, else whoever is left
   for(const holding of [true,false])
     for(const rr of [r,1-r]){
