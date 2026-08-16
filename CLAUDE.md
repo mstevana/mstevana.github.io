@@ -962,6 +962,64 @@ walks `G.L.monsters`. That is deliberate and asserted in T43, so turning
 friendly fire on is a decision someone makes on purpose rather than a
 regression.
 
+## Spell effects are shaped
+
+Every offensive spell used to be one glowing blob (`fxGlowTex`) flying to the
+first foe plus up to nine identical bursts on the footprint — a fireball and
+cloudkill differed only in hex colour. Effects are now dispatched through three
+tables at the cast site in `07_game.js`, and a spell in none of them keeps the
+legacy blob-and-bursts:
+
+- **`SPELL_PROJ`** — how the bolt travels, where there is one: the fireball's
+  bead, cloudkill's rolling fog bank (slow on purpose — the book has the cloud
+  reach you before it kills you, so damage still resolves on arrival), the acid
+  arrow. Options: texture, scale, speed, tint, riding light (`lite`/`liteI` —
+  per-spell strength, a bead lights the corridor and an arrow only glimmers),
+  `spin`, `rot`, a `trail` of additive puffs, and `delay` for volleys. Magic
+  missile is its own block above the table: N staggered darts, one damage roll,
+  landed with the last.
+- **`SPELL_INSTANT`** — spells with no projectile at all: the bolt, both cones,
+  ice storm, flame strike, the three rays. These resolve at the word of command.
+- **`SPELL_IMPACT`** — the shaped impact itself, keyed like `SPELL_FX`,
+  called with `(at, areaTiles, color, foes, casterLevel)`.
+
+**The screen-space rule, paid for three times before it was learned:** any
+shape that extends away from the first-person camera — the bolt's lane, a
+cone's wedge, a ray's beam — must be drawn as a 2D overlay (`fx2dBegin`, a
+canvas inside `#view-wrap`, positions via `projectToScreen`). A world-space
+ribbon down the lane is seen almost end-on: its whole length projects into a
+few dozen pixels and any geometry there sums under additive blending into one
+white wad. Corollaries learned on the way: sprite quads write depth across
+their transparent margins (monster sprites now carry `alphaTest:0.08` so
+effects behind them stop getting rectangular holes; the bolt also sets
+`depthTest:false`), and billboarded polylines need rung-continuity or they
+twist into bowties. One overlay effect draws per frame — each clears the shared
+canvas — which holds because only the party casts overlay spells.
+
+**`R3.fxLight` is one PointLight parked in the scene at intensity 0**, moved
+and driven by `flash` fx and riding projectiles. It must never be added or
+removed at runtime: three.js compiles materials against the light count, and a
+transient light recompiles every shader mid-fight. It is also a term in
+`lightAt`, so monsters are lit by the spell striking them — without that a
+fireball lit the stonework while the creatures inside it stayed dark.
+
+Anything near the camera must scale down: constant world-size trail puffs and
+darts balloon at the muzzle (the wake scales by distance from the eye; the
+missile volley launches from most of a tile ahead). The party's arrows —
+bow, crossbow, acid arrow — fly upright, tip up and fletching down, because a
+horizontal arrow receding from the eye reads as a sideways smudge.
+
+Every fx kind must terminate cleanly under one big `updateFx(10)` step — the
+node tests land spells that way — and a negative `t` is the scheduling idiom
+(staggered flames, hail with its splash timed to the landing, volley delays).
+
+The capture harness is `shots/spellfx.js` (+`stitchfx.js`): it casts in a
+deterministic arena, pauses the game the same tick, steps `updateFx` by hand,
+and detects the impact rather than guessing flight time. It picks the cleric
+for divine spells — a wizard refuses them silently, and flame strike once
+photographed four frames of nothing — and prints CAST REFUSED when a cast does
+not happen.
+
 ## The wizard's spellbook
 
 The wizard is the only prepared caster, and `preparesSpells(ch)` is the

@@ -8217,8 +8217,11 @@ function doAttack(ch,slot,wDef,wIt,m,isRangedShot){
   };
   if(isRangedShot){
     SFX.arrow();
+    // an arrow receding from the eye reads as a sideways smudge when drawn
+    // horizontal; stood upright — tip up, fletching down — it reads as an arrow
     spawnProjectile({from:partyMuzzle(),toFn:()=>monsterAim(m),
-      tex:wDef.spr==='sling'?fxStoneTex():fxArrowTex(),scale:wDef.spr==='sling'?0.12:0.2,speed:8,
+      tex:wDef.spr==='sling'?fxStoneTex():fxArrowTex(),scale:wDef.spr==='sling'?0.12:0.24,speed:8,
+      rot:wDef.spr==='sling'?0:Math.PI/2-0.18,
       onHit:deliver});
   }else deliver();
 }
@@ -8497,9 +8500,28 @@ function castSpell(ch,key,opts){
   // down the corridor at a walking pace looking for its first victim
   if(SPELL_INSTANT[key]&&shaped){
     const at=monsterAim(c0);
-    shaped(at,areaTiles,color,foes);
+    shaped(at,areaTiles,color,foes,cl);
     if(sp.target==='foes')for(const m of foes)resolveFoe(m);
     else resolveFoe(c0);
+    return true;
+  }
+  /* PHB: magic missile — "missiles of magical energy dart forth... and
+     unerringly strike" — one dart at 1st level, five by 9th. A staggered volley
+     of force darts, each trailing a faint wake; the spell's single damage roll
+     lands with the last dart, so nothing resolves before the volley is home. */
+  if(key==='magicmissile'&&sp.target==='foe'){
+    const n=Math.min(5,Math.floor((cl+1)/2));
+    const [fdx,fdy]=DIRS[G.facing];
+    for(let i=0;i<n;i++){
+      const last=i===n-1, off=(i%2?1:-1)*(0.14+i*0.05);
+      // launched from most of a tile ahead: at the muzzle itself every dart is
+      // huge on screen and five of them read as a wall of purple
+      spawnProjectile({from:{x:R3.camera.position.x+fdx*0.85-fdy*off,
+          y:EYE-0.14+(i%3)*0.09,z:R3.camera.position.z+fdy*0.85+fdx*off},
+        toFn:()=>monsterAim(c0),tex:fxGlowTex(color),scale:0.13,speed:7.5,
+        delay:i*0.13,trail:color,
+        onHit:()=>{spawnBurst(monsterAim(c0),color,0.8);if(last)resolveFoe(c0);}});
+    }
     return true;
   }
   const pj=SPELL_PROJ[key]||{};
@@ -8508,12 +8530,14 @@ function castSpell(ch,key,opts){
     scale:pj.scale||0.4,
     speed:pj.speed||5.5,
     lite:pj.lite||null,
+    liteI:pj.liteI,
+    rot:pj.rot||0,
     spin:!!pj.spin,
     tint:pj.tint||null,
     onHit:()=>{
       const at=monsterAim(c0);
       if(sp.target==='foes'){
-        if(shaped)shaped(at,areaTiles,color);
+        if(shaped)shaped(at,areaTiles,color,foes,cl);
         // paint the footprint rather than one blob, so the shape is legible:
         // a bolt reads as a line of flashes, a fireball as a disc
         else if(areaTiles&&areaTiles.size){
@@ -9182,17 +9206,20 @@ function strikeAnim(m){
   s.userData.attackPhase='strike';s.userData.phaseT=performance.now();
 }
 /* ---------- projectiles & transient effects ---------- */
-function spawnProjectile(o){ // {from:{x,y,z}, toFn, speed, tex, scale, onHit, tint?, lite?, spin?}
+function spawnProjectile(o){ // {from:{x,y,z}, toFn, speed, tex, scale, onHit, tint?, lite?, spin?, rot?}
   const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:o.tex,transparent:true,depthWrite:false}));
   if(o.tint&&spr.material&&spr.material.color)spr.material.color.set(o.tint);
+  if(o.rot&&spr.material)spr.material.rotation=o.rot;
   spr.scale.set(o.scale,o.scale,1);
   spr.position.set(o.from.x,o.from.y,o.from.z);
   spr.userData={kind:'fx'}; // tagged so view taps pass through instead of being blocked
   R3.levelGroup.add(spr);
-  G.fx.push({kind:'proj',spr,speed:o.speed,toFn:o.toFn,onHit:o.onHit,baseScale:o.scale,t:0,lite:o.lite,spin:o.spin});
+  G.fx.push({kind:'proj',spr,speed:o.speed,toFn:o.toFn,onHit:o.onHit,baseScale:o.scale,
+    t:-(o.delay||0),lite:o.lite,liteI:o.liteI,spin:o.spin,trail:o.trail});
 }
-function spawnBurst(pos,color,size,delay){
-  const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:fxGlowTex(color),transparent:true,depthWrite:false}));
+function spawnBurst(pos,color,size,delay,add){
+  const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:fxGlowTex(color),transparent:true,depthWrite:false,
+    blending:add?THREE.AdditiveBlending:THREE.NormalBlending}));
   spr.scale.set(0.25,0.25,1);
   spr.position.set(pos.x,pos.y,pos.z);
   spr.userData={kind:'fx'};
@@ -9347,8 +9374,11 @@ function bolt2dDraw(f,op){
    away from the caster at a walking pace exactly as written — which is why its
    damage still resolves on arrival rather than at the word of command. */
 const SPELL_PROJ={
-  fireball:{tex:()=>fxFireballTex(),scale:0.55,speed:6.5,lite:'#ff8c2a',spin:true},
+  fireball:{tex:()=>fxFireballTex(),scale:0.55,speed:6.5,lite:'#ff8c2a',liteI:1.6,spin:true},
   cloudkill:{tex:()=>fxMistTex(),scale:1.3,speed:3.2,tint:'#a8d45e'},
+  // an arrow of acid, not a glow: the mundane arrow art tinted sickly green,
+  // dripping a wake of acid behind it
+  acidarrow:{tex:()=>fxArrowTex(),scale:0.6,speed:7,tint:'#cfe86a',trail:'#9fdc39',lite:'#9fdc39',liteI:0.5,rot:Math.PI/2-0.18},
 };
 /* PHB: cloudkill — "a bank of fog billows out... yellowish-green vapors." The
    rolling bank is the projectile above; this is the cloud it becomes when it
@@ -9612,10 +9642,42 @@ function waves2dDraw(f,op){
     ctx.beginPath();ctx.moveTo(ax,ay);ctx.quadraticCurveTo(cx2,cy2,bx,by);ctx.stroke();
   }
 }
+/* the rays — scorching ray, searing light, ray of frost — are instant beams
+   from the caster's hands to the victim, drawn on the overlay like everything
+   that points away from the eye. Scorching ray fires two rays at 7th caster
+   level and three at 11th, as the book has it. */
+function spawnBeam2d(tw,core,glow,width,n){
+  G.fx.push({kind:'beam2d',t:0,dur:0.42,tw:{x:tw.x,y:tw.y,z:tw.z},core,glow,width,n:n||1,
+    seed:1+Math.floor(Math.random()*1e9)});
+}
+function beam2dDraw(f,op){
+  const b=fx2dBegin();
+  if(!b)return;
+  const ctx=b.ctx;
+  if(op<=0)return;
+  const p=projectToScreen(f.tw);
+  if(p.behind)return;
+  const rr=_lcg(f.seed+1+Math.floor(f.t*24)*7);   // a slight shimmer, reseeded
+  ctx.lineCap='round';
+  for(let j=0;j<f.n;j++){
+    if(f.t<j*0.07)continue;
+    const sx=b.W*0.5+(j-(f.n-1)/2)*52, sy=b.H*0.97;
+    const tx=p.x+(rr()-0.5)*5, ty=p.y+(rr()-0.5)*5;
+    ctx.globalAlpha=op;
+    const st=(w,c)=>{ctx.strokeStyle=c;ctx.lineWidth=w;
+      ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(tx,ty);ctx.stroke();};
+    st(f.width*3,'rgba('+f.glow+',0.26)');
+    st(f.width*1.4,'rgba('+f.glow+',0.6)');
+    st(f.width*0.55,'rgba('+f.core+',0.95)');
+  }
+  ctx.globalAlpha=1;
+}
 function updateFx(dt){
   for(const f of G.fx.slice()){
     if(f.kind==='proj'){
       f.t+=dt;
+      if(f.t<0){f.spr.visible=false;continue;}   // a volley launches staggered
+      f.spr.visible=true;
       const tgt=f.toFn();
       const dx=tgt.x-f.spr.position.x,dy=tgt.y-f.spr.position.y,dz=tgt.z-f.spr.position.z;
       const dist=Math.hypot(dx,dy,dz);
@@ -9631,10 +9693,21 @@ function updateFx(dt){
         const p=1+Math.sin(f.t*22)*0.13;
         f.spr.scale.set(f.baseScale*p,f.baseScale*p,1);
         if(f.spin&&f.spr.material)f.spr.material.rotation+=dt*3.2;
+        if(f.trail){f.tT=(f.tT||0)+dt;
+          if(f.tT>0.04){f.tT=0;
+            // the wake scales with distance from the eye, or the puffs balloon
+            // at the muzzle and the dart drowns in its own trail
+            const cp2=R3.camera.position;
+            const dc=Math.hypot(f.spr.position.x-cp2.x,f.spr.position.z-cp2.z);
+            spawnBurst({x:f.spr.position.x,y:f.spr.position.y,z:f.spr.position.z},
+              f.trail,0.55*Math.max(0.22,Math.min(1,dc/3.2)),0,true);}}
         if(f.lite&&R3.fxLight){
           R3.fxLight.position.set(f.spr.position.x,f.spr.position.y,f.spr.position.z);
           R3.fxLight.color.set(f.lite);
-          R3.fxLight.intensity=1.5+Math.sin(f.t*28)*0.4;
+          // per-spell strength: a fireball bead lights the corridor, an acid
+          // arrow only glimmers
+          const li=f.liteI||1.5;
+          R3.fxLight.intensity=li+Math.sin(f.t*28)*li*0.25;
         }
       }
     }else if(f.kind==='bolt2d'){
@@ -9645,6 +9718,13 @@ function updateFx(dt){
         if(f.flick>=0.07){f.flick=0;f.seed=1+Math.floor(Math.random()*1e9);}
         const k=f.t/f.dur;
         bolt2dDraw(f,k<0.55?1:1-(k-0.55)/0.45);
+      }
+    }else if(f.kind==='beam2d'){
+      f.t+=dt;
+      if(f.t>=f.dur){beam2dDraw(f,0);G.fx.splice(G.fx.indexOf(f),1);}
+      else{
+        const k=f.t/f.dur;
+        beam2dDraw(f,k<0.55?1:1-(k-0.55)/0.45);
       }
     }else if(f.kind==='waves2d'){
       f.t+=dt;
@@ -9796,6 +9876,21 @@ const SPELL_IMPACT={
       spawnBurst({x:p.x+dx/d*0.4,y:p.y,z:p.z+dz/d*0.4},'#bfe8ff',1.3);
     }
   },
+  scorchingray:(at,tiles,color,foes,cl)=>{
+    spawnBeam2d(at,'255,243,208','255,122,30',5,1+(cl>=7?1:0)+(cl>=11?1:0));
+    spawnFlash(at,'#ff8c2a',2,0.35);
+    spawnBurst(at,'#ff9a40',1.1);
+  },
+  searinglight:(at)=>{
+    spawnBeam2d(at,'255,255,245','255,222,140',6,1);
+    spawnFlash(at,'#ffe8a0',2.6,0.4);
+    spawnBurst(at,'#fff2c0',1.2);
+  },
+  rayfrost:(at)=>{
+    spawnBeam2d(at,'240,250,255','120,190,235',3.5,1);
+    spawnFlash(at,'#a8e0ff',1.4,0.3);
+    spawnBurst(at,'#cfe8fa',0.8);
+  },
   wavesfatigue:(at,tiles,color,foes)=>{
     const [dx,dy]=DIRS[G.facing];
     const a=SPELLS.wavesfatigue.area, L=a.len+0.4, halfW=(a.len+1.2)/2;
@@ -9846,7 +9941,8 @@ const SPELL_IMPACT={
   },
 };
 // spells that resolve the instant they are cast, with no projectile at all
-const SPELL_INSTANT={lightning:true,conecold:true,icestorm:true,flamestrike:true,wavesfatigue:true};
+const SPELL_INSTANT={lightning:true,conecold:true,icestorm:true,flamestrike:true,wavesfatigue:true,
+  scorchingray:true,searinglight:true,rayfrost:true};
 /* ---------- conditions & buffs tick ---------- */
 let bleedTimer=0,poisonTimer=0;
 function updateParty(dt){
