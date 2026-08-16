@@ -10214,6 +10214,15 @@ const SPELL_IMPACT={
     spawnFlash(at,'#a8e0ff',1.4,0.3);
     spawnBurst(at,'#cfe8fa',0.8);
   },
+  enervation:(at)=>{
+    // a black ray of negative energy: the dark core laid over a violet glow
+    // makes the beam read as a shaft of nothing edged in cold light
+    spawnBeam2d(at,'34,8,54','168,96,226',5,1);
+    spawnFlash(at,'#8a4ae0',1.7,0.42);
+    spawnBurst(at,'#5a2496',1.2);
+    // the life guttering out of the foe: dark motes sinking one after another
+    for(let i=0;i<3;i++)spawnBurst({x:at.x,y:at.y-0.12*i,z:at.z},'#3a1466',0.7,0.12+i*0.1);
+  },
   wavesfatigue:(at,tiles,color,foes)=>{
     const [dx,dy]=DIRS[G.facing];
     const a=SPELLS.wavesfatigue.area, L=a.len+0.4, halfW=(a.len+1.2)/2;
@@ -10274,7 +10283,7 @@ const SPELL_IMPACT={
 };
 // spells that resolve the instant they are cast, with no projectile at all
 const SPELL_INSTANT={lightning:true,conecold:true,icestorm:true,flamestrike:true,wavesfatigue:true,
-  scorchingray:true,searinglight:true,rayfrost:true,burninghands:true};
+  scorchingray:true,searinglight:true,rayfrost:true,burninghands:true,enervation:true};
 /* ---------- conditions & buffs tick ---------- */
 let bleedTimer=0,poisonTimer=0;
 function updateParty(dt){
