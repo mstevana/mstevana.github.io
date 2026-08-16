@@ -1120,10 +1120,25 @@ negative on its last frame and stops there. Harmless — every gate tests
 
 ## Left and right
 
-Both sides of a fight pair up by position: a character on the left of the
-formation meets the monster on the left of the line, and that monster
-swings back at them. `SIDE_L`/`SIDE_R`, `monsterSide`, `charSide`,
-`charOnSide` and `facingMonsterAt` hold all of it.
+**A monster picks its mark one of two ways, and which one depends on whether
+it is standing in a line or standing alone.** `pickPartyTarget` branches on
+`monstersOn(m.x,m.y).length>1`, and the split is deliberate rather than a
+special case: `rankOffset` only spreads a tile's occupants apart once there
+are two of them, so a line has visible sides and a lone creature does not.
+
+**In a line** (a tile holding several monsters) both sides pair up by
+position: a character on the left of the formation meets the monster on the
+left of the line, and that monster swings back at them. `SIDE_L`/`SIDE_R`,
+`monsterSide`, `charSide`, `charOnSide` and `facingMonsterAt` hold all of it,
+and the rank and lane rules below apply.
+
+**Alone**, a monster holds the centre of its tile and so has no file to meet.
+It takes one of the two characters **facing** it at random — a fresh roll for
+every blow, so the front rank shares the punishment instead of one file
+soaking it — and reaches past to the **back rank**, again at random, only once
+both of the front two are down. That is what keeps the casters alive behind
+the line. It applies to a lone archer and a lone caster exactly as it does to
+a lone brute, because every path runs through the one function.
 
 **The two conventions are opposite, which is the whole reason they are
 named rather than inlined:**
@@ -1139,14 +1154,15 @@ gets the sign wrong, and an earlier probe that read `projectToScreen`
 without rendering first reported a mapping that flipped between facings —
 it was reading a stale camera matrix, not finding a bug.
 
-Rank matches too. The two formations face each other square on, so
-`pickPartyTarget` reaches for the same side **and** the same rank: a
-front-rank monster meets the party's front rank, and a back-rank monster
-(which needs reach to swing at all) goes for the party's back rank. Every
-way a monster reaches the party runs through that one function — melee,
+Rank matches too, **in the line case**. The two formations face each other
+square on, so `pickPartyTarget` reaches for the same side **and** the same
+rank: a front-rank monster meets the party's front rank, and a back-rank
+monster (which needs reach to swing at all) goes for the party's back rank.
+Every way a monster reaches the party runs through that one function — melee,
 shots, and a caster's bolt.
 
-A character holds their place only while they can fight for it. Down, or
+In the line case a character holds their place only while they can fight for
+it. Down, or
 unable to act (`canAct` covers paralysis, hold, sleep, stun), and the lane
 opens: the blow reaches past them to whoever else is in that lane. Note the
 order of the two fallbacks, which is the part worth not breaking — a

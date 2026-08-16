@@ -9621,17 +9621,48 @@ function moveMonster(m,nx,ny){
    OTHER side only when its own lane is empty of the living, so putting a
    character out of action never makes them safer -- if they are the last one
    standing in their lane, the blows are still theirs. */
+/* Who a monster swings at, and the answer depends on whether it is standing in
+   a line or standing alone.
+
+   A tile holding SEVERAL monsters forms a line, and the two formations face
+   each other square on: the monster on the party's left meets the character on
+   the party's left, and rank meets rank. That is worth doing only when the
+   sides are actually distinct on screen — and `rankOffset` spreads a tile's
+   occupants apart precisely when there are two or more of them.
+
+   A LONE monster holds the centre of its tile, so it has no file to meet. It
+   takes one of the two characters facing it at random; only once both of those
+   are down does it reach past them to the back rank, which is what keeps the
+   casters alive behind the line.
+
+   Every way a monster reaches the party comes through here — melee, shots and a
+   caster's bolt alike — so a lone archer and a lone caster pick their mark the
+   same way a lone brute does. */
 function pickPartyTarget(m){
   const alive=G.party.filter(ch=>!isDown(ch));
   if(!alive.length)return null;
   if(!m)return pick(alive);
-  // The front rank shields the back: an enemy strikes a random living front-row
-  // character (party indices 0-1), and only reaches the back row — where the
-  // casters usually stand — once the whole front row is down. `pick` is fresh
-  // for every blow, so the two front characters share the punishment rather
-  // than one file soaking all of it.
-  const front=alive.filter(ch=>charRank(ch)===RANK_F);
-  return pick(front.length?front:alive);
+  const at=(side,rank)=>alive.find(ch=>charSide(ch)===side&&charRank(ch)===rank);
+  if(monstersOn(m.x,m.y).length>1){
+    const s=monsterSide(m),r=monsterRank(m);
+    // its own lane, own rank first; whoever can still hold it, else whoever is
+    // left — a character keeps their place only while they can fight for it,
+    // and both ranks of its OWN side are tried before it will cross the line
+    for(const holding of [true,false])
+      for(const rr of [r,1-r]){
+        const ch=at(s,rr);
+        if(ch&&(!holding||canAct(ch)))return ch;
+      }
+    // the lane is empty: cross the line, keeping rank for rank
+    return at(1-s,r)||at(1-s,1-r)||null;
+  }
+  // alone: a fresh roll for every blow, so the two facing characters share the
+  // punishment rather than one of them soaking all of it
+  for(const rank of [RANK_F,RANK_B]){
+    const row=alive.filter(ch=>charRank(ch)===rank);
+    if(row.length)return pick(row);
+  }
+  return pick(alive);
 }
 /* ---------- the grove answers for its own ----------
    A myconid that is hurt broadcasts distress, and every other myconid within
