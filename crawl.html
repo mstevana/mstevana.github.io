@@ -3810,17 +3810,34 @@ function tryGen(depth,targetWalk,theme){
   if(theme.name==='Crypt'){
     const KINDS=['sarcophagus','tombs','stacked','candle','recess'];
     const nCrypt=9+rnd(7);
-    let cTries=400;
-    while(crypts.length<nCrypt&&cTries-->0){
-      const x=1+rnd(W-2),y=1+rnd(H-2);
-      if(g[idx(x,y)]!==T_FLOOR)continue;
-      // a plain wall only: never a secret door, a real door, or the stairs
-      const wd=DIRS.filter(([dx,dy])=>g[idx(x+dx,y+dy)]===T_WALL);
-      if(!wd.length)continue;
-      if(crypts.some(c=>Math.abs(c.x-x)+Math.abs(c.y-y)<2))continue;
-      const [dx,dy]=pick(wd);
-      crypts.push({x,y,dx,dy,kind:pick(KINDS)});
-    }
+    // find a plain wall face with room to stand at it, and set a feature there.
+    // Never a secret door, a real door, or the stairs; never crowding another.
+    const place=(kind,empty)=>{
+      let tries=200;
+      while(tries-->0){
+        const x=1+rnd(W-2),y=1+rnd(H-2);
+        if(g[idx(x,y)]!==T_FLOOR)continue;
+        const wd=DIRS.filter(([dx,dy])=>g[idx(x+dx,y+dy)]===T_WALL);
+        if(!wd.length)continue;
+        if(crypts.some(c=>Math.abs(c.x-x)+Math.abs(c.y-y)<2))continue;
+        const [dx,dy]=pick(wd);
+        const c={x,y,dx,dy,kind};
+        if(empty)c.empty=true;
+        crypts.push(c);
+        return true;
+      }
+      return false;
+    };
+    // first pass: the ordinary mix, its coffins holding what they always did
+    for(let i=0;i<nCrypt;i++)place(pick(KINDS),false);
+    // then twice as many coffins and tomb plaques for atmosphere — but the extra
+    // coffins are EMPTY, so doubling the furniture never doubles the loot. Match
+    // the counts the first pass happened to place of each.
+    const isCoffin=k=>k==='sarcophagus'||k==='stacked';
+    const nCof=crypts.filter(c=>isCoffin(c.kind)).length;
+    const nPlq=crypts.filter(c=>c.kind==='tombs').length;
+    for(let i=0;i<nCof;i++)place(pick(['sarcophagus','stacked']),true);
+    for(let i=0;i<nPlq;i++)place('tombs',false);
   }
   // duergar halls: the walls are dressed and furnished — engaged pillars carrying
   // the roof, and torches burning in iron brackets. Sited exactly like the crypt's
@@ -11012,6 +11029,16 @@ function openCoffin(ci,slot){
   c.opened.push(slot);
   SFX.secret();
   refreshCryptFeature(ci);
+  // the extra coffins that double the crypt's furniture are empty by
+  // construction: they hold neither grave goods nor an occupant, so the floor's
+  // loot and its threat do not grow with its dressing
+  if(c.empty){
+    UI.toast(pick(['Nothing but dust and a smell of old air.',
+      'Bones, collapsed and undisturbed. Nothing worth taking.',
+      'Empty. Whatever lay here was taken long ago.',
+      'A shroud, rotted to threads. Nothing beneath it.']));
+    return;
+  }
   const roll=Math.random();
   if(roll<0.20){
     /* The occupant is still in residence. What climbs out of a grave is a
