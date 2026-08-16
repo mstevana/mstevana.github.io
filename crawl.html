@@ -7342,13 +7342,16 @@ function buildLevel(L){
           const w=new THREE.LineSegments(cobwebGeo(rr,0.5+rr()*0.28),webLineMat.clone());
           w.position.set(x+0.5,WALLH-0.18,y+0.5);
           w.rotation.set((rr()-0.5)*0.5,rr()*Math.PI*2,(rr()-0.5)*0.4);
+          w.userData.decor=true;
           litter.add(w);
           (R3.webMeshes||(R3.webMeshes=[])).push(w);
         }
       }
       const mkInst=(mats,geo,mat)=>{ if(!mats.length)return;
         const inst=new THREE.InstancedMesh(geo,mat,mats.length);
-        mats.forEach((m,i)=>inst.setMatrixAt(i,m)); inst.instanceMatrix.needsUpdate=true; litter.add(inst); };
+        mats.forEach((m,i)=>inst.setMatrixAt(i,m)); inst.instanceMatrix.needsUpdate=true;
+        inst.userData.decor=true; // cosmetic: never blocks a tap to the item on the same tile
+        litter.add(inst); };
       mkInst(frames,boxU,slabRimMat); mkInst(panels,boxU,slabMat);
       mkInst(carves,boxU,slabCarveMat); mkInst(lines,boxU,webMat);
       mkInst(shafts,cylU,boneMat2); mkInst(knobs,sphU,boneMat2);
@@ -13007,6 +13010,7 @@ function initInput(){
     const hits=ray.intersectObjects(R3.levelGroup.children,true);
     for(const h of hits){
       const u=h.object.userData;
+      if(u&&u.decor)continue; // cosmetic floor dressing (slabs, bones, cobwebs) is tapped through
       if(!u||!u.kind)break; // solid geometry (walls, floor, stairs steps) blocks the tap
       if(u.kind==='item'){
         const dist=Math.abs(u.x-G.px)+Math.abs(u.y-G.py);
