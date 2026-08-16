@@ -5985,9 +5985,46 @@ function fxMistTex(){
   const tex=texFromCanvas(cv,{mipmap:false});
   R3.texCache[key]=tex;return tex;
 }
-
-
-
+/* the phantasmal killer: a hooded terror. A pure-black shape is invisible on
+   black stone, so the body is a mid violet-grey that reads over the dark, the
+   hood a darker void, and the eyes and rim glow — the menace comes from those
+   lit parts, not from a silhouette that would vanish. */
+function fxPhantomTex(){
+  const key='fx_phantom';
+  if(R3.texCache[key])return R3.texCache[key];
+  const cv=document.createElement('canvas');cv.width=128;cv.height=192;
+  const ctx=cv.getContext('2d');
+  const cx=64;
+  let g=ctx.createRadialGradient(cx,84,10,cx,92,92);
+  g.addColorStop(0,'rgba(120,80,190,0.26)');g.addColorStop(1,'rgba(120,80,190,0)');
+  ctx.fillStyle=g;ctx.fillRect(0,0,128,192);
+  // robed body down to a ragged hem
+  ctx.beginPath();
+  ctx.moveTo(cx,18);
+  ctx.bezierCurveTo(30,30,22,72,26,120);
+  for(const [x,y] of [[34,150],[30,178],[45,157],[53,184],[64,163],[75,184],[83,157],[98,178],[94,150],[102,120]])ctx.lineTo(x,y);
+  ctx.bezierCurveTo(106,72,98,30,cx,18);
+  ctx.closePath();
+  g=ctx.createLinearGradient(0,20,0,184);
+  g.addColorStop(0,'rgba(86,66,120,0.82)');
+  g.addColorStop(0.5,'rgba(56,40,84,0.64)');
+  g.addColorStop(1,'rgba(28,18,46,0.04)');
+  ctx.fillStyle=g;ctx.fill();
+  // the void of the hood
+  ctx.fillStyle='rgba(12,7,24,0.78)';
+  ctx.beginPath();ctx.ellipse(cx,52,25,33,0,0,7);ctx.fill();
+  // luminous rim along the cowl
+  ctx.strokeStyle='rgba(150,100,225,0.55)';ctx.lineWidth=3;
+  ctx.beginPath();ctx.ellipse(cx,52,26,34,0,Math.PI*0.82,Math.PI*2.18);ctx.stroke();
+  // two glowing eyes in the dark
+  for(const ex of [cx-10,cx+10]){
+    const eg=ctx.createRadialGradient(ex,46,0,ex,46,8);
+    eg.addColorStop(0,'rgba(242,226,255,0.98)');eg.addColorStop(0.5,'rgba(184,124,242,0.8)');eg.addColorStop(1,'rgba(150,90,220,0)');
+    ctx.fillStyle=eg;ctx.beginPath();ctx.arc(ex,46,8,0,7);ctx.fill();
+  }
+  const tex=texFromCanvas(cv,{mipmap:false});
+  R3.texCache[key]=tex;return tex;
+}
 function fxHailTex(){
   const key='fx_hail';
   if(R3.texCache[key])return R3.texCache[key];
@@ -10058,6 +10095,30 @@ function rings2dDraw(f,op){
   }
   ctx.globalCompositeOperation='source-over';
 }
+/* PHB: phantasmal killer — "a phantasmal image of the most fearsome creature
+   imaginable". A hooded terror rises off the floor at the victim, looms up to
+   full height, then lunges toward the eye before guttering out; violet fear-
+   glow and rising wisps surround it. */
+function spawnPhantasm(at){
+  const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:fxPhantomTex(),transparent:true,depthWrite:false,opacity:0}));
+  spr.scale.set(0.8,0.6,1);
+  spr.position.set(at.x,at.y-0.1,at.z);
+  spr.userData={kind:'fx'};
+  R3.levelGroup.add(spr);
+  G.fx.push({kind:'phantom',spr,t:0,dur:0.8,x0:at.x,y0:at.y-0.1,z0:at.z});
+  spawnFlash({x:at.x,z:at.z},'#7a4ad0',1.4,0.55);
+  spawnBurst({x:at.x,y:at.y,z:at.z},'#2a1044',1.5,0.2);
+  for(let i=0;i<6;i++){
+    const w=new THREE.Sprite(new THREE.SpriteMaterial({map:fxGlowTex('#5a2a9a'),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+    const sc=0.1+Math.random()*0.08, ox=(Math.random()-0.5)*0.7;
+    w.scale.set(sc,sc,1);
+    w.position.set(at.x+ox,at.y-0.2,at.z+(Math.random()-0.5)*0.5);
+    w.userData={kind:'fx'};
+    R3.levelGroup.add(w);
+    G.fx.push({kind:'shard',spr:w,t:0,dur:0.55,vx:ox*0.3,vy:1.1,vz:0});   // wisps curling up
+  }
+  R3.shake=Math.max(R3.shake,0.14);
+}
 function updateFx(dt){
   for(const f of G.fx.slice()){
     if(f.kind==='proj'){
@@ -10125,6 +10186,19 @@ function updateFx(dt){
       else{
         const k=f.t/f.dur;
         rings2dDraw(f,k<0.5?1:1-(k-0.5)/0.5);
+      }
+    }else if(f.kind==='phantom'){
+      f.t+=dt;
+      if(f.t>=f.dur){R3.levelGroup.remove(f.spr);G.fx.splice(G.fx.indexOf(f),1);}
+      else{
+        const k=f.t/f.dur, rise=Math.min(1,k/0.45);
+        f.spr.scale.set(0.8+rise*0.6,0.6+rise*1.3,1);   // looms to full height
+        f.spr.position.y=f.y0+rise*0.7;
+        const lunge=Math.max(0,(k-0.5)/0.5);            // then surges at the eye
+        const cp=R3.camera.position,ddx=cp.x-f.x0,ddz=cp.z-f.z0,d=Math.hypot(ddx,ddz)||1;
+        f.spr.position.x=f.x0+ddx/d*lunge*0.6;
+        f.spr.position.z=f.z0+ddz/d*lunge*0.6;
+        if(f.spr.material)f.spr.material.opacity=(k<0.2?k/0.2:1)*(k<0.65?1:1-(k-0.65)/0.35);
       }
     }else if(f.kind==='wedge2d'){
       f.t+=dt;
@@ -10314,6 +10388,7 @@ const SPELL_IMPACT={
   slayliving:(at)=>spawnDeathTouch(at),
   vampirictouch:(at)=>spawnVampiricDrain(at),
   soundburst:(at)=>spawnSoundBurst(at),
+  phantasmalkiller:(at)=>spawnPhantasm(at),
   wavesfatigue:(at,tiles,color,foes)=>{
     const [dx,dy]=DIRS[G.facing];
     const a=SPELLS.wavesfatigue.area, L=a.len+0.4, halfW=(a.len+1.2)/2;
@@ -10375,7 +10450,7 @@ const SPELL_IMPACT={
 // spells that resolve the instant they are cast, with no projectile at all
 const SPELL_INSTANT={lightning:true,conecold:true,icestorm:true,flamestrike:true,wavesfatigue:true,
   scorchingray:true,searinglight:true,rayfrost:true,burninghands:true,enervation:true,slayliving:true,
-  vampirictouch:true,soundburst:true};
+  vampirictouch:true,soundburst:true,phantasmalkiller:true};
 /* ---------- conditions & buffs tick ---------- */
 let bleedTimer=0,poisonTimer=0;
 function updateParty(dt){
