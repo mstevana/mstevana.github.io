@@ -6185,6 +6185,120 @@ function fxPillarTex(core){
   R3.texCache[key]=tex;return tex;
 }
 
+/* ---------- the lightning bolt, on the GPU ----------
+   The bolt is still drawn in SCREEN space — that rule is not negotiable, a lane
+   running away from the eye projects into a few dozen pixels — but three canvas
+   strokes can only ever be three tubes of constant width with hard edges. A
+   fragment shader gets the thing light actually does: brightness falling off
+   with distance from the arc, so the filament is hot white, the sheath blue and
+   the haze reaches much further than any stroke could be drawn without turning
+   into a slab.
+
+   The geometry stays on the CPU (the zigzag has to pin every victim, which is
+   game logic, not shading). What crosses to the GPU is a flat list of SEGMENTS:
+   the main stroke first, then the forks, split by `uMain` so forks can be shaded
+   thinner and dimmer without a second pass or a per-segment attribute.
+
+   Two portability notes, both load-bearing:
+   - the loop runs a constant 64 iterations with no dynamic `break`, because
+     GLSL ES 1.00 only promises constant-bounded loops. Unused slots are parked
+     far off-screen so their distance never wins the min.
+   - the vertex shader bypasses the camera matrices entirely and writes NDC
+     straight from pixel coordinates, so the quad needs no camera fitting and
+     must have `frustumCulled=false`.
+
+   The quad covers only the bolt's bounding box (plus a margin for the haze),
+   not the whole screen: at 64 segments a fullscreen pass is most of a million
+   fragments doing 64 distance tests apiece, and the bolt occupies a fifth of
+   the view. */
+const BOLT_MAX_SEG=64;
+function boltShaderInit(){
+  if(R3.boltQuad!==undefined)return R3.boltQuad;   // built once; null means unavailable
+  R3.boltQuad=null;
+  if(!R3.renderer||!THREE.ShaderMaterial)return null;
+  const segs=[];
+  for(let i=0;i<BOLT_MAX_SEG;i++)segs.push(new THREE.Vector4(-9999,-9999,-9999,-9999));
+  const mat=new THREE.ShaderMaterial({
+    uniforms:{
+      uSeg:{value:segs},
+      uN:{value:0},uMain:{value:0},
+      uBox:{value:new THREE.Vector4(0,0,1,1)},
+      uRes:{value:new THREE.Vector2(1,1)},
+      uOp:{value:1},uT:{value:0},uSeed:{value:0},
+      uCore:{value:new THREE.Color('#f2faff')},
+      uMid:{value:new THREE.Color('#9fd4ff')},
+      uOuter:{value:new THREE.Color('#5fa8e8')}
+    },
+    vertexShader:[
+      'uniform vec4 uBox;','uniform vec2 uRes;','varying vec2 vP;',
+      'void main(){',
+      '  vec2 uv=position.xy*0.5+0.5;',              // PlaneGeometry(2,2) spans -1..1
+      '  vP=mix(uBox.xy,uBox.zw,uv);',               // this fragment's pixel position
+      '  vec2 ndc=(vP/uRes)*2.0-1.0;',
+      '  ndc.y=-ndc.y;',                             // screen pixels count down, NDC counts up
+      '  gl_Position=vec4(ndc,0.0,1.0);',
+      '}'].join('\n'),
+    fragmentShader:[
+      'precision highp float;',
+      'uniform vec4 uSeg['+BOLT_MAX_SEG+'];',
+      'uniform int uN;','uniform int uMain;',
+      'uniform float uOp;','uniform float uT;','uniform float uSeed;',
+      'uniform vec3 uCore;','uniform vec3 uMid;','uniform vec3 uOuter;',
+      'varying vec2 vP;',
+      'float h21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);}',
+      'float vnoise(vec2 p){',
+      '  vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);',
+      '  return mix(mix(h21(i),h21(i+vec2(1.,0.)),f.x),',
+      '             mix(h21(i+vec2(0.,1.)),h21(i+vec2(1.,1.)),f.x),f.y);}',
+      'void main(){',
+      '  float dM=1e6,dF=1e6;',
+      '  for(int i=0;i<'+BOLT_MAX_SEG+';i++){',
+      '    vec4 s=uSeg[i];',
+      '    vec2 a=s.xy,b=s.zw,pa=vP-a,ba=b-a;',
+      '    float hh=clamp(dot(pa,ba)/max(dot(ba,ba),1e-5),0.0,1.0);',
+      '    float d=length(pa-ba*hh);',
+      // no dynamic branch: fold each segment into the main or the fork minimum
+      '    float isMain=step(float(i)+0.5,float(uMain));',
+      '    dM=min(dM,mix(1e6,d,isMain));',
+      '    dF=min(dF,mix(d,1e6,isMain));',
+      '  }',
+      // crackle: warp the distance field so the edge shimmers instead of reading
+      // as a smooth tube, and so the arc is not the same width along its length
+      '  float n=vnoise(vP*0.07+vec2(uSeed,uT*4.0));',
+      '  float n2=vnoise(vP*0.23+vec2(uT*9.0,uSeed));',
+      '  float dm=max(0.0,dM-(n-0.5)*2.4-(n2-0.5)*1.2);',
+      '  float df=max(0.0,dF-(n-0.5)*1.6);',
+      // NOTE: smoothstep is UNDEFINED when edge0>=edge1, so the canvas idiom of
+      // reversing the edges to invert it produces NaN here — and one NaN takes
+      // the whole fragment with it. Invert with 1.0-smoothstep instead.
+      // the filament is kept narrow on purpose: everything here sums additively,
+      // so a wide core plus its sheath saturates to white and the bolt loses the
+      // blue that says lightning rather than "bright line"
+      '  float core=1.0-smoothstep(0.0,1.9,dm);',    // the filament itself
+      '  float inner=exp(-dm*0.24);',                // the sheath around it
+      '  float outer=exp(-dm*0.055);',               // haze, reaching well out
+      '  float fork=(1.0-smoothstep(0.0,1.7,df))*0.85+exp(-df*0.32)*0.45;',
+      '  float energy=0.72+0.55*n;',
+      '  vec3 col=uCore*core*1.00+uMid*inner*0.80*energy',
+      '          +uOuter*outer*0.45*energy+uMid*fork*0.62;',
+      '  gl_FragColor=vec4(col*uOp,1.0);',
+      '}'].join('\n'),
+    // DoubleSide is load-bearing, not belt-and-braces: the vertex shader negates
+    // ndc.y to go from screen pixels (counting down) to NDC (counting up), and
+    // that flip reverses the quad's winding — as FrontSide it is culled outright
+    // and nothing draws at all.
+    transparent:true,blending:THREE.AdditiveBlending,depthTest:false,depthWrite:false,
+    side:THREE.DoubleSide
+  });
+  const q=new THREE.Mesh(new THREE.PlaneGeometry(2,2),mat);
+  q.frustumCulled=false;                    // the vertex shader ignores the camera
+  q.visible=false;
+  R3.boltScene=new THREE.Scene();
+  R3.boltScene.add(q);
+  R3.boltCam=new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+  R3.boltQuad=q;
+  return q;
+}
 function initRenderer(){
   const cv=document.getElementById('view3d');
   R3.renderer=new THREE.WebGLRenderer({canvas:cv,antialias:false});
@@ -9754,19 +9868,18 @@ function fx2dBegin(){
   ctx.clearRect(0,0,wrap.clientWidth,wrap.clientHeight);
   return {ctx,W:wrap.clientWidth,H:wrap.clientHeight};
 }
-function bolt2dDraw(f,op){
-  const b=fx2dBegin();
-  if(!b)return;
-  const ctx=b.ctx,wrap={clientWidth:b.W,clientHeight:b.H};
-  if(op<=0)return;
+/* The bolt's geometry: the zigzag that pins every victim, plus its forks. This
+   is game logic rather than shading — the stroke must visit each creature the
+   spell actually hits — so it stays on the CPU and feeds either renderer. */
+function boltGeom(f,W,H){
   const rr=_lcg(f.seed);
   // projected waypoints, dropped if behind the eye
-  const pts=[{x:wrap.clientWidth*0.5,y:wrap.clientHeight*0.97}];
+  const pts=[{x:W*0.5,y:H*0.97}];
   for(const wp of f.wps){
     const p=projectToScreen(wp);
     if(!p.behind)pts.push(p);
   }
-  if(pts.length<2)return;
+  if(pts.length<2)return null;
   // subdivide each leg into an alternating zigzag whose amplitude shrinks as
   // the stroke recedes, and pin every waypoint so each victim is truly struck
   const path=[pts[0]];
@@ -9784,6 +9897,58 @@ function bolt2dDraw(f,op){
     }
     path.push(b);done+=len;
   }
+  // forks, thrown off the stroke at a sharp angle and kinking once
+  const forks=[];
+  for(let i=2;i<path.length-2;i+=3){
+    if(rr()<0.45)continue;
+    const p=path[i],q=path[i+1];
+    const ang=Math.atan2(q.y-p.y,q.x-p.x)+(rr()<0.5?1:-1)*(0.7+rr()*0.5);
+    const l1=8+rr()*12;
+    const m={x:p.x+Math.cos(ang)*l1,y:p.y+Math.sin(ang)*l1};
+    const e={x:m.x+Math.cos(ang+(rr()-0.5)*0.8)*l1*0.7,y:m.y+Math.sin(ang+(rr()-0.5)*0.8)*l1*0.7};
+    forks.push([p,m],[m,e]);
+  }
+  return {path,forks};
+}
+function bolt2dDraw(f,op){
+  const q=boltShaderInit();
+  // the shared 2D canvas is cleared either way: the shader path paints nothing
+  // on it, and a stale frame from another overlay effect must not be left up
+  const b=fx2dBegin();
+  if(!q)return bolt2dCanvas(f,op,b);
+  if(op<=0){q.visible=false;return;}
+  const host=document.getElementById('view-wrap');
+  if(!host)return;
+  const W=host.clientWidth,H=host.clientHeight;
+  const g=boltGeom(f,W,H);
+  if(!g){q.visible=false;return;}
+  // pack the stroke and then the forks into one segment list, main first
+  const u=q.material.uniforms,segs=u.uSeg.value;
+  let n=0;
+  const put=(a,c)=>{if(n<BOLT_MAX_SEG)segs[n++].set(a.x,a.y,c.x,c.y);};
+  for(let i=1;i<g.path.length;i++)put(g.path[i-1],g.path[i]);
+  const nMain=n;
+  for(const [a,c] of g.forks)put(a,c);
+  for(let i=n;i<BOLT_MAX_SEG;i++)segs[i].set(-9999,-9999,-9999,-9999);
+  // the quad covers the bolt's bounding box plus room for the haze to fall off
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  for(let i=0;i<n;i++){const s=segs[i];
+    x0=Math.min(x0,s.x,s.z);y0=Math.min(y0,s.y,s.w);
+    x1=Math.max(x1,s.x,s.z);y1=Math.max(y1,s.y,s.w);}
+  const pad=64;
+  u.uBox.value.set(x0-pad,y0-pad,x1+pad,y1+pad);
+  u.uRes.value.set(W,H);
+  u.uN.value=n;u.uMain.value=nMain;
+  u.uOp.value=op;u.uT.value=f.t;u.uSeed.value=(f.seed%1000)/1000;
+  q.visible=true;
+}
+// the original three strokes, kept for anything without a GL context
+function bolt2dCanvas(f,op,b){
+  if(!b||op<=0)return;
+  const ctx=b.ctx;
+  const g=boltGeom(f,b.W,b.H);
+  if(!g)return;
+  const path=g.path;
   ctx.globalAlpha=op;ctx.lineCap='round';ctx.lineJoin='round';
   const stroke=(w,c)=>{ctx.strokeStyle=c;ctx.lineWidth=w;
     ctx.beginPath();ctx.moveTo(path[0].x,path[0].y);
@@ -9792,16 +9957,10 @@ function bolt2dDraw(f,op){
   stroke(9,'rgba(95,168,232,0.30)');
   stroke(4.5,'rgba(159,212,255,0.6)');
   stroke(1.8,'#f2faff');
-  // a few forks, thinner, off the upper half of the stroke
   ctx.globalAlpha=op*0.8;
-  for(let i=2;i<path.length-2;i+=3){
-    if(rr()<0.45)continue;
-    const p=path[i],q=path[i+1];
-    const ang=Math.atan2(q.y-p.y,q.x-p.x)+(rr()<0.5?1:-1)*(0.7+rr()*0.5);
-    const l1=8+rr()*12;
-    const m={x:p.x+Math.cos(ang)*l1,y:p.y+Math.sin(ang)*l1};
-    const e={x:m.x+Math.cos(ang+(rr()-0.5)*0.8)*l1*0.7,y:m.y+Math.sin(ang+(rr()-0.5)*0.8)*l1*0.7};
-    ctx.strokeStyle='rgba(200,230,255,0.7)';ctx.lineWidth=1.2;
+  ctx.strokeStyle='rgba(200,230,255,0.7)';ctx.lineWidth=1.2;
+  for(let i=0;i<g.forks.length;i+=2){
+    const [p,m]=g.forks[i],e=g.forks[i+1]?g.forks[i+1][1]:m;
     ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(m.x,m.y);ctx.lineTo(e.x,e.y);ctx.stroke();
   }
   ctx.globalAlpha=1;
@@ -10638,6 +10797,7 @@ function updateFx(dt){
 function clearFx(){
   for(const f of G.fx)if(f.spr&&f.spr.parent)f.spr.parent.remove(f.spr);
   if(R3.boltCv){const c=R3.boltCv.getContext('2d');if(c)c.clearRect(0,0,R3.boltCv.width,R3.boltCv.height);}
+  if(R3.boltQuad)R3.boltQuad.visible=false;
   G.fx.length=0;
 }
 function partyMuzzle(){
@@ -11266,6 +11426,13 @@ function loop(now){
     updateCamera(now);
     updateSprites(now);
     R3.renderer.render(R3.scene,R3.camera);
+    // the bolt is a second, additive pass laid over the finished frame: it is a
+    // screen-space quad with no depth, so nothing in the world can occlude it
+    if(R3.boltQuad&&R3.boltQuad.visible){
+      R3.renderer.autoClear=false;
+      R3.renderer.render(R3.boltScene,R3.boltCam);
+      R3.renderer.autoClear=true;
+    }
   }
 }
 // the formation squares up to the party, so the rank that can actually fight is
