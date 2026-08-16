@@ -690,6 +690,13 @@ const MONSTERS={
              cave:true, lurk:true, hold:{dc:17,dur:4}},
   cavebear: {name:'Cave bear',     cr:3,  hp:28, ac:15,atk:7, dmg:[1,10,3],xp:900, speed:1.3, type:'beast', spr:'cavebear',
              cave:true},
+  /* The cave roster had no cheap creature: its lightest was the troglodyte, and
+     `nMon` is `min(targetCount, budget/lightest)`, so a depth-10 cave floor
+     could only afford ten bodies against a target of eighteen and came out
+     visibly emptier than the floors above it. The stirge is that missing rung —
+     a darting blood-drinker that costs about what the budget wants to spend. */
+  stirge:   {name:'Stirge',        cr:1/2,hp:9,  ac:14,atk:4, dmg:[1,4,1], xp:200, speed:1.1, type:'beast', spr:'stirge',
+             cave:true},
   troglodyte:{name:'Troglodyte',   cr:3,  hp:24, ac:16,atk:5, dmg:[1,8,2], xp:900, speed:1.4, type:'humanoid', spr:'troglodyte',
              cave:true, poison:{dc:13,abil:'str',dice:[1,3]}},
   crawler:  {reach:true, name:'Carrion crawler',cr:4,hp:28,ac:16,atk:6,dmg:[1,6,2],xp:1200,speed:1.5, type:'aberration', spr:'crawler',
@@ -708,6 +715,10 @@ const MONSTERS={
      priest who casts, a runecaster whose bolt is elemental -- plus two of
      their own: `enlarge`, the gift their mind flayer masters left them, and
      `duergar` itself, which is the whole of what the halls' spawn bias reads. */
+  // and the same gap in the duergar halls, where the warrior was the floor:
+  // a drudge is the labourer the warriors drive, in leather rather than plate
+  duergardrudge:{name:'Duergar drudge', cr:2, hp:22, ac:14,atk:5, dmg:[1,6,2],xp:600, speed:1.4, type:'humanoid', spr:'duergardrudge',
+             duergar:true},
   duergar:  {name:'Duergar warrior', cr:5, hp:46, ac:18,atk:9, dmg:[1,10,6],xp:1500,speed:1.5, type:'humanoid', spr:'duergar',
              duergar:true, enlarge:true},
   duergarxbow:{name:'Duergar arbalest',cr:5,hp:40,ac:17,atk:9,dmg:[1,10,4],xp:1500,speed:1.6, type:'humanoid', spr:'duergarxbow',
@@ -900,7 +911,7 @@ const SPAWN_DEPTH={
   hobgoblin:[2,5],orc:[2,5],gobshaman:[3,6],spider:[3,7],ghoul:[3,7],gnoll:[3,7],bugbear:[3,8],
   ogre:[6,12],wight:[6,11],wightnec:[8,13],minotaur:[8,13],troll:[10,28],ogremage:[13,99],dragon:[15,99],
   mummy:[10,20],wraith:[12,24],barrowwight:[13,26],bonecolossus:[16,32],deathknight:[20,99],lich:[22,99],bonedrake:[26,99],
-  piercer:[8,18],cavebear:[8,18],troglodyte:[8,18],crawler:[9,20],cavefisher:[12,26],otyugh:[14,28],
+  stirge:[8,20],piercer:[8,18],cavebear:[8,18],troglodyte:[8,18],crawler:[9,20],cavefisher:[12,26],otyugh:[14,28],
   umberhulk:[18,32],roper:[24,99],purpleworm:[30,99],
   shrieker:[15,24],mysprout:[15,24],violetfungus:[16,28],sporeservant:[17,30],
   myguard:[17,30],mycaster:[20,34],myelder:[24,99],
@@ -914,7 +925,7 @@ const SPAWN_DEPTH={
   // debut before 14, so with the roster restricted to its own floors those three
   // levels were a two-creature floor repeated. The shadowblade and the stonepriest
   // are pulled forward to open the block properly.
-  duergar:[12,24],duergarxbow:[12,24],duergarscout:[12,28],
+  duergardrudge:[12,26],duergar:[12,24],duergarxbow:[12,24],duergarscout:[12,28],
   duergarpriest:[14,30],duergarrune:[19,34],duergarlord:[23,99],
 };
 /* Elite templates. The bestiary runs out around depth 20, so past that the
@@ -2310,6 +2321,35 @@ const MONSTER_ART={
      Grey skin, white beards bound with iron rings, and armour that is plate
      rather than hide: they are the one roster in the game that turned up with
      a smith. Males go bald, so the silhouette is beard-and-helm, never hair. */
+  /* The drudge is the warrior stripped of his plate: leather apron, bare arms,
+     a mining pick rather than a war axe. Same grey skin and red eyes, so he
+     still reads as duergar at a glance, but nothing about him is armoured. */
+  duergardrudge:()=>({o:{hp:[32,26],ap:[46,38],lit:'#82858b',mid:'#34373c',eye:'#d8402c',rough:[1.4,0.3],seed:44,ad:0.6,aw:0.4},
+    body:`<path d="M21 31 Q18 41 20 52 L25 59 L39 59 L44 52 Q46 41 43 31 Z" fill="url(#bg)" ${RIM}/>`+
+    // the apron: heavy leather, scuffed, hung from a shoulder strap
+    `<path d="M23 34 L41 34 L42 50 Q32 55 22 50 Z" fill="#4a3826"/>`+
+    `<path d="M23 34 L41 34" stroke="#6b5238" stroke-width="1.1"/>`+
+    `<path d="M26 33 L38 45 M38 33 L26 45" stroke="#3a2b1c" stroke-width="0.8" fill="none"/>`+
+    `<path d="M24 40 Q32 43 40 40" stroke="#5c452e" stroke-width="0.9" fill="none"/>`+
+    `<circle cx="32" cy="37" r="1.2" fill="#8a6a42"/>`+
+    // bare arms — the off arm hangs, the working arm is the |A| layer
+    armL(21,34,12,42,14,52,'#82858b',2.5,'#9aa0a8','#5f6268')+
+    `<path d="M24 36 Q21.5 46 24.5 57" stroke="#000" stroke-opacity="0.26" stroke-width="3" fill="none"/>`+
+    `<path d="M32 47 L32 58.5" stroke="#23262b" stroke-width="1.2" stroke-linecap="round"/>`+
+    `<path d="M24.5 55 L30.6 55 M33.4 55 L39.5 55" stroke="#23262b" stroke-width="2.1" stroke-opacity="0.5"/>`+
+    `|H|<path d="M25 19 Q25 11 32 11 Q39 11 39 19 L39 23 Q35 26 29 26 Q25 24 25 19 Z" fill="#82858b" ${RIM}/>`+
+    // no helm: a rag tied over the brow, and the beard the plate used to hide
+    `<path d="M24.5 15 Q32 11 39.5 15 L39.5 18 Q32 15 24.5 18 Z" fill="#6b5238"/>`+
+    `<path d="M39.5 16 L43 19 L40 20 Z" fill="#5c452e"/>`+
+    `<circle cx="28.5" cy="21" r="1.2" fill="#d8402c"/><circle cx="35.5" cy="21" r="1.2" fill="#d8402c"/>`+
+    `<path d="M26 25 Q32 41 38 25 Q35 28 32 28 Q29 28 26 25 Z" fill="#b9bcc0"/>`+
+    `<path d="M29 31 Q32 34 35 31" stroke="#8b8e93" stroke-width="0.8" fill="none"/>|/H|`+
+    // the pick: a shaft with a single curved iron head
+    `|A|<path d="M44 38 L56 32" stroke="#5a4326" stroke-width="2.4"/>`+
+    `<path d="M52 35 Q59 27 62.5 30.5 Q58 32.5 55.5 37.5 Z" fill="#6d7178" ${RIM}/>`+
+    `<path d="M56 30 Q60 29 62 30.5" stroke="#9aa0a8" stroke-width="0.8" fill="none"/>`+
+    `<path d="M52 35 L55.5 37.5" stroke="#3c4046" stroke-width="1.2"/>|/A|`,
+    sharp:`|H|`+gEye(28.5,21,1.2,{pupil:1})+gEye(35.5,21,1.2,{pupil:1})+`|/H|`}),
   duergar:()=>({o:{hp:[32,26],ap:[46,38],lit:'#8d9096',mid:'#3f4348',eye:'#d8402c',rough:[1,0.25],seed:41},
     body:`<path d="M19 31 Q16 41 18 52 L23 59 L41 59 L46 52 Q48 41 45 31 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M20 32 L44 32 L45 45 Q32 50 19 45 Z" fill="#4a4e55"/>`+
@@ -2833,6 +2873,31 @@ const MONSTER_ART={
     sharp:`|H|`+gEye(41,21,1.7)+gEye(50,21,1.7)+fangsDown(46,29,8,3,2.2)+`|/H|`+
     `|A|`+clawsAt(8,50,[110,135,160],5,'#d8ccaa')+`|/A|`}),
 
+  /* A stirge strikes with its proboscis, so it carries a head layer and no arm
+     — the same anatomy the rat and the spider have. The wings stay on the body
+     so they do not swing with the head; what nods is the skull and the needle. */
+  stirge:()=>({o:{hp:[32,30],ap:[44,36],lit:'#9a5a48',mid:'#3a1c16',eye:'#ffcf6a',rough:[2.2,0.4],seed:71},
+    body:`<path d="M22 36 Q18 27 26 24 L38 24 Q46 27 42 36 Q40 47 32 50 Q24 47 22 36 Z" fill="url(#bg)" ${RIM}/>`+
+    // the blood sac, fuller and darker than the shell around it
+    `<path d="M26 34 Q32 30 38 34 Q39 43 32 47 Q25 43 26 34 Z" fill="#5e1f1c" fill-opacity="0.85"/>`+
+    `<path d="M28 37 Q32 35 36 37" stroke="#7d2a24" stroke-width="1"/>`+
+    // wings: a membrane on each side with its own ribbing, folded back
+    `<path d="M24 27 Q10 20 4 30 Q12 33 14 40 Q20 35 25 34 Z" fill="#48211b" fill-opacity="0.92" ${RIM}/>`+
+    `<path d="M40 27 Q54 20 60 30 Q52 33 50 40 Q44 35 39 34 Z" fill="#48211b" fill-opacity="0.92" ${RIM}/>`+
+    `<path d="M23 29 L8 28 M23 32 L11 34 M23 35 L14 39" stroke="#2a120f" stroke-width="0.9" fill="none"/>`+
+    `<path d="M41 29 L56 28 M41 32 L53 34 M41 35 L50 39" stroke="#2a120f" stroke-width="0.9" fill="none"/>`+
+    // four spindly legs tucked under
+    `<path d="M27 48 L23.5 56 M30 49 L28.5 57 M34 49 L35.5 57 M37 48 L40.5 56" stroke="#43231c" stroke-width="1.1" stroke-linecap="round" fill="none"/>`+
+    `|H|<path d="M27 24 Q27 16 32 16 Q37 16 37 24 Q37 28 32 29 Q27 28 27 24 Z" fill="url(#bg)" ${RIM}/>`+
+    /* The proboscis is the whole point of the creature, but drawn as a straight
+       pale stroke down the middle it reads as a stripe painted ON the body. A
+       tapering quad, leaned a little off vertical and edged dark on one side,
+       reads as a needle hanging in front of it instead. */
+    `<path d="M31.3 28 L32.5 28 L33.1 40 L32.3 40 Z" fill="#caa079"/>`+
+    `<path d="M31.3 28 L32.3 40" stroke="#4a2a1d" stroke-width="0.6" fill="none"/>`+
+    `<path d="M32.7 40 L33.4 45" stroke="#e6d0b0" stroke-width="0.8" stroke-linecap="round"/>`+
+    `<path d="M29 20 Q32 18 35 20" stroke="#6d3a2c" stroke-width="0.9" fill="none"/>|/H|`,
+    sharp:`|H|`+gEye(29.5,21,1.3)+gEye(34.5,21,1.3)+`|/H|`}),
   troglodyte:()=>({o:{hp:[32,24],ap:[46,34],lit:'#5f7a52',mid:'#26301f',eye:'#e0e06a',rough:[2.4,0.45],seed:65},
     body:`<path d="M24 30 Q20 44 22 59 Q27 55 32 60 Q37 55 42 59 Q44 44 40 30 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M26 34 Q32 38 38 34 M25 42 Q32 46 39 42 M26 50 Q32 54 38 50" stroke="#1a2214" stroke-width="1.2" fill="none"/>`+
@@ -2967,6 +3032,14 @@ const MONSTER_DETAIL={
   bugbear:     {base:(o)=>kitHumanoid(o,{w:10,belt:17,dark:'#3a2a16'})+hideDetail(o,{x0:20,x1:48,y0:34,y1:58,n:16,col:'#241a0c',seed:9}),
                 head:(o)=>faceDetail(o,{w:8,eye:12,col:'#241a0c'})},
   // --- Sewers ---
+  // the stirge's detail is veining: on the wing membranes and across the sac,
+  // which is what makes a translucent thing read as translucent
+  // one rect per WING: a single box across the whole creature scatters veins
+  // into the empty air either side of it
+  stirge:      {base:(o)=>hideDetail(o,{x0:7,x1:24,y0:23,y1:39,n:7,col:'#2a120f',seed:71})
+                        +hideDetail(o,{x0:40,x1:57,y0:23,y1:39,n:7,col:'#2a120f',seed:73})
+                        +hideDetail(o,{x0:27,x1:37,y0:33,y1:45,n:6,col:'#6d2622',seed:72}),
+                head:(o)=>faceDetail(o,{w:5,eye:10,col:'#3a1c16'})},
   rat:         {base:(o)=>hideDetail(o,{x0:14,x1:46,y0:32,y1:54,n:16,col:'#241a10',seed:13})},
   spider:      {base:(o)=>hideDetail(o,{x0:20,x1:44,y0:24,y1:44,n:14,col:'#120c08',seed:17})},
   ratswarm:    {base:(o)=>hideDetail(o,{x0:10,x1:54,y0:30,y1:56,n:22,col:'#241a10',seed:19})},
@@ -2991,6 +3064,11 @@ const MONSTER_DETAIL={
   crawler:     {base:(o)=>hideDetail(o,{x0:14,x1:50,y0:34,y1:56,n:16,col:'#20180a',seed:61})},
   cavefisher:  {base:(o)=>hideDetail(o,{x0:22,x1:42,y0:32,y1:56,n:12,col:'#1a1a14',seed:67})},
   // --- Duergar: built things, so plate rather than straps ---
+  // leather, not plate: the drudge takes kitHumanoid's straps and a scuffed
+  // hide over the apron where the warriors get banded steel
+  duergardrudge:{base:(o)=>kitHumanoid(o,{w:9,belt:16,dark:'#3a2b1c'})
+                         +hideDetail(o,{x0:23,x1:41,y0:36,y1:52,n:9,col:'#3a2b1c',seed:44}),
+                head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
   duergar:     {base:(o)=>plateBands(o,{w:10,y0:9,n:3,gap:4.4}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
   duergarxbow: {base:(o)=>plateBands(o,{w:10,y0:9,n:3,gap:4.4}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
   duergarscout:{base:(o)=>plateBands(o,{w:9,y0:9,n:2,gap:4.4,dark:'#242830',mid:'#2e333c'}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},

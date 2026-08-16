@@ -1271,6 +1271,25 @@ floored at `COUNT_MIN_FRAC` (0.55) of the target so a heavy roster cannot
 empty a level out. Where the roster has anything near the share — most floors
 — it buys more than the target and nothing changes.
 
+**So every roster needs a creature at the price its budget wants to spend,
+and that is a standing requirement rather than a one-off tuning job.** The
+`lightest` term is a *minimum*, so one cheap creature fixes a roster and no
+number of heavy ones will. When `depthAtkBonus` was later capped at +20 the
+early slope steepened (+3 → +9 at depth 10), and because `threatOf` multiplies
+attack in, a flat bonus inflates a weak creature's score proportionally far
+more than a strong one's — so `lightest` climbed faster than the pool mean
+that sets the budget, and `budget / lightest` fell through the floor. Caves
+and Duergar were the two rosters with no cheap rung (troglodyte 58 and duergar
+warrior 227 at their own depths, against kobold 2 / rat 6 / skeleton 8
+elsewhere), so a depth-10 cave floor could afford ten bodies against a target
+of eighteen and read as abandoned. The **stirge** and the **duergar drudge**
+are that missing rung; both floors field their full target again.
+
+Note what this means for the dials: raising `COUNT_MIN_FRAC` would have made
+the count look right while leaving the floors *unfunded* — measured, depth 10
+went from 53% to 105% over budget, because the floor can add bodies but cannot
+conjure cheap ones. Fix the roster, not the fraction.
+
 **`rawBudget` and `poolCeiling` deliberately still read the whole
 `spawnPool`.** This was tried the other way round first and it is worse:
 `threatBudget` is a *chain*, each floor clamped to a step off the one above,
