@@ -8723,6 +8723,34 @@ function castSpell(ch,key,opts){
     }
     return true;
   }
+  /* PHB: flaming sphere — "a burning globe of fire rolls in whichever direction
+     you point it". A fist of flame that trundles along the FLOOR to the foe —
+     not a fireball's airborne bead — spinning and trailing fire, then bursts
+     into lingering flame where it comes to rest. */
+  if(key==='flamingsphere'&&sp.target==='foe'){
+    const [fdx,fdy]=DIRS[G.facing];
+    spawnProjectile({
+      from:{x:R3.camera.position.x+fdx*0.4,y:0.3,z:R3.camera.position.z+fdy*0.4},
+      toFn:()=>{const p=monsterAim(c0);return {x:p.x,y:0.32,z:p.z};},   // rolls to the feet
+      tex:fxFireballTex(),scale:0.5,speed:5,spin:true,
+      trail:'#ff7a1e',lite:'#ff8c2a',liteI:1.3,
+      onHit:()=>{
+        const at=monsterAim(c0);
+        spawnFlash({x:at.x,z:at.z},'#ff9a30',2,0.45);
+        spawnBurst({x:at.x,y:0.4,z:at.z},'#ffb050',1.8,0,true);
+        R3.shake=Math.max(R3.shake,0.12);
+        for(let i=0;i<5;i++){
+          const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:fxFlameTex(),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+          spr.scale.set(0.4,0.2,1);
+          spr.position.set(at.x+(Math.random()-0.5)*0.7,0.15,at.z+(Math.random()-0.5)*0.7);
+          spr.userData={kind:'fx'};
+          R3.levelGroup.add(spr);
+          G.fx.push({kind:'flame',spr,t:-Math.random()*0.1,dur:0.6});
+        }
+        resolveFoe(c0);
+      }});
+    return true;
+  }
   const pj=SPELL_PROJ[key]||{};
   spawnProjectile({from:pj.low?bowMuzzle():partyMuzzle(),toFn:()=>monsterAim(c0),
     tex:pj.tex?pj.tex():fxGlowTex(color),
