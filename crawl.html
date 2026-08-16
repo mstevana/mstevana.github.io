@@ -9977,6 +9977,28 @@ function beam2dDraw(f,op){
   }
   ctx.globalAlpha=1;
 }
+/* PHB: slay living — "you can slay any one living creature" with a touch of
+   negative energy. Not a ray: death gathers from the air around the victim and
+   implodes onto it, a sickly decay-green, and where the motes meet there is a
+   pale flash and a dark punch of nothing. */
+function spawnDeathTouch(at){
+  const dur=0.24;
+  for(let i=0;i<10;i++){
+    const ang=(i/10)*Math.PI*2, r=0.7+Math.random()*0.35;
+    const ox=Math.cos(ang)*r, oz=Math.sin(ang)*r, oy=(Math.random()-0.3)*0.7;
+    const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:fxGlowTex('#3f7a34'),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+    const sc=0.12+Math.random()*0.1;
+    spr.scale.set(sc,sc,1);
+    spr.position.set(at.x+ox,at.y+oy,at.z+oz);
+    spr.userData={kind:'fx'};
+    R3.levelGroup.add(spr);
+    G.fx.push({kind:'shard',spr,t:0,dur,vx:-ox/dur,vy:-oy/dur,vz:-oz/dur});  // inward
+  }
+  spawnFlash({x:at.x,z:at.z},'#a8e07a',1.9,0.5);
+  spawnBurst({x:at.x,y:at.y,z:at.z},'#20401a',2.0,dur,true);   // the dark implosion
+  spawnBurst({x:at.x,y:at.y,z:at.z},'#c0e896',1.2,dur,true);   // sickly light at the touch
+  R3.shake=Math.max(R3.shake,0.16);
+}
 function updateFx(dt){
   for(const f of G.fx.slice()){
     if(f.kind==='proj'){
@@ -10223,6 +10245,7 @@ const SPELL_IMPACT={
     // the life guttering out of the foe: dark motes sinking one after another
     for(let i=0;i<3;i++)spawnBurst({x:at.x,y:at.y-0.12*i,z:at.z},'#3a1466',0.7,0.12+i*0.1);
   },
+  slayliving:(at)=>spawnDeathTouch(at),
   wavesfatigue:(at,tiles,color,foes)=>{
     const [dx,dy]=DIRS[G.facing];
     const a=SPELLS.wavesfatigue.area, L=a.len+0.4, halfW=(a.len+1.2)/2;
@@ -10283,7 +10306,7 @@ const SPELL_IMPACT={
 };
 // spells that resolve the instant they are cast, with no projectile at all
 const SPELL_INSTANT={lightning:true,conecold:true,icestorm:true,flamestrike:true,wavesfatigue:true,
-  scorchingray:true,searinglight:true,rayfrost:true,burninghands:true,enervation:true};
+  scorchingray:true,searinglight:true,rayfrost:true,burninghands:true,enervation:true,slayliving:true};
 /* ---------- conditions & buffs tick ---------- */
 let bleedTimer=0,poisonTimer=0;
 function updateParty(dt){
