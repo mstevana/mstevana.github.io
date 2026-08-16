@@ -8724,7 +8724,7 @@ function castSpell(ch,key,opts){
     return true;
   }
   const pj=SPELL_PROJ[key]||{};
-  spawnProjectile({from:partyMuzzle(),toFn:()=>monsterAim(c0),
+  spawnProjectile({from:pj.low?bowMuzzle():partyMuzzle(),toFn:()=>monsterAim(c0),
     tex:pj.tex?pj.tex():fxGlowTex(color),
     scale:pj.scale||0.4,
     speed:pj.speed||5.5,
@@ -9582,7 +9582,7 @@ const SPELL_PROJ={
   cloudkill:{tex:()=>fxMistTex(),scale:1.3,speed:3.2,tint:'#a8d45e'},
   // an arrow of acid, not a glow: the mundane arrow art tinted sickly green,
   // dripping a wake of acid behind it
-  acidarrow:{tex:()=>fxArrowTex(),scale:0.6,speed:7,tint:'#cfe86a',trail:'#9fdc39',lite:'#9fdc39',liteI:0.5,rot:Math.PI/2-0.18},
+  acidarrow:{tex:()=>fxArrowTex(),scale:0.6,speed:7,tint:'#cfe86a',trail:'#9fdc39',lite:'#9fdc39',liteI:0.5,rot:Math.PI/2-0.18,low:true},
 };
 /* PHB: cloudkill — "a bank of fog billows out... yellowish-green vapors." The
    rolling bank is the projectile above; this is the cloud it becomes when it
