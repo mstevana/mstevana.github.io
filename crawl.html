@@ -6140,6 +6140,7 @@ function initRenderer(){
    worse experience than one you can barely make out. It keeps a silhouette. */
 const SPRITE_GAIN=0.55, SPRITE_FLOOR=0.13;
 const _sprC=new THREE.Color();
+const WEB_BASE=new THREE.Color(0xbfc4ca); // a cobweb's own pale colour, before the torch dims it
 function lightAt(x,y,z){
   const t=R3.torch,f=R3.torchFill,a=R3.ambient;
   const att=(L)=>{
@@ -6169,6 +6170,11 @@ function shadeSprites(){
     const s=R3.itemSprites[i];
     if(s&&s.material)s.material.color.copy(lightAt(s.position.x,s.position.y,s.position.z));
   }
+  // cobwebs are unlit line geometry, so without this a web ten tiles off is as
+  // bright as one overhead; multiply their pale colour by the same torch falloff
+  if(R3.webMeshes)for(const w of R3.webMeshes){
+    if(w.material)w.material.color.copy(WEB_BASE).multiply(lightAt(w.position.x,w.position.y,w.position.z));
+  }
 }
 function onResize(){
   const wrap=document.getElementById('view-wrap');
@@ -6181,7 +6187,7 @@ function disposeLevel(){
   for(const f of R3.liquidFlows)f.tex.dispose();
   R3.liquidFlows=[];R3.liquidShaders=[];
   R3.doorMeshes={};R3.secretMeshes={};R3.trapDecals={};R3.itemSprites={};R3.monsterSprites={};R3.monsterGlows={};R3.monsterShadows={};R3.prewarmQ=[];R3.prewarmT=0;R3.stairsGroup=null;
-  R3.candleFlames=[];R3.cryptGroups=[];R3.lurkerMeshes={};R3.wallMats=null;
+  R3.candleFlames=[];R3.cryptGroups=[];R3.lurkerMeshes={};R3.wallMats=null;R3.webMeshes=[];
 }
 function buildLevel(L){
   disposeLevel();
@@ -6793,10 +6799,12 @@ function buildLevel(L){
             litter.add(sk);
           }
         }else if(roll<0.19){ // a cobweb strung across a high corner
-          const w=new THREE.LineSegments(cobwebGeo(rr,0.5+rr()*0.28),webLineMat);
+          // its own material so shadeSprites can dim it by distance each frame
+          const w=new THREE.LineSegments(cobwebGeo(rr,0.5+rr()*0.28),webLineMat.clone());
           w.position.set(x+0.5,WALLH-0.18,y+0.5);
           w.rotation.set((rr()-0.5)*0.5,rr()*Math.PI*2,(rr()-0.5)*0.4);
           litter.add(w);
+          (R3.webMeshes||(R3.webMeshes=[])).push(w);
         }
       }
       grp.add(litter);
