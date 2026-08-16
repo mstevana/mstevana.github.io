@@ -394,20 +394,20 @@ const RACES={
 
 // BAB: full|three|half ; saves: good = 2+lvl/2, poor = lvl/3
 const CLASSES={
-  fighter:  {name:'Fighter',  hd:10, bab:'full',  fort:1,ref:0,will:0, startWeapon:'shortsword',
+  fighter:  {name:'Fighter',  hd:10, bab:'full',  fort:1,ref:0,will:0, startWeapon:'shortsword', weaponProf:'martial',
              note:'Master of arms. Tough, simple, reliable.', prio:['str','con','dex','wis','int','cha']},
-  barbarian:{name:'Barbarian',hd:12, bab:'full',  fort:1,ref:0,will:0, startWeapon:'shortsword', rage:true,
+  barbarian:{name:'Barbarian',hd:12, bab:'full',  fort:1,ref:0,will:0, startWeapon:'shortsword', rage:true, weaponProf:'martial',
              note:'Rage (per rest): +4 STR/CON, −2 AC, for 30s.', prio:['str','con','dex','wis','int','cha']},
-  ranger:   {name:'Ranger',   hd:8,  bab:'full',  fort:1,ref:1,will:0, startWeapon:'shortsword', favored:true, twf:true,
+  ranger:   {name:'Ranger',   hd:8,  bab:'full',  fort:1,ref:1,will:0, startWeapon:'shortsword', favored:true, twf:true, weaponProf:'martial',
              note:'Favored enemies (+2 dmg vs beasts & goblinoids). Lighter two-weapon penalties.', prio:['str','dex','con','wis','int','cha']},
-  paladin:  {name:'Paladin',  hd:10, bab:'full',  fort:1,ref:0,will:0, startWeapon:'shortsword', layon:true, smite:true, grace:true,
+  paladin:  {name:'Paladin',  hd:10, bab:'full',  fort:1,ref:0,will:0, startWeapon:'shortsword', layon:true, smite:true, grace:true, weaponProf:'martial',
              note:'Lay on Hands heal pool, Smite Evil (per rest), CHA to saves.', prio:['str','cha','con','wis','dex','int']},
-  rogue:    {name:'Rogue',    hd:6,  bab:'three', fort:0,ref:1,will:0, startWeapon:'shortsword', sneak:true, trapfind:true,
-             note:'Sneak attack vs foes that have not yet struck back. Finds and disarms traps, spots secret doors.', prio:['dex','str','con','int','wis','cha']},
-  cleric:   {name:'Cleric',   hd:8,  bab:'three', fort:1,ref:0,will:1, startWeapon:'mace', caster:'divine', turn:true,
+  rogue:    {name:'Rogue',    hd:6,  bab:'three', fort:0,ref:1,will:0, startWeapon:'shortsword', sneak:true, trapfind:true, armorMax:'medium', weaponProf:'simple', weaponAlso:['rapier','shortsword','shortbow'],
+             note:'Sneak attack vs foes that have not yet struck back. Finds and disarms traps, spots secret doors. Wears up to medium armour.', prio:['dex','str','con','int','wis','cha']},
+  cleric:   {name:'Cleric',   hd:8,  bab:'three', fort:1,ref:0,will:1, startWeapon:'mace', caster:'divine', turn:true, weaponProf:'simple',
              note:'Divine spells (WIS): healing, blessings, holy fire. Turn Undead (per rest).', prio:['wis','con','str','cha','dex','int']},
-  wizard:   {name:'Wizard',   hd:4,  bab:'half',  fort:0,ref:0,will:1, startWeapon:'staff', caster:'arcane',
-             note:'Arcane spells (INT): missiles, fire, frost, time itself.', prio:['int','dex','con','wis','cha','str']},
+  wizard:   {name:'Wizard',   hd:4,  bab:'half',  fort:0,ref:0,will:1, startWeapon:'staff', caster:'arcane', armorMax:'light', weaponProf:'basic', weaponAlso:['dagger','staff','crossbow'],
+             note:'Arcane spells (INT): missiles, fire, frost, time itself. Wears only light armour.', prio:['int','dex','con','wis','cha','str']},
 };
 const XP_FOR_LEVEL=(lvl)=>500*lvl*(lvl-1); // cumulative XP needed to be level lvl
 const MAX_LEVEL=20;
@@ -416,46 +416,53 @@ function saveOf(good,lvl){return good?2+Math.floor(lvl/2):Math.floor(lvl/3);}
 
 /* ---------- items ---------- */
 // kind: weapon|armor|helmet|boots|shield|amulet|ring|potion|scroll|wand|key|ammoNone
+// `cat` (simple|martial) is the proficiency tier; `finesse` lets the wielder
+// attack with DEX when it beats STR (damage stays STR, as 3.5 has it). A class
+// that is not proficient with a weapon can still swing it, at −4 to hit.
 const WEAPONS={
-  // `finesse` lets the wielder attack with DEX when it beats STR (damage stays
-  // STR, as 3.5 has it)
-  dagger:    {name:'Dagger',      dmg:[1,4], crit:[19,2], hands:1, light:true, finesse:true, dtype:'p', spr:'dagger'},
-  rapier:    {name:'Rapier',      dmg:[1,6], crit:[18,2], hands:1, finesse:true, dtype:'p', spr:'rapier'},
-  battleaxe: {name:'Battleaxe',   dmg:[1,8], crit:[20,3], hands:1, dtype:'s', spr:'battleaxe'},
-  greataxe:  {name:'Greataxe',    dmg:[1,12],crit:[20,3], hands:2, dtype:'s', spr:'greataxe'},
-  halberd:   {name:'Halberd',     dmg:[1,10],crit:[20,3], hands:2, reach:true, dtype:'s', spr:'halberd'},
-  shortsword:{name:'Short sword', dmg:[1,6], crit:[19,2], hands:1, light:true, dtype:'p', spr:'shortsword'},
-  longsword: {name:'Long sword',  dmg:[1,8], crit:[19,2], hands:1, dtype:'s', spr:'longsword'},
-  mace:      {name:'Mace',        dmg:[1,8], crit:[20,2], hands:1, dtype:'b', spr:'mace'},
-  warhammer: {name:'Warhammer',   dmg:[1,8], crit:[20,3], hands:1, dtype:'b', spr:'warhammer'},
-  staff:     {name:'Quarterstaff',dmg:[1,6], crit:[20,2], hands:2, dtype:'b', spr:'staff'},
-  greatsword:{name:'Two-handed sword', dmg:[2,6], crit:[19,2], hands:2, dtype:'s', spr:'greatsword'},
-  sledge:    {name:'Sledgehammer',dmg:[1,10],crit:[20,2], hands:2, dtype:'b', spr:'sledge'},
-  spear:     {name:'Spear',       dmg:[1,8], crit:[20,3], hands:2, reach:true, dtype:'p', spr:'spear'},
-  shortbow:  {name:'Short bow',   dmg:[1,6], crit:[20,3], hands:2, ranged:6, dtype:'p', spr:'shortbow'},
-  longbow:   {name:'Long bow',    dmg:[1,8], crit:[20,3], hands:2, ranged:8, dtype:'p', spr:'longbow'},
-  crossbow:  {name:'Light crossbow',dmg:[1,8],crit:[19,2],hands:2, ranged:7, dtype:'p', spr:'crossbow'},
-  sling:     {name:'Sling',       dmg:[1,4], crit:[20,2], hands:1, ranged:5, dtype:'b', spr:'sling'},
+  dagger:    {name:'Dagger',      dmg:[1,4], crit:[19,2], hands:1, light:true, finesse:true, dtype:'p', cat:'simple', spr:'dagger'},
+  rapier:    {name:'Rapier',      dmg:[1,6], crit:[18,2], hands:1, finesse:true, dtype:'p', cat:'martial', spr:'rapier'},
+  battleaxe: {name:'Battleaxe',   dmg:[1,8], crit:[20,3], hands:1, dtype:'s', cat:'martial', spr:'battleaxe'},
+  greataxe:  {name:'Greataxe',    dmg:[1,12],crit:[20,3], hands:2, dtype:'s', cat:'martial', spr:'greataxe'},
+  halberd:   {name:'Halberd',     dmg:[1,10],crit:[20,3], hands:2, reach:true, dtype:'s', cat:'martial', spr:'halberd'},
+  shortsword:{name:'Short sword', dmg:[1,6], crit:[19,2], hands:1, light:true, dtype:'p', cat:'martial', spr:'shortsword'},
+  longsword: {name:'Long sword',  dmg:[1,8], crit:[19,2], hands:1, dtype:'s', cat:'martial', spr:'longsword'},
+  mace:      {name:'Mace',        dmg:[1,8], crit:[20,2], hands:1, dtype:'b', cat:'simple', spr:'mace'},
+  warhammer: {name:'Warhammer',   dmg:[1,8], crit:[20,3], hands:1, dtype:'b', cat:'martial', spr:'warhammer'},
+  staff:     {name:'Quarterstaff',dmg:[1,6], crit:[20,2], hands:2, dtype:'b', cat:'simple', spr:'staff'},
+  greatsword:{name:'Two-handed sword', dmg:[2,6], crit:[19,2], hands:2, dtype:'s', cat:'martial', spr:'greatsword'},
+  sledge:    {name:'Sledgehammer',dmg:[1,10],crit:[20,2], hands:2, dtype:'b', cat:'martial', spr:'sledge'},
+  spear:     {name:'Spear',       dmg:[1,8], crit:[20,3], hands:2, reach:true, dtype:'p', cat:'simple', spr:'spear'},
+  shortbow:  {name:'Short bow',   dmg:[1,6], crit:[20,3], hands:2, ranged:6, dtype:'p', cat:'martial', spr:'shortbow'},
+  longbow:   {name:'Long bow',    dmg:[1,8], crit:[20,3], hands:2, ranged:8, dtype:'p', cat:'martial', spr:'longbow'},
+  crossbow:  {name:'Light crossbow',dmg:[1,8],crit:[19,2],hands:2, ranged:7, dtype:'p', cat:'simple', spr:'crossbow'},
+  sling:     {name:'Sling',       dmg:[1,4], crit:[20,2], hands:1, ranged:5, dtype:'b', cat:'simple', spr:'sling'},
 };
+// `weight` (light|medium|heavy) is the proficiency tier: a class can only wear
+// gear up to its own armour cap (see classArmorMax) — that is what keeps a
+// wizard out of plate and a rogue out of the heavy tier. Clothes and the two
+// magical stat pieces carry no weight, so every class can always wear them.
 const ARMORS={ // slot:armor
   clothes:  {name:'Clothes',      ac:0, maxDex:99, slot:'armor', spr:'clothes'},
-  robe:     {name:'Robes',        ac:0, maxDex:99, slot:'armor', spr:'robe'},
-  padded:   {name:'Padded armor', ac:1, maxDex:8, slot:'armor', spr:'padded'},
-  lightarmor:{name:'Leather armor',ac:2, maxDex:6, slot:'armor', spr:'lightarmor'},
-  studded:  {name:'Studded leather',ac:3,maxDex:5, slot:'armor', spr:'studded'},
-  chainshirt:{name:'Chain shirt', ac:4, maxDex:4, slot:'armor', spr:'chainshirt'},
-  hide:     {name:'Hide armor',   ac:3, maxDex:4, slot:'armor', spr:'hide'},
-  scalemail:{name:'Scale mail',   ac:4, maxDex:3, slot:'armor', spr:'scalemail'},
-  medarmor: {name:'Breastplate',  ac:5, maxDex:3, slot:'armor', spr:'medarmor'},
-  heavyarmor:{name:'Full plate',  ac:8, maxDex:1, slot:'armor', spr:'heavyarmor'},
-  lhelm:    {name:'Leather helmet',ac:1,maxDex:99, slot:'helmet', spr:'lhelm'},
-  hhelm:    {name:'Heavy helmet', ac:2, maxDex:99, slot:'helmet', spr:'hhelm'},
-  lboots:   {name:'Leather boots',ac:1, maxDex:99, slot:'boots', spr:'lboots'},
-  hboots:   {name:'Heavy boots',  ac:2, maxDex:99, slot:'boots', spr:'hboots'},
-  lshield:  {name:'Light shield', ac:1, maxDex:99, slot:'hand', shield:true, spr:'lshield'},
-  hshield:  {name:'Heavy shield', ac:2, maxDex:99, slot:'hand', shield:true, spr:'hshield'},
+  robe:     {name:'Robes',        ac:0, maxDex:99, slot:'armor', weight:'light', spr:'robe'},
+  padded:   {name:'Padded armor', ac:1, maxDex:8, slot:'armor', weight:'light', spr:'padded'},
+  lightarmor:{name:'Leather armor',ac:2, maxDex:6, slot:'armor', weight:'light', spr:'lightarmor'},
+  studded:  {name:'Studded leather',ac:3,maxDex:5, slot:'armor', weight:'light', spr:'studded'},
+  chainshirt:{name:'Chain shirt', ac:4, maxDex:4, slot:'armor', weight:'light', spr:'chainshirt'},
+  hide:     {name:'Hide armor',   ac:3, maxDex:4, slot:'armor', weight:'medium', spr:'hide'},
+  scalemail:{name:'Scale mail',   ac:4, maxDex:3, slot:'armor', weight:'medium', spr:'scalemail'},
+  medarmor: {name:'Breastplate',  ac:5, maxDex:3, slot:'armor', weight:'medium', spr:'medarmor'},
+  heavyarmor:{name:'Full plate',  ac:8, maxDex:1, slot:'armor', weight:'heavy', spr:'heavyarmor'},
+  lhelm:    {name:'Leather helmet',ac:1,maxDex:99, slot:'helmet', weight:'light', spr:'lhelm'},
+  mhelm:    {name:'Steel helm',   ac:2, maxDex:5, slot:'helmet', weight:'medium', spr:'mhelm'},
+  hhelm:    {name:'Great helm',   ac:3, maxDex:2, slot:'helmet', weight:'heavy', spr:'hhelm'},
+  lboots:   {name:'Leather boots',ac:1, maxDex:99, slot:'boots', weight:'light', spr:'lboots'},
+  mboots:   {name:'Reinforced boots',ac:2,maxDex:5, slot:'boots', weight:'medium', spr:'mboots'},
+  hboots:   {name:'Plated boots', ac:3, maxDex:2, slot:'boots', weight:'heavy', spr:'hboots'},
+  lshield:  {name:'Light shield', ac:1, maxDex:99, slot:'hand', shield:true, weight:'light', spr:'lshield'},
+  hshield:  {name:'Heavy shield', ac:2, maxDex:99, slot:'hand', shield:true, weight:'medium', spr:'hshield'},
   // the only shield that caps DEX — dexACBonus folds shield caps in with the armour's
-  towershield:{name:'Tower shield',ac:3, maxDex:2, slot:'hand', shield:true, spr:'towershield'},
+  towershield:{name:'Tower shield',ac:3, maxDex:2, slot:'hand', shield:true, weight:'heavy', spr:'towershield'},
 };
 const TRINKETS={
   ringprot: {name:'Ring of protection', slot:'ring', spr:'ring'},
@@ -1139,7 +1146,19 @@ const ITEM_ART={
   heavyarmor:()=>`<path d="M18 12 L28 6 L32 10 L36 6 L46 12 L50 26 L41 28 L41 56 L23 56 L23 28 L14 26 Z" fill="#8f9296"/><path d="M23 30 L41 30 M23 38 L41 38 M23 46 L41 46" stroke="#5f6266" stroke-width="2.6"/><circle cx="32" cy="20" r="4" fill="#6f7276"/>`,
   lhelm:()=>`<path d="M16 36 Q16 12 32 12 Q48 12 48 36 L44 38 L44 30 L20 30 L20 38 Z" fill="#6b4a2c"/><path d="M20 30 L20 46 L26 42 L38 42 L44 46 L44 30" fill="#5a3c20"/>`,
   hhelm:()=>`<path d="M16 38 Q16 10 32 10 Q48 10 48 38 L42 42 L42 28 L22 28 L22 42 Z" fill="#7c7f83"/><rect x="22" y="28" width="20" height="18" fill="#6f7276"/><path d="M30 28 L30 44 M34 28 L34 44" stroke="#3a3d40" stroke-width="2.4"/><path d="M32 10 L32 2" stroke="#8c1f1f" stroke-width="3.4"/>`,
+  // open-faced steel cap with a nasal guard — steel like the great helm but not
+  // enclosed, so it reads between the leather cap and the full helm
+  mhelm:()=>`<path d="M17 35 Q17 12 32 12 Q47 12 47 35 L42 37 L42 31 L22 31 L22 37 Z" fill="#8f9296"/>`+
+    `<path d="M22 31 L22 40 L27 44 L27 33 L37 33 L37 44 L42 40 L42 31 Z" fill="#6f7276"/>`+
+    `<rect x="30.2" y="16" width="3.6" height="26" fill="#75787c"/>`+
+    `<path d="M18 24 Q32 20 46 24" stroke="#5f6266" stroke-width="1.6" fill="none"/>`,
   lboots:()=>`<path d="M20 10 L32 10 L32 38 L44 38 L46 50 L20 50 Z" fill="#6b4a2c"/><path d="M20 44 L46 44" stroke="#4a3018" stroke-width="2.4"/><path d="M22 16 L30 16 M22 24 L30 24" stroke="#4a3018" stroke-width="2"/>`,
+  // leather boot with a riveted steel shin plate strapped over it
+  mboots:()=>`<path d="M19 9 L33 9 L33 37 L45 37 L48 51 L19 51 Z" fill="#6b5a3c"/>`+
+    `<path d="M22 12 L31 12 L31 37 L22 37 Z" fill="#8f9296"/>`+
+    `<path d="M19 45 L48 45" stroke="#4a3d24" stroke-width="2.6"/>`+
+    `<path d="M22 18 L31 18 M22 26 L31 26 M22 33 L31 33" stroke="#5f6266" stroke-width="1.3"/>`+
+    `<circle cx="24" cy="15" r="1" fill="#5f6266"/><circle cx="29" cy="15" r="1" fill="#5f6266"/>`,
   hboots:()=>`<path d="M18 8 L34 8 L34 36 L46 36 L50 52 L18 52 Z" fill="#75787c"/><path d="M18 44 L50 44" stroke="#4a4d50" stroke-width="3"/><path d="M20 16 L32 16 M20 26 L32 26" stroke="#4a4d50" stroke-width="2.6"/>`,
   lshield:()=>`<path d="M32 6 Q46 8 48 14 Q48 40 32 56 Q16 40 16 14 Q18 8 32 6 Z" fill="#6b4a2c"/><circle cx="32" cy="26" r="6" fill="#8a7343"/>`,
   hshield:()=>`<path d="M32 4 Q48 6 50 12 Q50 42 32 60 Q14 42 14 12 Q16 6 32 4 Z" fill="#6f7276"/><path d="M32 8 L32 54 M18 24 L46 24" stroke="#4a4d50" stroke-width="2.6"/><circle cx="32" cy="24" r="5" fill="#8f9296"/>`,
@@ -3131,7 +3150,7 @@ const TRAP_ART={
 const STAIRS_SVG=`<svg xmlns="${SVGNS}" viewBox="0 0 64 64"><g stroke="#080706" stroke-width="1.6"><rect x="8" y="8" width="48" height="48" fill="#12100c"/><path d="M8 8 L56 8 L56 20 L44 20 L44 32 L32 32 L32 44 L20 44 L20 56 L8 56 Z" fill="#3a352c"/><path d="M56 20 L44 20 L44 32 L32 32 L32 44 L20 44 L20 56 L56 56 Z" fill="#1e1b15"/></g></svg>`;
 /* ============================== ITEM REGISTRY & LOOT ============================== */
 const ITEM_DEFS={};
-for(const k in WEAPONS)ITEM_DEFS[k]={kind:'weapon',...WEAPONS[k]};
+for(const k in WEAPONS)ITEM_DEFS[k]={kind:'weapon',key:k,...WEAPONS[k]};
 for(const k in ARMORS)ITEM_DEFS[k]={kind:ARMORS[k].shield?'shield':ARMORS[k].slot,...ARMORS[k]};
 for(const k in TRINKETS)ITEM_DEFS[k]={kind:TRINKETS[k].slot,...TRINKETS[k]};
 for(const k in POTIONS)ITEM_DEFS[k]={kind:'potion',...POTIONS[k]};
@@ -3173,6 +3192,21 @@ function affixDesc(it){
   if(a.resist)return ` ${a.name}: ${ELEMENTS[a.resist].name} resistance ${a.amount} (subtracted from each ${ELEMENTS[a.resist].name} hit).`;
   return '';
 }
+const andJoin=(a)=>a.length<=1?a.join(''):a.slice(0,-1).join(', ')+' and '+a[a.length-1];
+// names the gear's weight tier and, if any class is barred from it, who
+function weightNote(def){
+  if(!def.weight)return '';
+  const cap=def.weight[0].toUpperCase()+def.weight.slice(1);
+  const barred=Object.keys(CLASSES).filter(c=>classArmorMax(c)<WEIGHT_RANK[def.weight]).map(c=>CLASSES[c].name+'s');
+  return ` ${cap}.`+(barred.length?` ${andJoin(barred)} cannot wear it.`:'');
+}
+// names the weapon's proficiency tier and which classes swing it untrained (−4)
+function profNote(def){
+  if(!def.cat)return '';
+  const cap=def.cat[0].toUpperCase()+def.cat.slice(1);
+  const unskilled=Object.keys(CLASSES).filter(c=>!weaponProficient({cls:c},def)).map(c=>CLASSES[c].name+'s');
+  return ` ${cap} weapon.`+(unskilled.length?` ${andJoin(unskilled)} swing it at −4.`:'');
+}
 function itemDesc(it){
   const def=ITEM_DEFS[it.base];
   if(def.kind==='weapon'){
@@ -3182,12 +3216,12 @@ function itemDesc(it){
     if(def.finesse)s+=' Finesse: attacks with DEX when it is the better hand.';
     if(def.hands===2)s+=' Two-handed.';
     if(it.bonus)s+=` +${it.bonus} to attack and damage.`;
-    return s+dtypeNote(def)+affixDesc(it);
+    return s+dtypeNote(def)+profNote(def)+affixDesc(it);
   }
   if(def.kind==='shield'){
     let s=`Shield: +${def.ac+it.bonus} AC (off hand).`;
     if(def.maxDex<99)s+=` Max DEX bonus ${def.maxDex}.`;
-    return s+affixDesc(it);
+    return s+weightNote(def)+affixDesc(it);
   }
   if(def.luck)return `Worn: +${Math.min(3,Math.max(1,it.bonus||0))} luck on every saving throw.`+affixDesc(it);
   if(def.freedom)return 'Worn: the wearer cannot be paralysed or held.'+affixDesc(it);
@@ -3205,7 +3239,7 @@ function itemDesc(it){
   if(['armor','helmet','boots'].includes(def.kind)){
     let s=`${def.kind[0].toUpperCase()+def.kind.slice(1)}: +${def.ac+it.bonus} AC.`;
     if(def.maxDex<9)s+=` Max DEX bonus ${def.maxDex}.`;
-    return s+affixDesc(it);
+    return s+weightNote(def)+affixDesc(it);
   }
   if(def.kind==='ring')return `Ring: +${it.bonus||1} deflection AC.`+affixDesc(it);
   if(def.kind==='amulet')return `Amulet: +${it.bonus||1} natural armor AC.`+affixDesc(it);
@@ -3286,8 +3320,8 @@ function randLoot(depth,rich,noPotion,noRation){
     // pool at depth — a plain robe is the shirt on every wizard's back, and it
     // earns a drop slot only where the bonus ladder usually enchants it.
     const pool=depth<3?['padded','lightarmor','studded','lhelm','lboots','lshield']:
-      depth<7?['padded','lightarmor','studded','chainshirt','hide','scalemail','medarmor','lhelm','hhelm','lboots','hboots','lshield','hshield']:
-      ['robe','studded','chainshirt','scalemail','medarmor','heavyarmor','hhelm','hboots','hshield','towershield'];
+      depth<7?['padded','lightarmor','studded','chainshirt','hide','scalemail','medarmor','lhelm','mhelm','hhelm','lboots','mboots','hboots','lshield','hshield']:
+      ['robe','studded','chainshirt','scalemail','medarmor','heavyarmor','mhelm','hhelm','mboots','hboots','hshield','towershield'];
     return mkItem(pick(pool),{bonus:gbon(),affix:rollAffix(depth,rich,ARMOR_AFFIXES)});
   }
   if(kind==='scroll'){
@@ -4190,15 +4224,21 @@ function spendPrepared(ch,key){
 function charSlots(ch){return slotsFor(ch.cls,ch.level,abilScore(ch,casterAbil(ch)));}
 // the worn piece whose DEX cap is actually biting — body armour or a shield
 // (only the tower shield carries a cap). Null when nothing caps.
+// armour proficiency by weight: everyone up to heavy, save the two classes the
+// player asked to hold back — a rogue stops at medium, a wizard at light
+const WEIGHT_RANK={light:1,medium:2,heavy:3};
+function classArmorMax(cls){return WEIGHT_RANK[CLASSES[cls].armorMax||'heavy'];}
+function canWear(ch,it){
+  const w=ITEM_DEFS[it.base].weight;
+  return !w||WEIGHT_RANK[w]<=classArmorMax(ch.cls);
+}
+// the worn piece whose DEX cap is actually biting: armour, a shield, or now a
+// helmet or boots — the tightest of them wins
 function dexCapItem(ch){
   let capDef=null;
-  for(const s of ['armor','lhand','rhand']){
-    const it=ch.equip[s];
-    if(!it)continue;
-    const d=ITEM_DEFS[it.base];
-    if(s!=='armor'&&d.kind!=='shield')continue;
-    if((d.maxDex??99)<99&&(!capDef||d.maxDex<capDef.maxDex))capDef=d;
-  }
+  const consider=(d)=>{if((d.maxDex??99)<99&&(!capDef||d.maxDex<capDef.maxDex))capDef=d;};
+  for(const s of ['armor','helmet','boots']){const it=ch.equip[s];if(it)consider(ITEM_DEFS[it.base]);}
+  for(const s of ['lhand','rhand']){const it=ch.equip[s];if(it&&ITEM_DEFS[it.base].kind==='shield')consider(ITEM_DEFS[it.base]);}
   return capDef;
 }
 function dexACBonus(ch){
@@ -4262,6 +4302,18 @@ function weaponOf(ch,slot){
   const def=ITEM_DEFS[it.base];
   return def.kind==='weapon'?{it,def}:null;
 }
+// 3.5 weapon proficiency: martial classes wield everything; a simple class only
+// simple weapons; the wizard only its short 'basic' list; and every class is
+// proficient with anything on its own `weaponAlso` list (and with its fists).
+// Not a gate — a non-proficient swing still lands, at −4 (see attackBonus).
+function weaponProficient(ch,wDef){
+  if(!wDef||wDef.unarmed)return true;
+  const c=CLASSES[ch.cls];
+  if(c.weaponAlso&&c.weaponAlso.includes(wDef.key))return true;
+  if(c.weaponProf==='martial')return true;
+  if(c.weaponProf==='simple')return wDef.cat==='simple';
+  return false; // 'basic': only the weaponAlso list above
+}
 function attackBonus(ch,wDef,wIt,offhand){
   let b=babOf(ch.cls,ch.level)-ch.negLevels;
   // a finesse blade is worked with DEX when that is the better hand; damage
@@ -4274,6 +4326,7 @@ function attackBonus(ch,wDef,wIt,offhand){
   for(const bf of ch.buffs)if(bf.atk)b+=bf.atk;
   if(ch._smiting)b+=Math.max(0,mod(ch.abil.cha));
   if(hasCond(ch,'shaken'))b-=2;
+  if(!weaponProficient(ch,wDef))b-=4; // wrong tool in hand: 3.5 nonproficiency
   if(offhand!==undefined&&offhand!==null){ // dual wield penalties
     b-=CLASSES[ch.cls].twf?2:4;
   }
@@ -11667,6 +11720,7 @@ const UI=(()=>{
       return;
     }
     if(to.type==='equip'&&!slotAccepts(to.slot,it)){toast("That doesn't go there.");return;}
+    if(to.type==='equip'&&!canWear(invChar,it)){toast(invChar.name+' cannot wear '+ITEM_DEFS[it.base].weight+' gear.');return;}
     // one source of truth for the hand rules: returns null when the slot can take
     // the item, 'needs-stash' when a two-hander needs the off-hand emptied, or a
     // human-readable refusal. ignoreSlot is treated as empty (the drag source).
@@ -11825,7 +11879,8 @@ const UI=(()=>{
       const af=h.it.affix&&AFFIXES[h.it.affix];
       const rider=af&&af.dice?` + ${af.dice[0]}d${af.dice[1]} ${ELEMENTS[af.elem].name}`:'';
       const lead=prof.dual?`<b>${h.offhand?'Off hand':'Main hand'}</b>`:'<b>Attack</b>';
-      atkLine+=`${lead} ${fmtMod(h.atk)} with ${itemName(h.it)} (${dice}${rider})<br>`;
+      const unskilled=!weaponProficient(ch,h.def)?` <span class="dim-note">(non-proficient −4)</span>`:'';
+      atkLine+=`${lead} ${fmtMod(h.atk)} with ${itemName(h.it)} (${dice}${rider})${unskilled}<br>`;
     }
     if(prof.dual)atkLine=`<span class="dim-note">Two-weapon fighting${CLASSES[ch.cls].twf?'':' — untrained (−4)'}</span><br>`+atkLine;
     const abils=ABILITIES.map(a=>{
