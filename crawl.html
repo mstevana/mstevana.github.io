@@ -6250,6 +6250,183 @@ function fxPillarTex(core){
    not the whole screen: at 64 segments a fullscreen pass is most of a million
    fragments doing 64 distance tests apiece, and the bolt occupies a fifth of
    the view. */
+/* ---------- fire, on the GPU ----------
+   Every flame in the game used to be a canvas texture on a quad, animated only
+   by scaling and fading it from JS. That is what made fire read as a decal: the
+   licks in `fxFireballTex` are frozen at the angles they were drawn at, so
+   spinning the sprite turns the whole stamp rigidly rather than making anything
+   burn. Fire's defining behaviour is that it MOVES — it advects, it churns, and
+   its colour is a function of temperature.
+
+   So fire is computed as a scalar TEMPERATURE field from domain-warped fbm and
+   mapped through ONE ramp, `fireRamp`. Two reasons that is a single function
+   rather than a gradient per effect:
+   - the old textures each hard-coded their own stops and had drifted apart
+     (#ff8c26 against #ff7a1e against a third for the tongues);
+   - everything here blends additively, and stacking several tinted layers
+     saturates to white — the lesson the bolt taught. One temperature through
+     one ramp cannot blow out that way.
+
+   `ffbmP` is the periodic variant, needed wherever the field wraps around a
+   cylinder: without it the flame strike's pillar shows a seam where u meets
+   itself. Three octaves everywhere — this is evaluated per pixel, and the
+   impact disk covers a lot of them. */
+const FIRE_GLSL=[
+'float fh(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);}',
+'float fnoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);',
+'  return mix(mix(fh(i),fh(i+vec2(1.,0.)),f.x),mix(fh(i+vec2(0.,1.)),fh(i+vec2(1.,1.)),f.x),f.y);}',
+'float ffbm(vec2 p){float s=0.0,a=0.5;for(int i=0;i<3;i++){s+=a*fnoise(p);p*=2.03;a*=0.5;}return s;}',
+'float fnoiseP(vec2 p,float per){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);',
+'  vec2 i0=mod(i,per),i1=mod(i+1.0,per);',
+'  float a=fh(i0),b=fh(vec2(i1.x,i0.y)),c=fh(vec2(i0.x,i1.y)),d=fh(i1);',
+'  return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);}',
+'float ffbmP(vec2 p,float per){float s=0.0,a=0.5,pe=per;',
+'  for(int i=0;i<3;i++){s+=a*fnoiseP(p,pe);p*=2.0;pe*=2.0;a*=0.5;}return s;}',
+// temperature -> colour: smoke, then dull red, orange, yellow, white-hot
+'vec3 fireRamp(float t){',
+'  t=clamp(t,0.0,1.0);',
+'  vec3 c=mix(vec3(0.04,0.012,0.004),vec3(0.55,0.06,0.01),smoothstep(0.00,0.26,t));',
+'  c=mix(c,vec3(1.00,0.33,0.03),smoothstep(0.20,0.52,t));',
+'  c=mix(c,vec3(1.00,0.72,0.16),smoothstep(0.48,0.78,t));',
+'  c=mix(c,vec3(1.00,0.97,0.86),smoothstep(0.76,1.00,t));',
+'  return c;}'
+].join('\n');
+// shared by every fire material: additive, unlit, no depth write
+function fireMat(frag,extra){
+  const u=Object.assign({uTime:{value:0},uLife:{value:0},uSeed:{value:0},uGain:{value:1}},extra||{});
+  return new THREE.ShaderMaterial({
+    uniforms:u,
+    vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+    fragmentShader:'precision highp float;\nvarying vec2 vUv;\nuniform float uTime;uniform float uLife;uniform float uSeed;uniform float uGain;\n'+FIRE_GLSL+'\n'+frag,
+    transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide
+  });
+}
+/* the explosion seen from above, on the expanding floor quad. The fire is
+   advected OUTWARD along the radius, so the front races away while the middle
+   churns — the old texture's eighteen tongues were fixed and merely rotated. */
+function fireDiskMat(){
+  return fireMat([
+    'void main(){',
+    '  vec2 q=vUv*2.0-1.0;',
+    '  float rr=length(q);',
+    '  vec2 dir=q/max(rr,1e-4);',
+    // advecting along dir (not by angle) keeps the field seamless at the wrap
+    '  float n=ffbm(q*3.1-dir*uTime*2.6);',
+    '  float body=1.0-smoothstep(0.10,1.0,rr);',
+    '  float t=body*(0.50+0.85*n)-uLife*0.55;',
+    '  float a=clamp(t*1.7,0.0,1.0);',
+    '  gl_FragColor=vec4(fireRamp(t)*a,1.0);',
+    '}'].join('\n'));
+}
+/* a burning ball: the fireball's bead and the flaming sphere. Licks advect out
+   of the core and upward, so the ball boils instead of turning as one piece. */
+function fireBallMat(){
+  return fireMat([
+    'void main(){',
+    '  vec2 q=vUv*2.0-1.0;',
+    '  float rr=length(q);',
+    '  vec2 dir=q/max(rr,1e-4);',
+    '  float n=ffbm(q*2.7+vec2(uSeed,-uTime*2.2)+dir*uTime*1.1);',
+    '  float body=1.0-smoothstep(0.05,1.0,rr);',
+    '  float t=body*(0.55+0.95*n)*uGain;',
+    '  float a=clamp(t*1.8,0.0,1.0);',
+    '  gl_FragColor=vec4(fireRamp(t)*a,1.0);',
+    '}'].join('\n'));
+}
+/* one tongue standing on a tile. The field scrolls upward and the flame cools
+   with height, so each tongue licks on its own rather than being the same
+   drawing scaled — `uSeed` is the tile, so no two agree. */
+/* A tongue is ERODED out of a soft blob, never masked into a shape. The first
+   attempt tapered a hard-edged wedge and every flame came out a solid orange
+   traffic cone: with additive blending a crisp silhouette is exactly what you
+   must not have. So the horizontal profile is a wide soft falloff, the noise is
+   subtracted rather than multiplied (it eats holes in the flame), and the top
+   is cooled away so the tip breaks into licks instead of ending in a straight
+   edge. */
+function fireTongueMat(){
+  return fireMat([
+    'void main(){',
+    '  float d=abs(vUv.x-0.5)*2.0;',
+    '  float core=1.0-smoothstep(0.10,1.0,d);',     // soft, no hard flank
+    '  float rise=1.0-smoothstep(0.05,0.95,vUv.y);', // cools with height
+    '  float n=ffbm(vec2(vUv.x*2.4+uSeed,vUv.y*2.2-uTime*3.0));',
+    '  float t=core*rise*1.45*uGain;',
+    '  t-=(1.0-n)*0.55+vUv.y*0.30;',                // erode: holes, ragged tip
+    '  t*=1.0-uLife*0.75;',
+    '  float a=clamp(t*1.5,0.0,1.0);',
+    '  gl_FragColor=vec4(fireRamp(t)*a,1.0);',
+    '}'].join('\n'));
+}
+/* the flame strike pillar, wrapped on a cylinder. Periodic in u at PER, or the
+   seam where the texture meets itself shows as a vertical scar. */
+function firePillarMat(core){
+  return fireMat([
+    'void main(){',
+    '  const float PER=8.0;',
+    '  float n=ffbmP(vec2(vUv.x*PER,vUv.y*3.0-uTime*3.6),PER);',
+    // Both ends must fall to nothing. A cylinder shaded evenly shows its own
+    // rims as two hard ellipses and the whole thing reads as a plastic tube —
+    // which is exactly what the first attempt looked like.
+    '  float ends=smoothstep(0.0,0.18,vUv.y)*(1.0-smoothstep(0.50,1.0,vUv.y));',
+    '  float t=(0.20+1.30*n)*ends*'+(core?'1.30':'1.00')+'*uGain;',
+    '  t-=(1.0-n)*0.42;',                              // erode into licks
+    '  t*=1.0-uLife*0.55;',
+    '  float a=clamp(t*1.6,0.0,1.0)*'+(core?'0.90':'0.70')+';',
+    '  gl_FragColor=vec4(fireRamp(t)*a,1.0);',
+    '}'].join('\n'));
+}
+/* Burning hands, in screen space. A cone thrown away from the eye is the same
+   problem the bolt had — as world geometry it foreshortens to a band and hides
+   its apex under the camera — so it is a quad in screen space like everything
+   else that points away. Inside the triangle the fire is the same temperature
+   field as the rest, advected from the apex outward, so the fan flows out of
+   the caster's hands rather than sitting there as a gradient. */
+function fireFanInit(){
+  if(R3.fanQuad!==undefined)return R3.fanQuad;
+  R3.fanQuad=null;
+  if(!R3.renderer||!THREE.ShaderMaterial)return null;
+  const mat=new THREE.ShaderMaterial({
+    uniforms:{uBox:{value:new THREE.Vector4(0,0,1,1)},uRes:{value:new THREE.Vector2(1,1)},
+      uApex:{value:new THREE.Vector2(0,0)},uL:{value:new THREE.Vector2(0,0)},uR:{value:new THREE.Vector2(0,0)},
+      uTime:{value:0},uLife:{value:0},uOp:{value:1},uSeed:{value:0}},
+    vertexShader:['uniform vec4 uBox;','uniform vec2 uRes;','varying vec2 vP;',
+      'void main(){vec2 uv=position.xy*0.5+0.5;vP=mix(uBox.xy,uBox.zw,uv);',
+      ' vec2 ndc=(vP/uRes)*2.0-1.0;ndc.y=-ndc.y;gl_Position=vec4(ndc,0.0,1.0);}'].join('\n'),
+    fragmentShader:['precision highp float;','varying vec2 vP;',
+      'uniform vec2 uApex;uniform vec2 uL;uniform vec2 uR;',
+      'uniform float uTime;uniform float uLife;uniform float uOp;uniform float uSeed;',
+      FIRE_GLSL,
+      // barycentric-ish: how far along the fan, and how far off its axis
+      'void main(){',
+      '  vec2 ax=(uL+uR)*0.5-uApex;',
+      '  float axl=length(ax);vec2 an=ax/max(axl,1e-4);',
+      '  vec2 rel=vP-uApex;',
+      '  float along=dot(rel,an)/max(axl,1e-4);',        // 0 at hands, 1 at the mouth
+      '  if(along<0.0||along>1.15){gl_FragColor=vec4(0.0);return;}',
+      '  vec2 perp=vec2(-an.y,an.x);',
+      '  float halfW=length(uR-uL)*0.5;',
+      '  float off=abs(dot(rel,perp))/max(halfW*max(along,0.04),1e-4);',
+      '  float n=ffbm(vec2(off*2.2+uSeed,along*3.0-uTime*3.4));',
+      // the flank is pushed about by the same noise, or the cone's edge reads as
+      // a drawn straight line no matter how ragged the fire inside it is
+      '  off+=(n-0.5)*0.55;',
+      '  float core=1.0-smoothstep(0.0,1.0,off);',
+      '  float t=core*1.35*(1.0-smoothstep(0.50,1.15,along));',
+      '  t-=(1.0-n)*0.5;',
+      '  t*=1.0-uLife*0.7;',
+      '  float a=clamp(t*1.5,0.0,1.0)*uOp;',
+      '  gl_FragColor=vec4(fireRamp(t)*a,1.0);',
+      '}'].join('\n'),
+    transparent:true,blending:THREE.AdditiveBlending,depthTest:false,depthWrite:false,
+    side:THREE.DoubleSide      // the ndc.y flip reverses winding, as with the bolt
+  });
+  const q=new THREE.Mesh(new THREE.PlaneGeometry(2,2),mat);
+  q.frustumCulled=false;q.visible=false;
+  boltShaderInit();            // makes the overlay scene if the bolt has not yet
+  if(R3.boltScene)R3.boltScene.add(q);
+  R3.fanQuad=q;
+  return q;
+}
 const BOLT_MAX_SEG=64;
 function boltShaderInit(){
   if(R3.boltQuad!==undefined)return R3.boltQuad;   // built once; null means unavailable
@@ -9096,7 +9273,7 @@ function castSpell(ch,key,opts){
     spawnProjectile({
       from:{x:R3.camera.position.x+fdx*0.4,y:0.3,z:R3.camera.position.z+fdy*0.4},
       toFn:()=>{const p=monsterAim(c0);return {x:p.x,y:0.32,z:p.z};},   // rolls to the feet
-      tex:fxFireballTex(),scale:0.5,speed:5,spin:true,
+      fire:true,scale:0.5,speed:5,
       trail:'#ff7a1e',lite:'#ff8c2a',liteI:1.3,
       onHit:()=>{
         const at=monsterAim(c0);
@@ -9118,6 +9295,7 @@ function castSpell(ch,key,opts){
   const pj=SPELL_PROJ[key]||{};
   spawnProjectile({from:pj.low?bowMuzzle():partyMuzzle(),toFn:()=>monsterAim(c0),
     tex:pj.tex?pj.tex():fxGlowTex(color),
+    fire:!!pj.fire,
     scale:pj.scale||0.4,
     speed:pj.speed||5.5,
     lite:pj.lite||null,
@@ -9816,16 +9994,19 @@ function strikeAnim(m){
   s.userData.attackPhase='strike';s.userData.phaseT=performance.now();
 }
 /* ---------- projectiles & transient effects ---------- */
-function spawnProjectile(o){ // {from:{x,y,z}, toFn, speed, tex, scale, onHit, tint?, lite?, spin?, rot?}
-  const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:o.tex,transparent:true,depthWrite:false}));
+function spawnProjectile(o){ // {from:{x,y,z}, toFn, speed, tex, scale, onHit, tint?, lite?, spin?, rot?, fire?}
+  // `fire` swaps the textured sprite for a shaded, billboarded quad: a burning
+  // ball has to boil, and SpriteMaterial cannot carry a shader
+  const spr=o.fire?fireBillboard(fireBallMat(),o.scale,o.scale)
+    :new THREE.Sprite(new THREE.SpriteMaterial({map:o.tex,transparent:true,depthWrite:false}));
   if(o.tint&&spr.material&&spr.material.color)spr.material.color.set(o.tint);
-  if(o.rot&&spr.material)spr.material.rotation=o.rot;
+  if(o.rot&&spr.material&&spr.material.rotation!==undefined)spr.material.rotation=o.rot;
   spr.scale.set(o.scale,o.scale,1);
   spr.position.set(o.from.x,o.from.y,o.from.z);
   spr.userData={kind:'fx'}; // tagged so view taps pass through instead of being blocked
   R3.levelGroup.add(spr);
   G.fx.push({kind:'proj',spr,speed:o.speed,toFn:o.toFn,onHit:o.onHit,baseScale:o.scale,
-    t:-(o.delay||0),lite:o.lite,liteI:o.liteI,spin:o.spin,trail:o.trail});
+    t:-(o.delay||0),lite:o.lite,liteI:o.liteI,spin:o.spin,trail:o.trail,bill:!!o.fire});
 }
 function spawnBurst(pos,color,size,delay,add){
   const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:fxGlowTex(color),transparent:true,depthWrite:false,
@@ -9840,9 +10021,17 @@ function spawnBurst(pos,color,size,delay,add){
 function spawnFlash(pos,color,intensity,dur){
   G.fx.push({kind:'flash',pos,color,base:intensity,dur,t:0});
 }
+// a billboarded quad carrying a fire material, standing in for a Sprite —
+// SpriteMaterial cannot take a custom shader, so anything shaded is a Mesh that
+// is turned to face the camera each frame (`bill`)
+function fireBillboard(mat,w,h){
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(1,1),mat);
+  m.scale.set(w,h,1);
+  m.userData={kind:'fx'};
+  return m;
+}
 function spawnFireDisk(at,r){
-  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),
-    new THREE.MeshBasicMaterial({map:fxFireDiskTex(),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),fireDiskMat());
   mesh.rotation.x=-Math.PI/2;
   mesh.position.set(at.x,0.04,at.z);
   mesh.renderOrder=5;
@@ -9856,25 +10045,32 @@ function spawnFireDisk(at,r){
      of the same fire, capped near ceiling height: 3.5's fireball fills the
      room's height and then spreads, so the vertical burst stays bounded and
      the racing floor disk is what carries the radius. */
-  const bloom=new THREE.Sprite(new THREE.SpriteMaterial({map:fxFireDiskTex(),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
-  bloom.scale.set(0.5,0.5,1);
+  // the bloom is a wash behind the disk, not a second sun: at full gain its
+  // core clamps to white and swallows the room
+  const bloomMat=fireBallMat();
+  if(bloomMat.uniforms)bloomMat.uniforms.uGain.value=0.5;
+  const bloom=fireBillboard(bloomMat,0.5,0.5);
   bloom.position.set(at.x,0.55,at.z);
-  bloom.userData={kind:'fx'};
   R3.levelGroup.add(bloom);
-  G.fx.push({kind:'disk',spr:bloom,t:0,dur:0.5,s1:2.5,sprite:true});
+  G.fx.push({kind:'disk',spr:bloom,t:0,dur:0.5,s1:2.5,sprite:true,bill:true});
+}
+// one shaded tongue standing at a spot, seeded so no two lick alike
+function spawnFlameTongue(x,y,z,w,h){
+  const mat=fireTongueMat();
+  if(mat.uniforms)mat.uniforms.uSeed.value=Math.random()*10;
+  const spr=fireBillboard(mat,w,h);
+  spr.position.set(x,y,z);
+  R3.levelGroup.add(spr);
+  return spr;
 }
 function spawnFlameTiles(tiles,cap){
   const arr=[...tiles];
   const step=Math.max(1,Math.ceil(arr.length/(cap||16)));
   for(let i=0;i<arr.length;i+=step){
     const t=arr[i],x=(t%G.L.w)+0.5,z=Math.floor(t/G.L.w)+0.5;
-    const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:fxFlameTex(),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
-    spr.scale.set(0.5,0.2,1);
-    spr.position.set(x,0.15,z);
-    spr.userData={kind:'fx'};
-    R3.levelGroup.add(spr);
+    const spr=spawnFlameTongue(x,0.15,z,0.5,0.2);
     // negative t is an unlit fuse: the tongues erupt in a ragged wave, not a grid
-    G.fx.push({kind:'flame',spr,t:-Math.random()*0.15,dur:0.65});
+    G.fx.push({kind:'flame',spr,t:-Math.random()*0.15,dur:0.65,bill:true});
   }
 }
 /* PHB: lightning bolt "releases a powerful stroke of electrical energy" from
@@ -9969,6 +10165,20 @@ function boltGeom(f,W,H){
   }
   return {path,forks};
 }
+/* Scorching ray: straight strokes rather than a zigzag, fanned at the muzzle so
+   several rays read as several rays. It goes through the bolt's own shader —
+   a ray is a bolt with the kinks taken out — so nothing new is compiled. */
+function boltRays(f,W,H){
+  const p=projectToScreen(f.wps[0]);
+  if(p.behind)return null;
+  const mainSegs=[];
+  for(let i=0;i<f.rays;i++){
+    const off=(i-(f.rays-1)/2)*46;
+    mainSegs.push([{x:W*0.5+off,y:H*0.97},{x:p.x+off*0.12,y:p.y}]);
+  }
+  // disjoint strokes, so they are handed over as segments rather than a polyline
+  return {mainSegs,forks:[]};
+}
 function bolt2dDraw(f,op){
   const q=boltShaderInit();
   // the shared 2D canvas is cleared either way: the shader path paints nothing
@@ -9979,13 +10189,14 @@ function bolt2dDraw(f,op){
   const host=document.getElementById('view-wrap');
   if(!host)return;
   const W=host.clientWidth,H=host.clientHeight;
-  const g=boltGeom(f,W,H);
+  const g=f.rays?boltRays(f,W,H):boltGeom(f,W,H);
   if(!g){q.visible=false;return;}
   // pack the stroke and then the forks into one segment list, main first
   const u=q.material.uniforms,segs=u.uSeg.value;
   let n=0;
   const put=(a,c)=>{if(n<BOLT_MAX_SEG)segs[n++].set(a.x,a.y,c.x,c.y);};
-  for(let i=1;i<g.path.length;i++)put(g.path[i-1],g.path[i]);
+  if(g.mainSegs){for(const [a,c] of g.mainSegs)put(a,c);}
+  else for(let i=1;i<g.path.length;i++)put(g.path[i-1],g.path[i]);
   const nMain=n;
   for(const [a,c] of g.forks)put(a,c);
   for(let i=n;i<BOLT_MAX_SEG;i++)segs[i].set(-9999,-9999,-9999,-9999);
@@ -9999,6 +10210,10 @@ function bolt2dDraw(f,op){
   u.uRes.value.set(W,H);
   u.uN.value=n;u.uMain.value=nMain;
   u.uOp.value=op;u.uT.value=f.t;u.uSeed.value=(f.seed%1000)/1000;
+  // a bolt is blue-white; a scorching ray burns. Same shader, different palette.
+  u.uCore.value.set(f.cCore||'#f2faff');
+  u.uMid.value.set(f.cMid||'#9fd4ff');
+  u.uOuter.value.set(f.cOuter||'#5fa8e8');
   q.visible=true;
 }
 // the original three strokes, kept for anything without a GL context
@@ -10029,7 +10244,7 @@ function bolt2dCanvas(f,op,b){
    away from the caster at a walking pace exactly as written — which is why its
    damage still resolves on arrival rather than at the word of command. */
 const SPELL_PROJ={
-  fireball:{tex:()=>fxFireballTex(),scale:0.55,speed:6.5,lite:'#ff8c2a',liteI:1.6,spin:true},
+  fireball:{fire:true,scale:0.55,speed:6.5,lite:'#ff8c2a',liteI:1.6},
   cloudkill:{tex:()=>fxMistTex(),scale:1.3,speed:3.2,tint:'#a8d45e'},
   // an arrow of acid, not a glow: the mundane arrow art tinted sickly green,
   // dripping a wake of acid behind it
@@ -10079,9 +10294,7 @@ function spawnPoisonCloud(at,tiles){
 function spawnFlameStrike(at,tiles){
   const H=1.28;
   const mk=(r,core)=>{
-    const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r*0.92,H,14,1,true),
-      new THREE.MeshBasicMaterial({map:fxPillarTex(core),transparent:true,depthWrite:false,
-        blending:THREE.AdditiveBlending,side:THREE.DoubleSide}));
+    const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r*0.92,H,14,1,true),firePillarMat(core));
     m.position.set(at.x,H,at.z);
     m.scale.y=0.01;
     m.userData={kind:'fx'};
@@ -10092,8 +10305,7 @@ function spawnFlameStrike(at,tiles){
   const outer=mk(0.52,false),inner=mk(0.28,true);
   G.fx.push({kind:'column',outer,inner,t:0,dur:0.9,H});
   // the scorch: the fireball's racing disk, held to the column's one-tile reach
-  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),
-    new THREE.MeshBasicMaterial({map:fxFireDiskTex(),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),fireDiskMat());
   mesh.rotation.x=-Math.PI/2;
   mesh.position.set(at.x,0.04,at.z);
   mesh.renderOrder=5;
@@ -10245,6 +10457,31 @@ function spawnFlameFan(){
 }
 // the fire fan overlay: hot gradient body, wavering tongues, rising embers
 function firefan2dDraw(f,op){
+  const q=fireFanInit();
+  if(q){
+    // the shaded fan: same screen-space triangle, but the fire inside it is the
+    // shared temperature field flowing out of the caster's hands
+    const b0=fx2dBegin();                       // clear the canvas; we paint none of it
+    if(op<=0){q.visible=false;return;}
+    const host=document.getElementById('view-wrap');
+    if(!host)return;
+    const W=host.clientWidth,H=host.clientHeight;
+    const pL=projectToScreen(f.farL),pR=projectToScreen(f.farR);
+    if(pL.behind&&pR.behind){q.visible=false;return;}
+    const ax=W*0.5, ay=H*0.995;
+    const u=q.material.uniforms;
+    u.uApex.value.set(ax,ay);
+    u.uL.value.set(pL.x,pL.y);
+    u.uR.value.set(pR.x,pR.y);
+    const pad=70;
+    u.uBox.value.set(Math.min(ax,pL.x,pR.x)-pad,Math.min(ay,pL.y,pR.y)-pad,
+                     Math.max(ax,pL.x,pR.x)+pad,Math.max(ay,pL.y,pR.y)+pad);
+    u.uRes.value.set(W,H);
+    u.uTime.value=f.t;u.uLife.value=Math.min(1,f.t/f.dur);u.uOp.value=op;
+    u.uSeed.value=(f.seed%1000)/1000;
+    q.visible=true;
+    return;
+  }
   const b=fx2dBegin();
   if(!b)return;
   const ctx=b.ctx;
@@ -10646,6 +10883,17 @@ function flourish2dDraw(f,op){
   }
   ctx.globalCompositeOperation='source-over';
 }
+/* Drive a fire material's clock and, for anything standing in for a Sprite,
+   turn it to face the eye. Safe on every other fx: a material with no uniforms
+   is left alone, so the frost disk and the mist puffs pass through untouched. */
+function fireTick(f,k){
+  const m=f.spr&&f.spr.material;
+  if(m&&m.uniforms&&m.uniforms.uTime){
+    m.uniforms.uTime.value=Math.max(0,f.t);
+    m.uniforms.uLife.value=Math.min(1,Math.max(0,k||0));
+  }
+  if(f.bill&&f.spr&&R3.camera)f.spr.quaternion.copy(R3.camera.quaternion);
+}
 function updateFx(dt){
   for(const f of G.fx.slice()){
     if(f.kind==='proj'){
@@ -10666,7 +10914,8 @@ function updateFx(dt){
         f.spr.position.z+=dz/dist*step;
         const p=1+Math.sin(f.t*22)*0.13;
         f.spr.scale.set(f.baseScale*p,f.baseScale*p,1);
-        if(f.spin&&f.spr.material)f.spr.material.rotation+=dt*3.2;
+        if(f.spin&&f.spr.material&&f.spr.material.rotation!==undefined)f.spr.material.rotation+=dt*3.2;
+        fireTick(f,0);          // a bead in flight never cools: uLife stays 0
         if(f.trail){f.tT=(f.tT||0)+dt;
           if(f.tT>0.04){f.tT=0;
             // the wake scales with distance from the eye, or the puffs balloon
@@ -10764,6 +11013,8 @@ function updateFx(dt){
           m.position.y=f.H-(f.H*e)/2;
           if(m.rotation)m.rotation.y+=(m===f.inner?-2.2:1.4)*dt;
           if(m.material)m.material.opacity=k<0.6?1:1-(k-0.6)/0.4;
+          if(m.material&&m.material.uniforms&&m.material.uniforms.uTime){
+            m.material.uniforms.uTime.value=f.t;m.material.uniforms.uLife.value=k;}
         }
       }
     }else if(f.kind==='hail'){
@@ -10826,9 +11077,12 @@ function updateFx(dt){
         const e=1-Math.pow(1-Math.min(1,k*1.4),3);
         const sc=0.4+(f.s1-0.4)*e;
         f.spr.scale.set(sc,sc,1);
-        if(f.sprite)f.spr.material.rotation=k*0.6;
+        // a billboarded fire quad has its orientation set by fireTick, so only
+        // the flat floor disk is spun here
+        if(f.sprite){if(f.spr.material.rotation!==undefined)f.spr.material.rotation=k*0.6;}
         else f.spr.rotation.z=k*(f.rot!==undefined?f.rot:0.8);
         f.spr.material.opacity=(f.max||1)*(k<0.55?1:1-(k-0.55)/0.45);
+        fireTick(f,k);
       }
     }else if(f.kind==='flame'){
       f.t+=dt;
@@ -10839,6 +11093,7 @@ function updateFx(dt){
         f.spr.scale.set(0.5+k*0.2,h,1);
         f.spr.position.y=h*0.48+0.02;
         f.spr.material.opacity=k<0.5?1:1-(k-0.5)/0.5;
+        fireTick(f,k);
       }
     }else if(f.kind==='burst'){
       f.t+=dt;
@@ -10857,6 +11112,7 @@ function clearFx(){
   for(const f of G.fx)if(f.spr&&f.spr.parent)f.spr.parent.remove(f.spr);
   if(R3.boltCv){const c=R3.boltCv.getContext('2d');if(c)c.clearRect(0,0,R3.boltCv.width,R3.boltCv.height);}
   if(R3.boltQuad)R3.boltQuad.visible=false;
+  if(R3.fanQuad)R3.fanQuad.visible=false;
   G.fx.length=0;
 }
 function partyMuzzle(){
@@ -10907,7 +11163,14 @@ const SPELL_IMPACT={
     }
   },
   scorchingray:(at,tiles,color,foes,cl)=>{
-    spawnBeam2d(at,'255,243,208','255,122,30',5,1+(cl>=7?1:0)+(cl>=11?1:0));
+    const n=1+(cl>=7?1:0)+(cl>=11?1:0);
+    // through the bolt's distance-field shader, with the kinks out and a fire
+    // palette: real falloff, and no second shader to compile
+    if(boltShaderInit())
+      G.fx.push({kind:'bolt2d',rays:n,wps:[at],t:0,dur:0.42,flick:0,
+        seed:1+Math.floor(Math.random()*1e9),
+        cCore:'#fff3d0',cMid:'#ff9a30',cOuter:'#c8400a'});
+    else spawnBeam2d(at,'255,243,208','255,122,30',5,n);
     spawnFlash(at,'#ff8c2a',2,0.35);
     spawnBurst(at,'#ff9a40',1.1);
   },
@@ -11487,7 +11750,7 @@ function loop(now){
     R3.renderer.render(R3.scene,R3.camera);
     // the bolt is a second, additive pass laid over the finished frame: it is a
     // screen-space quad with no depth, so nothing in the world can occlude it
-    if(R3.boltQuad&&R3.boltQuad.visible){
+    if((R3.boltQuad&&R3.boltQuad.visible)||(R3.fanQuad&&R3.fanQuad.visible)){
       R3.renderer.autoClear=false;
       R3.renderer.render(R3.boltScene,R3.boltCam);
       R3.renderer.autoClear=true;
