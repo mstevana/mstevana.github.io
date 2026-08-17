@@ -8133,12 +8133,17 @@ function itemTexKey(it){return 'it_'+it.base+'_'+it.bonus+'_'+(it.tint||'')+'_'+
 // single source of truth for monster frame textures (cache key + raster options)
 function monsterFrameTex(sprKey,boss,pose,elite){
   const tint=elite&&ELITES[elite]?ELITES[elite].tint:null;
+  // 640px, not 384: a large creature one tile away fills ~750 physical pixels on
+  // a DPR-3 phone, so a 384px raster was magnified ~2x and read as blurry up
+  // close. 640 brings that down to ~1.2x — near its native resolution — at the
+  // cost of ~2.8x the raster time and texture memory per frame.
   return svgToTexture(monsterSVG(sprKey,boss,pose,tint),
-    'mon_'+sprKey+(boss?'_b':'')+(elite?'_'+elite:'')+'_'+pose,{size:384,mipmap:true});
+    'mon_'+sprKey+(boss?'_b':'')+(elite?'_'+elite:'')+'_'+pose,{size:640,mipmap:true});
 }
 /* Every pose is rasterised the first time it is used, and a frame costs about
-   25ms of main thread to decode now that it carries the rim and contact-shadow
-   filters (11ms without them, measured over 36 frames at 384px). Paid lazily
+   25ms of main thread to decode at 384px once it carries the rim and contact-
+   shadow filters (11ms without them, over 36 frames); at the 640px raster the
+   frames now use, budget roughly 2.8x that. Paid lazily
    that lands as a stutter the first time a creature winds up — mid-fight, which
    is the worst possible moment. So a floor pre-warms every pose of every kind
    standing on it while the level is being built, where a hitch is expected and
@@ -8156,10 +8161,12 @@ function prewarmMonsterFrames(L){
       queue.push([MONSTERS[m.key].spr,m.boss,pose,m.elite]);
   }
   /* Drained a couple at a time rather than in one block. A frame costs about
-     30ms of main thread to rasterise once it carries the rim, the contact
-     shadow and its detail, and a floor holds five or six kinds — done together
-     that is a second of dead air on the level transition, and several times
-     that on a phone. Spread over idle callbacks it is invisible, and anything
+     30ms of main thread to rasterise at 384px once it carries the rim, the
+     contact shadow and its detail — and roughly 2.8x that at the 640px raster
+     these frames now use — and a floor holds five or six kinds, so done
+     together that is well over a second of dead air on the level transition,
+     several times that on a phone. Spreading it over idle callbacks matters
+     more at 640 than it did, not less. Spread that way it is invisible, and anything
      the player reaches before its turn comes up still rasterises lazily on
      first use exactly as it always did. */
   R3.prewarmQ=queue;
