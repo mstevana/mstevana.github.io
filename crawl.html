@@ -4000,11 +4000,25 @@ function tryGen(depth,targetWalk,theme){
     for(let i=0;i<nCof;i++)place(pick(['sarcophagus','stacked']),true);
     for(let i=0;i<nPlq;i++)place('tombs',false);
   }
-  // duergar halls: the walls are dressed and furnished — engaged pillars carrying
-  // the roof, and torches burning in iron brackets. Sited exactly like the crypt's
-  // furniture, against a plain wall face with room to stand in front of it.
+  /* Duergar halls: the walls are dressed and furnished. Sited exactly like the
+     crypt's furniture, against a plain wall face with room to stand in front.
+
+     The kinds are weighted rather than picked evenly, because they are not equals.
+     Pillars and torches are the fabric of the hall — structure and light — and
+     have to stay the common sight or the place reads as a museum of one of
+     everything. The other four are what the hall is FOR: a working forge, a rack
+     of picks, a niche to Laduguer, and the manacles that say out loud who does
+     the digging. Note the head count is unchanged, so this costs nothing: the
+     floor already placed 10-17 features and they are simply more varied now. */
   let duergar=[];
   if(theme.name==='Duergar'){
+    const KINDS=[['pillar',0.30],['torch',0.26],['rack',0.12],
+                 ['forge',0.11],['chains',0.11],['shrine',0.10]];
+    const pickKind=()=>{
+      let r=Math.random();
+      for(const [k,w] of KINDS){if((r-=w)<=0)return k;}
+      return 'pillar';
+    };
     const nD=10+rnd(8);
     let dTries=400;
     while(duergar.length<nD&&dTries-->0){
@@ -4014,8 +4028,7 @@ function tryGen(depth,targetWalk,theme){
       if(!wd.length)continue;
       if(duergar.some(c=>Math.abs(c.x-x)+Math.abs(c.y-y)<2))continue;
       const [dx,dy]=pick(wd);
-      // pillars are the commoner sight; a hall is lit but not blazing
-      duergar.push({x,y,dx,dy,kind:Math.random()<0.55?'pillar':'torch'});
+      duergar.push({x,y,dx,dy,kind:pickKind()});
     }
   }
   /* A duergar hall of any size carries its roof on a colonnade: a ring of free
@@ -7102,6 +7115,46 @@ function disposeLevel(){
   R3.doorMeshes={};R3.secretMeshes={};R3.trapDecals={};R3.itemSprites={};R3.monsterSprites={};R3.monsterGlows={};R3.monsterShadows={};R3.prewarmQ=[];R3.prewarmT=0;R3.stairsGroup=null;
   R3.candleFlames=[];R3.cryptGroups=[];R3.lurkerMeshes={};R3.wallMats=null;R3.webMeshes=[];
 }
+/* Scenery welding. A piece of furniture is a dozen little boxes and cylinders,
+   and built as a dozen meshes it costs a dozen draw calls apiece — which for
+   seventeen features on a floor is more than the room they decorate. `Bins`
+   collects transformed geometries per material and hands back one mesh each, so
+   a forge or a weapon rack is three or four calls however many parts it has.
+
+   Position and normal only: none of this is textured, it is all flat stone,
+   iron and wood, which is why the weld can be this short. */
+function weldGeos(list){
+  const pos=[],nrm=[];
+  for(const g of list){
+    const P=g.attributes.position,N=g.attributes.normal;
+    for(let i=0;i<P.count;i++){
+      pos.push(P.getX(i),P.getY(i),P.getZ(i));
+      nrm.push(N.getX(i),N.getY(i),N.getZ(i));
+    }
+  }
+  const out=new THREE.BufferGeometry();
+  out.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pos),3));
+  out.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(nrm),3));
+  return out;
+}
+function Bins(){
+  const bins=new Map();
+  return {
+    // geo placed at (x,y,z) with an optional Euler rotation, filed under `mat`
+    at(mat,geo,x,y,z,rx,ry,rz){
+      const m=new THREE.Matrix4();
+      if(rx||ry||rz)m.makeRotationFromEuler(new THREE.Euler(rx||0,ry||0,rz||0));
+      m.setPosition(x||0,y||0,z||0);
+      if(!bins.has(mat))bins.set(mat,[]);
+      bins.get(mat).push(geo.toNonIndexed().applyMatrix4(m));
+      return this;
+    },
+    addTo(group){
+      for(const [mat,list] of bins)if(list.length)group.add(new THREE.Mesh(weldGeos(list),mat));
+      return group;
+    }
+  };
+}
 function buildLevel(L){
   disposeLevel();
   const th=L.theme;
@@ -7993,31 +8046,183 @@ function buildLevel(L){
     const darkMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall2).multiplyScalar(1.15),
       specular:0x1a1813,shininess:10});
     const goldMat=new THREE.MeshPhongMaterial({color:gold,specular:0xfff0c0,shininess:70});
-    const ironMat=new THREE.MeshPhongMaterial({color:0x2b2b2e,specular:0x6a6a70,shininess:34});
+    /* Iron, and it has to be nearly black. The first pass used a bright specular
+       and a big flat flue caught the torch square-on — the brightest case any
+       surface can be, the same thing that made the cave door look pale — and came
+       out as a white plaster column running up the wall. Dark body, narrow soft
+       highlight: metal in a dark hall is read from its sheen, not its tone. */
+    /* Iron, and the specular is the whole story. Two passes got this wrong before
+       the cause was isolated by forcing the specular black and re-rendering, which
+       took the weapon heads straight from near-white to a believable grey — the
+       diffuse term was never the problem.
+
+       The trap: three.js Blinn-Phong normalises the specular lobe by roughly
+       (shininess+2)/8, so a HIGHER shininess makes the highlight narrower AND
+       BRIGHTER at its peak. Shininess 48 multiplies the specular colour by about
+       six. And since the torch sits at the eye, every face turned toward the
+       player sits on that peak at once. "Narrow the highlight" is therefore
+       exactly the wrong fix and made it worse; the specular COLOUR has to come
+       down. A big flat face square-on to a torch is the brightest case any surface
+       can be — the same thing that made the cave door look pale — and on metal
+       that lands multiplied. */
+    const ironMat=new THREE.MeshPhongMaterial({color:0x2e2e34,specular:0x0e0e12,shininess:26});
+    // hafts and staves: worked wood, not stone, and duller than either
+    const woodMat=new THREE.MeshPhongMaterial({color:0x3a2a1c,specular:0x1a1206,shininess:6});
+    // the black of a recess or a firebox mouth. Unlit on purpose: it is meant to
+    // be a hole, and a lit material fills a hole in with the torch.
+    const voidMat=new THREE.MeshBasicMaterial({color:0x000000});
+    const emberMat=new THREE.MeshBasicMaterial({color:0xff4a12});
     const flames=R3.candleFlames||[];
+    /* One column of flame per registered entry, and it must live in its own
+       subgroup. The flicker loop writes each sprite's local `position.x` every
+       frame, so two flames parented to the same group would both be dragged to
+       x=0 — a shrine's pair of candles would merge into one. The subgroup carries
+       the offset and the loop only ever moves the sprite within it. */
+    const flameAt=(parent,x,y,z,cols,base,col,dist)=>{
+      const sub=new THREE.Group();sub.position.set(x,0,z);parent.add(sub);
+      const layer=(c,w,h,dy,op)=>{
+        const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:fxGlowTex(c),
+          transparent:true,opacity:op,depthWrite:false,blending:THREE.AdditiveBlending}));
+        sp.scale.set(w,h,1);sp.position.set(0,y+dy,0);sp.userData={w,h,dy};
+        sub.add(sp);return sp;
+      };
+      const fire=cols.map(([c,w,h,dy,op])=>layer(c,w,h,dy,op));
+      return {fire,y,sub,base,col,dist};
+    };
     for(const f of L.duergar){
       const g0=new THREE.Group();
+      const B=Bins();
       if(f.kind==='pillar'){
         // a half-round column standing proud of the wall, with base and capital
         const H=WALLH;
-        const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.145,H*0.78,12,1,false,-Math.PI/2,Math.PI),stoneMat);
-        shaft.position.set(0,H*0.5,0.02);g0.add(shaft);
-        // flutes, cut as thin dark ribs down the face of the shaft
-        for(let i=-2;i<=2;i++){
-          const fl=new THREE.Mesh(new THREE.BoxGeometry(0.012,H*0.74,0.02),darkMat);
-          fl.position.set(i*0.045,H*0.5,0.02+0.128);g0.add(fl);
+        const half=(r0,r1,h)=>new THREE.CylinderGeometry(r0,r1,h,12,1,false,-Math.PI/2,Math.PI);
+        B.at(stoneMat,half(0.13,0.145,H*0.78),0,H*0.50,0.02);
+        for(let i=-2;i<=2;i++)                     // flutes, as thin dark ribs
+          B.at(darkMat,new THREE.BoxGeometry(0.012,H*0.74,0.02),i*0.045,H*0.50,0.148);
+        B.at(stoneMat,new THREE.BoxGeometry(0.36,H*0.10,0.20),0,H*0.05,0.06);   // base
+        B.at(darkMat,new THREE.BoxGeometry(0.42,H*0.045,0.24),0,H*0.022,0.07);  // plinth
+        B.at(stoneMat,new THREE.BoxGeometry(0.38,H*0.09,0.22),0,H*0.90,0.065);  // capital
+        B.at(darkMat,new THREE.BoxGeometry(0.44,H*0.04,0.26),0,H*0.965,0.075);  // abacus
+        B.at(goldMat,half(0.15,0.15,0.022),0,H*0.845,0.02);                     // gold band
+        B.addTo(g0);
+      }else if(f.kind==='forge'){
+        /* A smith's station: the firebox in the wall with its flue running up
+           into the roof, an anvil on its stump beside it, and the quench trough
+           at its foot. This is the thing the whole theme is about — Laduguer's
+           temples are built over the mine shafts and heated by their own forges —
+           and it is the only furniture here that is still working. */
+        /* An open hearth, not a firebox. The first pass built a closed mass with
+           a dark mouth on its front face and the coals inside — which put the
+           mouth panel physically in front of the coals and hid the fire
+           completely, so the one working thing in the theme rendered as a black
+           rectangle. A smith's hearth is open on top: you lay the work IN the
+           coals, so the coals go on the upper face where they can be seen. */
+        const RIM=0.30;                                       // the top of the hearth mass
+        B.at(stoneMat,new THREE.BoxGeometry(0.50,RIM,0.26),-0.10,RIM/2,0.13);   // hearth mass
+        B.at(darkMat,new THREE.BoxGeometry(0.54,0.05,0.30),-0.10,0.025,0.14);   // its footing
+        B.at(emberMat,new THREE.BoxGeometry(0.36,0.03,0.18),-0.10,RIM+0.012,0.13); // the coal bed
+        for(const s of [-1,1])                                                  // the kerb round it
+          B.at(darkMat,new THREE.BoxGeometry(0.05,0.045,0.26),-0.10+s*0.225,RIM+0.02,0.13);
+        B.at(darkMat,new THREE.BoxGeometry(0.50,0.045,0.05),-0.10,RIM+0.02,0.245);
+        B.at(darkMat,new THREE.BoxGeometry(0.46,0.075,0.20),-0.10,0.86,0.11);   // the hood over it
+        B.at(ironMat,new THREE.BoxGeometry(0.11,WALLH-0.90,0.09),-0.10,0.90+(WALLH-0.90)/2,0.05); // flue
+        B.at(darkMat,new THREE.BoxGeometry(0.135,0.03,0.11),-0.10,1.22,0.05);   // one band on it
+        B.at(darkMat,new THREE.CylinderGeometry(0.075,0.088,0.30,8),0.30,0.15,0.28); // stump
+        B.at(ironMat,new THREE.BoxGeometry(0.22,0.055,0.10),0.30,0.325,0.28);   // anvil face
+        B.at(ironMat,new THREE.BoxGeometry(0.09,0.05,0.07),0.30,0.272,0.28);    // its waist
+        B.at(ironMat,new THREE.BoxGeometry(0.15,0.035,0.09),0.30,0.243,0.28);   // and foot
+        B.at(ironMat,new THREE.ConeGeometry(0.042,0.12,6),0.455,0.325,0.28,0,0,-Math.PI/2); // horn
+        B.at(woodMat,new THREE.CylinderGeometry(0.014,0.016,0.26,6),0.36,0.44,0.26,0.25,0,0.5);
+        B.at(ironMat,new THREE.BoxGeometry(0.05,0.05,0.10),0.30,0.545,0.29);    // the hammer on it
+        B.addTo(g0);
+        // the trough, open on top: four walls and a dark still surface inside
+        const T=Bins();
+        T.at(darkMat,new THREE.BoxGeometry(0.30,0.02,0.16),-0.24,0.01,0.34);
+        for(const s of [-1,1])T.at(darkMat,new THREE.BoxGeometry(0.02,0.11,0.16),-0.24+s*0.14,0.055,0.34);
+        for(const s of [-1,1])T.at(darkMat,new THREE.BoxGeometry(0.30,0.11,0.02),-0.24,0.055,0.34+s*0.07);
+        T.at(voidMat,new THREE.BoxGeometry(0.26,0.005,0.12),-0.24,0.085,0.34);
+        T.addTo(g0);
+        // the fire itself, low and red: coals, not a torch
+        const fl=flameAt(g0,-0.10,RIM+0.02,0.13,[
+          ['#ff3c08',0.36,0.15,0.03,0.44],
+          ['#ff7a1e',0.23,0.13,0.04,0.52],
+          ['#ffc25a',0.12,0.10,0.05,0.62]],0.55,0xff5a1e,3.2);
+        g0.userData.flame=fl;
+      }else if(f.kind==='chains'){
+        /* Manacles on a wall ring. Nothing in the theme said out loud that these
+           halls run on slaves; this does, and it costs four boxes and a run of
+           links. The chain hangs with a slack curve rather than straight down —
+           a plumb-straight chain reads as a rod. */
+        const link=new THREE.TorusGeometry(0.026,0.007,4,8);
+        for(const [rx,ry0,n,sw] of [[-0.16,1.16,7,1],[0.17,1.06,5,-1]]){
+          B.at(ironMat,new THREE.BoxGeometry(0.07,0.07,0.035),rx,ry0,0.018);    // the plate
+          B.at(ironMat,new THREE.TorusGeometry(0.034,0.009,4,10),rx,ry0,0.045,Math.PI/2);
+          let px=rx,py=ry0-0.05;
+          for(let i=0;i<n;i++){
+            px+=sw*0.006*i; py-=0.044;
+            B.at(ironMat,link,px,py,0.052,i%2?0:Math.PI/2,0,sw*0.10*i);
+          }
+          B.at(ironMat,new THREE.TorusGeometry(0.042,0.011,5,12),px+sw*0.01,py-0.05,0.052,0.5,0,sw*0.6);
         }
-        const base=new THREE.Mesh(new THREE.BoxGeometry(0.36,H*0.10,0.20),stoneMat);
-        base.position.set(0,H*0.05,0.06);g0.add(base);
-        const plinth=new THREE.Mesh(new THREE.BoxGeometry(0.42,H*0.045,0.24),darkMat);
-        plinth.position.set(0,H*0.022,0.07);g0.add(plinth);
-        const cap=new THREE.Mesh(new THREE.BoxGeometry(0.38,H*0.09,0.22),stoneMat);
-        cap.position.set(0,H*0.90,0.065);g0.add(cap);
-        const abac=new THREE.Mesh(new THREE.BoxGeometry(0.44,H*0.04,0.26),darkMat);
-        abac.position.set(0,H*0.965,0.075);g0.add(abac);
-        // a gold band where the capital meets the shaft
-        const band=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,0.022,12,1,false,-Math.PI/2,Math.PI),goldMat);
-        band.position.set(0,H*0.845,0.02);g0.add(band);
+        B.addTo(g0);
+      }else if(f.kind==='shrine'){
+        /* A niche to Laduguer. A wall tile is a solid box, so the recess is the
+           trick the crypt and the sewer culverts use: a dead-black panel on the
+           face with a surround standing proud of it, and everything inside sits
+           slightly forward of the wall plane rather than behind it. */
+        const Y=0.86, W=0.34, H=0.46;
+        B.at(voidMat,new THREE.BoxGeometry(W,H,0.02),0,Y,0.012);
+        for(const [w,h,x,y] of [[W+0.14,0.055,0,Y+H/2+0.03],[W+0.14,0.055,0,Y-H/2-0.03],
+                                [0.055,H+0.11,-W/2-0.03,Y],[0.055,H+0.11,W/2+0.03,Y]])
+          B.at(stoneMat,new THREE.BoxGeometry(w,h,0.06),x,y,0.03);
+        B.at(darkMat,new THREE.BoxGeometry(W+0.22,0.05,0.14),0,Y-H/2-0.085,0.07); // the shelf
+        /* The shield with the broken bolt across it: the same mark the wall
+           variants carry, so the faith reads as one thing wherever it shows.
+
+           The point is STEPPED rather than coned. A three-sided cone under a box
+           reads as two objects — a square with a separate triangle below it — and
+           a four-sided one is far too deep for a plate 35mm thick. Three boxes of
+           falling width give a heater shield's taper in silhouette, which is all
+           that survives at this size anyway. Grey, not pale: Laduguer's shield is
+           described grey, and against a dead-black niche the mid tone reads while
+           the bright one glares. */
+        for(const [w,h,dy] of [[0.19,0.19,0.055],[0.13,0.05,-0.065],[0.065,0.035,-0.105]])
+          B.at(darkMat,new THREE.BoxGeometry(w,h,0.035),0,Y+dy,0.045);
+        B.at(goldMat,new THREE.BoxGeometry(0.15,0.016,0.012),-0.025,Y+0.055,0.066,0,0,0.7);
+        B.at(goldMat,new THREE.BoxGeometry(0.032,0.032,0.012),0.032,Y+0.115,0.066,0,0,0.7);
+        B.at(goldMat,new THREE.BoxGeometry(0.075,0.016,0.012),0.055,Y-0.02,0.066,0,0,0.34);
+        for(const s of [-1,1])                                                  // candle stubs
+          B.at(darkMat,new THREE.CylinderGeometry(0.019,0.023,0.10,6),s*0.21,Y-H/2-0.005,0.075);
+        B.addTo(g0);
+        for(const s of [-1,1]){
+          const fl=flameAt(g0,s*0.21,Y-H/2+0.055,0.075,[
+            ['#ff8a2a',0.085,0.115,0.014,0.55],
+            ['#ffe0a0',0.042,0.062,0.022,0.75]],0.30,0xffb066,2.1);
+          (g0.userData.flames||(g0.userData.flames=[])).push(fl);
+        }
+      }else if(f.kind==='rack'){
+        /* A rack of picks and hammers. Duergar work is mining and war and the
+           same tools do both, so the rack is a barracks and a toolshed at once. */
+        for(const yy of [0.26,1.06])                                            // rails
+          B.at(woodMat,new THREE.BoxGeometry(0.62,0.035,0.045),0,yy,0.10);
+        for(const s of [-1,1])                                                  // uprights
+          B.at(woodMat,new THREE.BoxGeometry(0.045,0.86,0.045),s*0.29,0.66,0.10);
+        const haft=new THREE.CylinderGeometry(0.013,0.015,0.80,6);
+        for(let i=0;i<5;i++){
+          const x=-0.22+i*0.11, lean=(i%2?1:-1)*0.055;
+          B.at(woodMat,haft,x,0.50,0.13,0,0,lean);
+          const hy=0.88, hx=x+lean*0.42;
+          if(i%3===0){                                                          // a hammer
+            B.at(ironMat,new THREE.BoxGeometry(0.13,0.055,0.055),hx,hy,0.13,0,0,lean);
+          }else if(i%3===1){                                                    // a pick
+            B.at(ironMat,new THREE.BoxGeometry(0.20,0.026,0.03),hx,hy,0.13,0,0,lean+0.30);
+            B.at(ironMat,new THREE.BoxGeometry(0.05,0.05,0.05),hx,hy,0.13);
+          }else{                                                                // a broad axe
+            B.at(ironMat,new THREE.BoxGeometry(0.05,0.14,0.02),hx+0.045,hy-0.01,0.13,0,0,lean);
+            B.at(ironMat,new THREE.BoxGeometry(0.05,0.05,0.045),hx,hy,0.13);
+          }
+        }
+        B.addTo(g0);
       }else{
         // torch: an iron bracket out of the wall, a socket, and a live flame
         const Y=0.92;
@@ -8062,6 +8267,18 @@ function buildLevel(L){
         l.position.set(f.x+0.5+f.dx*0.5-f.dx*0.30,1.16,f.y+0.5+f.dy*0.5-f.dy*0.30);
         grp.add(l);
         flames.push({light:l,base:0.85,fire:g0.userData.fire,embers:g0.userData.embers,y:0.92});
+      }
+      /* Anything else that burns. The light goes in world space beside the piece
+         rather than inside it, so it lights the wall and the floor around it, and
+         its `base` is the level the flicker loop breathes about — a forge is not
+         a torch and a votive candle is neither. */
+      const lit=[].concat(g0.userData.flame||[],g0.userData.flames||[]);
+      for(const fl of lit){
+        const l=new THREE.PointLight(fl.col,fl.base,fl.dist,2);
+        const w=new THREE.Vector3(fl.sub.position.x,fl.y+0.06,fl.sub.position.z+0.10);
+        w.applyEuler(g0.rotation).add(g0.position);
+        l.position.copy(w);grp.add(l);
+        flames.push({light:l,base:fl.base,fire:fl.fire,y:fl.y});
       }
     }
     R3.candleFlames=flames;
