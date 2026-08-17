@@ -9748,9 +9748,19 @@ function castSpell(ch,key,opts){
     return true;
   }
   if(sp.target==='allies'){
+    // one casting, one row: the tally collects who it reached and what each of
+    // them got, and the detail line carries the per-character numbers that used
+    // to be a row apiece. With one member still standing it reads as what it
+    // is — a spell cast on that one person.
+    const sink={names:[],parts:[],healed:0};
     let any=false;
-    for(const t of G.party)if(!t.dead&&applySpellToAlly(ch,t,sp,cl))any=true;
-    if(any){commit();friendlyFx(sp);}
+    for(const t of G.party)if(!t.dead&&applySpellToAlly(ch,t,sp,cl,sink))any=true;
+    if(any){
+      const who=sink.names.length===1?sink.names[0]:'the party';
+      logAdd('spell',ch.name+' casts '+sp.name+' on '+who+(sp.healFn?' — heals '+sink.healed:''),
+        'circle '+sp.circle+(sink.parts.length?'  ·  '+sink.parts.join(', '):''));
+      commit();friendlyFx(sp);
+    }
     return any;
   }
   // offensive: the spell flies as a glowing bolt and resolves on impact
@@ -9881,7 +9891,12 @@ function castSpell(ch,key,opts){
     }});
   return true;
 }
-function applySpellToAlly(caster,t,sp,cl){
+/* `sink`, when the caller passes one, turns the per-target log line into an
+   entry in a tally the caller writes out as a single row. A party spell is one
+   casting of one slot, and a row per member buried the rest of the fight under
+   four copies of the same sentence. Everything else — the healing, the wards,
+   the floats — is still per character, because that is what it acts on. */
+function applySpellToAlly(caster,t,sp,cl,sink){
   if(sp.raise){
     if(!t.dead){UI.toast(t.name+' is not dead. The slot is spared.');return false;}
     t.dead=false;t.level=Math.max(1,t.level-1);t.xp=XP_FOR_LEVEL(t.level);
@@ -9892,7 +9907,11 @@ function applySpellToAlly(caster,t,sp,cl){
   if(t.dead){UI.toast(t.name+' is dead. Only Raise Dead can help.');return false;}
   if(sp.healFn){
     const bag=traceRoll(()=>sp.healFn(cl));
-    logAdd('spell',caster.name+' casts '+sp.name+' on '+t.name+' — heals '+bag.value,
+    if(sink){
+      sink.names.push(t.name);sink.healed+=bag.value;
+      sink.parts.push(t.name+' '+bag.value+(bag.dice.length?' ('+fmtTrace(bag.dice)+')':''));
+    }
+    else logAdd('spell',caster.name+' casts '+sp.name+' on '+t.name+' — heals '+bag.value,
       'circle '+sp.circle+(bag.dice.length?'  ·  '+fmtTrace(bag.dice):''));
     healChar(t,bag.value);
   }
@@ -9923,7 +9942,8 @@ function applySpellToAlly(caster,t,sp,cl){
   }
   if(sp.restoreLevels&&t.negLevels>0){t.negLevels=0;removeCond(t,'drained');recalcHp(t,false);UI.toast('Lost life-force floods back into '+t.name+'.');}
   if(sp.buff){
-    logAdd('spell',caster.name+' casts '+sp.name+' on '+t.name,'circle '+sp.circle);
+    if(sink){sink.names.push(t.name);sink.parts.push(t.name);}
+    else logAdd('spell',caster.name+' casts '+sp.name+' on '+t.name,'circle '+sp.circle);
     const b=Object.assign({},sp.buff);
     b.tag=b.tag||sp.name;
     b.name=sp.name;   // the tag is a stacking key ('magearmor'); this is what the UI says

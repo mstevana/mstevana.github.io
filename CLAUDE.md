@@ -1137,14 +1137,30 @@ list in the monster's attack, and `freedom` is read by `addCond`. Four
 copies of a buff are four independent ledgers, which is what you want:
 Stoneskin's pool drains on whoever is actually being hit.
 
-Two things deliberately left alone:
+**`target:'ally'` spells still pick one friend**, and that is deliberate:
+Stoneskin, Shield of Faith, Protection from Evil, Bull's Strength and
+Freedom of Movement are a choice about *who*, and the `UI.pickAlly` prompt
+is that choice. They are not self-buffs and were never the complaint.
 
-- **`target:'ally'` spells still pick one friend.** Stoneskin, Shield of
-  Faith, Protection from Evil, Bull's Strength and Freedom of Movement are
-  a choice about *who*, and the `UI.pickAlly` prompt is that choice. They
-  are not self-buffs and were never the complaint.
-- **The log still writes one line per target**, because `applySpellToAlly`
-  logs per character and Bless/Prayer/Mass Cure have always done that.
+**One casting writes one row.** `applySpellToAlly` logs per character, so a
+party spell used to put four copies of the same sentence in the log and
+bury the rest of the fight — a cost Bless, Prayer and Mass Cure had been
+paying all along, and one that got five spells worse here. The allies
+branch now passes a `sink` (`{names,parts,healed}`); given one,
+`applySpellToAlly` files its line as a tally entry instead of writing it,
+and the branch emits the single row afterwards:
+
+```
+Sable casts Mass Cure Light Wounds on the party — heals 46
+circle 5  ·  Ulma 11 (1d8+9 = 11), Sable 10 (1d8+9 = 10), …
+```
+
+Nothing is lost to the collapse — every per-character roll is still in the
+detail, which is where `fmtTrace` output has always lived. A heal keeps its
+total in the headline because that is the number read at a glance. With one
+member still standing the row names them rather than "the party", and
+without a `sink` the function logs exactly as it did, which is what every
+`target:'ally'` cast still does.
 
 **A buff can describe itself.** It used to be an anonymous `✦` on the
 portrait and nothing at all on the status sheet, so a party three wards
@@ -1169,8 +1185,10 @@ fine for a tooltip, and the status sheet rebuilds on open.
 T56 covers this: that no buff spell targets `self`, that a cast lands on
 every living member and lifts each of their ACs, that the dead are skipped
 and a recast refreshes rather than stacks, that every buff in `SPELLS`
-produces a non-empty `buffEffects`, and that the sheet grows a Blessings
-line only when there is something to put in it.
+produces a non-empty `buffEffects`, that the sheet grows a Blessings line
+only when there is something to put in it, and that one party casting
+writes exactly one log row whose per-character rolls still sum to the
+headline total.
 
 ## Hands and their timers
 
