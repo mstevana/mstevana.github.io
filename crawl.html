@@ -13374,6 +13374,40 @@ function bindPad(id,fn){
   el.addEventListener('pointerleave',stop);
   el.addEventListener('pointercancel',stop);
 }
+/* Keys are read by PHYSICAL POSITION (e.code) rather than by the letter printed on
+   them, so the WASD cluster stays under the same fingers on AZERTY and QWERTZ —
+   where reading e.key would put "strafe left" on the far side of the keyboard.
+   KEY_LETTER is the fallback for anything that reports no code. */
+const KEY_ACTION={
+  KeyW:'fwd',   ArrowUp:'fwd',
+  KeyS:'back',  ArrowDown:'back',
+  KeyA:'sleft', KeyD:'sright',
+  KeyQ:'ccw',   ArrowLeft:'ccw',
+  KeyE:'cw',    ArrowRight:'cw',
+  KeyM:'map',   KeyL:'log',      KeyR:'rest',   Escape:'close'
+};
+const KEY_LETTER={w:'fwd',arrowup:'fwd',s:'back',arrowdown:'back',a:'sleft',d:'sright',
+  q:'ccw',arrowleft:'ccw',e:'cw',arrowright:'cw',m:'map',l:'log',r:'rest',escape:'close'};
+// Escape dismisses a panel through the panel's own button, so a rest that is
+// waiting on a spell loadout still continues afterwards. Character creation and
+// the death screen have no entry: they must be answered.
+const OVL_DISMISS={'ovl-inv':'inv-close','ovl-stats':'st-close','ovl-spells':'sp-close',
+  'ovl-memo':'memo-done','ovl-log':'log-close','ovl-map':'map-close','ovl-target':'tg-cancel'};
+function topOverlay(){
+  const open=[...document.querySelectorAll('.ovl.show')].filter(o=>o.id!=='ovl-rotate');
+  return open[open.length-1]||null;
+}
+function closeTopOverlay(){
+  const o=topOverlay();
+  if(!o)return false;
+  if(o.id==='ovl-menu'){ // no dismiss button of its own, and nothing to return to before the game starts
+    if(!G.started||G.over)return false;
+    UI.hide('ovl-menu');return true;
+  }
+  const b=OVL_DISMISS[o.id]&&document.getElementById(OVL_DISMISS[o.id]);
+  if(!b)return false;
+  b.click();return true;
+}
 function initInput(){
   document.getElementById('b-fwd').innerHTML=UI_ICONS.fwd;
   document.getElementById('b-back').innerHTML=UI_ICONS.back;
@@ -13396,17 +13430,32 @@ function initInput(){
   });
   document.getElementById('b-menu').addEventListener('click',()=>{refreshMenu();UI.show('ovl-menu');});
   window.addEventListener('keydown',(e)=>{
-    if(UI.anyOverlayOpen())return;
-    switch(e.key.toLowerCase()){
-      case 'w':case 'arrowup':tryMove('fwd');break;
-      case 's':case 'arrowdown':tryMove('back');break;
-      case 'a':tryMove('sleft');break;
-      case 'd':tryMove('sright');break;
-      case 'q':case 'arrowleft':tryRotate(-1);break;
-      case 'e':case 'arrowright':tryRotate(1);break;
-      case 'm':if(G.started&&!G.over)UI.openMap();break;
-      case 'l':if(G.started)UI.openLog();break;
-      case 'r':tryRest();break;
+    if(e.ctrlKey||e.metaKey||e.altKey)return;  // leave the browser's own shortcuts alone
+    const t=e.target;
+    if(t&&/^(input|textarea|select)$/i.test(t.tagName))return; // a save code is being typed
+    const act=KEY_ACTION[e.code]||KEY_LETTER[(e.key||'').toLowerCase()];
+    if(!act)return;
+    if(UI.anyOverlayOpen()){
+      // Escape closes the panel; so does the key that opened it, so a look at the
+      // map is one keystroke each way.
+      const top=topOverlay();
+      if(act==='close'||(act==='map'&&top&&top.id==='ovl-map')||(act==='log'&&top&&top.id==='ovl-log')){
+        if(closeTopOverlay())e.preventDefault();
+      }
+      return;
+    }
+    e.preventDefault();                        // arrows would otherwise scroll the page
+    switch(act){
+      case 'fwd':tryMove('fwd');break;
+      case 'back':tryMove('back');break;
+      case 'sleft':tryMove('sleft');break;
+      case 'sright':tryMove('sright');break;
+      case 'ccw':tryRotate(-1);break;
+      case 'cw':tryRotate(1);break;
+      case 'map':if(G.started&&!G.over)UI.openMap();break;
+      case 'log':if(G.started)UI.openLog();break;
+      case 'rest':tryRest();break;
+      case 'close':refreshMenu();UI.show('ovl-menu');break;
     }
   });
   // tap in 3D view: pick up items / open doors / disarm found traps

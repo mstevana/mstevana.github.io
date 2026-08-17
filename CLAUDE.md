@@ -1119,6 +1119,34 @@ walks every living preparer through `UI.openMemo` and only then calls
 would let a player re-prepare between fights, which is the decision the
 whole system exists to make.
 
+## The keyboard reads positions, not letters
+
+`KEY_ACTION` in `09_boot.js` is keyed by **`e.code`** — the physical key — and
+`KEY_LETTER` is only the fallback for anything that reports no code. WASD is a
+*shape* rather than four letters: on AZERTY the keys in those positions are
+labelled ZQSD, and reading `e.key` would put "strafe left" on the far side of
+the keyboard. Q/E rotate, the arrows duplicate forward/back and the two
+rotations, and M/L/R open the map, the log and a camp.
+
+Three guards around it, each of which was a live misfire:
+
+- **Modifiers are left to the browser.** `Ctrl+A` used to strafe and `Cmd+R`
+  used to make camp on the way to reloading the page.
+- **Typing is not steering.** A keystroke whose target is an `input`,
+  `textarea` or `select` is ignored, so a save code can contain the letter W.
+- **Handled keys `preventDefault`.** Otherwise the arrows scroll the page out
+  from under the viewport.
+
+Escape is the way out of every panel, and it dismisses through the panel's
+**own button** rather than calling `UI.hide` — `ovl-memo` is the reason: a rest
+is blocked waiting on the wizard's loadout, and only `memo-done` runs the
+continuation. `OVL_DISMISS` maps each overlay to that button; anything absent
+from it cannot be escaped, which is deliberate for character creation and the
+death screen. `ovl-menu` has no button of its own and is closed directly, but
+only once a game is running — before that there is nothing to return to.
+M and L also close the panel they opened, so a look at the map is one keystroke
+each way.
+
 ## Hands and their timers
 
 `ch.cdL` / `ch.cdR` are two independent cooldowns, and which one a use arms
