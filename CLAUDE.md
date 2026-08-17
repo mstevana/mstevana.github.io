@@ -344,7 +344,12 @@ in any individual creature, so all 78 get them at once.
 
 **Filters are the expensive half of rasterising a frame, and it is paid on the
 main thread during play.** Measured over 36 frames at 384px: 11.3ms plain,
-+5.9ms for the contact shadow, +7.4ms for the rim, 24.6ms for both. That lands
++5.9ms for the contact shadow, +7.4ms for the rim, 24.6ms for both. **Monster
+frames now rasterise at 640px, not 384** (`monsterFrameTex`), because a large
+creature one tile away fills ~750 physical pixels on a DPR-3 phone and a 384px
+raster was magnified ~2x into visible blur up close; 640 costs roughly 2.8x the
+raster time and texture memory per frame, so treat the figures above as a
+per-pixel baseline and scale them. That cost lands
 as a stutter the first time a creature winds up, which is the worst possible
 moment — so `prewarmMonsterFrames` rasterises all six poses of every kind on a
 floor while the level is being built, where a hitch is expected. The texture
