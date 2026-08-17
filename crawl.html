@@ -4018,6 +4018,34 @@ function tryGen(depth,targetWalk,theme){
       duergar.push({x,y,dx,dy,kind:Math.random()<0.55?'pillar':'torch'});
     }
   }
+  /* A duergar hall of any size carries its roof on a colonnade: a ring of free
+     standing columns set one tile in from the walls.
+
+     They stand on the LATTICE — the corner where four tiles meet — not on tile
+     centres, which is what keeps them out of the party's way. A tile centre is
+     half a tile from any corner, so a column at a corner leaves every walking
+     line clear; one on a centre would be something to walk through. The four
+     tiles around each point are checked rather than assumed, so a corridor cut
+     through the room, a pit or the stairs shaft simply drops that column and
+     leaves the rest of the ring standing.
+
+     `r.x+1 .. r.x+r.w-1` is the whole inner lattice; its perimeter is the ring,
+     which lands exactly one tile off each wall. Rooms are generated odd-sized
+     (3, 5, 7), so "4x4 or larger" means 5x5 up. */
+  let pillars=[];
+  if(theme.name==='Duergar'){
+    const walkable=(x,y)=>{const t=g[idx(x,y)];
+      return t===T_FLOOR||t===T_DOOR||t===T_DOOR_OPEN||t===T_DOOR_LOCKED;};
+    for(const r of rooms){
+      if(r.w<4||r.h<4)continue;
+      const x0=r.x+1,x1=r.x+r.w-1,y0=r.y+1,y1=r.y+r.h-1;
+      for(let py=y0;py<=y1;py++)for(let px=x0;px<=x1;px++){
+        if(px!==x0&&px!==x1&&py!==y0&&py!==y1)continue;      // the ring, not the field
+        if(!walkable(px-1,py-1)||!walkable(px,py-1)||!walkable(px-1,py)||!walkable(px,py))continue;
+        pillars.push({x:px,y:py});
+      }
+    }
+  }
   // drow houses: rose windows set into the wall, glazed in faerzress-lit glass.
   // Occasional, unlike the duergar's torches — this light is a statement, not a
   // way of seeing, and a wall with one every few paces would be a shopfront.
@@ -4049,7 +4077,7 @@ function tryGen(depth,targetWalk,theme){
     if(bm)bm.atk=Math.max(bm.atk,monsters.reduce((a,m)=>m.boss?a:Math.max(a,m.atk),0));
   }
   return {w:W,h:H,grid:g,start,stairs,traps,items,monsters,secrets,theme,depth,
-    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,lurkers,duergar,drow};
+    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,lurkers,duergar,pillars,drow};
 }
 /* ---------- difficulty curve ----------
    Depth, not party level, drives everything. One documented scalar grows every
@@ -7559,6 +7587,67 @@ function buildLevel(L){
   // +Z out into the room — then turned to face the tile they stand against.
   // The scan stores dx,dy as floor->wall, so the turn is atan2(-dx,-dy), the
   // same sign the crypt furniture uses and the opposite of the cave gems.
+  /* The colonnade: free-standing columns carrying the roof of any hall big
+     enough to need it, standing on the lattice one tile in from the walls.
+
+     One column is built ONCE, merged down to a geometry per material, and then
+     INSTANCED across every site — three draw calls for the whole hall however
+     many columns it has. Built per part per column it would be a dozen meshes
+     apiece and a big hall would cost more than the room it decorates.
+
+     It is the engaged wall pillar made round and free: square plinth and
+     abacus, a fluted drum between them, and the same gold band under the
+     capital. Slimmer than its wall cousin, because these stand a tile apart in
+     rows and a fat one turns a hall into a warehouse of pillars. */
+  if(th.name==='Duergar'&&L.pillars&&L.pillars.length){
+    const H=WALLH;
+    const stone=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.06),
+      specular:0x24211a,shininess:16});
+    const dark=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall2).multiplyScalar(1.15),
+      specular:0x1a1813,shininess:10});
+    const goldM=new THREE.MeshPhongMaterial({color:new THREE.Color(th.gold||'#c9a227'),
+      specular:0xfff0c0,shininess:70});
+    const parts={s:[],d:[],g:[]};
+    const at=(bin,geo,x,y,z,ry)=>{
+      const m=new THREE.Matrix4();
+      if(ry)m.makeRotationY(ry);
+      m.setPosition(x,y,z);
+      parts[bin].push(geo.toNonIndexed().applyMatrix4(m));
+    };
+    at('d',new THREE.BoxGeometry(0.34,H*0.045,0.34),0,H*0.022,0);      // plinth
+    at('s',new THREE.BoxGeometry(0.29,H*0.09,0.29),0,H*0.07,0);        // base
+    at('s',new THREE.CylinderGeometry(0.105,0.118,H*0.76,12),0,H*0.50,0); // drum
+    for(let i=0;i<8;i++){                                              // flutes
+      const a2=i/8*Math.PI*2;
+      at('d',new THREE.BoxGeometry(0.011,H*0.72,0.018),
+         Math.cos(a2)*0.108,H*0.50,Math.sin(a2)*0.108,-a2);
+    }
+    at('g',new THREE.CylinderGeometry(0.126,0.126,0.022,12),0,H*0.875,0); // gold band
+    at('s',new THREE.BoxGeometry(0.30,H*0.075,0.30),0,H*0.925,0);      // capital
+    at('d',new THREE.BoxGeometry(0.36,H*0.035,0.36),0,H*0.978,0);      // abacus
+    const weld=(list)=>{
+      const pos=[],nrm=[];
+      for(const gg of list){
+        const P=gg.attributes.position,N=gg.attributes.normal;
+        for(let i=0;i<P.count;i++){
+          pos.push(P.getX(i),P.getY(i),P.getZ(i));
+          nrm.push(N.getX(i),N.getY(i),N.getZ(i));
+        }
+      }
+      const out=new THREE.BufferGeometry();
+      out.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pos),3));
+      out.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(nrm),3));
+      return out;
+    };
+    const mt=new THREE.Matrix4();
+    for(const [bin,mat] of [['s',stone],['d',dark],['g',goldM]]){
+      if(!parts[bin].length)continue;
+      const inst=new THREE.InstancedMesh(weld(parts[bin]),mat,L.pillars.length);
+      L.pillars.forEach((p,i)=>{mt.makeTranslation(p.x,0,p.y);inst.setMatrixAt(i,mt);});
+      inst.instanceMatrix.needsUpdate=true;
+      grp.add(inst);
+    }
+  }
   if(th.name==='Duergar'&&L.duergar&&L.duergar.length){
     const gold=new THREE.Color(th.gold||'#c9a227');
     const stoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.06),
@@ -12158,7 +12247,7 @@ function serializeGame(){
       traps:Object.values(L.traps),items:Object.keys(L.items).map(i=>[+i,L.items[i]]),
       monsters:L.monsters.map(m=>{const c=Object.assign({},m);delete c._sc;delete c._regenT;delete c.dot;return c;}),
       secrets:L.secrets,lockedRoom:L.lockedRoom,restCount:L.restCount||{},restsHere:L.restsHere||0,
-      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,lurkers:L.lurkers||[],duergar:L.duergar||[],drow:L.drow||[],
+      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,lurkers:L.lurkers||[],duergar:L.duergar||[],pillars:L.pillars||[],drow:L.drow||[],
     },
   };
 }
@@ -12178,7 +12267,7 @@ function deserializeGame(o){
     w:lv.w,h:lv.h,grid:b64ToU8(lv.grid),explored:b64ToU8(lv.explored),
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
     traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
-    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],drow:lv.drow||[],
+    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],pillars:lv.pillars||[],drow:lv.drow||[],
   };
   clearFx();
   G.L=L;G.over=false;
