@@ -4018,6 +4018,34 @@ function tryGen(depth,targetWalk,theme){
       duergar.push({x,y,dx,dy,kind:Math.random()<0.55?'pillar':'torch'});
     }
   }
+  /* A duergar hall of any size carries its roof on a colonnade: a ring of free
+     standing columns set one tile in from the walls.
+
+     They stand on the LATTICE — the corner where four tiles meet — not on tile
+     centres, which is what keeps them out of the party's way. A tile centre is
+     half a tile from any corner, so a column at a corner leaves every walking
+     line clear; one on a centre would be something to walk through. The four
+     tiles around each point are checked rather than assumed, so a corridor cut
+     through the room, a pit or the stairs shaft simply drops that column and
+     leaves the rest of the ring standing.
+
+     `r.x+1 .. r.x+r.w-1` is the whole inner lattice; its perimeter is the ring,
+     which lands exactly one tile off each wall. Rooms are generated odd-sized
+     (3, 5, 7), so "4x4 or larger" means 5x5 up. */
+  let pillars=[];
+  if(theme.name==='Duergar'){
+    const walkable=(x,y)=>{const t=g[idx(x,y)];
+      return t===T_FLOOR||t===T_DOOR||t===T_DOOR_OPEN||t===T_DOOR_LOCKED;};
+    for(const r of rooms){
+      if(r.w<4||r.h<4)continue;
+      const x0=r.x+1,x1=r.x+r.w-1,y0=r.y+1,y1=r.y+r.h-1;
+      for(let py=y0;py<=y1;py++)for(let px=x0;px<=x1;px++){
+        if(px!==x0&&px!==x1&&py!==y0&&py!==y1)continue;      // the ring, not the field
+        if(!walkable(px-1,py-1)||!walkable(px,py-1)||!walkable(px-1,py)||!walkable(px,py))continue;
+        pillars.push({x:px,y:py});
+      }
+    }
+  }
   // drow houses: rose windows set into the wall, glazed in faerzress-lit glass.
   // Occasional, unlike the duergar's torches — this light is a statement, not a
   // way of seeing, and a wall with one every few paces would be a shopfront.
@@ -4049,7 +4077,7 @@ function tryGen(depth,targetWalk,theme){
     if(bm)bm.atk=Math.max(bm.atk,monsters.reduce((a,m)=>m.boss?a:Math.max(a,m.atk),0));
   }
   return {w:W,h:H,grid:g,start,stairs,traps,items,monsters,secrets,theme,depth,
-    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,lurkers,duergar,drow};
+    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,lurkers,duergar,pillars,drow};
 }
 /* ---------- difficulty curve ----------
    Depth, not party level, drives everything. One documented scalar grows every
@@ -6778,9 +6806,16 @@ function buildLevel(L){
     tex.wrapS=tex.wrapT=THREE.RepeatWrapping; // displacement samples can wrap at face edges
     // dressed stone is flatter than quarried rock and takes a harder highlight
     // fungal flesh is soft and a touch waxy: gentle relief, a low wide highlight
+    /* Cave displacement used to be 0.10 — twice the dungeon's and, more to the
+       point, wider than a door is thick (DOORTH is 0.07). The bulge on the wall
+       faces flanking a doorway therefore reached clean through the door slab and
+       swallowed its edges. It is 0.05 now, in family with the other themes, and
+       the roughness it gave up is paid back on the BUMP map, which is a lie
+       about the surface rather than real geometry and so cannot collide with
+       anything. */
     const mat=new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,
-      bumpScale:cave?0.05:(duer?0.015:(myco?0.035:(drow?0.012:0.02))),
-      displacementMap:tex,displacementScale:cave?0.10:(duer?0.025:(myco?0.06:(drow?0.018:0.05))),
+      bumpScale:cave?0.075:(duer?0.015:(myco?0.035:(drow?0.012:0.02))),
+      displacementMap:tex,displacementScale:cave?0.05:(duer?0.025:(myco?0.06:(drow?0.018:0.05))),
       specular:duer?0x1c1a14:(myco?0x2a2233:(drow?0x13151b:0x191309)),
       shininess:cave?3:(duer?14:(myco?8:(drow?9:5)))});
     if(built.glow){
@@ -6797,14 +6832,28 @@ function buildLevel(L){
                               :myco?myconidFloorCanvas(th)
                               :drow?drowFloorCanvas(th)
                                    :noiseCanvas(th.floor,th.wall2,false,th.moss));
-  // the only theme that roofs itself with something: caps seen from below
-  const ceilTex=texFromCanvas(myco?myconidCeilCanvas(th):noiseCanvas(th.ceil,'#000',false,null));
+  /* The roof. Myconid grows its own — caps seen from below — and a cave is
+     roofed with the same rock it stands on, so it takes the floor's map. The
+     other themes keep the plain dark wash.
+
+     A cave's repeat has to match the floor's or the trick is wasted: the one
+     big ceiling plane is uv 0..1, so `repeat` IS the tile count, and at
+     (L.w, L.h) the map restarts on every tile and prints a lattice overhead —
+     the very thing the merged floor mesh exists to avoid. Dividing by FLOOR_SPAN
+     spans it over the same four tiles the ground does. */
+  const FLOOR_SPAN=4;
+  const ceilTex=texFromCanvas(myco?myconidCeilCanvas(th)
+                             :cave?caveFloorCanvas(th)
+                                  :noiseCanvas(th.ceil,'#000',false,null));
   floorTex.wrapS=floorTex.wrapT=THREE.RepeatWrapping;floorTex.repeat.set(1,1);
-  ceilTex.wrapS=ceilTex.wrapT=THREE.RepeatWrapping;ceilTex.repeat.set(L.w,L.h);
+  ceilTex.wrapS=ceilTex.wrapT=THREE.RepeatWrapping;
+  ceilTex.repeat.set(cave?L.w/FLOOR_SPAN:L.w,cave?L.h/FLOOR_SPAN:L.h);
   const floorMat=new THREE.MeshPhongMaterial({map:floorTex,bumpMap:floorTex,
     bumpScale:cave?0.03:(duer?0.006:(myco?0.035:(drow?0.005:0.015))),   // gravel has real tooth
     specular:duer?0x24211a:(drow?0x262a36:0x120e08),shininess:cave?3:(duer?18:(drow?26:4))});
-  const ceilMat=new THREE.MeshPhongMaterial({map:ceilTex,bumpMap:ceilTex,bumpScale:0.012,specular:0x0c0a06,shininess:3});
+  const ceilMat=new THREE.MeshPhongMaterial({map:ceilTex,bumpMap:ceilTex,
+    bumpScale:cave?0.03:0.012,color:cave?0x8c8c8c:0xffffff,
+    specular:0x0c0a06,shininess:3});
   // floor: one unit plane per non-wall tile. holes fall out naturally at the
   // stairs shaft and at sewer lake pits.
   {
@@ -6821,7 +6870,7 @@ function buildLevel(L){
       // ground. Here the tiles are merged into one mesh whose uvs come from
       // world position, so the ground runs continuously across them and only
       // repeats every FSPAN tiles — far enough apart not to read as a lattice.
-      const FSPAN=4;
+      const FSPAN=FLOOR_SPAN;
       const pos=new Float32Array(cells.length*18),uv=new Float32Array(cells.length*12),
             nrm=new Float32Array(cells.length*18);
       cells.forEach(([x,y],i)=>{
@@ -6886,10 +6935,13 @@ function buildLevel(L){
   const doorTexB=texFromCanvas(doorCanvas(th,false)),doorTexL=texFromCanvas(doorCanvas(th,true));
   // gates and grates are drawn with holes in them, so their material must honour
   // the texture's alpha instead of painting the gaps black
-  const grate=th.name==='Sewers'||th.name==='Drow';
+  // Caves join these: their doors are planks knocked together with daylight
+  // between them, and a gap only reads as a gap if you can see through it
+  const grate=th.name==='Sewers'||th.name==='Drow'||th.name==='Caves';
   const doorOpts=grate?{transparent:true,alphaTest:0.35,side:THREE.DoubleSide,specular:0x15150f,shininess:10}:{specular:0x1a150c,shininess:8};
-  const doorMatBase=new THREE.MeshPhongMaterial(Object.assign({map:doorTexB,bumpMap:doorTexB,bumpScale:0.015},doorOpts));
-  const doorMatLocked=new THREE.MeshPhongMaterial(Object.assign({map:doorTexL,bumpMap:doorTexL,bumpScale:0.015},doorOpts));
+  const dBump=th.name==='Caves'?0.05:0.015;   // sawn planks have tooth; a fitted door does not
+  const doorMatBase=new THREE.MeshPhongMaterial(Object.assign({map:doorTexB,bumpMap:doorTexB,bumpScale:dBump},doorOpts));
+  const doorMatLocked=new THREE.MeshPhongMaterial(Object.assign({map:doorTexL,bumpMap:doorTexL,bumpScale:dBump},doorOpts));
   R3.doorMatBase=doorMatBase;
   for(let y=0;y<L.h;y++)for(let x=0;x<L.w;x++){
     const t=L.grid[y*L.w+x];
@@ -7535,6 +7587,67 @@ function buildLevel(L){
   // +Z out into the room — then turned to face the tile they stand against.
   // The scan stores dx,dy as floor->wall, so the turn is atan2(-dx,-dy), the
   // same sign the crypt furniture uses and the opposite of the cave gems.
+  /* The colonnade: free-standing columns carrying the roof of any hall big
+     enough to need it, standing on the lattice one tile in from the walls.
+
+     One column is built ONCE, merged down to a geometry per material, and then
+     INSTANCED across every site — three draw calls for the whole hall however
+     many columns it has. Built per part per column it would be a dozen meshes
+     apiece and a big hall would cost more than the room it decorates.
+
+     It is the engaged wall pillar made round and free: square plinth and
+     abacus, a fluted drum between them, and the same gold band under the
+     capital. Slimmer than its wall cousin, because these stand a tile apart in
+     rows and a fat one turns a hall into a warehouse of pillars. */
+  if(th.name==='Duergar'&&L.pillars&&L.pillars.length){
+    const H=WALLH;
+    const stone=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.06),
+      specular:0x24211a,shininess:16});
+    const dark=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall2).multiplyScalar(1.15),
+      specular:0x1a1813,shininess:10});
+    const goldM=new THREE.MeshPhongMaterial({color:new THREE.Color(th.gold||'#c9a227'),
+      specular:0xfff0c0,shininess:70});
+    const parts={s:[],d:[],g:[]};
+    const at=(bin,geo,x,y,z,ry)=>{
+      const m=new THREE.Matrix4();
+      if(ry)m.makeRotationY(ry);
+      m.setPosition(x,y,z);
+      parts[bin].push(geo.toNonIndexed().applyMatrix4(m));
+    };
+    at('d',new THREE.BoxGeometry(0.34,H*0.045,0.34),0,H*0.022,0);      // plinth
+    at('s',new THREE.BoxGeometry(0.29,H*0.09,0.29),0,H*0.07,0);        // base
+    at('s',new THREE.CylinderGeometry(0.105,0.118,H*0.76,12),0,H*0.50,0); // drum
+    for(let i=0;i<8;i++){                                              // flutes
+      const a2=i/8*Math.PI*2;
+      at('d',new THREE.BoxGeometry(0.011,H*0.72,0.018),
+         Math.cos(a2)*0.108,H*0.50,Math.sin(a2)*0.108,-a2);
+    }
+    at('g',new THREE.CylinderGeometry(0.126,0.126,0.022,12),0,H*0.875,0); // gold band
+    at('s',new THREE.BoxGeometry(0.30,H*0.075,0.30),0,H*0.925,0);      // capital
+    at('d',new THREE.BoxGeometry(0.36,H*0.035,0.36),0,H*0.978,0);      // abacus
+    const weld=(list)=>{
+      const pos=[],nrm=[];
+      for(const gg of list){
+        const P=gg.attributes.position,N=gg.attributes.normal;
+        for(let i=0;i<P.count;i++){
+          pos.push(P.getX(i),P.getY(i),P.getZ(i));
+          nrm.push(N.getX(i),N.getY(i),N.getZ(i));
+        }
+      }
+      const out=new THREE.BufferGeometry();
+      out.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pos),3));
+      out.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(nrm),3));
+      return out;
+    };
+    const mt=new THREE.Matrix4();
+    for(const [bin,mat] of [['s',stone],['d',dark],['g',goldM]]){
+      if(!parts[bin].length)continue;
+      const inst=new THREE.InstancedMesh(weld(parts[bin]),mat,L.pillars.length);
+      L.pillars.forEach((p,i)=>{mt.makeTranslation(p.x,0,p.y);inst.setMatrixAt(i,mt);});
+      inst.instanceMatrix.needsUpdate=true;
+      grp.add(inst);
+    }
+  }
   if(th.name==='Duergar'&&L.duergar&&L.duergar.length){
     const gold=new THREE.Color(th.gold||'#c9a227');
     const stoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.06),
@@ -7736,6 +7849,118 @@ function buildLevel(L){
   // appear on every one of the ~29 tiles sharing it — wallpaper, not a find.
   // Seeded from tile coordinates so a rebuild puts them back where they were.
   if(th.name==='Caves'){
+    /* Dripstone. Teeth from the roof and stumps from the ground, seeded from
+       tile coordinates exactly as the gems are, so none of it needs saving and
+       a rebuild puts the same cave back.
+
+       Both are faced with CLONES of the room's own maps at repeat 1. The maps
+       carry the ceiling's and floor's tiling (L.w/FLOOR_SPAN and 1/FLOOR_SPAN),
+       and repeat lives on the texture rather than the material — hand the same
+       object to a cone a fifth of a tile across and it samples a slab of the
+       map into it, which averages to a flat wash. The drow stalactites learned
+       this the hard way.
+
+       Sizes vary a long way on purpose, but the tall ones are pushed to the
+       tile's edge: a big spike through the middle of a tile is something the
+       party walks bodily through, and the grid has no idea it is there. */
+    const dripTex=(src)=>{const t=src.clone();t.repeat.set(1,1);t.needsUpdate=true;return t;};
+    /* Dripstone is MERGED, and that is not a micro-optimisation: at one tile in
+       ten overhead and one in twelve underfoot, with up to four teeth apiece, a
+       mesh per cone came to 216 draw calls on a 289-tile chamber and a real cave
+       floor is larger than that. This is a phone game. Everything hanging goes
+       into one buffer and everything standing into another, and the per-piece
+       brightness that would otherwise need a material each is baked into a
+       vertex-colour attribute instead — two draw calls, all the variation.
+
+       Brightness sits with the surface the piece grows out of. The first pass
+       tinted them to 1.25 against a roof shaded 0.55 and they came out as pale
+       traffic cones: brighter than the rock they were supposedly part of. */
+    const acc=()=>({pos:[],nrm:[],uv:[],col:[]});
+    const capA=acc(),groundA=acc();
+    const mtx=new THREE.Matrix4(),qt=new THREE.Quaternion(),
+          vp=new THREE.Vector3(),vs=new THREE.Vector3(1,1,1);
+    const bake=(A,geo,px,py,pz,flip,k)=>{
+      const g=geo.toNonIndexed();
+      qt.set(0,0,0,1);if(flip)qt.setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI);
+      mtx.compose(vp.set(px,py,pz),qt,vs);
+      g.applyMatrix4(mtx);                             // moves normals too
+      const P=g.attributes.position,N=g.attributes.normal,U=g.attributes.uv;
+      for(let i=0;i<P.count;i++){
+        A.pos.push(P.getX(i),P.getY(i),P.getZ(i));
+        A.nrm.push(N.getX(i),N.getY(i),N.getZ(i));
+        A.uv.push(U.getX(i),U.getY(i));
+        A.col.push(k,k,k);
+      }
+    };
+    // nothing underground is turned on a lathe. Same treatment the ambushers
+    // get: shove the vertices about, and stretch the uvs to the piece's real
+    // size so its grain runs at the room's texel density, not one map per cone.
+    const gnarl=(geo,amt,rad,len,rr)=>{
+      const p=geo.attributes.position;
+      for(let i=0;i<p.count;i++){
+        const x=p.getX(i),y=p.getY(i),z=p.getZ(i);
+        if(Math.hypot(x,z)<1e-4)continue;              // leave the tip and the axis
+        const k=1+(rr()-0.5)*amt;
+        p.setX(i,x*k);p.setZ(i,z*k);p.setY(i,y+(rr()-0.5)*amt*0.10);
+      }
+      const uv=geo.attributes.uv;
+      if(uv){
+        const ou=rr(),ov=rr(),su=6.28*rad/FLOOR_SPAN,sv=len/FLOOR_SPAN;
+        for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*su+ou,uv.getY(i)*sv+ov);
+      }
+      geo.computeVertexNormals();
+      return geo;
+    };
+    for(let y=1;y<L.h-1;y++)for(let x=1;x<L.w-1;x++){
+      if(L.grid[y*L.w+x]!==T_FLOOR)continue;
+      const cx=x+0.5,cz=y+0.5;
+      // teeth from the roof
+      let h=((x*2246822519)^(y*3266489917))>>>0;h=(h^(h>>>13))*2654435761>>>0;
+      if((h>>>8)/16777216<0.10){
+        let seed=h||1;const rr=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+        for(let k=0,n=1+Math.floor(rr()*4);k<n;k++){
+          const big=rr();                              // a few are proper fangs
+          const len=0.10+big*big*0.34, rad=0.028+big*0.055;
+          const a2=rr()*6.28, d=(0.10+rr()*0.26)*(0.4+big);
+          const px=cx+Math.cos(a2)*d, pz=cz+Math.sin(a2)*d;
+          bake(capA,gnarl(new THREE.ConeGeometry(rad,len,7,2),0.34,rad,len,rr),
+               px,WALLH-len/2,pz,true,0.60+big*0.16);
+          // a skirt where it meets the roof, or it ends in mid-air against a
+          // surface it shares no shading with
+          bake(capA,gnarl(new THREE.ConeGeometry(rad*1.7,0.05,7,1),0.26,rad*1.7,0.05,rr),
+               px,WALLH-0.024,pz,true,0.52);
+        }
+      }
+      // stumps from the ground, on their own hash so the two do not pair up
+      let h2=((x*40503)^(y*2654435761)^0x5bf03635)>>>0;h2=(h2^(h2>>>13))*1274126177>>>0;
+      if((h2>>>8)/16777216<0.085){
+        let seed=h2||1;const rr=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+        for(let k=0,n=1+Math.floor(rr()*3);k<n;k++){
+          const big=rr();
+          const hgt=0.08+big*big*0.26, rad=0.045+big*0.055;
+          // pushed toward the tile's edge, further the taller it is: a big spike
+          // through the middle of a tile is something the party walks bodily
+          // through, and the grid has no idea it is there
+          const a2=rr()*6.28, d=0.16+rr()*0.16+big*0.10;
+          const px=cx+Math.cos(a2)*d, pz=cz+Math.sin(a2)*d;
+          bake(groundA,gnarl(new THREE.ConeGeometry(rad,hgt,7,2),0.34,rad,hgt,rr),
+               px,hgt/2,pz,false,0.82+big*0.14);       // cones point +Y already
+          bake(groundA,gnarl(new THREE.ConeGeometry(rad*1.7,0.04,7,1),0.26,rad*1.7,0.04,rr),
+               px,0.02,pz,false,0.74);
+        }
+      }
+    }
+    for(const [A,src] of [[capA,ceilTex],[groundA,floorTex]]){
+      if(!A.pos.length)continue;
+      const tex=dripTex(src);
+      const g=new THREE.BufferGeometry();
+      g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(A.pos),3));
+      g.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(A.nrm),3));
+      g.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(A.uv),2));
+      g.setAttribute('color',new THREE.BufferAttribute(new Float32Array(A.col),3));
+      grp.add(new THREE.Mesh(g,new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,bumpScale:0.05,
+        vertexColors:true,specular:0x0e0c08,shininess:2,flatShading:true})));
+    }
     const GEMS=[{c:0x9a5ce0,e:0x6b3fa0},{c:0x3ec8a0,e:0x2b8b70},
                 {c:0xe04a6a,e:0x9c344a},{c:0x4a9ae0,e:0x346b9c},{c:0xe0c04a,e:0x9c8634}];
     const faces=[];
@@ -8055,6 +8280,84 @@ function doorCanvas(th,locked){
       ctx.fillStyle=lit;ctx.fillRect(55,95,4,20);
       ctx.fillStyle='#07070a';ctx.beginPath();ctx.arc(63.5,102,4,0,7);ctx.fill();
       ctx.fillRect(61.5,103,4,9);
+    }
+    return cv;
+  }
+  /* Caves: nobody dressed this timber. Planks of uneven width stood side by
+     side, cut square-ish at neither end, nailed to two crooked braces, with the
+     dark showing between them where they do not meet. Everything is stained
+     near-black by damp and rot, so the wood reads as old rather than merely
+     brown — the light comes from the few edges that still catch it.
+
+     Seeded from the tile so a door does not reshuffle when the level rebuilds,
+     and the gaps are genuinely transparent (Caves is in the `grate` set), which
+     is the whole difference between a gap and a painted dark line. */
+  if(th.name==='Caves'){
+    let s=0x9e3779b9;
+    const rr=()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};
+    ctx.clearRect(0,0,128,128);                       // start from the gaps
+    const planks=[];
+    for(let x=2;x<126;){
+      const w=13+Math.floor(rr()*9);                  // uneven widths
+      planks.push({x,w:Math.min(w,126-x)});
+      x+=w+2+Math.floor(rr()*3);                      // and uneven gaps between
+    }
+    for(const p of planks){
+      const top=1+rr()*7, bot=127-rr()*7;             // cut square at neither end
+      const lean=(rr()-0.5)*2.4;                      // stood a little crooked
+      const base=9+rr()*6;                            // each plank its own darkness
+      const body='rgb('+Math.round(base*1.5)+','+Math.round(base*1.05)+','+Math.round(base*0.72)+')';
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(p.x+lean,top);ctx.lineTo(p.x+p.w+lean,top-rr()*3);
+      ctx.lineTo(p.x+p.w,bot+rr()*3);ctx.lineTo(p.x,bot);
+      ctx.closePath();ctx.clip();
+      ctx.fillStyle=body;ctx.fillRect(p.x-3,0,p.w+6,128);
+      // grain: long dark fibres down the plank, a couple of them splitting
+      for(let g=0;g<5;g++){
+        const gx=p.x+2+rr()*(p.w-4);
+        ctx.strokeStyle='rgba(0,0,0,'+(0.16+rr()*0.24).toFixed(2)+')';
+        ctx.lineWidth=0.7+rr()*1.1;
+        ctx.beginPath();ctx.moveTo(gx,top);
+        ctx.bezierCurveTo(gx+(rr()-0.5)*5,44,gx+(rr()-0.5)*5,88,gx+(rr()-0.5)*4,bot);
+        ctx.stroke();
+      }
+      // a knot or two, and rot creeping up from the foot
+      if(rr()<0.55){
+        const kx=p.x+3+rr()*(p.w-6),ky=18+rr()*92,kr=1.6+rr()*2.2;
+        const kg=ctx.createRadialGradient(kx,ky,0.4,kx,ky,kr);
+        kg.addColorStop(0,'rgba(0,0,0,0.75)');kg.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.fillStyle=kg;ctx.beginPath();ctx.arc(kx,ky,kr,0,7);ctx.fill();
+      }
+      const rot=ctx.createLinearGradient(0,128,0,128-(40+rr()*44));
+      rot.addColorStop(0,'rgba(9,13,8,0.78)');rot.addColorStop(1,'rgba(9,13,8,0)');
+      ctx.fillStyle=rot;ctx.fillRect(p.x-3,0,p.w+6,128);
+      // the one lit edge: without it the plank is a flat dark stripe
+      ctx.fillStyle='rgba(196,168,116,0.13)';ctx.fillRect(p.x+lean,top,1.4,bot-top);
+      ctx.fillStyle='rgba(0,0,0,0.42)';ctx.fillRect(p.x+p.w-1.6,top,1.6,bot-top);
+      ctx.restore();
+    }
+    // two braces nailed across, neither of them level
+    for(const [by,tilt] of [[30,-2.5],[95,3]]){
+      ctx.save();
+      ctx.translate(64,by);ctx.rotate(tilt*Math.PI/180);ctx.translate(-64,-by);
+      ctx.fillStyle='rgb(22,16,11)';ctx.fillRect(0,by-6,128,13);
+      ctx.fillStyle='rgba(150,126,86,0.13)';ctx.fillRect(0,by-6,128,1.6);
+      ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(0,by+5.4,128,1.8);
+      for(const p of planks){                          // a nail per plank, roughly
+        const nx=p.x+p.w*0.5+(rr()-0.5)*3;
+        ctx.fillStyle='#15161a';ctx.beginPath();ctx.arc(nx,by+(rr()-0.5)*3,1.5,0,7);ctx.fill();
+        ctx.fillStyle='rgba(178,168,150,0.30)';ctx.beginPath();ctx.arc(nx-0.5,by-0.5+(rr()-0.5)*2,0.7,0,7);ctx.fill();
+      }
+      ctx.restore();
+    }
+    if(locked){ // a hasp and a heavy padlock, the only worked iron on it
+      ctx.fillStyle='#1b1d22';ctx.fillRect(54,58,22,9);
+      ctx.fillStyle='rgba(170,162,148,0.22)';ctx.fillRect(54,58,22,1.6);
+      ctx.strokeStyle='#23262c';ctx.lineWidth=3.2;
+      ctx.beginPath();ctx.arc(65,68,5,Math.PI,0);ctx.stroke();
+      ctx.fillStyle='#2a2d34';ctx.fillRect(60,68,10,11);
+      ctx.fillStyle='#0a0b0d';ctx.beginPath();ctx.arc(65,73,1.7,0,7);ctx.fill();
     }
     return cv;
   }
@@ -9571,8 +9874,26 @@ function applySpellToAlly(caster,t,sp,cl){
   if(sp.cures)for(const c of sp.cures)cureCond(t,c);
   if(sp.restoreAbility){
     let left=sp.restoreAbility===99?999:roll(1,4);
-    for(const a of ABILITIES){const heal=Math.min(left,t.abilDmg[a]);t.abilDmg[a]-=heal;left-=heal;}
+    /* The poison badge carries a ledger of what IT drained, and a cure gives
+       back exactly that. So healing ability damage has to settle up with the
+       ledger as it goes, or two things go wrong: the badge outlives everything
+       it was doing (Restoration undoes the drain and leaves the mark), and a
+       cure later hands the same points back a second time on top of whatever a
+       fresh poison has since taken. */
+    const px=t.conditions.find(c=>c.kind==='poison');
+    for(const a of ABILITIES){
+      const heal=Math.min(left,t.abilDmg[a]);
+      t.abilDmg[a]-=heal;left-=heal;
+      if(heal&&px&&px.drain&&px.drain[a]){
+        px.drain[a]=Math.max(0,px.drain[a]-heal);
+        if(!px.drain[a])delete px.drain[a];
+      }
+    }
+    // nothing of the poison is left to undo, so the mark goes with it — a badge
+    // that no longer stands for anything is exactly what this game does not want
+    if(px&&px.drain&&!Object.keys(px.drain).length)removeCond(t,'poison');
     recalcHp(t,false);
+    UI.refreshParty();
     UI.toast(t.name+' feels vigour return.');
   }
   if(sp.restoreLevels&&t.negLevels>0){t.negLevels=0;removeCond(t,'drained');recalcHp(t,false);UI.toast('Lost life-force floods back into '+t.name+'.');}
@@ -11933,7 +12254,7 @@ function serializeGame(){
       traps:Object.values(L.traps),items:Object.keys(L.items).map(i=>[+i,L.items[i]]),
       monsters:L.monsters.map(m=>{const c=Object.assign({},m);delete c._sc;delete c._regenT;delete c.dot;return c;}),
       secrets:L.secrets,lockedRoom:L.lockedRoom,restCount:L.restCount||{},restsHere:L.restsHere||0,
-      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,lurkers:L.lurkers||[],duergar:L.duergar||[],drow:L.drow||[],
+      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,lurkers:L.lurkers||[],duergar:L.duergar||[],pillars:L.pillars||[],drow:L.drow||[],
     },
   };
 }
@@ -11953,7 +12274,7 @@ function deserializeGame(o){
     w:lv.w,h:lv.h,grid:b64ToU8(lv.grid),explored:b64ToU8(lv.explored),
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
     traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
-    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],drow:lv.drow||[],
+    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],pillars:lv.pillars||[],drow:lv.drow||[],
   };
   clearFx();
   G.L=L;G.over=false;
