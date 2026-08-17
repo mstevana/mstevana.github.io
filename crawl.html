@@ -5900,6 +5900,115 @@ function duergarFloorCanvas(th){
   }
   return cv;
 }
+/* The roof of a duergar hall is built, not dug, and it is under permanent smoke:
+   the one surface the forges never stop working on.
+
+   Each tile is one bay of groin vaulting. Ribs run along all four edges — so
+   neighbouring tiles share a rib line rather than each printing its own — and
+   across both diagonals, dividing the bay into four webs. The courses in each
+   web run parallel to its own outer edge, which is how a real groin vault is
+   laid, and the whole thing is then blackened from the crown outward: carbon
+   pools where the smoke does, and the ribs stand proud enough for the draught to
+   keep them comparatively clean.
+
+   Unlike the other themes the per-tile repeat is wanted here. A flagstone map
+   repeated per tile prints a lattice on the ground and that is a bug; a vault
+   repeated per tile prints a rib at every bay, and that is architecture. */
+function duergarCeilCanvas(th){
+  const {cv,ctx}=newCanvas(128);
+  const wrap9=(fn)=>{for(const oy of [-128,0,128])for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0+oy);fn();ctx.restore();}};
+  const C=64, RIB=7, DIAG=5;
+  ctx.fillStyle=shade(th.wall,-0.74);ctx.fillRect(0,0,128,128);
+  // the four webs, each with its own courses running parallel to its outer edge
+  const webs=[[[0,0],[128,0]],[[128,0],[128,128]],[[128,128],[0,128]],[[0,128],[0,0]]];
+  webs.forEach(([a,b],wi)=>{
+    ctx.save();
+    ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.lineTo(C,C);ctx.closePath();ctx.clip();
+    ctx.fillStyle=shade(th.wall,wi%2?-0.66:-0.62);ctx.fillRect(0,0,128,128);
+    // courses: parallel to the outer edge, tightening toward the crown the way
+    // voussoirs do as the ring closes
+    const horiz=(wi%2)===0;
+    for(let d=6;d<64;d+=7){
+      const t=d/64, off=horiz?(wi===0?d:128-d):(wi===1?128-d:d);
+      ctx.strokeStyle=`rgba(0,0,0,${0.34-t*0.12})`;ctx.lineWidth=1.2;
+      ctx.beginPath();
+      if(horiz){ctx.moveTo(0,off);ctx.lineTo(128,off);}else{ctx.moveTo(off,0);ctx.lineTo(off,128);}
+      ctx.stroke();
+      ctx.strokeStyle=`rgba(255,246,225,${0.07-t*0.03})`;ctx.lineWidth=0.7;
+      ctx.beginPath();
+      if(horiz){ctx.moveTo(0,off+(wi===0?1:-1));ctx.lineTo(128,off+(wi===0?1:-1));}
+      else{ctx.moveTo(off+(wi===3?1:-1),0);ctx.lineTo(off+(wi===3?1:-1),128);}
+      ctx.stroke();
+      // the joints between voussoirs, staggered course to course
+      const n=6+((d/7)|0);
+      for(let k=0;k<n;k++){
+        const p=((k+(d%2?0.5:0))/n)*128;
+        ctx.strokeStyle='rgba(0,0,0,0.26)';ctx.lineWidth=1;
+        ctx.beginPath();
+        if(horiz){ctx.moveTo(p,off);ctx.lineTo(p,off+(wi===0?7:-7));}
+        else{ctx.moveTo(off,p);ctx.lineTo(off+(wi===3?7:-7),p);}
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  });
+  // the diagonal ribs, drawn as a dark body with one lit arris
+  for(const [dx,dy] of [[1,1],[1,-1]]){
+    ctx.save();ctx.translate(C,C);ctx.rotate(Math.atan2(dy,dx));
+    ctx.fillStyle=shade(th.wall,-0.50);ctx.fillRect(-100,-DIAG/2,200,DIAG);
+    ctx.fillStyle='rgba(255,246,225,0.055)';ctx.fillRect(-100,-DIAG/2,200,1.2);
+    ctx.fillStyle='rgba(0,0,0,0.42)';ctx.fillRect(-100,DIAG/2-1.2,200,1.2);
+    ctx.restore();
+  }
+  // the wall ribs: half a rib on each edge, so two tiles make one
+  const edge=(x,y,w,h,lit)=>{
+    ctx.fillStyle=shade(th.wall,-0.44);ctx.fillRect(x,y,w,h);
+    ctx.fillStyle='rgba(255,246,225,0.06)';
+    if(w>h)ctx.fillRect(x,lit?y+h-1.2:y,w,1.2);else ctx.fillRect(lit?x+w-1.2:x,y,1.2,h);
+    ctx.fillStyle='rgba(0,0,0,0.40)';
+    if(w>h)ctx.fillRect(x,lit?y+h:y-1.2,w,1.2);else ctx.fillRect(lit?x+w:x-1.2,y,1.2,h);
+  };
+  edge(0,0,128,RIB/2,true); edge(0,128-RIB/2,128,RIB/2,false);
+  edge(0,0,RIB/2,128,true); edge(128-RIB/2,0,RIB/2,128,false);
+  // the boss where the diagonals cross, and the springing blocks at the corners.
+  // Both are kept nearly as dark as the rib they interrupt: in perspective a pale
+  // block at a corner stops reading as masonry and starts reading as a hatch
+  // hanging in the roof.
+  ctx.fillStyle=shade(th.wall,-0.38);ctx.beginPath();ctx.arc(C,C,6.5,0,7);ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.45)';ctx.lineWidth=1.4;
+  ctx.beginPath();ctx.arc(C,C,6.5,0,7);ctx.stroke();
+  ctx.strokeStyle='rgba(255,246,225,0.07)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.arc(C-0.6,C-0.7,5.2,0,7);ctx.stroke();
+  for(const [sx,sy] of [[0,0],[128,0],[0,128],[128,128]]){
+    wrap9(()=>{ctx.fillStyle=shade(th.wall,-0.40);ctx.fillRect(sx-4.5,sy-4.5,9,9);
+      ctx.strokeStyle='rgba(0,0,0,0.34)';ctx.lineWidth=1;ctx.strokeRect(sx-5,sy-5,10,10);});
+  }
+  // and then the smoke of a thousand years. It is heaviest at the crown, where it
+  // pools, but nothing escapes it — the ribs only stand out because the draught
+  // works hardest over them, not because they are clean.
+  const so=ctx.createRadialGradient(C,C,3,C,C,78);
+  so.addColorStop(0,'rgba(8,7,6,0.88)');
+  so.addColorStop(0.42,'rgba(8,7,6,0.70)');
+  so.addColorStop(1,'rgba(8,7,6,0.42)');
+  ctx.fillStyle=so;ctx.fillRect(0,0,128,128);
+  for(let i=0;i<34;i++){
+    const a=rnd(628)/100, r0=10+rnd(30), r1=r0+14+rnd(28);
+    wrap9(()=>{
+      ctx.strokeStyle=`rgba(6,5,4,${0.10+Math.random()*0.16})`;
+      ctx.lineWidth=3+rnd(7);ctx.lineCap='round';
+      ctx.beginPath();
+      ctx.moveTo(C+Math.cos(a)*r0,C+Math.sin(a)*r0);
+      ctx.lineTo(C+Math.cos(a+0.2)*r1,C+Math.sin(a+0.2)*r1);
+      ctx.stroke();
+    });
+  }
+  ctx.lineCap='butt';
+  for(let i=0;i<600;i++){
+    ctx.fillStyle=Math.random()<0.45?'rgba(255,255,255,0.020)':'rgba(0,0,0,0.06)';
+    ctx.fillRect(rnd(128),rnd(128),1,1);
+  }
+  return cv;
+}
 function caveFloorCanvas(th){
   const base=caveBaseCanvas(th,th.floor,0.72);
   const {cv,ctx}=newCanvas(128);
@@ -6844,6 +6953,7 @@ function buildLevel(L){
   const FLOOR_SPAN=4;
   const ceilTex=texFromCanvas(myco?myconidCeilCanvas(th)
                              :cave?caveFloorCanvas(th)
+                             :duer?duergarCeilCanvas(th)
                                   :noiseCanvas(th.ceil,'#000',false,null));
   floorTex.wrapS=floorTex.wrapT=THREE.RepeatWrapping;floorTex.repeat.set(1,1);
   ceilTex.wrapS=ceilTex.wrapT=THREE.RepeatWrapping;
@@ -6852,7 +6962,8 @@ function buildLevel(L){
     bumpScale:cave?0.03:(duer?0.006:(myco?0.035:(drow?0.005:0.015))),   // gravel has real tooth
     specular:duer?0x24211a:(drow?0x262a36:0x120e08),shininess:cave?3:(duer?18:(drow?26:4))});
   const ceilMat=new THREE.MeshPhongMaterial({map:ceilTex,bumpMap:ceilTex,
-    bumpScale:cave?0.03:0.012,color:cave?0x8c8c8c:0xffffff,
+    // a vault has real relief; a plain dark wash has none to find
+    bumpScale:cave?0.03:(duer?0.028:0.012),color:cave?0x8c8c8c:0xffffff,
     specular:0x0c0a06,shininess:3});
   // floor: one unit plane per non-wall tile. holes fall out naturally at the
   // stairs shaft and at sewer lake pits.
