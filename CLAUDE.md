@@ -739,6 +739,40 @@ three themes carry real machinery:
   parented to the same group would both be dragged to x=0 — a shrine's pair of
   candles would merge into one.
 
+  ### The furniture is textured, and the UVs are projected
+
+  Everything built through `Bins` was flat colour to begin with, and a 40cm box of
+  flat colour reads as a *shape* rather than a made thing. `duergarTex` supplies
+  worked stone, wrought iron and grained wood, all three as **modulation maps
+  around white** rather than colour maps, so one texture can be handed to any of
+  them without changing its tone, and each doubles as its own bump map.
+
+  **`weldGeos` projects the UVs from position rather than copying them.** A
+  `BoxGeometry`'s own uv runs 0..1 across each face however big the face is, so a
+  shared map would be smeared once over a whole hearth and printed postage-stamp
+  size on a rivet. Projecting along whichever axis the face points down gives every
+  part the same texel density for free — which a merged mesh needs, because it
+  cannot carry a per-piece `repeat`. `Bins(density)` is repeats per world unit and
+  defaults to 5 for props; a wall's 2-ish puts hammer dimples the size of a fist on
+  an anvil.
+
+  Three things about the art itself:
+
+  - **Masonry is read from its joints.** The hearth and the anvil block were each
+    one box, which is the main reason they read as flat: a 50cm slab has no scale
+    to it. They are laid up in courses now, four or five blocks to a course, offset
+    row to row, with each course a hair narrower than the one below.
+  - **An anvil is read from its waist.** `addAnvil` builds the London pattern once
+    for both the wall forge and the hall — spread foot, narrow neck, body swelling
+    back out to a face wider than the neck, horn, step, hardie and pritchel holes.
+    Three stacked boxes is a doorstop.
+  - **A hammered surface must not be regular.** The iron's dimples read as bubble
+    wrap through two rounds of softening, because a perfect circle with a lit
+    top-left and a dark rim is the canonical *sphere* cue and the eye keeps
+    counting balls however faint it gets. Stretching and rotating them at random
+    is what finally made them undulation. Rivets are real spheres, and those are
+    meant to read as spheres.
+
 - **`Myconid`** — a grove that grew rather than one that was built, and the
   only theme that replaces the **ceiling** as well as the walls and floor:
   `myconidCeilCanvas` draws the gilled underside of the caps overhead,

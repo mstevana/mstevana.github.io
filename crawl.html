@@ -6311,6 +6311,128 @@ function duergarCeilCanvas(th){
   }
   return cv;
 }
+/* Surfaces for the halls' furniture. Everything built out of `Bins` was a flat
+   colour, and a 40cm box of flat colour reads as a shape rather than an object —
+   worst on the anvil and the forge, because they are the biggest solid things in
+   the theme and the eye has nothing to measure them by.
+
+   All three are MODULATION maps, not colour maps: they sit around white and are
+   multiplied into the material's own colour, so a texture can be handed to iron,
+   stone or wood without any of them changing tone. They double as bump maps. */
+function duergarWorkedStoneCanvas(){
+  const {cv,ctx}=newCanvas(128);
+  ctx.fillStyle='#efefef';ctx.fillRect(0,0,128,128);
+  // tooling: short chisel strokes running roughly one way, as a mason works
+  for(let i=0;i<460;i++){
+    const x=rnd(128),y=rnd(128),l=2+rnd(5);
+    wrap9(ctx,()=>{
+      ctx.strokeStyle=Math.random()<0.5?'rgba(255,255,255,0.30)':'rgba(0,0,0,0.07)';
+      ctx.lineWidth=0.9;
+      ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+l*0.92,y+l*0.36);ctx.stroke();
+    });
+  }
+  // chips knocked out of it, each with a lit upper lip. Shallow: at 12% black
+  // these are pocks in dressed stone, at 20% they were cobbles.
+  for(let i=0;i<30;i++){
+    const x=rnd(128),y=rnd(128),r=1.2+rnd(2.8);
+    const body=genBlob(x,y,r,0.85);
+    wrap9(ctx,()=>{
+      pathBlob(ctx,body);ctx.fillStyle='rgba(0,0,0,0.12)';ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,0.26)';ctx.lineWidth=0.8;ctx.stroke();
+    });
+  }
+  for(let i=0;i<1600;i++){
+    ctx.fillStyle=Math.random()<0.5?'rgba(255,255,255,0.13)':'rgba(0,0,0,0.04)';
+    ctx.fillRect(rnd(128),rnd(128),1,1);
+  }
+  // soot gathering in patches — this is a forge hall, nothing here stays clean
+  for(let i=0;i<5;i++){
+    const x=rnd(128),y=rnd(128),r=18+rnd(30);
+    wrap9(ctx,()=>{
+      const g2=ctx.createRadialGradient(x,y,2,x,y,r);
+      g2.addColorStop(0,'rgba(0,0,0,0.11)');g2.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g2;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+    });
+  }
+  return cv;
+}
+function duergarIronCanvas(){
+  const {cv,ctx}=newCanvas(128);
+  ctx.fillStyle='#e6e6e6';ctx.fillRect(0,0,128,128);
+  /* Hammer dimples — this is wrought iron, beaten, not cast smooth. Two things
+     kept these reading as bubble wrap rather than as a beaten surface, and both
+     had to go: the contrast (30% black at the rim, then 11%, now 5%) and the
+     REGULARITY. A perfect circle with a lit top-left and a dark rim is the
+     canonical "sphere" cue, so however faint it gets the eye still counts balls;
+     stretched and rotated at random they finally read as undulation. */
+  for(let i=0;i<48;i++){
+    const x=rnd(128),y=rnd(128),r=5+rnd(10),e=0.5+Math.random()*0.9,a=Math.random()*6.3;
+    wrap9(ctx,()=>{
+      ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.scale(1,e);
+      const g2=ctx.createRadialGradient(-r*0.30,-r*0.34,r*0.08,0,0,r);
+      g2.addColorStop(0,'rgba(255,255,255,0.18)');
+      g2.addColorStop(0.6,'rgba(255,255,255,0.03)');
+      g2.addColorStop(1,'rgba(0,0,0,0.05)');
+      ctx.fillStyle=g2;ctx.beginPath();ctx.arc(0,0,r,0,7);ctx.fill();
+      ctx.restore();
+    });
+  }
+  // pitting, and long scratches from the file
+  for(let i=0;i<220;i++){
+    const x=rnd(128),y=rnd(128);
+    wrap9(ctx,()=>{ctx.fillStyle='rgba(0,0,0,0.16)';ctx.fillRect(x,y,1,1);});
+  }
+  for(let i=0;i<46;i++){
+    const x=rnd(128),y=rnd(128),l=4+rnd(16),a=(Math.random()-0.5)*1.4;
+    wrap9(ctx,()=>{
+      ctx.strokeStyle=Math.random()<0.5?'rgba(255,255,255,0.28)':'rgba(0,0,0,0.10)';
+      ctx.lineWidth=0.8;ctx.beginPath();ctx.moveTo(x,y);
+      ctx.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l);ctx.stroke();
+    });
+  }
+  // rust, sparingly. It is a working forge, not a wreck
+  for(let i=0;i<8;i++){
+    const x=rnd(128),y=rnd(128),r=3+rnd(8);
+    const body=genBlob(x,y,r,0.9);
+    wrap9(ctx,()=>{pathBlob(ctx,body);ctx.fillStyle='rgba(150,86,40,0.12)';ctx.fill();});
+  }
+  return cv;
+}
+function duergarWoodCanvas(){
+  const {cv,ctx}=newCanvas(128);
+  ctx.fillStyle='#ececec';ctx.fillRect(0,0,128,128);
+  // grain: long fibres, a few of them dark enough to read as splits
+  for(let i=0;i<110;i++){
+    const x=rnd(128),w=0.6+Math.random()*2.2,dark=Math.random()<0.4;
+    wrap9(ctx,()=>{
+      ctx.strokeStyle=dark?'rgba(0,0,0,0.16)':'rgba(255,255,255,0.42)';
+      ctx.lineWidth=w;ctx.beginPath();
+      let px=x;ctx.moveTo(px,-8);
+      for(let y=-8;y<136;y+=14){px+=(Math.random()-0.5)*2.4;ctx.lineTo(px,y);}
+      ctx.stroke();
+    });
+  }
+  for(let i=0;i<5;i++){                       // knots
+    const x=rnd(128),y=rnd(128),r=2+rnd(4);
+    wrap9(ctx,()=>{
+      for(let k=3;k>=1;k--){
+        ctx.strokeStyle=k%2?'rgba(0,0,0,0.20)':'rgba(255,255,255,0.30)';
+        ctx.lineWidth=1.1;ctx.beginPath();ctx.ellipse(x,y,r*k*0.45,r*k*0.62,0.3,0,7);ctx.stroke();
+      }
+    });
+  }
+  return cv;
+}
+// one copy each per run: these are shared by every piece of duergar furniture
+function duergarTex(kind){
+  const key='duerTex_'+kind;
+  if(R3.texCache[key])return R3.texCache[key];
+  const cv=kind==='iron'?duergarIronCanvas():kind==='wood'?duergarWoodCanvas():duergarWorkedStoneCanvas();
+  const t=texFromCanvas(cv);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  R3.texCache[key]=t;
+  return t;
+}
 function caveFloorCanvas(th){
   const base=caveBaseCanvas(th,th.floor,0.72);
   const {cv,ctx}=newCanvas(128);
@@ -7185,22 +7307,42 @@ function disposeLevel(){
 
    Position and normal only: none of this is textured, it is all flat stone,
    iron and wood, which is why the weld can be this short. */
-function weldGeos(list){
-  const pos=[],nrm=[];
+/* The weld carries UVs, and they are PROJECTED FROM POSITION rather than taken
+   from the source geometry. A BoxGeometry's own uv runs 0..1 across each face
+   however big that face is, so a shared map would be smeared once over a whole
+   hearth and printed postage-stamp size on a rivet — which is worse than no
+   texture at all. Projecting along whichever axis the face points down gives
+   every part the same texel density for free, and nothing needs a per-piece
+   repeat (which a merged mesh could not carry anyway).
+
+   `density` is repeats per world unit. A dungeon tile is one unit. */
+function weldGeos(list,density){
+  const D=density||2.4;
+  const pos=[],nrm=[],uv=[];
   for(const g of list){
     const P=g.attributes.position,N=g.attributes.normal;
     for(let i=0;i<P.count;i++){
-      pos.push(P.getX(i),P.getY(i),P.getZ(i));
-      nrm.push(N.getX(i),N.getY(i),N.getZ(i));
+      const x=P.getX(i),y=P.getY(i),z=P.getZ(i);
+      const nx=N.getX(i),ny=N.getY(i),nz=N.getZ(i);
+      pos.push(x,y,z);nrm.push(nx,ny,nz);
+      const ax=Math.abs(nx),ay=Math.abs(ny),az=Math.abs(nz);
+      if(ay>=ax&&ay>=az)uv.push(x*D,z*D);        // a face looking up or down
+      else if(ax>=az)uv.push(z*D,y*D);           // ...along X
+      else uv.push(x*D,y*D);                     // ...along Z
     }
   }
   const out=new THREE.BufferGeometry();
   out.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pos),3));
   out.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(nrm),3));
+  out.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(uv),2));
   return out;
 }
-function Bins(){
-  const bins=new Map();
+/* `density` is repeats per world unit for the projected UVs, and furniture wants
+   a much finer grain than a wall does: these are 20–50cm objects, so a map that
+   repeats twice a tile puts hammer dimples the size of a fist on an anvil. The
+   default here is tuned for props. */
+function Bins(density){
+  const bins=new Map(),D=density||5.0;
   return {
     // geo placed at (x,y,z) with an optional Euler rotation, filed under `mat`
     at(mat,geo,x,y,z,rx,ry,rz){
@@ -7212,10 +7354,51 @@ function Bins(){
       return this;
     },
     addTo(group){
-      for(const [mat,list] of bins)if(list.length)group.add(new THREE.Mesh(weldGeos(list),mat));
+      for(const [mat,list] of bins)if(list.length)group.add(new THREE.Mesh(weldGeos(list,D),mat));
       return group;
     }
   };
+}
+/* A London-pattern anvil, shared by the wall forge and the forge hall so the two
+   are the same object at two sizes.
+
+   Three stacked boxes is what it was, and three stacked boxes is a doorstop. An
+   anvil is read from its WAIST: the spread foot, the narrow neck, and the body
+   swelling back out to a face wider than the neck it stands on. Add the horn
+   tapering off one end, the step below it, and the two holes in the heel, and the
+   silhouette is unmistakable at any range. Everything is laid out here at unit
+   height (face at y=0.317) and scaled by `s` at the call site.
+
+   `M` carries {iron, dark, hole}. Drawn along +X with the horn to the right. */
+function addAnvil(B,M,x,y,z,s){
+  const S=(a,b,c)=>new THREE.BoxGeometry(a*s,b*s,c*s);
+  const at=(mat,g,dx,dy,dz,rx,ry,rz)=>B.at(mat,g,x+dx*s,y+dy*s,z+dz*s,rx,ry,rz);
+  at(M.dark,S(0.58,0.045,0.32), 0,0.023,0);                   // the foot, spread wide
+  at(M.iron,S(0.50,0.040,0.26), 0,0.066,0);                   // its chamfer course
+  at(M.iron,S(0.21,0.100,0.17), 0,0.138,0);                   // the waist — the whole tell
+  at(M.iron,S(0.40,0.045,0.25), 0,0.211,0);                   // shoulder
+  at(M.iron,S(0.52,0.055,0.27), 0,0.262,0);                   // the body
+  at(M.iron,S(0.54,0.028,0.28), 0,0.303,0);                   // the hardened face
+  // the horn, tapering off the right, with the step under its root
+  at(M.iron,new THREE.ConeGeometry(0.115*s,0.30*s,7),0.40,0.285,0,0,0,-Math.PI/2);
+  at(M.iron,S(0.10,0.030,0.20), 0.245,0.258,0);               // the step
+  // the heel: a hardie hole and a pritchel hole, both punched clean through
+  at(M.hole,S(0.058,0.014,0.058),-0.19,0.316,0);
+  at(M.hole,new THREE.CylinderGeometry(0.022*s,0.022*s,0.014*s,8),-0.245,0.316,0);
+  // and the chamfers down the long edges of the face, which is where an anvil
+  // catches the light — a square-edged slab reads as a plank
+  for(const sd of [-1,1])
+    at(M.dark,S(0.54,0.016,0.020),0,0.296,sd*0.132);
+  return B;
+}
+// a line of rivet heads along a strap, which is what makes a strap read as iron
+// bolted on rather than as a stripe painted across the thing it is holding
+function addRivets(B,mat,x,y,z,n,dx,dy,dz,r){
+  for(let i=0;i<n;i++){
+    const t=n===1?0:(i/(n-1)-0.5);
+    B.at(mat,new THREE.SphereGeometry(r,5,4),x+dx*t,y+dy*t,z+dz*t);
+  }
+  return B;
 }
 function buildLevel(L){
   disposeLevel();
@@ -8103,16 +8286,14 @@ function buildLevel(L){
   }
   if(th.name==='Duergar'&&L.duergar&&L.duergar.length){
     const gold=new THREE.Color(th.gold||'#c9a227');
-    const stoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.06),
-      specular:0x24211a,shininess:16});
-    const darkMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall2).multiplyScalar(1.15),
-      specular:0x1a1813,shininess:10});
+    // Every one of these carries a grain and a bump. They were flat colours, and
+    // a big box of flat colour reads as a shape rather than a made thing.
+    const stoneT=duergarTex('stone'),ironT=duergarTex('iron'),woodT=duergarTex('wood');
+    const stoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.10),
+      map:stoneT,bumpMap:stoneT,bumpScale:0.010,specular:0x24211a,shininess:16});
+    const darkMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall2).multiplyScalar(1.20),
+      map:stoneT,bumpMap:stoneT,bumpScale:0.012,specular:0x1a1813,shininess:10});
     const goldMat=new THREE.MeshPhongMaterial({color:gold,specular:0xfff0c0,shininess:70});
-    /* Iron, and it has to be nearly black. The first pass used a bright specular
-       and a big flat flue caught the torch square-on — the brightest case any
-       surface can be, the same thing that made the cave door look pale — and came
-       out as a white plaster column running up the wall. Dark body, narrow soft
-       highlight: metal in a dark hall is read from its sheen, not its tone. */
     /* Iron, and the specular is the whole story. Two passes got this wrong before
        the cause was isolated by forcing the specular black and re-rendering, which
        took the weapon heads straight from near-white to a believable grey — the
@@ -8127,13 +8308,16 @@ function buildLevel(L){
        down. A big flat face square-on to a torch is the brightest case any surface
        can be — the same thing that made the cave door look pale — and on metal
        that lands multiplied. */
-    const ironMat=new THREE.MeshPhongMaterial({color:0x2e2e34,specular:0x0e0e12,shininess:26});
+    const ironMat=new THREE.MeshPhongMaterial({color:0x32323a,map:ironT,bumpMap:ironT,
+      bumpScale:0.004,specular:0x0e0e12,shininess:26});
     // hafts and staves: worked wood, not stone, and duller than either
-    const woodMat=new THREE.MeshPhongMaterial({color:0x3a2a1c,specular:0x1a1206,shininess:6});
+    const woodMat=new THREE.MeshPhongMaterial({color:0x33261a,map:woodT,bumpMap:woodT,
+      bumpScale:0.005,specular:0x1a1206,shininess:6});
     // the black of a recess or a firebox mouth. Unlit on purpose: it is meant to
     // be a hole, and a lit material fills a hole in with the torch.
     const voidMat=new THREE.MeshBasicMaterial({color:0x000000});
     const emberMat=new THREE.MeshBasicMaterial({color:0xff4a12});
+    const ANV={iron:ironMat,dark:darkMat,hole:voidMat};
     const flames=R3.candleFlames||[];
     const pend=[];
     /* One column of flame per registered entry, and it must live in its own
@@ -8180,23 +8364,40 @@ function buildLevel(L){
            completely, so the one working thing in the theme rendered as a black
            rectangle. A smith's hearth is open on top: you lay the work IN the
            coals, so the coals go on the upper face where they can be seen. */
+        /* Laid up in COURSES rather than modelled as one box. Masonry is read
+           from its joints — a single 50cm slab has no scale to it and is the main
+           reason this thing looked like a flat shape — and four short blocks per
+           course, offset row to row, costs nothing once the piece is welded. */
         const RIM=0.30;                                       // the top of the hearth mass
-        B.at(stoneMat,new THREE.BoxGeometry(0.50,RIM,0.26),-0.10,RIM/2,0.13);   // hearth mass
         B.at(darkMat,new THREE.BoxGeometry(0.54,0.05,0.30),-0.10,0.025,0.14);   // its footing
+        for(let r=0;r<3;r++){
+          const yy=0.05+r*((RIM-0.05)/3), hh=(RIM-0.05)/3-0.008;
+          const n=r%2?3:4, w=0.49/n;
+          for(let k=0;k<n;k++)
+            B.at(stoneMat,new THREE.BoxGeometry(w-0.010,hh,0.255),
+                 -0.345+w*(k+0.5),yy+hh/2+0.004,0.13);
+        }
         B.at(emberMat,new THREE.BoxGeometry(0.36,0.03,0.18),-0.10,RIM+0.012,0.13); // the coal bed
         for(const s of [-1,1])                                                  // the kerb round it
           B.at(darkMat,new THREE.BoxGeometry(0.05,0.045,0.26),-0.10+s*0.225,RIM+0.02,0.13);
         B.at(darkMat,new THREE.BoxGeometry(0.50,0.045,0.05),-0.10,RIM+0.02,0.245);
+        // an iron strap round the mass, riveted, holding the courses together
+        B.at(ironMat,new THREE.BoxGeometry(0.52,0.022,0.275),-0.10,0.185,0.13);
+        addRivets(B,ironMat,-0.10,0.185,0.268,4,0.40,0,0,0.011);
         B.at(darkMat,new THREE.BoxGeometry(0.46,0.075,0.20),-0.10,0.86,0.11);   // the hood over it
+        B.at(stoneMat,new THREE.BoxGeometry(0.50,0.024,0.225),-0.10,0.908,0.115); // its lip
         B.at(ironMat,new THREE.BoxGeometry(0.11,WALLH-0.90,0.09),-0.10,0.90+(WALLH-0.90)/2,0.05); // flue
         B.at(darkMat,new THREE.BoxGeometry(0.135,0.03,0.11),-0.10,1.22,0.05);   // one band on it
-        B.at(darkMat,new THREE.CylinderGeometry(0.075,0.088,0.30,8),0.30,0.15,0.28); // stump
-        B.at(ironMat,new THREE.BoxGeometry(0.22,0.055,0.10),0.30,0.325,0.28);   // anvil face
-        B.at(ironMat,new THREE.BoxGeometry(0.09,0.05,0.07),0.30,0.272,0.28);    // its waist
-        B.at(ironMat,new THREE.BoxGeometry(0.15,0.035,0.09),0.30,0.243,0.28);   // and foot
-        B.at(ironMat,new THREE.ConeGeometry(0.042,0.12,6),0.455,0.325,0.28,0,0,-Math.PI/2); // horn
-        B.at(woodMat,new THREE.CylinderGeometry(0.014,0.016,0.26,6),0.36,0.44,0.26,0.25,0,0.5);
-        B.at(ironMat,new THREE.BoxGeometry(0.05,0.05,0.10),0.30,0.545,0.29);    // the hammer on it
+        // the stump, hooped with iron the way a real one is or it splits
+        B.at(woodMat,new THREE.CylinderGeometry(0.078,0.092,0.30,10),0.30,0.15,0.28);
+        for(const yy of [0.055,0.255])
+          B.at(ironMat,new THREE.CylinderGeometry(0.083,0.086,0.022,10),0.30,yy,0.28);
+        addAnvil(B,ANV,0.30,0.30,0.28,0.36);
+        // the smith's hammer left across the face, and tongs hooked on the stump
+        B.at(woodMat,new THREE.CylinderGeometry(0.012,0.014,0.20,6),0.335,0.428,0.255,0,0.5,Math.PI/2);
+        B.at(ironMat,new THREE.BoxGeometry(0.075,0.042,0.042),0.235,0.428,0.235,0,0.5,0);
+        for(const sd of [-1,1])
+          B.at(ironMat,new THREE.CylinderGeometry(0.008,0.010,0.26,5),0.415,0.19,0.335,0.22,0,sd*0.10);
         B.addTo(g0);
         // the trough, open on top: four walls and a dark still surface inside
         const T=Bins();
@@ -8369,11 +8570,15 @@ function buildLevel(L){
      other room in the dungeon is lit from the party's own lantern at eye level. */
   if(th.name==='Duergar'&&L.forge){
     const f=L.forge;
-    const stoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.04),
-      specular:0x1e1c16,shininess:12});
-    const darkMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall2).multiplyScalar(1.12),
-      specular:0x161409,shininess:8});
-    const ironMat=new THREE.MeshPhongMaterial({color:0x2e2e34,specular:0x0e0e12,shininess:26});
+    const stoneT=duergarTex('stone'),ironT=duergarTex('iron'),woodT=duergarTex('wood');
+    const stoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.08),
+      map:stoneT,bumpMap:stoneT,bumpScale:0.011,specular:0x1e1c16,shininess:12});
+    const darkMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall2).multiplyScalar(1.18),
+      map:stoneT,bumpMap:stoneT,bumpScale:0.013,specular:0x161409,shininess:8});
+    const ironMat=new THREE.MeshPhongMaterial({color:0x32323a,map:ironT,bumpMap:ironT,
+      bumpScale:0.004,specular:0x0e0e12,shininess:26});
+    const woodMat=new THREE.MeshPhongMaterial({color:0x33261a,map:woodT,bumpMap:woodT,
+      bumpScale:0.005,specular:0x1a1206,shininess:6});
     /* Gold, but not the pillars' gold. That one is specular 0xfff0c0 at shininess
        70 — about nine times the specular colour once Blinn-Phong normalises it —
        which is right for a thin band catching a glint round a column and turns a
@@ -8392,20 +8597,45 @@ function buildLevel(L){
          thing in the chamber. A smith works at the fire from the front — there is
          nothing there to climb over. */
       const RIM=0.46;
-      B.at(darkMat,new THREE.BoxGeometry(0.86,RIM,0.34),0,RIM/2,0.17);           // the mass
-      B.at(stoneMat,new THREE.BoxGeometry(0.90,0.055,0.36),0,RIM-0.16,0.18);     // a course band
+      /* Laid up in COURSES. A hearth this size modelled as one box has no scale
+         to it at all — the eye has nothing to measure it against and it reads as
+         a painted flat, which is exactly how it was reported. Five blocks to a
+         course, offset row to row, with the joints doing all the work. */
       B.at(darkMat,new THREE.BoxGeometry(0.92,0.06,0.40),0,0.03,0.19);           // footing
+      for(let r=0;r<4;r++){
+        const hh=(RIM-0.06)/4, yy=0.06+r*hh;
+        const n=r%2?4:5, w=0.86/n;
+        for(let k=0;k<n;k++)
+          B.at(r%2?darkMat:stoneMat,new THREE.BoxGeometry(w-0.012,hh-0.010,0.335),
+               -0.43+w*(k+0.5),yy+hh/2,0.17);
+      }
       B.at(emberMat,new THREE.BoxGeometry(0.68,0.05,0.26),0,RIM+0.014,0.17);     // the fire bed
       for(const s of [-1,1])                                                     // kerb, sides only
         B.at(stoneMat,new THREE.BoxGeometry(0.06,0.06,0.34),s*0.40,RIM+0.03,0.17);
+      // an iron lintel across the mouth of it, strapped and riveted into the
+      // masonry — the piece that makes it read as built rather than extruded
+      B.at(ironMat,new THREE.BoxGeometry(0.94,0.05,0.055),0,RIM-0.05,0.345);
+      addRivets(B,ironMat,0,RIM-0.05,0.375,5,0.80,0,0,0.014);
+      for(const s of [-1,1]){                                                    // its uprights
+        B.at(ironMat,new THREE.BoxGeometry(0.045,RIM-0.10,0.05),s*0.44,(RIM-0.10)/2+0.06,0.345);
+        addRivets(B,ironMat,s*0.44,(RIM-0.10)/2+0.06,0.372,3,0,RIM-0.20,0,0.012);
+      }
       B.at(darkMat,new THREE.BoxGeometry(0.80,0.10,0.30),0,H*0.62,0.15);         // the hood
       B.at(stoneMat,new THREE.BoxGeometry(0.84,0.03,0.32),0,H*0.62+0.065,0.16);  // its lip
+      B.at(ironMat,new THREE.BoxGeometry(0.86,0.022,0.315),0,H*0.62-0.048,0.155); // its strap
+      addRivets(B,ironMat,0,H*0.62-0.048,0.312,5,0.72,0,0,0.012);
       B.at(darkMat,new THREE.BoxGeometry(0.20,H*0.34,0.15),0,H*0.83,0.075);      // the flue
       for(const yy of [H*0.72,H*0.92])
         B.at(stoneMat,new THREE.BoxGeometry(0.24,0.04,0.17),0,yy,0.075);
       // the tuyere and its bellows, the reason it is still hot
       B.at(ironMat,new THREE.CylinderGeometry(0.045,0.045,0.24,8),-0.52,RIM*0.72,0.14,0,0,Math.PI/2);
-      B.at(darkMat,new THREE.BoxGeometry(0.26,0.20,0.22),-0.70,RIM*0.72,0.14,0,0,0.18);
+      B.at(woodMat,new THREE.BoxGeometry(0.26,0.20,0.22),-0.70,RIM*0.72,0.14,0,0,0.18);
+      B.at(ironMat,new THREE.BoxGeometry(0.27,0.02,0.23),-0.70,RIM*0.72+0.10,0.14,0,0,0.18);
+      B.at(woodMat,new THREE.CylinderGeometry(0.014,0.016,0.30,6),-0.78,RIM*0.72+0.20,0.14,0,0,0.5);
+      // fire irons stood against the mass: a poker and a rake
+      for(let i=0;i<2;i++)
+        B.at(ironMat,new THREE.CylinderGeometry(0.010,0.012,0.62,6),
+             0.55+i*0.07,0.31,0.30+i*0.03,0.30,0,0.16-i*0.05);
       // Laduguer's mark on the hood: this is a temple as much as a workshop
       B.at(goldMat,new THREE.BoxGeometry(0.16,0.020,0.014),-0.01,H*0.62,0.305,0,0,0.7);
       B.at(goldMat,new THREE.BoxGeometry(0.08,0.020,0.014),0.07,H*0.62-0.06,0.305,0,0,0.34);
@@ -8431,31 +8661,42 @@ function buildLevel(L){
       // dark stone with a lit course at the top, not a pale cube: at a tile's
       // range this thing fills the lower half of the frame, and a blank bright
       // block there reads as a packing crate rather than as masonry
-      B.at(darkMat,new THREE.BoxGeometry(0.62,0.09,0.62),0,0.045,0);         // plinth
-      B.at(darkMat,new THREE.BoxGeometry(0.48,0.26,0.48),0,0.22,0);          // the block
-      B.at(stoneMat,new THREE.BoxGeometry(0.52,0.045,0.52),0,0.328,0);       // its capping course
-      B.at(ironMat,new THREE.BoxGeometry(0.42,0.085,0.18),0,0.435,0);        // anvil face
-      B.at(ironMat,new THREE.BoxGeometry(0.16,0.075,0.12),0,0.358,0);        // waist
-      B.at(ironMat,new THREE.BoxGeometry(0.28,0.05,0.16),0,0.371,0);         // foot
-      B.at(ironMat,new THREE.ConeGeometry(0.068,0.20,6),0.31,0.435,0,0,0,-Math.PI/2); // horn
-      B.at(voidMat,new THREE.BoxGeometry(0.06,0.008,0.05),-0.11,0.479,0);    // the hardie hole
+      /* Three courses of dressed stone with iron corner straps, not one cube. At a
+         tile's range this thing fills the lower half of the frame, so it is the
+         piece with the least excuse for having no joints in it — and the straps
+         and their rivets are what say the duergar built it rather than that it was
+         extruded. Each course is a hair narrower than the one below, which reads
+         as batter and stops the silhouette being a perfect prism. */
+      B.at(darkMat,new THREE.BoxGeometry(0.64,0.075,0.64),0,0.038,0);        // plinth
+      B.at(stoneMat,new THREE.BoxGeometry(0.58,0.025,0.58),0,0.088,0);       // its wash
+      const CO=[[0.52,0.095,0.108],[0.495,0.090,0.205],[0.47,0.085,0.294]];
+      for(const [w,h,yy] of CO)
+        B.at(darkMat,new THREE.BoxGeometry(w,h-0.008,w),0,yy,0);
+      B.at(stoneMat,new THREE.BoxGeometry(0.55,0.040,0.55),0,0.357,0);       // capping course
+      for(const sx of [-1,1])for(const sz of [-1,1]){                        // corner straps
+        B.at(ironMat,new THREE.BoxGeometry(0.035,0.235,0.10),sx*0.245,0.215,sz*0.16);
+        B.at(ironMat,new THREE.BoxGeometry(0.10,0.235,0.035),sx*0.16,0.215,sz*0.245);
+        addRivets(B,ironMat,sx*0.263,0.215,sz*0.16,3,0,0.17,0,0.013);
+        addRivets(B,ironMat,sx*0.16,0.215,sz*0.263,3,0,0.17,0,0.013);
+      }
+      addAnvil(B,{iron:ironMat,dark:darkMat,hole:voidMat},0,0.377,0,0.50);
       if(!f.opened){
-        /* The stock sits ON THE CAPPING COURSE IN FRONT of the anvil, not on the
-           anvil face. Stacked on the face it was hidden behind the anvil's own
-           silhouette from every approach, and taking it changed the room by one
-           small yellow rectangle — a one-shot the player would never notice
-           firing. In front it has its own footprint against the dark anvil and
-           the block is visibly bare afterwards. */
-        // Bar iron, with ONE ingot. Alternating gold and iron made the stock a
-        // stack of gold bars, which is a dragon's hoard rather than a smith's:
-        // what a duergar forge holds is stock to work, and the gold is the thing
-        // set aside on top of it.
-        for(let i=0;i<5;i++){
-          const row=i>2?1:0, k=row?i-3:i;
-          B.at(ironMat,new THREE.BoxGeometry(0.30,0.042,0.075),
-               0.02,0.372+row*0.044,0.10-k*0.085,0,(i%2?0.05:-0.04),0);
+        /* The stock stacks on the capping course along the FRONT EDGE of the
+           block, beside the anvil rather than on it.
+
+           Two placements failed first. On the anvil face it hid behind the
+           anvil's own silhouette from every approach — and once the anvil got its
+           real shape there was no room up there anyway. On the floor in front of
+           the block it fell out of the bottom of the frame: at a tile's range the
+           eye is 0.62 up and looking level, so the ground at the near edge of the
+           next tile is simply not in shot. Waist height on the front edge is the
+           one place that is both unobscured and framed. */
+        for(let i=0;i<4;i++){
+          const row=i>1?1:0, k=row?i-2:i;
+          B.at(ironMat,new THREE.BoxGeometry(0.30,0.038,0.062),
+               -0.02+row*0.012,0.396+row*0.040,0.185+k*0.070,0,(i%2?0.05:-0.04),0);
         }
-        B.at(goldMat,new THREE.BoxGeometry(0.09,0.05,0.09),0.05,0.441,0.06,0,0.5,0);
+        B.at(goldMat,new THREE.BoxGeometry(0.095,0.05,0.095),0.16,0.402,0.205,0,0.5,0);
       }
       B.addTo(g0);
       // every part of it answers the tap — the block, the anvil and the stock are
