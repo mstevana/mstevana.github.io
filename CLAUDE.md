@@ -1119,6 +1119,59 @@ walks every living preparer through `UI.openMemo` and only then calls
 would let a player re-prepare between fights, which is the decision the
 whole system exists to make.
 
+## Buffs cover the party, and say so
+
+**No buff spell targets `self` any more.** Shield, Mage Armor, Mirror
+Image, Fire Shield and Divine Power were `target:'self'`, which meant the
+one character who could least use them — the caster, standing in the back
+rank behind two people being hit — was the only one who got them. They are
+`target:'allies'` now, and `castSpell`'s existing allies branch does the
+rest: it walks `G.party`, skips the dead, and burns one slot for the whole
+sweep. `'self'` is still a supported target in `castSpell`; nothing uses it.
+
+The buff data needed no change for this, because every buff was already
+per-character. `ac`/`atk`/`dmg`/`saves`/`str` are summed out of `ch.buffs`
+by `charAC`/`attackBonus`/`charSaves`/`abilMod`, `images` and `dr`/`pool`
+are spent in `hurtChar`, `fireshield` fires from the struck character's own
+list in the monster's attack, and `freedom` is read by `addCond`. Four
+copies of a buff are four independent ledgers, which is what you want:
+Stoneskin's pool drains on whoever is actually being hit.
+
+Two things deliberately left alone:
+
+- **`target:'ally'` spells still pick one friend.** Stoneskin, Shield of
+  Faith, Protection from Evil, Bull's Strength and Freedom of Movement are
+  a choice about *who*, and the `UI.pickAlly` prompt is that choice. They
+  are not self-buffs and were never the complaint.
+- **The log still writes one line per target**, because `applySpellToAlly`
+  logs per character and Bless/Prayer/Mass Cure have always done that.
+
+**A buff can describe itself.** It used to be an anonymous `✦` on the
+portrait and nothing at all on the status sheet, so a party three wards
+deep could not tell which ward was about to lapse. `applySpellToAlly` now
+stamps `b.name` (the spell's display name) alongside `b.tag` (the stacking
+key — the two differ only for Mage Armor, whose tag is `magearmor`), and
+three helpers read it:
+
+- **`buffName(b)`** — `name`, falling back to `tag` for buffs in saves
+  written before the field existed.
+- **`buffEffects(b)`** — the bonuses as prose, built by probing the same
+  fields the rules read. Stoneskin reports its remaining `pool` rather
+  than only its time, because damage is what actually spends it.
+- **`buffLabel(b)`** — name, effects, and `fmtSecs(b.until - G.time)`.
+
+`liveBuffs(ch)` is the `until > G.time` filter, shared by both readouts:
+`openStats` prints a **Blessings** line above Afflictions, and
+`refreshParty` hangs the same label off each `✦` as a `title`. The portrait
+tooltip's countdown is only as fresh as the last `refreshParty` — that is
+fine for a tooltip, and the status sheet rebuilds on open.
+
+T56 covers this: that no buff spell targets `self`, that a cast lands on
+every living member and lifts each of their ACs, that the dead are skipped
+and a recast refreshes rather than stacks, that every buff in `SPELLS`
+produces a non-empty `buffEffects`, and that the sheet grows a Blessings
+line only when there is something to put in it.
+
 ## Hands and their timers
 
 `ch.cdL` / `ch.cdR` are two independent cooldowns, and which one a use arms
