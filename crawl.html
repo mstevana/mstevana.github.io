@@ -5780,6 +5780,136 @@ function dethekGlyph(ctx,x,y,h,seed){
   if(rr()<0.35){const at=y+h*(0.2+rr()*0.6);ctx.moveTo(x-h*0.18,at);ctx.lineTo(x+h*0.18,at);}
   ctx.stroke();
 }
+/* The two gods, carved rather than written, so unlike Dethek they are allowed
+   curves. Both are cut the same way the runes are — a dark stroke for the groove,
+   then a lit stroke offset up and left for the face of the cut — which is what
+   makes an incision read as depth instead of as paint.
+
+   Laduguer's is a broken crossbow bolt on a grey shield: the Grey Protector's
+   mark, and the one thing in the theme that has earned its gold. Deep Duerra's
+   is a mind flayer skull split by a crack across the crown — the duergar were
+   enslaved by illithids and she stole psionics from them, so her symbol is a
+   trophy taken off the thing that owned her people. */
+function laduguerMark(ctx,cx,cy,r,gold){
+  const shield=()=>{
+    ctx.beginPath();
+    ctx.moveTo(cx-r,cy-r*0.95);
+    ctx.lineTo(cx+r,cy-r*0.95);
+    ctx.lineTo(cx+r,cy+r*0.15);
+    ctx.quadraticCurveTo(cx+r*0.92,cy+r*0.95,cx,cy+r*1.25);
+    ctx.quadraticCurveTo(cx-r*0.92,cy+r*0.95,cx-r,cy+r*0.15);
+    ctx.closePath();
+  };
+  shield();ctx.fillStyle='rgba(0,0,0,0.34)';ctx.fill();     // the sunk field
+  shield();ctx.strokeStyle='rgba(0,0,0,0.62)';ctx.lineWidth=2.6;ctx.stroke();
+  shield();ctx.strokeStyle=gold;ctx.lineWidth=1.5;ctx.stroke();
+  ctx.save();ctx.translate(-0.5,-0.6);
+  shield();ctx.strokeStyle='rgba(255,244,205,0.34)';ctx.lineWidth=0.7;ctx.stroke();
+  ctx.restore();
+  /* The bolt, laid across the shield and snapped. Drawn in its own rotated frame
+     with +x toward the head, which is the only way the asymmetry survives: the
+     first attempt put a solid triangle on BOTH ends — a head at the point and
+     the "fletching" as a second triangle at the butt — and it read unmistakably
+     as a double-headed arrow with no break in it at all. A bolt is read from its
+     asymmetry: one narrow head, longer than it is wide, and vanes that sweep
+     BACK along the shaft rather than flaring off the end of it. And a break is
+     read from misalignment, not from a gap: the head half is kicked out of line
+     about the break so the two lengths visibly no longer belong to one shaft. */
+  const L=r*1.10, SH=r*0.10, BRK=r*0.10, KICK=0.30;
+  const bolt=(col)=>{
+    ctx.fillStyle=col;
+    ctx.beginPath();                                    // butt half of the shaft
+    ctx.rect(-L,-SH,L-BRK,SH*2);
+    ctx.fill();
+    for(const s of [-1,1]){                             // vanes, swept back
+      ctx.beginPath();
+      ctx.moveTo(-L+r*0.44,s*SH);
+      ctx.lineTo(-L+r*0.06,s*SH*3.4);
+      ctx.lineTo(-L-r*0.08,s*SH*3.0);
+      ctx.lineTo(-L+r*0.30,s*SH*0.6);
+      ctx.closePath();ctx.fill();
+    }
+    ctx.beginPath();                                    // the splintered butt face
+    ctx.moveTo(-BRK,-SH);ctx.lineTo(-BRK+r*0.09,0);ctx.lineTo(-BRK,SH);
+    ctx.closePath();ctx.fill();
+    ctx.save();ctx.translate(BRK,0);ctx.rotate(KICK);    // head half, kicked out of line
+    ctx.beginPath();ctx.rect(0,-SH,L*0.66,SH*2);ctx.fill();
+    ctx.beginPath();                                    // a long narrow head
+    ctx.moveTo(L*0.66,-SH*1.9);ctx.lineTo(L*1.02,0);ctx.lineTo(L*0.66,SH*1.9);
+    ctx.closePath();ctx.fill();
+    ctx.restore();
+  };
+  ctx.save();ctx.translate(cx,cy);ctx.rotate(-0.72);
+  bolt('rgba(0,0,0,0.70)');
+  ctx.translate(-0.6,-0.7);bolt(gold);
+  ctx.restore();
+}
+/* An illithid skull is read from three things and none of them is the outline:
+   a cranium taller than it is wide with no jaw under it, sockets set low and
+   slanted, and four tentacles hanging clear of each other. Drawn as outlines of
+   even weight it comes out as a cartoon face — the first attempt had round eyes,
+   a chin, and four inward-curling tentacles that merged into one shape reading
+   unmistakably as a mouth with a tongue in it. Solid silhouette, filled sockets,
+   and tentacles splayed OUTWARD and well below the skull is what fixes it. */
+function duerraMark(ctx,cx,cy,r){
+  const skull=()=>{
+    ctx.beginPath();
+    ctx.moveTo(cx,cy-r*1.00);                                   // the crown
+    ctx.bezierCurveTo(cx+r*0.86,cy-r*0.92, cx+r*0.80,cy-r*0.02, cx+r*0.40,cy+r*0.30);
+    ctx.bezierCurveTo(cx+r*0.20,cy+r*0.44, cx-r*0.20,cy+r*0.44, cx-r*0.40,cy+r*0.30);
+    ctx.bezierCurveTo(cx-r*0.80,cy-r*0.02, cx-r*0.86,cy-r*0.92, cx,cy-r*1.00);
+    ctx.closePath();
+  };
+  const tent=(s,k)=>{
+    const x0=cx+s*r*(0.08+k*0.26), y0=cy+r*0.22, w=r*0.13*(1-k*0.22);
+    const x1=cx+s*r*(0.44+k*0.44), y1=cy+r*0.74;
+    const x2=cx+s*r*(0.34+k*0.34), y2=cy+r*1.22;
+    ctx.beginPath();
+    ctx.moveTo(x0-w,y0);
+    ctx.quadraticCurveTo(x1-w*0.7,y1,x2,y2);
+    ctx.quadraticCurveTo(x1+w*0.7,y1,x0+w,y0);
+    ctx.closePath();
+  };
+  const body=(col)=>{
+    ctx.fillStyle=col;
+    skull();ctx.fill();
+    for(const s of [-1,1])for(const k of [0,1]){tent(s,k);ctx.fill();}
+  };
+  // the sunk field it is cut into, then the silhouette twice: dark, then a lit
+  // face offset up and left, which is the same incision the runes use
+  ctx.fillStyle='rgba(0,0,0,0.30)';
+  ctx.beginPath();ctx.ellipse(cx,cy+r*0.16,r*1.10,r*1.34,0,0,7);ctx.fill();
+  body('rgba(0,0,0,0.70)');
+  ctx.save();ctx.translate(-0.9,-1.0);body('rgba(226,220,202,0.34)');ctx.restore();
+  // sockets: filled, slanted, and set low — an outline here draws an eye
+  ctx.fillStyle='rgba(0,0,0,0.78)';
+  for(const s of [-1,1]){
+    ctx.beginPath();
+    ctx.moveTo(cx+s*r*0.13,cy-r*0.02);
+    ctx.quadraticCurveTo(cx+s*r*0.36,cy-r*0.36,cx+s*r*0.58,cy-r*0.10);
+    ctx.quadraticCurveTo(cx+s*r*0.38,cy+r*0.10,cx+s*r*0.13,cy-r*0.02);
+    ctx.closePath();ctx.fill();
+  }
+  // and the crack that makes it hers: one fissure off the crown, not a symmetric
+  // zigzag across it, which reads as a pair of eyebrows
+  ctx.strokeStyle='rgba(0,0,0,0.72)';ctx.lineWidth=2.2;ctx.lineJoin='miter';
+  ctx.beginPath();
+  ctx.moveTo(cx-r*0.30,cy-r*0.96);
+  ctx.lineTo(cx-r*0.05,cy-r*0.62);
+  ctx.lineTo(cx+r*0.34,cy-r*0.74);
+  ctx.lineTo(cx+r*0.55,cy-r*0.40);
+  ctx.lineTo(cx+r*0.82,cy-r*0.46);
+  ctx.stroke();
+  ctx.strokeStyle='rgba(226,220,202,0.32)';ctx.lineWidth=0.9;
+  ctx.save();ctx.translate(-0.7,-0.8);
+  ctx.beginPath();
+  ctx.moveTo(cx-r*0.30,cy-r*0.96);
+  ctx.lineTo(cx-r*0.05,cy-r*0.62);
+  ctx.lineTo(cx+r*0.34,cy-r*0.74);
+  ctx.lineTo(cx+r*0.55,cy-r*0.40);
+  ctx.lineTo(cx+r*0.82,cy-r*0.46);
+  ctx.stroke();ctx.restore();
+}
 function duergarWallCanvas(th,variant,base){
   const {cv,ctx}=newCanvas(128);
   const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
@@ -5802,10 +5932,19 @@ function duergarWallCanvas(th,variant,base){
       ctx.save();ctx.translate(-0.5,-0.6);dethekGlyph(ctx,gx,y,h,seed);ctx.restore();
     }
   }
-  // per-variant metalwork and wear on the block faces
+  /* Per-variant work on the block faces. Keyed on the variant itself rather than
+     on variant%4, because there are eight of them and the four spare slots were
+     repeats: the theme was showing the same three treatments twice each and one
+     of those three — a roundel with a meaningless star in it — said nothing about
+     whose hall this is. The eight now run plain, studs, chevrons, Laduguer, Deep
+     Duerra, a slave quota, an ore seam and the mason's roundel, so a long wall
+     carries the faith, the work and the mine rather than ornament alone.
+     `variant 0` is deliberately bare: with a device on every tile the frieze has
+     nothing to be read against. */
   const rr0=(variant*2654435761)>>>0;
   let sd=rr0;const rr=()=>{sd=(sd*1664525+1013904223)>>>0;return sd/4294967296;};
-  if(variant%4===1){                              // gold studs at the block corners
+  const BOT=base.rh*2.5;                          // the middle of the bottom course
+  if(variant===1){                                // gold studs at the block corners
     for(let r=0;r<base.rows;r++){
       const y=r*base.rh, phase=(r%2)?base.bw/2:0;
       for(let k=-1;k<=base.cols;k++){
@@ -5820,7 +5959,7 @@ function duergarWallCanvas(th,variant,base){
         }
       }
     }
-  }else if(variant%4===2){                        // a chevron course cut into the top band
+  }else if(variant===2){                          // a chevron course cut into the top band
     const y=base.rh*0.5, w=8;
     ctx.lineWidth=1.6;
     for(let x=-w;x<=128+w;x+=w){
@@ -5829,8 +5968,96 @@ function duergarWallCanvas(th,variant,base){
       ctx.strokeStyle='rgba(255,246,225,0.16)';
       ctx.beginPath();ctx.moveTo(x,y+3.2);ctx.lineTo(x+w/2,y-4.8);ctx.lineTo(x+w,y+3.2);ctx.stroke();
     }
-  }else if(variant%4===3){                        // a carved boss on one block of the bottom course
-    const cx=(variant%2?0.28:0.72)*128, cy=base.rh*2.5;
+  }else if(variant===3){                          // Laduguer, the Grey Protector
+    wrapX(()=>laduguerMark(ctx,0.30*128,BOT,12,gold));
+  }else if(variant===4){                          // Deep Duerra, and what she took it from
+    wrapX(()=>duerraMark(ctx,0.70*128,BOT-3,11.5));
+  }else if(variant===5){
+    /* A slave quota, cut where the overseer could reach it: fours struck through
+       by a fifth, in blocks, with the finished blocks scored out. Kept small and
+       high-contrast — at two tiles this has to read as writing rather than as
+       wear, and wear is what the wall already has plenty of. */
+    for(const [gx,gy] of [[0.12*128,BOT-11],[0.12*128,BOT+3],[0.66*128,BOT-4]]){
+      const groups=2+Math.floor(rr()*2);
+      for(let g=0;g<groups;g++){
+        const x0=gx+g*17, done=rr()<0.4;
+        wrapX(()=>{
+          for(let k=0;k<4;k++){
+            const x=x0+k*3.2;
+            ctx.strokeStyle='rgba(0,0,0,0.66)';ctx.lineWidth=1.9;
+            ctx.beginPath();ctx.moveTo(x,gy);ctx.lineTo(x+0.6,gy+10);ctx.stroke();
+            ctx.strokeStyle='rgba(255,246,225,0.34)';ctx.lineWidth=0.9;
+            ctx.beginPath();ctx.moveTo(x-0.7,gy-0.7);ctx.lineTo(x-0.1,gy+9.3);ctx.stroke();
+          }
+          ctx.strokeStyle='rgba(0,0,0,0.66)';ctx.lineWidth=1.9;
+          ctx.beginPath();ctx.moveTo(x0-1.8,gy+9.6);ctx.lineTo(x0+11.4,gy+0.6);ctx.stroke();
+          ctx.strokeStyle='rgba(255,246,225,0.34)';ctx.lineWidth=0.9;
+          ctx.beginPath();ctx.moveTo(x0-2.5,gy+8.9);ctx.lineTo(x0+10.7,gy-0.1);ctx.stroke();
+          if(done){                              // the tally paid off, scored out
+            ctx.strokeStyle='rgba(0,0,0,0.50)';ctx.lineWidth=2.6;
+            ctx.beginPath();ctx.moveTo(x0-3,gy+5);ctx.lineTo(x0+13,gy+5);ctx.stroke();
+          }
+        });
+      }
+    }
+  }else if(variant===6){
+    /* Where the hall was driven through a vein the dressing simply stops: the
+       facing is broken out, the raw rock behind it shows, and the ore is gone.
+       What is left is the ghost of the seam and the chisel marks of the men who
+       took it. Kept clear of the frieze, which is cut into the finished stone and
+       would not survive the hole. */
+    const cx=0.5*128, cy=BOT-2, R=26;
+    const body=genBlob(cx,cy,R,0.62);
+    wrapX(()=>{
+      pathBlob(ctx,body);
+      ctx.fillStyle=shade(th.wall,-0.52);ctx.fill();
+      /* The edge is a broken lip of stone, not a cut line. One even stroke round
+         the whole thing reads as a sticker pasted on the wall; what makes it a
+         hole is a shadow inside the top edge, a lit lip along the bottom where
+         the break catches the torch, and an outline that varies segment to
+         segment as a fracture does. */
+      ctx.save();pathBlob(ctx,body);ctx.clip();
+      ctx.strokeStyle='rgba(0,0,0,0.55)';ctx.lineWidth=6;pathBlob(ctx,body);ctx.stroke();
+      ctx.restore();
+      body.forEach(([px,py],i)=>{
+        const [qx,qy]=body[(i+1)%body.length];
+        const down=(py+qy)/2>cy;
+        ctx.strokeStyle=down?'rgba(255,246,225,0.16)':'rgba(0,0,0,0.5)';
+        ctx.lineWidth=down?1.6:1.2;
+        ctx.beginPath();ctx.moveTo(px,py+(down?1:0));ctx.lineTo(qx,qy+(down?1:0));ctx.stroke();
+      });
+      ctx.save();pathBlob(ctx,body);ctx.clip();
+      // broken rock inside the hole: angular facets, no courses
+      for(let i=0;i<26;i++){
+        const fx=cx+(rr()-0.5)*R*2, fy=cy+(rr()-0.5)*R*1.6, fr=2+rr()*6;
+        pathBlob(ctx,genBlob(fx,fy,fr,0.9));
+        ctx.fillStyle=shade(th.wall,-0.34-rr()*0.34);ctx.fill();
+        ctx.strokeStyle='rgba(0,0,0,0.28)';ctx.lineWidth=0.8;ctx.stroke();
+      }
+      // the seam itself: a band of dull metal wandering across the break
+      ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=4.2;
+      ctx.beginPath();ctx.moveTo(cx-R,cy+5);
+      ctx.bezierCurveTo(cx-R*0.3,cy-9,cx+R*0.3,cy+11,cx+R,cy-6);ctx.stroke();
+      ctx.strokeStyle='rgba(150,146,132,0.42)';ctx.lineWidth=2.4;
+      ctx.beginPath();ctx.moveTo(cx-R,cy+4.4);
+      ctx.bezierCurveTo(cx-R*0.3,cy-9.6,cx+R*0.3,cy+10.4,cx+R,cy-6.6);ctx.stroke();
+      for(let i=0;i<14;i++){                     // flecks the pick missed
+        const t=rr(), px=cx-R+t*R*2, py=cy+4-Math.sin(t*3.1)*8+(rr()-0.5)*4;
+        ctx.fillStyle=`rgba(214,208,188,${0.22+rr()*0.3})`;
+        ctx.fillRect(px,py,1+rr()*1.6,1);
+      }
+      ctx.restore();
+      // chisel marks radiating off the edge, into the dressed stone
+      for(let i=0;i<30;i++){
+        const a=rr()*Math.PI*2, r0=R*(0.86+rr()*0.26);
+        const x0=cx+Math.cos(a)*r0, y0=cy+Math.sin(a)*r0*0.8, l=2+rr()*4;
+        ctx.strokeStyle='rgba(0,0,0,0.30)';ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(x0,y0);
+        ctx.lineTo(x0+Math.cos(a)*l,y0+Math.sin(a)*l*0.8);ctx.stroke();
+      }
+    });
+  }else if(variant===7){                          // the mason's roundel
+    const cx=(variant%2?0.28:0.72)*128, cy=BOT;
     wrapX(()=>{
       ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=2;
       ctx.beginPath();ctx.arc(cx,cy,9,0,7);ctx.stroke();
