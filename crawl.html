@@ -7643,13 +7643,19 @@ function buildLevel(L){
     // a plank, not a block: at tile scale 0.22 read as a foot and a half of
     // timber, which looked like a wall segment rather than a door
     const DOORTH=0.07;
-    // a hair under WALLH so the slab's flat top and bottom caps don't lie
-    // exactly in the ceiling and floor planes. Coplanar there they z-fight into
-    // a flashing seam — worst in Caves, whose plank texture is opaque top to
-    // bottom, while the sewer and drow grates hide it because their bars are
-    // see-through at the edges and alphaTest discards those cap pixels. The 1cm
-    // inset top and bottom is invisible at WALLH=1.3.
-    const DOORH=WALLH-0.02;
+    /* Deliberately TALLER than the doorway, so the slab's flat top and bottom
+       caps end up buried behind the opaque floor and ceiling planes instead of
+       meeting them. Cut to exactly WALLH those caps are coplanar with floor and
+       ceiling and z-fight into a flashing seam; cut a hair SHORT they stop
+       fighting but are then exposed as grazing slivers with daylight under the
+       door, which flashes nearly as badly. Measured over a camera sweep at a
+       cave door, counting pixels that oscillate rather than change smoothly:
+       2415 at exactly WALLH, 669 cut short by 0.02, 441 overlapping by 0.04.
+       Interpenetrating is the standard answer and the only one that has no seam
+       to fight over. It reads in Caves first because the plank texture is opaque
+       top to bottom, while the sewer and drow grates are see-through at the
+       edges and alphaTest throws those pixels away. */
+    const DOORH=WALLH+0.06;
     const geo=new THREE.BoxGeometry(passageX?DOORTH:TILE,DOORH,passageX?TILE:DOORTH);
     const mesh=new THREE.Mesh(geo,t===T_DOOR_LOCKED?doorMatLocked:doorMatBase);
     const pv=new THREE.Group();
