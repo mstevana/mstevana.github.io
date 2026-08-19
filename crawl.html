@@ -70,8 +70,23 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
   border:1px solid var(--btn-line);color:var(--ink);display:flex;align-items:center;justify-content:center;font-size:20px;z-index:5;}
 .topbtn:active{background:#3a2f1d;}
 #b-map{left:8px;} #b-log{left:58px;} #b-rest{left:108px;} #b-mute{left:158px;} #b-menu{left:208px;}
-#memo-body{height:min(48vh,300px);overflow-y:auto;text-align:left;background:#0d0b07;
-  border:1px solid var(--btn-line);border-radius:6px;padding:6px 8px;margin-bottom:8px;font-size:12px;}
+/* two panes: the book on the left, what the selected spell does on the right.
+   The descendant selectors below still match through #memo-list, so the row
+   styling did not have to move with it. */
+#memo-body{display:flex;gap:8px;align-items:stretch;margin-bottom:8px;font-size:12px;text-align:left;}
+#memo-list{flex:1 1 58%;min-width:0;height:min(48vh,300px);overflow-y:auto;background:#0d0b07;
+  border:1px solid var(--btn-line);border-radius:6px;padding:6px 8px;}
+#memo-detail{flex:1 1 42%;min-width:0;height:min(48vh,300px);overflow-y:auto;background:#0d0b07;
+  border:1px solid var(--btn-line);border-radius:6px;padding:8px;color:var(--ink-dim);}
+#memo-body .mrow .mname{cursor:pointer;}
+#memo-body .mrow.sel{background:#241d13;border-radius:4px;}
+#memo-body .mrow.sel .mname{color:#e0cf9e;}
+#memo-detail .dt-name{color:#e0cf9e;font-size:14px;margin-bottom:1px;}
+#memo-detail .dt-sub{color:#8a7f66;margin-bottom:6px;}
+#memo-detail .dt-desc{color:var(--ink);line-height:1.5;margin-bottom:7px;}
+#memo-detail .dt-row{display:flex;gap:6px;padding:3px 0;border-top:1px solid #1d1811;}
+#memo-detail .dt-k{flex:0 0 66px;color:#8a7f66;}
+#memo-detail .dt-v{flex:1 1 auto;min-width:0;color:#c9b98a;}
 #memo-body .mcirc{color:#e0cf9e;font-weight:bold;margin:6px 0 3px;border-bottom:1px solid #241d13;padding-bottom:2px;}
 #memo-body .mcirc .full{color:#8a7f66;font-weight:normal;float:right;}
 #memo-body .mrow{display:flex;align-items:center;gap:6px;padding:3px 2px;}
@@ -320,7 +335,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 <div class="ovl" id="ovl-memo"><div class="panel" style="width:min(620px,94vw)">
   <h2 id="memo-title">Memorise</h2>
   <div class="dim-note" id="memo-sub"></div>
-  <div id="memo-body"></div>
+  <div id="memo-body"><div id="memo-list"></div><div id="memo-detail"></div></div>
   <div class="row">
     <button class="mbtn small" id="memo-clear">Clear all</button>
     <button class="mbtn small" id="memo-auto">Fill</button>
@@ -4760,6 +4775,64 @@ function buffEffects(b){
 function buffLabel(b){
   const eff=buffEffects(b);
   return buffName(b)+(eff?' ('+eff+')':'')+' — '+fmtSecs(b.until-G.time);
+}
+/* What a spell does, as structured rows, for the memorise panel's detail pane.
+   Everything is probed off the same fields the rules themselves read, so a
+   spell describes itself correctly the moment it is written — there is no
+   second table to keep in step. The prose `desc` carries the damage dice
+   (a dmgFn cannot be asked what it rolls without rolling it), so these rows
+   deliberately cover the mechanics AROUND the damage rather than repeating it. */
+const SAVE_LBL={ref:'Reflex',fort:'Fortitude',will:'Will'};
+const TARGET_LBL={foe:'One foe',foes:'Every foe in the area',ally:'One companion',
+  allies:'The whole party',self:'The caster'};
+function spellAreaText(a){
+  if(!a)return null;
+  if(a.kind==='burst')return 'Burst — everything within '+a.r+' tiles';
+  if(a.kind==='column')return 'Column — a pillar '+a.r+' tiles across';
+  if(a.kind==='line')return 'Line — '+a.len+' tiles straight ahead, one wide';
+  if(a.kind==='cone')return 'Cone — '+a.len+' tiles deep, widening';
+  return a.kind;
+}
+function spellEffects(sp){
+  const rows=[];
+  const add=(k,v)=>{if(v)rows.push({k,v});};
+  add('Target',TARGET_LBL[sp.target]||sp.target);
+  add('Area',spellAreaText(sp.area));
+  add('Save',sp.save
+    ? (SAVE_LBL[sp.save.type]||sp.save.type)+(sp.save.half?' — half on a success':sp.save.negate?' — negates':'')
+    : (sp.auto?'None — it always lands':'None'));
+  if(sp.buff){
+    // the template's `pool` is a budget to spend, not a remainder, so it is
+    // worded here rather than borrowing buffEffects' "hp left"
+    const b=Object.assign({},sp.buff);delete b.pool;
+    add('Grants',buffEffects(b));
+    if(sp.buff.pool)add('Absorbs',sp.buff.pool+' damage');
+    add('Lasts',sp.buff.dur?fmtSecs(sp.buff.dur):null);
+  }
+  if(sp.dot)add('Then',fmtDice(sp.dot.dmg[0],sp.dot.dmg[1])+' '+sp.dot.label+' a round for '+sp.dot.ticks+' rounds');
+  if(sp.healFn)add('Heals',sp.target==='allies'?'every living companion':'the target');
+  const holds=[];
+  if(sp.sleep)holds.push('puts it to sleep');
+  if(sp.hold)holds.push('holds it fast for '+sp.hold+'s');
+  if(sp.stun)holds.push('stuns for '+sp.stun+'s');
+  if(sp.slow)holds.push('halves its speed for '+sp.slow+'s');
+  if(sp.slowAll)holds.push('halves the speed of every foe caught, for '+sp.slowAll+'s');
+  if(sp.shaken)holds.push('leaves it shaken for '+sp.shaken+'s');
+  if(sp.negLevels)holds.push(sp.negLevels+' negative level'+(sp.negLevels>1?'s':''));
+  if(sp.drain)holds.push('the caster gains the life taken');
+  add('Effect',holds.join(', '));
+  const mends=[];
+  if(sp.cures&&sp.cures.length)mends.push('cures '+sp.cures.join(', '));
+  if(sp.restoreAbility)mends.push(sp.restoreAbility>=99?'restores drained ability scores':'restores up to '+sp.restoreAbility+' points of drained ability');
+  if(sp.restoreLevels)mends.push('restores lost levels');
+  if(sp.dispel)mends.push('strips magical effects');
+  if(sp.raise)mends.push('returns the dead to life');
+  add('Mends',mends.join(', '));
+  const only=[];
+  if(sp.humanoidOnly)only.push('humanoids');
+  if(sp.vsUndead)only.push('undead');
+  add('Only vs',only.join(', '));
+  return rows;
 }
 function canAct(ch){
   return !ch.dead&&ch.hp>0&&!hasCond(ch,'paralysis')&&!hasCond(ch,'sleep')
@@ -13957,13 +14030,24 @@ const UI=(()=>{
   // The wizard sets their loadout here and it holds until the next camp. What
   // is shown is the book, one block per circle, with the slots for that circle
   // as the budget. Rebuilt on every change: the whole panel is a dozen rows.
-  let memoCh=null,memoThen=null;
+  let memoCh=null,memoThen=null,memoSel=null;
+  /* the right-hand pane: what the spell picked on the left actually does */
+  function renderMemoDetail(){
+    const box=$('memo-detail');
+    const sp=memoSel&&SPELLS[memoSel];
+    if(!sp){box.innerHTML='<div class="dt-sub">Tap a spell to read what it does.</div>';return;}
+    const rows=spellEffects(sp).map(r=>
+      '<div class="dt-row"><div class="dt-k">'+r.k+'</div><div class="dt-v">'+r.v+'</div></div>').join('');
+    box.innerHTML='<div class="dt-name">'+sp.name+'</div>'+
+      '<div class="dt-sub">'+sp.circle+ordSuffix(sp.circle)+' circle · '+sp.list+'</div>'+
+      '<div class="dt-desc">'+sp.desc+'</div>'+rows;
+  }
   function renderMemo(){
     const ch=memoCh;if(!ch)return;
     const slots=charSlots(ch);
     $('memo-title').textContent=ch.name+' — memorise';
     $('memo-sub').textContent='Chosen now, carried until the next camp. Only what is memorised can be cast.';
-    const body=$('memo-body');
+    const body=$('memo-list');
     body.innerHTML='';
     let anything=false;
     for(let c=1;c<=5;c++){
@@ -13984,12 +14068,17 @@ const UI=(()=>{
         const sp=SPELLS[key];
         const n=ch.memo[c-1].filter(k=>k===key).length;
         const row=document.createElement('div');
-        row.className='mrow';
+        row.className='mrow'+(memoSel===key?' sel':'');
         row.innerHTML='<button class="mbtn2" data-d="-1">−</button>'+
           '<span class="mcount">'+n+'</span>'+
           '<button class="mbtn2" data-d="1">+</button>'+
           '<span class="mname">'+sp.name+'</span>';
         row.title=sp.desc;
+        // tapping the NAME reads the spell; the ± buttons are left alone, so
+        // choosing a loadout and reading about it never fight over one tap
+        row.querySelector('.mname').addEventListener('click',()=>{
+          memoSel=key;renderMemo();
+        });
         const [minus,plus]=row.querySelectorAll('.mbtn2');
         minus.disabled=n<=0;
         plus.disabled=used>=slots[c-1];
@@ -14008,11 +14097,13 @@ const UI=(()=>{
     if(!anything&&!body.children.length){
       body.innerHTML='<div class="none">'+ch.name+' has no spells they can prepare.</div>';
     }
+    renderMemoDetail();
   }
   // `then` is how the rest flow waits for the loadout before it sleeps
   function openMemo(ch,then){
     memoCh=ensureBook(ch);memoThen=then||null;
     ch.memo=trimMemo(ch);
+    memoSel=null;   // a fresh camp opens on the hint, not on the last wizard's pick
     renderMemo();show('ovl-memo');
   }
   function closeMemo(){
