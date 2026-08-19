@@ -894,6 +894,30 @@ three themes carry real machinery:
   rays from the corner it came out as metre-long rods lying flat on the floor,
   neither a web nor in the corner.
 
+  **Hanging cobwebs are the crypt's, reused.** `cobwebGeo(rnd,size)` was hoisted
+  out of the crypt's dressing block to module scope and returns bare line
+  geometry, so the caller picks the material, the tint and where it hangs — which
+  is the whole difference between the two themes. The corner sheets above are
+  silk that was *spun*; these are old tangle up in the dark that nobody has
+  swept, and they are what makes a corridor read as a spider city. About 42 a
+  floor against the crypt's 15.
+
+  Three things worth knowing before adding a third user:
+
+  - **Each web is its own `LineSegments` with its own material clone**, because
+    `shadeSprites` dims each by its own distance — cobwebs are unlit geometry and
+    without that a web ten tiles off is as bright as one overhead. So the count
+    is a draw-call count, and `DROW_WEBS` caps it.
+  - **The cap is spent as a RATE, not as a running total.** Counting up to a
+    limit inside a scan that runs top-left to bottom-right puts every web in the
+    first rooms it meets and leaves the bottom of a large floor bare. The floor's
+    tiles are counted before the loop and the cap turned into a per-tile
+    probability; the hard stop stays only as a backstop.
+  - **`shadeSprites` writes `material.color` every frame**, so a theme's own silk
+    colour cannot live in the material — it goes on `userData.webBase`, which the
+    shading multiplies instead of the shared `WEB_BASE`. The drow's is cooler,
+    because everything in the house is lit by faerzress.
+
   **The web snare** is the theme's one rules change. It **extends** the trap pool
   on drow floors rather than replacing anything, so `nTraps` is untouched and a
   snare displaces some other trap instead of adding to the tally. Reflex or

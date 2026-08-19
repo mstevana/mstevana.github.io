@@ -7704,6 +7704,44 @@ function initRenderer(){
 const SPRITE_GAIN=0.55, SPRITE_FLOOR=0.13;
 const _sprC=new THREE.Color();
 const WEB_BASE=new THREE.Color(0xbfc4ca); // a cobweb's own pale colour, before the torch dims it
+/* A corner cobweb built from real threads rather than a flat pane: an apex at
+   the top, radial spokes fanning down from it, sagging cross-threads webbing
+   them together, and a couple of broken strands trailing off.
+
+   This lived inside the crypt's dressing block until the drow wanted it too.
+   It takes a seeded `rnd` and a size and returns bare line geometry, so the
+   caller decides the material, the tint and where it hangs — which is the whole
+   of the difference between a crypt's cobweb and a drow house's. */
+function cobwebGeo(rnd,size){
+  const v=[],add=(ax,ay,bx,by)=>v.push(ax,ay,0,bx,by,0);
+  const hy=size*0.52;                        // apex, top-centre
+  const n=6+Math.floor(rnd()*3),span=1.25;   // spokes fan downward from it
+  const tips=[];
+  for(let i=0;i<n;i++){
+    const a=-span+2*span*(i/(n-1))+(rnd()-0.5)*0.08, r=size*(0.9+rnd()*0.25);
+    const tx=Math.sin(a)*r,ty=hy-Math.cos(a)*r;
+    tips.push([tx,ty]);add(0,hy,tx,ty);       // radial spoke
+  }
+  const rings=4+Math.floor(rnd()*2);          // concentric cross-threads
+  for(let k=1;k<=rings;k++){
+    const f=k/(rings+1);
+    for(let i=0;i<tips.length-1;i++){
+      const ax=tips[i][0]*f,ay=hy+(tips[i][1]-hy)*f;
+      const bx=tips[i+1][0]*f,by=hy+(tips[i+1][1]-hy)*f;
+      const mx=(ax+bx)/2,my=(ay+by)/2;         // sag the chord toward the apex
+      const dx=-mx,dy=hy-my,dl=Math.hypot(dx,dy)||1,s=size*0.12*(0.6+rnd()*0.7);
+      const cx=mx+dx/dl*s,cy=my+dy/dl*s;
+      add(ax,ay,cx,cy);add(cx,cy,bx,by);
+    }
+  }
+  for(let i=0;i<2+Math.floor(rnd()*3);i++){    // stray broken threads
+    const t=tips[Math.floor(rnd()*tips.length)];
+    add(t[0],t[1],t[0]+(rnd()-0.5)*size*0.35,t[1]-rnd()*size*0.5);
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));
+  return g;
+}
 function lightAt(x,y,z){
   const t=R3.torch,f=R3.torchFill,a=R3.ambient;
   const att=(L)=>{
@@ -7735,8 +7773,12 @@ function shadeSprites(){
   }
   // cobwebs are unlit line geometry, so without this a web ten tiles off is as
   // bright as one overhead; multiply their pale colour by the same torch falloff
+  // `webBase` lets a theme keep its own silk colour through this: the drow's
+  // catches the faerzress and is cooler than a crypt's dust-grey, and without
+  // it the shared WEB_BASE written here every frame would flatten the two.
   if(R3.webMeshes)for(const w of R3.webMeshes){
-    if(w.material)w.material.color.copy(WEB_BASE).multiply(lightAt(w.position.x,w.position.y,w.position.z));
+    if(w.material)w.material.color.copy(w.userData.webBase||WEB_BASE)
+      .multiply(lightAt(w.position.x,w.position.y,w.position.z));
   }
 }
 function onResize(){
@@ -8484,39 +8526,6 @@ function buildLevel(L){
       const webMat=new THREE.MeshBasicMaterial({color:0x9aa0a6,transparent:true,opacity:0.13,
         side:THREE.DoubleSide,depthWrite:false});
       const webLineMat=new THREE.LineBasicMaterial({color:0xbfc4ca,transparent:true,opacity:0.32,depthWrite:false});
-      // a corner cobweb built from real threads rather than a flat pane: an apex
-      // at the top, radial spokes fanning down, sagging cross-threads webbing
-      // them together, and a couple of broken strands trailing off
-      const cobwebGeo=(rnd,size)=>{
-        const v=[],add=(ax,ay,bx,by)=>v.push(ax,ay,0,bx,by,0);
-        const hy=size*0.52;                        // apex, top-centre
-        const n=6+Math.floor(rnd()*3),span=1.25;   // spokes fan downward from it
-        const tips=[];
-        for(let i=0;i<n;i++){
-          const a=-span+2*span*(i/(n-1))+(rnd()-0.5)*0.08, r=size*(0.9+rnd()*0.25);
-          const tx=Math.sin(a)*r,ty=hy-Math.cos(a)*r;
-          tips.push([tx,ty]);add(0,hy,tx,ty);       // radial spoke
-        }
-        const rings=4+Math.floor(rnd()*2);          // concentric cross-threads
-        for(let k=1;k<=rings;k++){
-          const f=k/(rings+1);
-          for(let i=0;i<tips.length-1;i++){
-            const ax=tips[i][0]*f,ay=hy+(tips[i][1]-hy)*f;
-            const bx=tips[i+1][0]*f,by=hy+(tips[i+1][1]-hy)*f;
-            const mx=(ax+bx)/2,my=(ay+by)/2;         // sag the chord toward the apex
-            const dx=-mx,dy=hy-my,dl=Math.hypot(dx,dy)||1,s=size*0.12*(0.6+rnd()*0.7);
-            const cx=mx+dx/dl*s,cy=my+dy/dl*s;
-            add(ax,ay,cx,cy);add(cx,cy,bx,by);
-          }
-        }
-        for(let i=0;i<2+Math.floor(rnd()*3);i++){    // stray broken threads
-          const t=tips[Math.floor(rnd()*tips.length)];
-          add(t[0],t[1],t[0]+(rnd()-0.5)*size*0.35,t[1]-rnd()*size*0.5);
-        }
-        const g=new THREE.BufferGeometry();
-        g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));
-        return g;
-      };
       // Dressing is built as instanced primitives — one draw call per shape
       // however many tiles carry it — so the detail below stays cheap. Each
       // feature composes a base transform (tile position + a seeded yaw) and
@@ -9532,6 +9541,34 @@ function buildLevel(L){
     const strands=[],sacs=[],chit=[],bolts=[];
     const wall=(x,y)=>{const t=L.grid[y*L.w+x];return t===T_WALL||t===T_SECRET;};
     const busy=new Set((L.drow||[]).map(f=>f.x+','+f.y));
+    /* Hanging cobwebs, the crypt's own geometry hung on the drow's terms. The
+       corner sheets above are silk that was SPUN — flat, taut, in the one place
+       a strand has two anchors — and the house needed the other kind too: old
+       tangle up in the dark that nobody has swept, which is what actually reads
+       as a spider city when you walk down a corridor.
+
+       Cooler and a touch brighter than a crypt's dust-grey, because everything
+       in here is lit by faerzress. `webBase` carries that through `shadeSprites`.
+
+       Each web is its own LineSegments with its own material clone, so each can
+       be dimmed by its own distance — which is why the count is CAPPED. The
+       crypt's 4% of tiles is about sixteen draw calls on a big floor; a house
+       thick enough with web to notice runs three times that, and DROW_WEBS is
+       what stops a large open level turning into a hundred. */
+    const DROW_WEBS=30;
+    const dWebBase=new THREE.Color(0xc6c2e0);
+    const dWebMat=new THREE.LineBasicMaterial({color:0xc6c2e0,transparent:true,
+      opacity:0.30,depthWrite:false});
+    /* The budget is spent as a RATE rather than as a running total. Counting up
+       to a cap inside a scan that runs top-left to bottom-right puts every web
+       in the first rooms it meets and leaves the bottom of a large floor bare —
+       the cap has to be turned into a per-tile probability against the floor's
+       own size before the loop, so the thirty are spread over the whole level.
+       A hard stop is still kept, as a backstop rather than as the mechanism. */
+    let nFloor=0;
+    for(let i=0;i<L.grid.length;i++)if(L.grid[i]===T_FLOOR)nFloor++;
+    const webP=Math.min(0.13,DROW_WEBS/Math.max(1,nFloor));
+    let nWebs=0;
     for(let y=1;y<L.h-1;y++)for(let x=1;x<L.w-1;x++){
       if(L.grid[y*L.w+x]!==T_FLOOR)continue;
       let hsh=((x*2246822519)^(y*3266489917))>>>0;
@@ -9557,6 +9594,30 @@ function buildLevel(L){
           const a=(k+0.5)/4*(Math.PI/2), t=0.33;
           strands.push(segM(ax,0.018,az,
                             ax-dx*Math.cos(a)*t,0.235,az-dz*Math.sin(a)*t, 0.0045));
+        }
+      }
+      /* Hung BEFORE the furniture check, and it is the one piece of dressing
+         that may share a tile with a wall feature: these ride up near the roof
+         and a rose window or a brazier is down on the wall face, so nothing
+         collides. Against a wall it hangs off that wall; in the open it swings
+         from the ceiling, because drow silk spans whatever it likes. */
+      if(nWebs<DROW_WEBS*1.6&&rr()<webP){
+        const near=[[-1,0],[1,0],[0,-1],[0,1]].filter(([dx,dz])=>wall(x+dx,y+dz));
+        const n2=1+(rr()<0.30?1:0);
+        for(let k=0;k<n2;k++){
+          const w2=new THREE.LineSegments(cobwebGeo(rr,0.42+rr()*0.40),dWebMat.clone());
+          const a2=near.length?near[Math.floor(rr()*near.length)]:null;
+          // high, but not all at one height — a row of webs level with each
+          // other reads as a fitting rather than as neglect
+          const hy2=WALLH-0.14-rr()*0.52;
+          w2.position.set(cx+(a2?a2[0]*0.34:(rr()-0.5)*0.5),hy2,
+                          cz+(a2?a2[1]*0.34:(rr()-0.5)*0.5));
+          w2.rotation.set((rr()-0.5)*0.6,a2?Math.atan2(-a2[0],-a2[1]):rr()*Math.PI*2,
+                          (rr()-0.5)*0.7);
+          w2.userData.decor=true;w2.userData.webBase=dWebBase;
+          litter.add(w2);
+          (R3.webMeshes||(R3.webMeshes=[])).push(w2);
+          nWebs++;
         }
       }
       if(busy.has(x+','+y))continue;                // a wall feature stands here
