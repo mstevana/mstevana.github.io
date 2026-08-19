@@ -76,17 +76,18 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 #memo-body{display:flex;gap:8px;align-items:stretch;margin-bottom:8px;font-size:12px;text-align:left;}
 #memo-list{flex:1 1 58%;min-width:0;height:min(48vh,300px);overflow-y:auto;background:#0d0b07;
   border:1px solid var(--btn-line);border-radius:6px;padding:6px 8px;}
-#memo-detail{flex:1 1 42%;min-width:0;height:min(48vh,300px);overflow-y:auto;background:#0d0b07;
-  border:1px solid var(--btn-line);border-radius:6px;padding:8px;color:var(--ink-dim);}
 #memo-body .mrow .mname{cursor:pointer;}
 #memo-body .mrow.sel{background:#241d13;border-radius:4px;}
 #memo-body .mrow.sel .mname{color:#e0cf9e;}
-#memo-detail .dt-name{color:#e0cf9e;font-size:14px;margin-bottom:1px;}
-#memo-detail .dt-sub{color:#8a7f66;margin-bottom:6px;}
-#memo-detail .dt-desc{color:var(--ink);line-height:1.5;margin-bottom:7px;}
-#memo-detail .dt-row{display:flex;gap:6px;padding:3px 0;border-top:1px solid #1d1811;}
-#memo-detail .dt-k{flex:0 0 66px;color:#8a7f66;}
-#memo-detail .dt-v{flex:1 1 auto;min-width:0;color:#c9b98a;}
+/* the read-what-it-does pane, shared by the memorise and cast windows */
+.detail-pane{flex:1 1 42%;min-width:0;height:min(48vh,300px);overflow-y:auto;background:#0d0b07;
+  border:1px solid var(--btn-line);border-radius:6px;padding:8px;color:var(--ink-dim);font-size:12px;}
+.dt-name{color:#e0cf9e;font-size:14px;margin-bottom:1px;}
+.dt-sub{color:#8a7f66;margin-bottom:6px;}
+.dt-desc{color:var(--ink);line-height:1.5;margin-bottom:7px;}
+.dt-row{display:flex;gap:6px;padding:3px 0;border-top:1px solid #1d1811;}
+.dt-k{flex:0 0 66px;color:#8a7f66;}
+.dt-v{flex:1 1 auto;min-width:0;color:#c9b98a;}
 #memo-body .mcirc{color:#e0cf9e;font-weight:bold;margin:6px 0 3px;border-bottom:1px solid #241d13;padding-bottom:2px;}
 #memo-body .mcirc .full{color:#8a7f66;font-weight:normal;float:right;}
 #memo-body .mrow{display:flex;align-items:center;gap:6px;padding:3px 2px;}
@@ -201,16 +202,18 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 #drag-ghost svg{width:100%;height:100%;}
 /* fixed width so a long description wraps inside the panel instead of
    stretching it — the panel must not change width as items are inspected */
-#item-tip,#spell-tip{font-size:12px;color:var(--ink-dim);margin-top:6px;overflow-wrap:break-word;}
-#item-tip{width:256px;min-height:52px;}  /* 256 = the pack grid: 5*48 + 4*4 gaps */
-#spell-tip{width:270px;min-height:46px;} /* 270 = #spell-list min-width */
+#item-tip{font-size:12px;color:var(--ink-dim);margin-top:6px;overflow-wrap:break-word;
+  width:256px;min-height:52px;}  /* 256 = the pack grid: 5*48 + 4*4 gaps */
 /* stats screen */
 .stat-lines{font-size:13px;line-height:1.55;}
 .stat-lines b{color:#e0cf9e;font-weight:normal;}
 .xpbar{height:10px;background:#0d0b08;border:1px solid var(--line);border-radius:3px;overflow:hidden;margin:4px 0;}
 .xpfill{height:100%;background:#6b5a9e;}
 /* spell menu */
-#spell-list{display:flex;flex-direction:column;gap:4px;max-height:70vh;overflow:auto;min-width:270px;}
+#spell-body{display:flex;gap:8px;align-items:stretch;margin-bottom:8px;text-align:left;}
+#spell-list{display:flex;flex-direction:column;gap:4px;flex:1 1 56%;min-width:0;
+  height:min(48vh,300px);overflow:auto;}
+.spell-row.sel{border-color:var(--ink);background:#3a2f1d;}
 .spell-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border:1px solid var(--btn-line);border-radius:5px;background:var(--btn);}
 .spell-row:active{background:#332a1c;}
 .spell-row.nosl{opacity:.35;}
@@ -325,17 +328,19 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   <button class="mbtn small" id="best-close">Close</button>
 </div></div>
 
-<div class="ovl" id="ovl-spells"><div class="panel">
+<div class="ovl" id="ovl-spells"><div class="panel" style="width:min(620px,94vw)">
   <h2 id="sp-title">Spells</h2>
-  <div id="spell-list"></div>
-  <div id="spell-tip"></div>
-  <button class="mbtn small" id="sp-close">Close</button>
+  <div id="spell-body"><div id="spell-list"></div><div id="spell-detail" class="detail-pane"></div></div>
+  <div class="row">
+    <button class="mbtn small" id="sp-cast">Cast</button>
+    <button class="mbtn small" id="sp-close">Cancel</button>
+  </div>
 </div></div>
 
 <div class="ovl" id="ovl-memo"><div class="panel" style="width:min(620px,94vw)">
   <h2 id="memo-title">Memorise</h2>
   <div class="dim-note" id="memo-sub"></div>
-  <div id="memo-body"><div id="memo-list"></div><div id="memo-detail"></div></div>
+  <div id="memo-body"><div id="memo-list"></div><div id="memo-detail" class="detail-pane"></div></div>
   <div class="row">
     <button class="mbtn small" id="memo-clear">Clear all</button>
     <button class="mbtn small" id="memo-auto">Fill</button>
@@ -14053,21 +14058,27 @@ const UI=(()=>{
       (e.detail?'<div class="ld">'+esc(e.detail)+'</div>':'')+'</div>').join('');
     box.scrollTop=box.scrollHeight;   // newest at the bottom, like a running tally
   }
+  /* ---------- the read-what-it-does pane ---------- */
+  // Shared by the memorise window and the cast window, so a spell reads the
+  // same either side of the camp.
+  function detailRows(rows){
+    return rows.map(r=>'<div class="dt-row"><div class="dt-k">'+r.k+'</div><div class="dt-v">'+r.v+'</div></div>').join('');
+  }
+  function spellDetailHTML(sp,cl){
+    return '<div class="dt-name">'+sp.name+'</div>'+
+      '<div class="dt-sub">'+sp.circle+ordSuffix(sp.circle)+' circle · '+sp.list+'</div>'+
+      '<div class="dt-desc">'+sp.desc+'</div>'+detailRows(spellEffects(sp,cl));
+  }
+  const DETAIL_HINT='<div class="dt-sub">Tap a spell to read what it does.</div>';
   /* ---------- memorising, at camp ---------- */
   // The wizard sets their loadout here and it holds until the next camp. What
   // is shown is the book, one block per circle, with the slots for that circle
   // as the budget. Rebuilt on every change: the whole panel is a dozen rows.
   let memoCh=null,memoThen=null,memoSel=null;
-  /* the right-hand pane: what the spell picked on the left actually does */
   function renderMemoDetail(){
     const box=$('memo-detail');
     const sp=memoSel&&SPELLS[memoSel];
-    if(!sp){box.innerHTML='<div class="dt-sub">Tap a spell to read what it does.</div>';return;}
-    const rows=spellEffects(sp,memoCh&&memoCh.level).map(r=>
-      '<div class="dt-row"><div class="dt-k">'+r.k+'</div><div class="dt-v">'+r.v+'</div></div>').join('');
-    box.innerHTML='<div class="dt-name">'+sp.name+'</div>'+
-      '<div class="dt-sub">'+sp.circle+ordSuffix(sp.circle)+' circle · '+sp.list+'</div>'+
-      '<div class="dt-desc">'+sp.desc+'</div>'+rows;
+    box.innerHTML=sp?spellDetailHTML(sp,memoCh&&memoCh.level):DETAIL_HINT;
   }
   function renderMemo(){
     const ch=memoCh;if(!ch)return;
@@ -14203,7 +14214,39 @@ const UI=(()=>{
     show('ovl-target');
   }
   /* spells */
+  // the cast window works like the memorise window: pick on the left, read on
+  // the right, then commit with the buttons underneath. TURN is the pseudo-key
+  // for a cleric's channelling, which is not a spell but is chosen the same way.
+  let spCh=null,spSel=null,spLeft={};
+  const TURN='__turn__';
+  function turnDetailHTML(ch){
+    const spent=ch.turnUsed;
+    return '<div class="dt-name">Turn Undead</div>'+
+      '<div class="dt-sub">Channelled · divine</div>'+
+      '<div class="dt-desc">Hold up a holy symbol and drive back the unliving. '+
+      'The strongest are unmoved, the weakest crumble outright.</div>'+
+      detailRows([
+        {k:'Target',v:'Every undead within 6 tiles that can be seen'},
+        {k:'Power',v:String(turnUndeadPower(ch))},
+        {k:'Routed',v:'flees, shaken, for 12s'},
+        {k:'Destroyed',v:'weak undead crumble outright'},
+        {k:'Unmoved',v:'anything far above the channeller\'s power'},
+        {k:'Uses',v:spent?'spent — rest to recover':'once, until the next rest'},
+      ]);
+  }
+  function renderSpellDetail(){
+    const box=$('spell-detail');
+    if(spSel===TURN){box.innerHTML=turnDetailHTML(spCh);return;}
+    const sp=spSel&&SPELLS[spSel];
+    box.innerHTML=sp?spellDetailHTML(sp,spCh&&spCh.level):DETAIL_HINT;
+  }
   function openSpells(ch){
+    spCh=ch;spSel=null;
+    renderSpells();
+    show('ovl-spells');
+  }
+  function renderSpells(){
+    const ch=spCh;if(!ch)return;
     $('sp-title').textContent=ch.name+' — spells';
     const list=$('spell-list');
     list.innerHTML='';
@@ -14217,17 +14260,12 @@ const UI=(()=>{
       list.appendChild(sec);
       const spent=ch.turnUsed;
       const tu=document.createElement('div');
-      tu.className='spell-row chan'+(spent?' spent':'');
+      tu.className='spell-row chan'+(spent?' spent':'')+(spSel===TURN?' sel':'');
       tu.innerHTML=`<span class="scircle">☨</span><span class="sname">Turn Undead</span>`+
         `<span class="sslots">${spent?'spent':'power '+turnUndeadPower(ch)}</span>`;
       tu.title=spent?'Already channelled — rest to recover.'
         :'Rout or destroy the undead within six tiles.';
-      tu.addEventListener('click',()=>{
-        if(spent){toast('Already channelled. Rest to recover.');return;}
-        if(!canAct(ch))return;
-        hide('ovl-spells');
-        turnUndead(ch);
-      });
+      tu.addEventListener('click',()=>{spSel=TURN;renderSpells();});
       list.appendChild(tu);
       const sec2=document.createElement('div');
       sec2.className='spell-sec';
@@ -14260,39 +14298,42 @@ const UI=(()=>{
       none.textContent=ch.name+' has nothing memorised. Camp to prepare spells from their book.';
       list.appendChild(none);
     }
-    const tip=$('spell-tip');
-    const HINT='Tap and hold a spell to read what it does.';
-    tip.textContent=HINT;
+    // how many of this spell are left, for the Cast button's gate
+    const leftOf={};
     for(const {key,left} of rows.sort((a,b)=>SPELLS[a.key].circle-SPELLS[b.key].circle)){
       const sp=SPELLS[key];
+      leftOf[key]=left;
       const row=document.createElement('div');
-      row.className='spell-row'+(left<=0?' nosl':'');
+      row.className='spell-row'+(left<=0?' nosl':'')+(spSel===key?' sel':'');
       row.innerHTML=`<span class="scircle">${sp.circle}</span><span class="sname">${sp.name}</span><span class="sslots">${Math.max(0,left)} left</span>`;
       row.title=sp.desc;
-      // hold to read: the description goes in the panel itself, so it can't end
-      // up behind the overlay, and the hold must not also cast the spell
-      let holdT=null,held=false;
-      row.addEventListener('pointerdown',()=>{
-        held=false;clearTimeout(holdT);
-        holdT=setTimeout(()=>{
-          held=true;
-          tip.innerHTML=`<b style="color:#e0cf9e">${sp.name}</b> · ${sp.circle}${ordSuffix(sp.circle)} circle<br>${sp.desc}`;
-        },450);
-      });
-      const endHold=()=>clearTimeout(holdT);
-      row.addEventListener('pointerup',endHold);
-      row.addEventListener('pointerleave',endHold);
-      row.addEventListener('pointercancel',endHold);
-      row.addEventListener('click',()=>{
-        if(held){held=false;return;} // that press was to read, not to cast
-        if(left<=0){toast('No slots of that circle left. Rest.');return;}
-        hide('ovl-spells');
-        castSpell(ch,key,{fromUI:true});
-      });
+      // a tap selects and reads; casting is the button underneath, so a
+      // mis-tap can no longer spend a slot
+      row.addEventListener('click',()=>{spSel=key;renderSpells();});
       list.appendChild(row);
     }
-    show('ovl-spells');
+    spLeft=leftOf;
+    renderSpellDetail();
+    // Cast is live only for something actually castable right now
+    const btn=$('sp-cast');
+    let ok=false,label='Cast';
+    if(spSel===TURN){ok=!ch.turnUsed&&canAct(ch);label='Channel';}
+    else if(spSel)ok=(spLeft[spSel]||0)>0;
+    btn.disabled=!ok;
+    btn.textContent=label;
   }
+  $('sp-cast').addEventListener('click',()=>{
+    const ch=spCh;if(!ch||!spSel)return;
+    if(spSel===TURN){
+      if(ch.turnUsed){toast('Already channelled. Rest to recover.');return;}
+      if(!canAct(ch))return;
+      hide('ovl-spells');turnUndead(ch);return;
+    }
+    if((spLeft[spSel]||0)<=0){toast('No slots of that circle left. Rest.');return;}
+    const key=spSel;
+    hide('ovl-spells');
+    castSpell(ch,key,{fromUI:true});
+  });
   $('sp-close').addEventListener('click',()=>hide('ovl-spells'));
   /* ---------- inventory ---------- */
   const DOLL_LAYOUT=[['helmet','Helm'],['amulet','Amulet'],['ring1','Ring'],['lhand','L hand'],['armor','Armor'],['rhand','R hand'],['ring2','Ring'],['boots','Boots'],[null,'']];
