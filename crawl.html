@@ -5622,6 +5622,57 @@ function espruarGlyph(ctx,x,y,h,seed){
   if(rr()<0.4){ctx.moveTo(x-w*0.22,y-h*0.10);ctx.quadraticCurveTo(x,y-h*0.22,x+w*0.24,y-h*0.08);}
   ctx.stroke();
 }
+/* The spider, which the theme had none of at all — `grep -c spider` over the
+   whole engine returned a single comment. It is the city's main motif, cut into
+   everything the drow build in honour of Lolth, so it belongs on the walls before
+   anything else does.
+
+   Drawn legs-first so the body sits over them, and shaped by the classic
+   silhouette rather than by anatomy: each leg goes OUT AND UP to a knee, then out
+   and DOWN to the tip. That kink is the whole recognition cue — legs drawn as
+   straight rays from a blob read as a sun, which is exactly what the old house
+   sigil looked like. Stroked twice, dark then lit and offset up-left, the same
+   incision every carved thing in this dungeon uses. */
+function drowSpiderPath(ctx,cx,cy,r,lolth){
+  for(const s of [-1,1])for(let i=0;i<4;i++){
+    const a=-0.98+i*0.60;                       // fore legs high, hind legs low
+    const hipX=cx+s*r*0.22, hipY=cy-r*0.10+i*r*0.11;
+    const kx=hipX+s*Math.cos(a)*r*1.05, ky=hipY+Math.sin(a)*r*1.05;
+    const tx=hipX+s*Math.cos(a+0.62)*r*1.75, ty=hipY+Math.sin(a+0.62)*r*1.75;
+    ctx.moveTo(hipX,hipY);
+    ctx.quadraticCurveTo(kx,ky,tx,ty);
+  }
+  if(lolth){
+    /* Lolth's own mark: the spider with a drow woman for a body. At this size a
+       face on the abdomen is four pixels of mush, so the WOMAN is the body —
+       a head with hair sweeping back, and the eight legs radiating from behind
+       it. The silhouette does the work. */
+    ctx.moveTo(cx+r*0.30,cy);
+    ctx.bezierCurveTo(cx+r*0.30,cy-r*0.52, cx-r*0.30,cy-r*0.52, cx-r*0.30,cy);
+    ctx.bezierCurveTo(cx-r*0.30,cy+r*0.36, cx+r*0.30,cy+r*0.36, cx+r*0.30,cy);
+    for(const s of [-1,1]){                     // the hair, swept out and down
+      ctx.moveTo(cx+s*r*0.26,cy-r*0.28);
+      ctx.bezierCurveTo(cx+s*r*0.72,cy-r*0.34, cx+s*r*0.66,cy+r*0.34, cx+s*r*0.34,cy+r*0.62);
+    }
+  }else{
+    ctx.moveTo(cx+r*0.40,cy+r*0.34);            // abdomen
+    ctx.bezierCurveTo(cx+r*0.40,cy+r*0.98, cx-r*0.40,cy+r*0.98, cx-r*0.40,cy+r*0.34);
+    ctx.bezierCurveTo(cx-r*0.40,cy-r*0.10, cx+r*0.40,cy-r*0.10, cx+r*0.40,cy+r*0.34);
+    ctx.moveTo(cx+r*0.26,cy-r*0.22);            // cephalothorax
+    ctx.bezierCurveTo(cx+r*0.26,cy-r*0.62, cx-r*0.26,cy-r*0.62, cx-r*0.26,cy-r*0.22);
+    ctx.bezierCurveTo(cx-r*0.26,cy+r*0.06, cx+r*0.26,cy+r*0.06, cx+r*0.26,cy-r*0.22);
+  }
+}
+function drowSpider(ctx,cx,cy,r,silver,lolth){
+  ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.strokeStyle='rgba(0,0,0,0.66)';ctx.lineWidth=2.3;
+  ctx.beginPath();drowSpiderPath(ctx,cx,cy,r,lolth);ctx.stroke();
+  ctx.save();ctx.translate(-0.6,-0.7);
+  ctx.strokeStyle=silver;ctx.globalAlpha=0.62;ctx.lineWidth=1.0;
+  ctx.beginPath();drowSpiderPath(ctx,cx,cy,r,lolth);ctx.stroke();
+  ctx.restore();
+  ctx.lineCap='butt';ctx.lineJoin='miter';
+}
 /* The inscriptions genuinely glow, which no other theme's do. A colour map can
    only ever be *pale* in torchlight; light of its own needs an emissive map, so
    a drow wall canvas comes back as a pair — the stone, and a black sheet with
@@ -5660,10 +5711,19 @@ function drowWallCanvas(th,variant,base){
     draw(col,2.2,0,0,0.42,em.ctx);
     draw('#ffffff',0.7,0,0,0.55,em.ctx);
   }
-  // per-variant stonework. A drow wall is not decorated so much as punctuated.
+  /* Per-variant stonework. A drow wall is not decorated so much as punctuated.
+
+     Keyed on the variant itself rather than variant%4, which showed four
+     treatments twice each over eight variants — the same duplication the duergar
+     walls had, and worse here because none of the four said "drow". The eight now
+     run plain, pilaster, an obsidian spider, an older worn hand, Lolth's own mark,
+     a web fan in the spandrels, a house sigil in its cartouche, and a sigil that
+     has been chiselled out. Variant 0 stays bare so the frieze has something to be
+     read against. */
   let sd=(variant*2654435761)>>>0;
   const rr=()=>{sd=(sd*1664525+1013904223)>>>0;return sd/4294967296;};
-  if(variant%4===1){
+  const LOW=base.rh*6.1;                        // the middle of the lower courses
+  if(variant===1){
     /* An engaged pilaster: a shallow shaft standing proud of the wall, with a
        spread capital under the roof and a plinth at the floor.
 
@@ -5726,31 +5786,131 @@ function drowWallCanvas(th,variant,base){
       em.ctx.save();em.ctx.globalAlpha=0.5;em.ctx.strokeStyle=col;em.ctx.lineWidth=1.6;
       em.ctx.beginPath();em.ctx.arc(px+ox,by,3.7,0,7);em.ctx.stroke();em.ctx.restore();
     }
-  }else if(variant%4===2){
-    // a house sigil cut into the lower courses: a ring with radiating legs,
-    // struck in the same curved hand as the script
-    const cx=(variant%8<4?0.34:0.66)*128, cy=base.rh*6.1, R=10;
+  }else if(variant===2){
+    /* An obsidian spider, set into the lower courses. The sources have the drow
+       casting these in obsidian all over the city, so it is a black inlay in
+       black brick: what separates it from the wall is the polish, which is why
+       it gets a sunk field behind it and a silver edge and no fill of its own. */
+    const cx=0.34*128;
     wrapX(()=>{
-      ctx.strokeStyle='rgba(0,0,0,0.55)';ctx.lineWidth=2.4;
-      ctx.beginPath();ctx.arc(cx+0.5,cy+0.5,R,0,7);ctx.stroke();
-      ctx.strokeStyle=silver;ctx.lineWidth=1.1;
-      ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.stroke();
-      for(let a=0;a<8;a++){
-        const t=a*Math.PI/4+0.2;
-        ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=1.8;
-        ctx.beginPath();ctx.moveTo(cx+Math.cos(t)*R*0.3,cy+Math.sin(t)*R*0.3);
-        ctx.quadraticCurveTo(cx+Math.cos(t+0.5)*R*0.9,cy+Math.sin(t+0.5)*R*0.9,
-                             cx+Math.cos(t)*R*1.5,cy+Math.sin(t)*R*1.5);ctx.stroke();
-        ctx.strokeStyle='rgba(206,214,236,0.30)';ctx.lineWidth=0.8;
-        ctx.beginPath();ctx.moveTo(cx+Math.cos(t)*R*0.3,cy+Math.sin(t)*R*0.3);
-        ctx.quadraticCurveTo(cx+Math.cos(t+0.5)*R*0.9,cy+Math.sin(t+0.5)*R*0.9,
-                             cx+Math.cos(t)*R*1.5,cy+Math.sin(t)*R*1.5);ctx.stroke();
+      ctx.save();ctx.globalAlpha=0.42;ctx.fillStyle='#000';
+      ctx.beginPath();ctx.ellipse(cx,LOW+1,16,15,0,0,7);ctx.fill();ctx.restore();
+      drowSpider(ctx,cx,LOW,11.5,silver,false);
+    });
+  }else if(variant===4){
+    // Lolth herself, and this one is allowed to burn: her mark is the only
+    // device in the house that carries the same light as the script
+    const cx=0.66*128;
+    wrapX(()=>{
+      ctx.save();ctx.globalAlpha=0.46;ctx.fillStyle='#000';
+      ctx.beginPath();ctx.ellipse(cx,LOW+1,18,17,0,0,7);ctx.fill();ctx.restore();
+      drowSpider(ctx,cx,LOW,13,col,true);
+    });
+    for(const ox of [-128,0,128]){
+      em.ctx.save();em.ctx.globalAlpha=0.34;em.ctx.strokeStyle=col;em.ctx.lineWidth=2.2;
+      em.ctx.beginPath();drowSpiderPath(em.ctx,cx+ox,LOW,13,true);em.ctx.stroke();
+      em.ctx.globalAlpha=0.7;em.ctx.lineWidth=0.8;
+      em.ctx.beginPath();drowSpiderPath(em.ctx,cx+ox,LOW,13,true);em.ctx.stroke();
+      em.ctx.restore();
+    }
+  }else if(variant===5){
+    /* Web slung into the spandrels — the corners above the frieze, where a wall
+       meets the roof and nobody has swept for a century. Radials from the corner,
+       then spirals crossing them, and the strands take a little of the faerzress
+       because drow silk does. */
+    const anchors=[[0,0],[128,0]];
+    wrapX(()=>{
+      for(const [ax,ay] of anchors){
+        const dir=ax?Math.PI:0, n=7;
+        ctx.lineCap='round';
+        for(const [c,lw,al] of [['rgba(0,0,0,0.42)',1.5,1],['rgba(214,222,246,0.30)',0.7,1]]){
+          ctx.save();ctx.globalAlpha=al;ctx.strokeStyle=c;ctx.lineWidth=lw;
+          ctx.beginPath();
+          for(let i=0;i<=n;i++){                 // radials
+            const t=dir+(ax?-1:1)*(i/n)*(Math.PI/2);
+            ctx.moveTo(ax,ay);
+            ctx.lineTo(ax+Math.cos(t)*30,ay+Math.sin(t)*30);
+          }
+          for(let k=1;k<=3;k++){                 // and the spiral crossing them
+            const R=9+k*7;
+            ctx.moveTo(ax+Math.cos(dir)*R,ay);
+            for(let i=1;i<=n;i++){
+              const t=dir+(ax?-1:1)*(i/n)*(Math.PI/2), rr2=R*(0.88+0.12*Math.cos(i*1.7));
+              ctx.lineTo(ax+Math.cos(t)*rr2,ay+Math.sin(t)*rr2);
+            }
+          }
+          ctx.stroke();ctx.restore();
+        }
+        ctx.lineCap='butt';
       }
     });
-  }else if(variant%4===3){
+    for(const ox of [-128,0,128])for(const [ax,ay] of anchors){
+      const dir=ax?Math.PI:0, n=7;
+      em.ctx.save();em.ctx.globalAlpha=0.16;em.ctx.strokeStyle=col;em.ctx.lineWidth=0.9;
+      em.ctx.beginPath();
+      for(let i=0;i<=n;i++){
+        const t=dir+(ax?-1:1)*(i/n)*(Math.PI/2);
+        em.ctx.moveTo(ax+ox,ay);em.ctx.lineTo(ax+ox+Math.cos(t)*30,ay+Math.sin(t)*30);
+      }
+      em.ctx.stroke();em.ctx.restore();
+    }
+  }else if(variant===6){
+    /* A house sigil: the house's own spider on a lozenge.
+
+       Two shapes failed here first, and both failed the same way — as an EYE. A
+       ring with radiating legs is a sunburst; put a ring inside a pointed oval and
+       it is a pupil inside an eyelid, which is what the curved cartouche gave.
+       Straight edges are what make a lozenge read as heraldry rather than as
+       anatomy, and a spider on it is what a drow house actually bears. */
+    const cx=0.34*128, W=17, H=13;
+    wrapX(()=>{
+      const lozenge=()=>{
+        ctx.beginPath();
+        ctx.moveTo(cx,LOW-H);ctx.lineTo(cx+W,LOW);
+        ctx.lineTo(cx,LOW+H);ctx.lineTo(cx-W,LOW);ctx.closePath();
+      };
+      lozenge();ctx.fillStyle='rgba(0,0,0,0.44)';ctx.fill();
+      lozenge();ctx.strokeStyle='rgba(0,0,0,0.62)';ctx.lineWidth=2.4;ctx.stroke();
+      ctx.save();ctx.translate(-0.6,-0.7);
+      lozenge();ctx.strokeStyle=silver;ctx.globalAlpha=0.72;ctx.lineWidth=1.0;ctx.stroke();
+      ctx.restore();
+      drowSpider(ctx,cx,LOW-1,6.4,silver,false);
+    });
+  }else if(variant===7){
+    /* A sigil that has been chiselled out. Drow houses annihilate each other and
+       then erase the name, and a defaced mark says more about the place than an
+       intact one does — you are walking through somebody's victory. The device is
+       drawn faint and then destroyed: cross-hatched chisel work over it, and one
+       deep gouge taken clean through. */
+    const cx=0.66*128, R=9.5;
+    wrapX(()=>{
+      /* The ghost is the SAME spider variant 6 bears, and it has to stay readable.
+         Drawn at a third alpha it was invisible and the gouge over it read as a
+         stray scratch in the brick — you cannot see that something was destroyed
+         unless you can still see what it was. Making it the house spider is what
+         tells the story: this wall carried a house's mark and somebody took it
+         off. */
+      ctx.save();ctx.globalAlpha=0.80;
+      drowSpider(ctx,cx,LOW-1,8.2,'rgba(206,214,236,0.55)',false);
+      ctx.restore();
+      for(let i=0;i<34;i++){                     // the chisel work that took it off
+        const a=rr()*Math.PI*2, d=rr()*R*1.55;
+        const x0=cx+Math.cos(a)*d, y0=LOW+Math.sin(a)*d, l=2+rr()*4, t=0.7+rr()*0.5;
+        ctx.strokeStyle='rgba(0,0,0,0.42)';ctx.lineWidth=1.5;
+        ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+Math.cos(t)*l,y0+Math.sin(t)*l);ctx.stroke();
+        ctx.strokeStyle='rgba(214,222,246,0.24)';ctx.lineWidth=0.7;
+        ctx.beginPath();ctx.moveTo(x0-0.5,y0-0.6);ctx.lineTo(x0-0.5+Math.cos(t)*l,y0-0.6+Math.sin(t)*l);ctx.stroke();
+      }
+      ctx.strokeStyle='rgba(0,0,0,0.60)';ctx.lineWidth=3.2;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(cx-R*1.5,LOW+R*0.9);ctx.lineTo(cx+R*1.4,LOW-R*1.0);ctx.stroke();
+      ctx.strokeStyle='rgba(214,222,246,0.22)';ctx.lineWidth=1.1;
+      ctx.beginPath();ctx.moveTo(cx-R*1.5-0.6,LOW+R*0.9-0.7);ctx.lineTo(cx+R*1.4-0.6,LOW-R*1.0-0.7);ctx.stroke();
+      ctx.lineCap='butt';
+    });
+  }else if(variant===3){
     // a second, fainter band of script low on the wall — an older hand, worn
     const h=base.rh*0.46, y=base.rh*6.5;
-    ctx.save();ctx.globalAlpha=0.5;ctx.lineCap='round';
+    ctx.save();ctx.globalAlpha=0.72;ctx.lineCap='round';
     for(let x=-9;x<=137;x+=9){
       ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=1.6;
       espruarGlyph(ctx,x+((variant*5)%9),y,h,(variant*104729)^(Math.round(x)*7919));
