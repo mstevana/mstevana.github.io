@@ -9200,12 +9200,60 @@ function buildLevel(L){
       map:ironT,bumpMap:ironT,bumpScale:0.003,specular:0x3a3f52,shininess:30});
     const burn=new THREE.MeshBasicMaterial({color:new THREE.Color(th.frieze||'#a86ce8')});
     const voidM=new THREE.MeshBasicMaterial({color:0x000000});
+    /* Two more, both learned from the first build of this pair.
+
+       `groove` is a cut rather than a surface. Bands modelled in the SAME
+       material as the thing they are cut into are invisible however many of
+       them there are — the abdomen's three rings were `adam` on `adam` and the
+       body still read as a smooth ball from a tile away. A groove has to be
+       darker than anything the light can make the surface, so it is unlit.
+
+       `silverD` is the calm silver, for anything with a broad flat face. The
+       bright one is right on a 10mm fillet and wrong on a 60cm table top: the
+       altar's mensa and rim came out as one white band, which is the specular
+       trap this dungeon keeps setting (see CLAUDE.md) — a face square-on to a
+       torch at the eye sits on the peak of the lobe. Same colour, a third of
+       the specular, half the shininess. */
+    const groove=new THREE.MeshBasicMaterial({color:0x05060a});
+    const silverD=new THREE.MeshPhongMaterial({color:new THREE.Color(th.silver||'#8c93a8')
+      .multiplyScalar(0.72),map:ironT,bumpMap:ironT,bumpScale:0.004,
+      specular:0x14161e,shininess:16});
+    const wax=new THREE.MeshPhongMaterial({color:0xa89ec0,specular:0x0e0c14,shininess:8});
     // --- the throne
     {
       const g0=new THREE.Group(),B=Bins(4.0);
-      B.at(cDark,new THREE.BoxGeometry(0.74,0.075,0.74),0,0.038,0);      // dais
-      B.at(cStone,new THREE.BoxGeometry(0.62,0.065,0.62),0,0.108,0);
-      B.at(cDark,new THREE.BoxGeometry(0.50,0.055,0.50),0,0.168,0);
+      /* The dais is laid up in COURSES, like everything else built down here. As
+         three plain slabs it was the same mistake the forge hearth made: a 70cm
+         step has no scale to it, and the eye has nothing to measure the throne
+         against. Eight blocks to a tier, offset tier to tier. */
+      const TIER=[[0.74,0.075,0.038,8],[0.62,0.065,0.108,7],[0.50,0.055,0.168,6]];
+      TIER.forEach(([w,h,yy,n],ti)=>{
+        const mat=ti%2?cStone:cDark, half=w/2, per=w/n;
+        for(let k=0;k<n;k++){                    // front and back runs
+          for(const sd of [-1,1])
+            B.at(mat,new THREE.BoxGeometry(per-0.012,h-0.008,0.09),
+                 -half+per*(k+0.5)+(ti%2?per*0.5:0),yy,sd*(half-0.045));
+        }
+        for(let k=1;k<n-1;k++){                  // and the two sides
+          for(const sd of [-1,1])
+            B.at(mat,new THREE.BoxGeometry(0.09,h-0.008,per-0.012),
+                 sd*(half-0.045),yy,-half+per*(k+0.5)+(ti%2?per*0.5:0));
+        }
+        B.at(mat,new THREE.BoxGeometry(w-0.19,h-0.008,w-0.19),0,yy,0);   // the field
+        B.at(ti%2?cDark:cStone,new THREE.BoxGeometry(w+0.012,0.012,w+0.012),0,yy+h/2,0);
+      });
+      /* A step up to it at the front, and a corner marker on the top tier.
+         These were tall silver cones and read as four lit candles standing in
+         front of the chair — a pale vertical at eye height is the strongest
+         thing in a dark frame, and these were competing with the throne they
+         were supposed to be edging. They are squat, dark, and carry the silver
+         as a cap and a collar rather than as the whole piece. */
+      B.at(cStone,new THREE.BoxGeometry(0.34,0.055,0.13),0,0.027,0.42);
+      for(const sx of [-1,1])for(const sz of [-1,1]){
+        B.at(adam,new THREE.CylinderGeometry(0.030,0.038,0.052,8),sx*0.30,0.226,sz*0.30);
+        B.at(silverD,new THREE.TorusGeometry(0.031,0.006,4,10),sx*0.30,0.246,sz*0.30,Math.PI/2);
+        B.at(silverD,new THREE.SphereGeometry(0.026,8,6),sx*0.30,0.266,sz*0.30);
+      }
       /* The CHAIR has to be legible first. The first build hung eight thick legs
          off a big body and at a tile's range it was a tangle of scaffolding poles
          with nothing to sit in — the throne read as a spider standing on a
@@ -9214,26 +9262,111 @@ function buildLevel(L){
          thin enough to be a frame around the chair instead of a thicket in front
          of it. Half the leg radius and two thirds the spread. */
       B.at(adam,new THREE.BoxGeometry(0.42,0.055,0.34),0,0.318,0.06);    // the seat
-      B.at(adam,new THREE.BoxGeometry(0.40,0.30,0.05),0,0.47,-0.115);    // its back
-      B.at(silverM,new THREE.BoxGeometry(0.42,0.014,0.055),0,0.625,-0.115);
+      B.at(adam,new THREE.BoxGeometry(0.44,0.022,0.36),0,0.352,0.06);    // its lip
+      B.at(silverD,new THREE.BoxGeometry(0.45,0.010,0.014),0,0.352,0.235);
+      B.at(adam,new THREE.BoxGeometry(0.40,0.30,0.05),0,0.47,-0.115);    // the back
+      B.at(silverD,new THREE.BoxGeometry(0.42,0.014,0.055),0,0.625,-0.115);
+      /* A web cut into the back of it. The back was a bare slab, and a bare slab
+         is the one surface on a throne that nobody leaves bare — it is the panel
+         the whole room looks at. Radials from the middle, three arcs crossing
+         them, in silver against the adamantine. */
+      {
+        const wy=0.47, wz=-0.086, RR=0.145;
+        const P=(a,r)=>[Math.cos(a)*r*1.30,wy+Math.sin(a)*r,wz];
+        for(let i=0;i<8;i++){
+          const a=i*Math.PI/4+Math.PI/8;
+          addSeg(B,silverM,0,wy,wz,...P(a,RR),0.006,0.004);
+        }
+        for(const rr2 of [RR*0.42,RR*0.72,RR*0.98])for(let i=0;i<8;i++){
+          const a0=i*Math.PI/4+Math.PI/8, a1=a0+Math.PI/4;
+          addSeg(B,silverM,...P(a0,rr2),...P(a1,rr2*0.93),0.0045,0.0045);
+        }
+        B.at(silverM,new THREE.SphereGeometry(0.017,7,6),0,wy,wz);
+      }
       for(const sx of [-1,1]){
         B.at(adam,new THREE.CylinderGeometry(0.020,0.026,0.29,6),sx*0.17,0.175,0.185);
         B.at(adam,new THREE.CylinderGeometry(0.020,0.026,0.14,6),sx*0.17,0.245,-0.09);
         B.at(adam,new THREE.BoxGeometry(0.045,0.035,0.30),sx*0.20,0.40,0.05); // the arms
+        // each arm ends in a claw, which is what says the chair is the creature
+        for(const c2 of [-1,1])
+          addSeg(B,adam,sx*0.20,0.40,0.195, sx*(0.20+c2*0.035),0.365,0.265,0.014,0.005);
+        B.at(silverD,new THREE.TorusGeometry(0.030,0.008,4,10),sx*0.20,0.40,0.115,0,Math.PI/2,0);
       }
-      // and only then the goddess, rearing over the back of it
-      B.at(adam,new THREE.SphereGeometry(0.185,11,9),0,0.76,-0.30);      // abdomen
+      /* And only then the goddess, rearing over the back of it. The abdomen is
+         BANDED: a smooth sphere is a ball however big it is, and the rings are
+         what make it a body. */
+      B.at(adam,new THREE.SphereGeometry(0.185,13,10),0,0.76,-0.30);     // abdomen
+      /* The rings are CUT, not raised, and unlit — see `groove` above. Sunk
+         just inside the surface so the sphere's own silhouette is untouched
+         and only the band goes dark. */
+      for(const dy of [-0.095,-0.012,0.072]){
+        const rr2=Math.sqrt(Math.max(0.0001,0.185*0.185-dy*dy))-0.004;
+        B.at(groove,new THREE.TorusGeometry(rr2,0.011,5,16),0,0.76+dy,-0.30,Math.PI/2);
+      }
+      /* And her mark on the back of it. A spider carries its pattern on the
+         abdomen and that is what the eye reads a species off; three rings alone
+         still leave a banded ball. Silver, so it catches the altar's light from
+         behind the chair. */
+      for(let i=0;i<3;i++){
+        /* On the CROWN, not the front. She rears behind the chair and her own
+           head hides everything below the top of the abdomen from anyone
+           standing in front of the throne — the mark's first placement was on
+           the forward face, where exactly one of the three chevrons could be
+           seen. */
+        const w2=0.078-i*0.018, yy=0.902-i*0.042;
+        const dy2=yy-0.76;
+        const rr2=Math.sqrt(Math.max(0.0001,0.185*0.185-dy2*dy2))-0.002;
+        for(const sd of [-1,1])
+          addSeg(B,silverM,0,yy+0.012,-0.30+rr2*0.30,
+                 sd*w2,yy-0.014,-0.30+rr2*0.92,0.015,0.006);
+      }
+      for(let i=0;i<3;i++)                                               // spinnerets
+        B.at(adam,new THREE.ConeGeometry(0.020,0.055,5),(i-1)*0.032,0.70,-0.455,-1.15,0,0);
       B.at(adam,new THREE.SphereGeometry(0.105,10,8),0,0.66,-0.12);      // cephalothorax
+      B.at(adam,new THREE.SphereGeometry(0.055,8,7),0,0.635,-0.015);     // her face
+      for(const sd of [-1,1]){                                           // chelicerae
+        addSeg(B,adam,sd*0.030,0.615,-0.02, sd*0.042,0.545,0.020,0.020,0.008);
+      }
+      /* Eight eyes, not two — the count is what makes it read as a spider. But
+         they have to be in ROWS: scattered over the face at four different
+         heights they read as a rash rather than as eyes, which is what the
+         first arrangement did. A real spider carries a row of four small ones
+         above a row of four with the middle pair much the largest, and it is
+         that big central pair the eye actually fixes on. */
+      for(const sd of [-1,1]){
+        B.at(burn,new THREE.SphereGeometry(0.020,8,7),sd*0.026,0.652,0.020);   // the front pair
+        B.at(burn,new THREE.SphereGeometry(0.012,6,5),sd*0.062,0.650,-0.008);
+        B.at(burn,new THREE.SphereGeometry(0.010,6,5),sd*0.024,0.692,0.010);   // the row above
+        B.at(burn,new THREE.SphereGeometry(0.009,6,5),sd*0.056,0.688,-0.014);
+      }
       for(const sd of [-1,1])for(let i=0;i<4;i++){
         const fwd=1.5-i;
-        const hip=[sd*0.06,0.66,-0.12+fwd*0.03];
-        const knee=[sd*(0.19+0.028*i),0.90-0.03*i,-0.10+fwd*0.10];
+        /* Where the hips SIT is the whole difference between a spider and a
+           starburst. All eight used to leave the body within 9cm of each other
+           and from the front the femurs read as a fan of straight rods behind
+           the head — a deck chair rather than a creature. A spider's coxae are
+           spaced right along the side of the cephalothorax, so the legs leave
+           it in four different places and at four different heights, and the
+           knees stay near the top of the body instead of towering over it. */
+        const hip=[sd*(0.075+0.004*i),0.685-0.022*i,-0.185+fwd*0.055];
+        const knee=[sd*(0.20+0.036*i),0.855-0.048*i,-0.135+fwd*0.115];
         const tip=[sd*(0.24+0.030*i),i<2?0.40:0.16,0.02+fwd*0.17];
-        addSeg(B,adam,...hip,...knee,0.019,0.014);
-        addSeg(B,adam,...knee,...tip,0.014,0.008);
+        /* A leg is read from its JOINTS. These were two even tubes with a bead
+           where they met and at a tile's range that is a bent pipe; a real limb
+           is thick at the hip, waisted at the knee and tapers to a point, and
+           the knuckle has to be plainly fatter than either segment it joins. */
+        addSeg(B,adam,...hip,...knee,0.026,0.013);
+        addSeg(B,adam,...knee,...tip,0.015,0.005);
+        B.at(adam,new THREE.SphereGeometry(0.029,8,7),...knee);          // the joint
+        B.at(groove,new THREE.TorusGeometry(0.027,0.005,4,10),...knee);  // and its seam
+        B.at(adam,new THREE.SphereGeometry(0.024,7,6),...hip);           // the coxa
+        // a spur halfway down the femur, the way a real leg carries them
+        const mx=(hip[0]+knee[0])/2,my=(hip[1]+knee[1])/2,mz=(hip[2]+knee[2])/2;
+        addSeg(B,adam,mx,my,mz,mx+sd*0.018,my+0.052,mz-0.024,0.009,0.002);
+        // and the tarsal claw it stands on, turned in toward the dais
+        const tx2=tip[0]-sd*0.030,ty2=tip[1]-0.030,tz2=tip[2]-0.026;
+        addSeg(B,adam,...tip,tx2,ty2,tz2,0.007,0.002);
       }
-      for(const sd of [-1,1])                                            // her eyes
-        B.at(burn,new THREE.SphereGeometry(0.022,7,6),sd*0.042,0.695,-0.035);
       B.addTo(g0);
       for(const ch2 of g0.children)ch2.userData={kind:'altar',x:c.tx,y:c.ty};
       g0.position.set(c.tx+0.5,0,c.ty+0.5);
@@ -9251,23 +9384,106 @@ function buildLevel(L){
           B.at(r%2?cDark:cStone,new THREE.BoxGeometry(w-0.012,hh-0.008,0.30),
                -0.30+w*(k+0.5),yy+hh/2,0.18);
       }
-      B.at(cStone,new THREE.BoxGeometry(0.72,0.055,0.38),0,0.353,0.18);  // the mensa
-      B.at(silverM,new THREE.BoxGeometry(0.66,0.010,0.33),0,0.383,0.18); // its silver top
-      // her mark burning on the front of it, cut through to the light behind
+      // the mensa, on a moulding rather than sitting flat on the courses
+      B.at(cDark,new THREE.BoxGeometry(0.66,0.022,0.34),0,0.336,0.18);
+      B.at(cStone,new THREE.BoxGeometry(0.72,0.048,0.38),0,0.371,0.18);
+      B.at(cDark,new THREE.BoxGeometry(0.74,0.014,0.40),0,0.399,0.18);   // its drip edge
+      /* The working surface is STONE, with silver only at its edges. Built as a
+         silver slab with a silver rim on top of it the whole table came out as
+         one white band across the picture — a broad face turned square-on to a
+         torch that sits at the eye is the brightest case there is, and a bright
+         metal there swallows everything standing on it. */
+      B.at(cStone,new THREE.BoxGeometry(0.64,0.010,0.31),0,0.410,0.18);
+      for(const sd of [-1,1])                                            // a raised rim
+        B.at(silverD,new THREE.BoxGeometry(0.64,0.014,0.014),0,0.417,0.18+sd*0.148);
+      B.at(silverD,new THREE.BoxGeometry(0.014,0.014,0.31),-0.312,0.417,0.18);
+      /* Channels cut in the top, running to a spout over the front edge. What an
+         altar is FOR is the detail it should carry, and hers is not a table.
+         Herringbone into the two mains, so the top is worked rather than scored
+         with a pair of parallel lines. */
+      /* Sunk FLUSH with the stone, at 0.410 against a top face at 0.415. The
+         first cut of these sat at 0.417 — 7mm proud of the surface — and a
+         pure-black box standing above a lit table is not a channel, it is a
+         rail: seen from standing height its sides showed and the whole top of
+         the altar read as a black slab. A groove shows one face and no sides. */
+      for(const sd of [-1,1]){
+        B.at(voidM,new THREE.BoxGeometry(0.011,0.010,0.24),sd*0.10,0.410,0.19);
+        for(let i=0;i<4;i++)                                 // feeders into the mains
+          B.at(voidM,new THREE.BoxGeometry(0.052,0.010,0.008),
+               sd*0.132,0.410,0.118+i*0.050,0,sd*0.6,0);
+      }
+      B.at(voidM,new THREE.BoxGeometry(0.22,0.010,0.011),0,0.410,0.30);
+      // and a lip over the front edge for it to run off, not a knob
+      B.at(silverD,new THREE.BoxGeometry(0.070,0.010,0.055),0,0.409,0.360,0.30,0,0);
+      B.at(silverD,new THREE.BoxGeometry(0.070,0.022,0.010),0,0.404,0.382);
+      B.at(silverD,new THREE.TorusGeometry(0.030,0.008,4,10),0,0.418,0.09,Math.PI/2); // the ring
+      // her mark burning on the front of it, cut through to the light behind, and
+      // a silver frame round it so it reads as set in rather than painted on
       B.at(voidM,new THREE.BoxGeometry(0.26,0.20,0.02),0,0.20,0.332);
+      for(const [w,h,px,py] of [[0.30,0.020,0,0.310],[0.30,0.020,0,0.090],
+                                [0.020,0.24,-0.14,0.20],[0.020,0.24,0.14,0.20]])
+        B.at(silverM,new THREE.BoxGeometry(w,h,0.028),px,py,0.336);
       const SP=(px,py,r2)=>B.at(burn,new THREE.SphereGeometry(r2,6,5),px,py,0.342);
-      SP(0,0.235,0.030);SP(0,0.185,0.045);                               // body
-      for(const sd of [-1,1])for(let i=0;i<4;i++){                       // legs
-        const a=-0.5+i*0.42;
-        addSeg(B,burn,sd*0.02,0.205,0.342,
-               sd*(0.055+Math.cos(a)*0.085),0.205+Math.sin(a)*0.075,0.342,0.010,0.006);
+      SP(0,0.250,0.022);SP(0,0.234,0.014);SP(0,0.196,0.038);             // head, waist, body
+      /* Her legs BEND. Eight straight rays off a blob is a sunburst, which is
+         the same thing the house sigil failed as twice before it was allowed a
+         knee — out and up to the joint, then out and down to the foot. */
+      for(const sd of [-1,1])for(let i=0;i<4;i++){
+        /* Wide, and each leg from its own point on the body. Bent legs bunched
+           into a tight arc off one hip do not read as legs either — they merge
+           into a filled triangle and the mark comes out as a moth with two
+           wings, which is what the first attempt at the bend produced. */
+        const a=-0.58+i*0.48, R=0.050+0.008*Math.abs(1.5-i);
+        const hx=sd*0.020, hy=0.240-i*0.020;
+        const kx=hx+sd*Math.cos(a)*R, ky=hy+Math.sin(a)*R*0.90+0.024;
+        const fx=hx+sd*Math.cos(a)*R*2.10, fy=ky-0.056-0.014*i;
+        addSeg(B,burn,hx,hy,0.342,kx,ky,0.342,0.008,0.005);
+        addSeg(B,burn,kx,ky,0.342,fx,fy,0.342,0.005,0.003);
+      }
+      /* Votive candles at the corners. The first pair were a silver stick on a
+         wide silver saucer and read as two white posts on funnels — a candle is
+         WAX on a small pricket, and the flame is a teardrop, not a bead. The
+         saucer is narrower than the stick is tall, which is what stops it
+         reading as a base for something else. */
+      for(const sd of [-1,1]){
+        B.at(silverD,new THREE.CylinderGeometry(0.024,0.030,0.012,8),sd*0.27,0.421,0.18);
+        B.at(silverD,new THREE.TorusGeometry(0.022,0.004,4,10),sd*0.27,0.428,0.18,Math.PI/2);
+        B.at(wax,new THREE.CylinderGeometry(0.015,0.017,0.090,8),sd*0.27,0.478,0.18);
+        B.at(wax,new THREE.CylinderGeometry(0.017,0.011,0.016,8),sd*0.27,0.529,0.18); // its melt
+        B.at(burn,new THREE.ConeGeometry(0.012,0.040,6),sd*0.27,0.556,0.18);
       }
       if(!c.opened){
-        // what the house has laid on her table
-        B.at(silverM,new THREE.CylinderGeometry(0.05,0.062,0.055,9),-0.19,0.416,0.16);
-        B.at(silverM,new THREE.CylinderGeometry(0.036,0.030,0.10,8),0.17,0.438,0.20);
-        B.at(burn,new THREE.SphereGeometry(0.032,7,6),0.02,0.425,0.14);
-        B.at(silverM,new THREE.TorusGeometry(0.042,0.008,4,10),0.02,0.396,0.14,Math.PI/2);
+        /* What the house has laid on her table. Three cylinders read as three
+           cylinders; a chalice needs a foot, a stem and a bowl, and a knife needs
+           a blade you can tell from its handle. */
+        /* The chalice. Its bowl was a 55mm cone flaring upward with a flat
+           coloured lid on top, which is a funnel — the widest part of a cup is
+           not the very top, and what says "full" is the liquid sitting DOWN
+           inside the rim rather than capping it. Foot, knop, waisted bowl,
+           a lip rolled over, and the wine below it. */
+        B.at(silverM,new THREE.CylinderGeometry(0.038,0.046,0.012,10),-0.17,0.420,0.15);
+        B.at(silverM,new THREE.CylinderGeometry(0.012,0.012,0.036,7),-0.17,0.444,0.15);
+        B.at(silverM,new THREE.SphereGeometry(0.019,8,6),-0.17,0.464,0.15);       // the knop
+        /* The bowl is nearly straight-sided over a rounded base. A cone is a
+           funnel however small it is — the flare is the tell, and a cup that
+           widens hard from a thin stem is read as one every time. */
+        B.at(silverM,new THREE.SphereGeometry(0.036,10,7,0,6.3,0,1.05),-0.17,0.512,0.15,Math.PI);
+        B.at(silverM,new THREE.CylinderGeometry(0.038,0.034,0.030,10),-0.17,0.516,0.15);
+        B.at(silverM,new THREE.TorusGeometry(0.038,0.005,4,12),-0.17,0.531,0.15,Math.PI/2);
+        B.at(burn,new THREE.CylinderGeometry(0.033,0.033,0.006,10),-0.17,0.521,0.15);
+        B.at(silverM,new THREE.CylinderGeometry(0.062,0.020,0.038,10),0.16,0.434,0.22);  // a bowl
+        B.at(groove,new THREE.CylinderGeometry(0.052,0.052,0.004,10),0.16,0.451,0.22);
+        /* The knife was adamantine on adamantine on a dark table and simply was
+           not there. A blade is bright and a hilt is not: that contrast is the
+           whole of how a knife is recognised. */
+        B.at(silverM,new THREE.BoxGeometry(0.018,0.008,0.105),0.15,0.419,0.095);
+        B.at(silverM,new THREE.ConeGeometry(0.013,0.052,4),0.15,0.419,0.174,Math.PI/2);
+        B.at(silverD,new THREE.BoxGeometry(0.034,0.010,0.012),0.15,0.419,0.038);   // its guard
+        B.at(adam,new THREE.CylinderGeometry(0.013,0.011,0.048,7),0.15,0.419,0.008,Math.PI/2);
+        B.at(silverD,new THREE.SphereGeometry(0.015,7,6),0.15,0.419,-0.020);       // the pommel
+        for(let i=0;i<7;i++)                                                       // coins
+          B.at(silverD,new THREE.CylinderGeometry(0.021,0.021,0.005,8),
+               -0.02+((i*37)%9-4)*0.014,0.417+(i>>2)*0.005,0.24+((i*53)%7-3)*0.012);
       }
       B.addTo(g0);
       for(const ch2 of g0.children)ch2.userData={kind:'altar',x:c.ax,y:c.ay};

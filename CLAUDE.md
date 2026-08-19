@@ -923,6 +923,61 @@ three themes carry real machinery:
   and legs at half the radius and two thirds the spread so they frame the chair
   instead of filling the view.
 
+  ### Making the pair detailed, and the five things that had to be looked at
+
+  Both were then taken from plain boxes to a real detail pass — the dais laid up
+  in three coursed tiers rather than three slabs, a web cut into the back of the
+  chair, the abdomen banded and marked, the altar given a moulding, blood
+  channels, votive candles and a chalice/bowl/knife/coins. Two materials were
+  added for it and both exist because of a mistake:
+
+  - **`groove` — a cut is not a surface.** The abdomen's three bands were tori in
+    the *same* material as the sphere they ringed, and the body still read as a
+    smooth ball from a tile away. A groove has to be darker than anything the
+    light can make the surface, so it is an unlit near-black. Same for the knee
+    seams.
+  - **`silverD` — the calm silver, for anything with a broad flat face.** The
+    bright one is right on a 10mm fillet and wrong on a 60cm table top: the
+    altar's mensa and rim came out as a single white band across the picture.
+    That is the specular trap again (see *Specular is what blows a surface
+    out*) — a face square-on to a torch that sits at the eye is on the peak of
+    the lobe. The working surface is stone now, with silver only at its edges.
+
+  And four placement lessons, each of which cost a screenshot:
+
+  - **A groove modelled above the surface is a rail.** The blood channels were
+    `voidM` boxes at y 0.417 against a mensa top face at 0.415 — 7mm proud. Seen
+    from standing height their *sides* showed and the whole top of the altar read
+    as a black slab. Sunk flush, only the top face shows and it reads as a line.
+  - **A pale vertical at eye height wins any dark frame.** The dais's four
+    corner finials were tall silver cones and read as four lit candles standing
+    in front of the chair, competing with the throne they were meant to edge.
+    Squat, dark, with the silver as a cap and a collar.
+  - **Where the hips sit is the difference between a spider and a starburst.**
+    All eight legs used to leave the body within 9cm of each other, and from the
+    front the femurs read as a fan of straight rods — a deck chair. Spaced along
+    the side of the cephalothorax at four heights, with the knees near the top of
+    the body rather than towering over it, they read as legs.
+  - **A mark goes where the thing can actually be seen from.** Her abdomen
+    marking was put on the forward face, which her own head hides from anyone
+    standing in front of the throne; exactly one of the three chevrons showed. It
+    belongs on the crown.
+
+  Three shapes are read from one feature each, and all three failed without it:
+  eyes from being in **rows** (scattered at four heights they are a rash, not a
+  face — four small above four with the middle pair much the largest); a chalice
+  from *not* flaring (a cone is a funnel however small, so the bowl is nearly
+  straight-sided over a rounded base, with the wine sitting down inside the rim
+  rather than capping it); and a knife from the contrast between a bright blade
+  and a dark hilt — adamantine on adamantine on a dark table simply was not
+  there.
+
+  The burning mark on the altar front is the **fourth** time a drow spider has
+  had to be re-cut. Straight rays off a blob is a sunburst; bent legs bunched
+  into a tight arc off one hip merge into filled triangles and the mark comes out
+  as a moth with two wings. Wide angular spread, each leg from its own point on
+  the body, and a thin tibia is what finally reads.
+
 Search for `theme.name==='Sewers'`, `th.name==='Crypt'`, `th.name==='Caves'`,
 `th.name==='Duergar'`, `th.name==='Myconid'` and `th.name==='Drow'`
 (plus the `cave`/`duer`/`myco`/`drow` flags in `buildLevel`) to find every hook
