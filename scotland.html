@@ -28,9 +28,10 @@
     background:var(--parchment);
     display:grid;
     grid-template-columns:330px 300px 1fr;
-    grid-template-rows:auto 1fr;
+    grid-template-rows:auto auto 1fr;
     grid-template-areas:
       "header header header"
+      "catpage catpage catpage"
       "sidebar path map";
     height:100vh; /* fallback for browsers without dvh support */
     height:100dvh; /* tracks the actual visible viewport, avoiding Android browsers'
@@ -43,9 +44,16 @@
   body.sidebar-collapsed.path-collapsed{ grid-template-columns:14px 14px 1fr; }
   header{
     grid-area:header;
-    padding:16px 24px 14px;
-    border-bottom:1px solid var(--line);
+    padding:16px 24px 10px;
     background:var(--parchment);
+  }
+  /* On desktop this sits just under the title, as the toggles always have; on mobile
+     the same element becomes the "Categories" tab's page. */
+  #catPage{
+    grid-area:catpage;
+    padding:0 24px 14px;
+    background:var(--parchment);
+    border-bottom:1px solid var(--line);
   }
   header h1{
     font-family:'Fraunces', serif;
@@ -418,7 +426,6 @@
   #map{ grid-area:map; min-width:0; min-height:0; }
 
   .mobile-tabs{ display:none; } /* shown only in the mobile media query below */
-  #headerDragHandle{ display:none; } /* shown only in the mobile media query below */
   .mobile-tab{
     flex:1 1 0;
     display:flex;
@@ -536,36 +543,29 @@
   @media (max-width: 760px){
     body{
       grid-template-columns:1fr;
-      grid-template-rows:auto auto 1fr auto;
+      grid-template-rows:auto 1fr auto;
       grid-template-areas:
         "header"
-        "headerHandle"
         "content"
         "tabbar";
     }
-    header{ overflow-y:auto; min-height:0; }
-    #headerDragHandle{
-      display:flex;
-      grid-area:headerHandle;
-      align-items:center;
-      justify-content:center;
-      height:18px;
-      background:var(--panel);
+    /* The toggles moved to their own tab, so the header is just a slim title bar —
+       nothing left to resize, and every tab gets the whole area below it. */
+    header{
+      padding:10px 14px;
       border-bottom:1px solid var(--line);
-      cursor:grab;
-      touch-action:none;
-      user-select:none;
     }
-    #headerDragHandle:active{ cursor:grabbing; }
-    #headerDragHandle .grip{ width:38px;height:4px;border-radius:2px;background:rgba(27,29,27,0.32); }
+    header h1{ margin:0; font-size:17px; }
 
-    /* Only one of these three occupies "content" at a time — tab switching just
+    /* Only one of these four occupies "content" at a time — tab switching just
        flips which one is display:none, so each gets the full remaining height. */
-    #sidebarWrap, #pathWrap, #map{ grid-area:content; display:none; min-height:0; }
+    #catPage, #sidebarWrap, #pathWrap, #map{ grid-area:content; display:none; min-height:0; }
+    body[data-mobile-tab="categories"] #catPage{ display:block; }
     body[data-mobile-tab="sidebar"] #sidebarWrap{ display:flex; }
     body[data-mobile-tab="path"] #pathWrap{ display:flex; }
     body[data-mobile-tab="map"] #map{ display:block; }
 
+    #catPage{ overflow-y:auto; padding:14px; border-bottom:none; }
     #sidebar, #pathCol{ border:none; }
     .col-toggle{ display:none; } /* no collapsing on mobile — tabs replace it */
 
@@ -583,10 +583,11 @@
 
 <header>
   <h1>Scotland's Scenic Map</h1>
-  <div class="cat-toggles" id="catToggles"></div>
 </header>
 
-<div id="headerDragHandle"><div class="grip"></div></div>
+<div id="catPage">
+  <div class="cat-toggles" id="catToggles"></div>
+</div>
 
 <div class="col-wrap" id="sidebarWrap">
   <div id="sidebar"></div>
@@ -601,6 +602,9 @@
 <div id="map"></div>
 
 <nav class="mobile-tabs" id="mobileTabs">
+  <button type="button" class="mobile-tab" data-tab="categories">
+    <span class="mobile-tab-icon">🗂️</span>Categories
+  </button>
   <button type="button" class="mobile-tab active" data-tab="map">
     <span class="mobile-tab-icon">🗺️</span>Map
   </button>
@@ -2206,11 +2210,11 @@ function locateMe(){
 
 /* ============ RESPONSIVE LAYOUT ============ */
 const mq = window.matchMedia('(max-width: 760px)');
-const headerEl = document.querySelector('header');
 
-// Below 760px the app becomes a 3-tab layout (map / locations / selected path) instead
-// of side-by-side columns — no column collapsing applies there, and each tab fills the
-// full remaining height (the title/category-toggles header stays drag-resizable, though).
+// Below 760px the app becomes a 4-tab layout (categories / map / locations / selected
+// path) instead of side-by-side columns. No column collapsing applies there, and with
+// the toggles on their own tab nothing needs resizing — each tab fills the whole area
+// below the slim title bar.
 const mobileTabsEl = document.getElementById('mobileTabs');
 let mobileTab = 'map';
 function setMobileTab(tab){
@@ -2233,40 +2237,16 @@ function updateMobileTabCount(){
   document.getElementById('mobileTabCount').textContent = selectedPath.length ? ` ${selectedPath.length}` : '';
 }
 
-// Drag-resize for the header (title + category toggles) on mobile — it can wrap to many
-// rows, so letting it shrink (it scrolls internally once smaller than its content) frees
-// up room for the active tab below.
-function clampHeaderHeight(h){ return Math.max(56, Math.min(h, window.innerHeight - 160)); }
-function setHeaderHeight(h){ headerEl.style.height = clampHeaderHeight(h) + 'px'; }
-
-const headerDragHandleEl = document.getElementById('headerDragHandle');
-let headerDragging=false, headerDragStartY=0, headerDragStartHeight=0;
-headerDragHandleEl.addEventListener('pointerdown', e => {
-  if (!mq.matches) return;
-  headerDragging=true; headerDragStartY=e.clientY; headerDragStartHeight=headerEl.getBoundingClientRect().height;
-  headerDragHandleEl.setPointerCapture(e.pointerId);
-});
-headerDragHandleEl.addEventListener('pointermove', e => {
-  if (!headerDragging) return;
-  setHeaderHeight(headerDragStartHeight + (e.clientY - headerDragStartY));
-  map.invalidateSize();
-});
-['pointerup','pointercancel'].forEach(evt => headerDragHandleEl.addEventListener(evt, () => { headerDragging=false; }));
-
 function applyResponsiveLayout(e){
   if (e.matches) {
     // Mobile doesn't support collapsed columns — tabs already isolate each panel.
     document.body.classList.remove('sidebar-collapsed', 'path-collapsed');
     setMobileTab(mobileTab);
-    if (headerEl.style.height) setHeaderHeight(parseFloat(headerEl.style.height)); // re-clamp for the new viewport
-  } else {
-    headerEl.style.height = '';
   }
   map.invalidateSize();
 }
 mq.addEventListener('change', applyResponsiveLayout);
 window.addEventListener('resize', () => {
-  if (mq.matches && headerEl.style.height) setHeaderHeight(parseFloat(headerEl.style.height));
   map.invalidateSize();
   updateSegmentBrackets(); // rows can rewrap at a new width, moving the segments
 });
