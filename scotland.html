@@ -1368,10 +1368,31 @@ function buildPointCategory(catKey, cat){
   return { layer, entries };
 }
 
+/* ============ CATEGORY VISIBILITY (persisted) ============ */
+const CATEGORY_STORAGE_KEY = 'scotlandCategories';
+
+// Stored as {catKey: bool} rather than a list of enabled keys, so a category added to
+// CATEGORIES later still starts at its own defaultOn instead of silently arriving off.
+function loadStoredCategories(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(CATEGORY_STORAGE_KEY) || 'null');
+    return (saved && typeof saved === 'object') ? saved : {};
+  } catch (e) { return {}; }
+}
+function persistCategories(){
+  try {
+    const state = {};
+    Object.keys(CATEGORIES).forEach(k => { state[k] = catState[k].on; });
+    localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(state));
+  } catch (e) { /* private browsing / storage disabled — just don't persist */ }
+}
+
+const storedCategories = loadStoredCategories();
 Object.entries(CATEGORIES).forEach(([catKey, cat]) => {
   const built = cat.kind==='lines' ? buildLineCategory(catKey, cat) : buildPointCategory(catKey, cat);
-  catState[catKey] = { on: cat.defaultOn, layer: built.layer, entries: built.entries };
-  if (cat.defaultOn) built.layer.addTo(map);
+  const on = typeof storedCategories[catKey] === 'boolean' ? storedCategories[catKey] : cat.defaultOn;
+  catState[catKey] = { on, layer: built.layer, entries: built.entries };
+  if (on) built.layer.addTo(map);
 });
 
 /* ============ PATH CODE (compact shareable/typeable path encoding) ============ */
@@ -1641,7 +1662,7 @@ Object.entries(routeEntries).forEach(([id, entry], i) => {
 const catTogglesEl = document.getElementById('catToggles');
 Object.entries(CATEGORIES).forEach(([catKey, cat]) => {
   const btn = document.createElement('button');
-  btn.className = 'cat-btn' + (cat.defaultOn ? ' on' : '');
+  btn.className = 'cat-btn' + (catState[catKey].on ? ' on' : '');
   btn.style.setProperty('--cat-color', cat.color);
   btn.dataset.cat = catKey;
   btn.innerHTML = `<span class="swatch"></span>${cat.label} <span class="count">${cat.data.length}</span>`;
@@ -1659,6 +1680,7 @@ function toggleCategory(catKey){
     activeLineId = null;
   }
   renderSidebar();
+  persistCategories();
 }
 
 // Adds/removes point markers from their category layer so the map mirrors the
