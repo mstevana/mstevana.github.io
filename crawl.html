@@ -4793,11 +4793,36 @@ function spellAreaText(a){
   if(a.kind==='cone')return 'Cone — '+a.len+' tiles deep, widening';
   return a.kind;
 }
-function spellEffects(sp){
+/* Dice notation out of a traced roll, runs of the same die collapsed — magic
+   missile fires five separate 1d4+1 rolls and should read as such rather than
+   as the same line five times. */
+function diceNotation(dice){
+  if(!dice||!dice.length)return null;
+  const parts=[];
+  for(const r of dice){
+    const s=fmtDice(r.n,r.d,r.mod),last=parts[parts.length-1];
+    if(last&&last.s===s)last.n++;else parts.push({s,n:1});
+  }
+  return parts.map(p=>p.n>1?p.n+' × '+p.s:p.s).join(' + ');
+}
+/* A dmgFn/healFn carries no notation to read off, so ask it the same way the
+   log does: arm the roll trace, call it, and report the dice it asked for
+   rather than the number it returned. The result is level-dependent, so it is
+   reported at the caster's own level — more use than the prose's "1d6/level". */
+function spellDice(fn,cl){
+  if(typeof fn!=='function')return null;
+  try{return diceNotation(traceRoll(()=>fn(cl||1)).dice);}catch(e){return null;}
+}
+function spellEffects(sp,cl){
   const rows=[];
   const add=(k,v)=>{if(v)rows.push({k,v});};
+  const atLvl=cl?' (at level '+cl+')':'';
   add('Target',TARGET_LBL[sp.target]||sp.target);
   add('Area',spellAreaText(sp.area));
+  add('Damage',sp.dmgFn?(spellDice(sp.dmgFn,cl)||'')+atLvl:null);
+  add('Heals',sp.healFn?(spellDice(sp.healFn,cl)||'')+atLvl
+    +(sp.target==='allies'?', to every living companion':''):null);
+  if(sp.dot)add('Then',fmtDice(sp.dot.dmg[0],sp.dot.dmg[1])+' '+sp.dot.label+' a round for '+sp.dot.ticks+' rounds');
   add('Save',sp.save
     ? (SAVE_LBL[sp.save.type]||sp.save.type)+(sp.save.half?' — half on a success':sp.save.negate?' — negates':'')
     : (sp.auto?'None — it always lands':'None'));
@@ -4807,20 +4832,22 @@ function spellEffects(sp){
     const b=Object.assign({},sp.buff);delete b.pool;
     add('Grants',buffEffects(b));
     if(sp.buff.pool)add('Absorbs',sp.buff.pool+' damage');
-    add('Lasts',sp.buff.dur?fmtSecs(sp.buff.dur):null);
   }
-  if(sp.dot)add('Then',fmtDice(sp.dot.dmg[0],sp.dot.dmg[1])+' '+sp.dot.label+' a round for '+sp.dot.ticks+' rounds');
-  if(sp.healFn)add('Heals',sp.target==='allies'?'every living companion':'the target');
-  const holds=[];
+  // what it does, and separately how long it holds: every timed effect reports
+  // its duration on the same row rather than hiding it inside the prose
+  const holds=[],durs=[];
+  const timed=(text,secs)=>{holds.push(text);if(secs)durs.push(secs);};
   if(sp.sleep)holds.push('puts it to sleep');
-  if(sp.hold)holds.push('holds it fast for '+sp.hold+'s');
-  if(sp.stun)holds.push('stuns for '+sp.stun+'s');
-  if(sp.slow)holds.push('halves its speed for '+sp.slow+'s');
-  if(sp.slowAll)holds.push('halves the speed of every foe caught, for '+sp.slowAll+'s');
-  if(sp.shaken)holds.push('leaves it shaken for '+sp.shaken+'s');
+  if(sp.hold)timed('holds it fast',sp.hold);
+  if(sp.stun)timed('stuns',sp.stun);
+  if(sp.slow)timed('halves its speed',sp.slow);
+  if(sp.slowAll)timed('halves the speed of every foe caught',sp.slowAll);
+  if(sp.shaken)timed('leaves it shaken',sp.shaken);
   if(sp.negLevels)holds.push(sp.negLevels+' negative level'+(sp.negLevels>1?'s':''));
   if(sp.drain)holds.push('the caster gains the life taken');
   add('Effect',holds.join(', '));
+  if(sp.buff&&sp.buff.dur)durs.push(sp.buff.dur);
+  add('Lasts',[...new Set(durs)].map(fmtSecs).join(' / '));
   const mends=[];
   if(sp.cures&&sp.cures.length)mends.push('cures '+sp.cures.join(', '));
   if(sp.restoreAbility)mends.push(sp.restoreAbility>=99?'restores drained ability scores':'restores up to '+sp.restoreAbility+' points of drained ability');
@@ -14036,7 +14063,7 @@ const UI=(()=>{
     const box=$('memo-detail');
     const sp=memoSel&&SPELLS[memoSel];
     if(!sp){box.innerHTML='<div class="dt-sub">Tap a spell to read what it does.</div>';return;}
-    const rows=spellEffects(sp).map(r=>
+    const rows=spellEffects(sp,memoCh&&memoCh.level).map(r=>
       '<div class="dt-row"><div class="dt-k">'+r.k+'</div><div class="dt-v">'+r.v+'</div></div>').join('');
     box.innerHTML='<div class="dt-name">'+sp.name+'</div>'+
       '<div class="dt-sub">'+sp.circle+ordSuffix(sp.circle)+' circle · '+sp.list+'</div>'+
