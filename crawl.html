@@ -500,14 +500,14 @@ const SPELLS={
     dmgFn:(cl)=>{let n=clamp(Math.floor((cl+1)/2),1,5),s=0;for(let i=0;i<n;i++)s+=roll(1,4,1);return s;}},
   burninghands:{name:'Burning Hands',circle:1,list:'arcane',target:'foe',save:{type:'ref',half:true},desc:'Fan of flame: 1d4/level (max 5d4), Reflex half.',
     dmgFn:(cl)=>roll(clamp(cl,1,5),4)},
-  shieldsp:{name:'Shield',circle:1,list:'arcane',target:'self',buff:{ac:4,dur:60},desc:'+4 AC for 60s.'},
-  magearmor:{name:'Mage Armor',circle:1,list:'arcane',target:'self',buff:{ac:4,dur:600,tag:'magearmor'},desc:'+4 armor for 10 min.'},
+  shieldsp:{name:'Shield',circle:1,list:'arcane',target:'allies',buff:{ac:4,dur:60},desc:'+4 AC for the party, 60s.'},
+  magearmor:{name:'Mage Armor',circle:1,list:'arcane',target:'allies',buff:{ac:4,dur:600,tag:'magearmor'},desc:'+4 armor for the party, 10 min.'},
   sleep:{name:'Sleep',circle:1,list:'arcane',target:'foe',save:{type:'will',negate:true},sleep:true,desc:'A weak foe (4 HD or less) falls asleep. Will negates.'},
   rayfrost:{name:'Ray of Enfeebling Frost',circle:1,list:'arcane',target:'foe',save:{type:'fort',half:true},desc:'1d6+2 cold, Fortitude half.',dmgFn:()=>roll(1,6,2)},
   // wizard 2
   scorchingray:{name:'Scorching Ray',circle:2,list:'arcane',target:'foe',auto:true,desc:'Ray of fire: 4d6, no save (ranged touch).',dmgFn:()=>roll(4,6)},
   acidarrow:{name:'Acid Arrow',circle:2,list:'arcane',target:'foe',auto:true,dot:{dmg:[2,4],ticks:2,label:'acid'},desc:'2d4 acid now and again each round for 2 rounds.',dmgFn:()=>roll(2,4)},
-  mirrorimage:{name:'Mirror Image',circle:2,list:'arcane',target:'self',buff:{images:3,dur:90},desc:'3 illusory doubles absorb blows meant for you.'},
+  mirrorimage:{name:'Mirror Image',circle:2,list:'arcane',target:'allies',buff:{images:3,dur:90},desc:'3 illusory doubles guard each of the party, absorbing blows meant for them.'},
   websp:{name:'Web',circle:2,list:'arcane',target:'foe',save:{type:'ref',negate:true},hold:8,desc:'Sticky webs hold the foe for 8s. Reflex negates.'},
   flamingsphere:{name:'Flaming Sphere',circle:2,list:'arcane',target:'foe',save:{type:'ref',half:true},desc:'Rolling ball of fire: 3d6, Reflex half.',dmgFn:()=>roll(3,6)},
   // wizard 3
@@ -524,7 +524,7 @@ const SPELLS={
   phantasmalkiller:{name:'Phantasmal Killer',circle:4,list:'arcane',target:'foe',save:{type:'will',half:true},desc:'Nightmare made real: 6d6, Will half (fear pierces the mind).',dmgFn:()=>roll(6,6)},
   stoneskin:{name:'Stoneskin',circle:4,list:'arcane',target:'ally',buff:{dr:10,pool:60,dur:300},desc:'Grants DR 10 until 60 damage is absorbed.'},
   enervation:{name:'Enervation',circle:4,list:'arcane',target:'foe',auto:true,negLevels:2,desc:'Black ray: foe suffers 2 negative levels (weaker attacks, −10 hp).'},
-  fireshield:{name:'Fire Shield',circle:4,list:'arcane',target:'self',buff:{fireshield:[2,6],dur:60},desc:'Attackers who strike you take 2d6 fire, for 60s.'},
+  fireshield:{name:'Fire Shield',circle:4,list:'arcane',target:'allies',buff:{fireshield:[2,6],dur:60},desc:'Attackers who strike anyone in the party take 2d6 fire, for 60s.'},
   // wizard 5
   conecold:{name:'Cone of Cold',circle:5,list:'arcane',target:'foes',area:{kind:'cone',len:6},save:{type:'ref',half:true},desc:'A widening cone six tiles deep: 1d6/level (max 15d6). Reflex half.',
     dmgFn:(cl)=>roll(clamp(cl,9,15),6)},
@@ -554,7 +554,7 @@ const SPELLS={
   // cleric 4
   ccw:{name:'Cure Critical Wounds',circle:4,list:'divine',target:'ally',healFn:(cl)=>roll(4,8,clamp(cl,7,20)),desc:'Heals 4d8 + level (max +20).'},
   neutralize:{name:'Neutralize Poison',circle:4,list:'divine',target:'ally',cures:['poison'],restoreAbility:99,desc:'Cures poison and restores poisoned ability damage.'},
-  divinepower:{name:'Divine Power',circle:4,list:'divine',target:'self',buff:{atk:3,str:2,dur:45},desc:'+3 attack, +2 STR for 45s.'},
+  divinepower:{name:'Divine Power',circle:4,list:'divine',target:'allies',buff:{atk:3,str:2,dur:45},desc:'+3 attack, +2 STR for the party, 45s.'},
   freedommove:{name:'Freedom of Movement',circle:4,list:'divine',target:'ally',buff:{freedom:true,dur:120},cures:['paralysis','hold'],desc:'Immune to paralysis and holds for 2 min.'},
   // cleric 5
   flamestrike:{name:'Flame Strike',circle:5,list:'divine',target:'foes',area:{kind:'column',r:1},save:{type:'ref',half:true},desc:'A pillar of divine fire one tile about where it falls: 1d6/level (max 15d6). Reflex half.',
@@ -3932,6 +3932,65 @@ function tryGen(depth,targetWalk,theme){
       }
     }
   }
+  /* The forge hall: one chamber a floor given over to the work the whole theme
+     exists for. A great hearth built into one wall and still burning, the anvil
+     block in the middle with the smith's stock on it, and the smith.
+
+     Built on exactly the ossuary's terms, because the hazards are the same:
+     - the anvil block is T_PIT — not a wall, but not walkable. A single tile at
+       the centre of a 3x3-or-larger room cannot cut the level in two, so it is
+       safe to place after the connectivity check.
+     - whatever is lying on that tile is SHOVED ASIDE, never deleted. Loot is
+       placed before this runs, and the level's only key is one of the things that
+       can be under it; swallowing it seals the locked room for good.
+     - the stairs are never built over. */
+  let forge=null;
+  if(theme.name==='Duergar'){
+    const cand=rooms.slice(1).filter(r=>r.w>=3&&r.h>=3&&!(lockedRoom&&r.x===lockedRoom.x&&r.y===lockedRoom.y));
+    if(cand.length){
+      const r=pick(cand);
+      const ax=r.x+(r.w>>1), ay=r.y+(r.h>>1);
+      // the hearth goes against a wall of the room, facing in
+      const edges=[];
+      for(let x=r.x;x<r.x+r.w;x++){
+        if(g[idx(x,r.y-1)]===T_WALL&&g[idx(x,r.y)]===T_FLOOR)edges.push({x,y:r.y,dx:0,dy:-1});
+        if(g[idx(x,r.y+r.h)]===T_WALL&&g[idx(x,r.y+r.h-1)]===T_FLOOR)edges.push({x,y:r.y+r.h-1,dx:0,dy:1});
+      }
+      for(let y=r.y;y<r.y+r.h;y++){
+        if(g[idx(r.x-1,y)]===T_WALL&&g[idx(r.x,y)]===T_FLOOR)edges.push({x:r.x,y,dx:-1,dy:0});
+        if(g[idx(r.x+r.w,y)]===T_WALL&&g[idx(r.x+r.w-1,y)]===T_FLOOR)edges.push({x:r.x+r.w-1,y,dx:1,dy:0});
+      }
+      const spot=edges.filter(e=>!(e.x===ax&&e.y===ay)&&!(e.x===sx&&e.y===sy));
+      if(spot.length&&!(ax===sx&&ay===sy)){
+        const h=pick(spot);
+        forge={x:r.x,y:r.y,w:r.w,h:r.h,ax,ay,hx:h.x,hy:h.y,hdx:h.dx,hdy:h.dy,opened:false};
+        g[idx(ax,ay)]=T_PIT;
+        const under=items[idx(ax,ay)];
+        if(under&&under.length){
+          let to=DIRS.map(([dx,dy])=>[ax+dx,ay+dy]).find(([x,y])=>g[idx(x,y)]===T_FLOOR);
+          if(!to)for(let yy=r.y;yy<r.y+r.h&&!to;yy++)
+            for(let xx=r.x;xx<r.x+r.w&&!to;xx++)
+              if(g[idx(xx,yy)]===T_FLOOR)to=[xx,yy];
+          if(to){const j=idx(to[0],to[1]);(items[j]=items[j]||[]).push(...under);}
+        }
+        delete items[idx(ax,ay)];
+        delete traps[idx(ax,ay)];
+        for(let i=monsters.length-1;i>=0;i--)if(monsters[i].x===ax&&monsters[i].y===ay)monsters.splice(i,1);
+        // the smith, at his anvil and already aware of them. Elite, like the
+        // ossuary's keeper, and drawn from the duergar the depth allows.
+        const spots=DIRS.map(([dx,dy])=>[ax+dx,ay+dy]).filter(([x,y])=>g[idx(x,y)]===T_FLOOR);
+        if(spots.length){
+          const [gx,gy]=pick(spots);
+          const pool=spawnPool(depth).filter(([k])=>MONSTERS[k].duergar);
+          const key=pool.length?pickWeighted(pool):'duergar';
+          const smith=mkMonster(key,gx,gy,depth);
+          makeElite(smith,pick(ELITE_KEYS));
+          smith.slot=0;smith.forge=true;
+          monsters.push(smith);
+        }
+      }
+    }
+  }
   // lurkers: a cave's ambushers wait as scenery rather than standing about.
   // Each one placed removes an ordinary monster from the floor, so a cave
   // carries the same total threat as any floor at its depth — the ambush
@@ -4000,11 +4059,25 @@ function tryGen(depth,targetWalk,theme){
     for(let i=0;i<nCof;i++)place(pick(['sarcophagus','stacked']),true);
     for(let i=0;i<nPlq;i++)place('tombs',false);
   }
-  // duergar halls: the walls are dressed and furnished — engaged pillars carrying
-  // the roof, and torches burning in iron brackets. Sited exactly like the crypt's
-  // furniture, against a plain wall face with room to stand in front of it.
+  /* Duergar halls: the walls are dressed and furnished. Sited exactly like the
+     crypt's furniture, against a plain wall face with room to stand in front.
+
+     The kinds are weighted rather than picked evenly, because they are not equals.
+     Pillars and torches are the fabric of the hall — structure and light — and
+     have to stay the common sight or the place reads as a museum of one of
+     everything. The other four are what the hall is FOR: a working forge, a rack
+     of picks, a niche to Laduguer, and the manacles that say out loud who does
+     the digging. Note the head count is unchanged, so this costs nothing: the
+     floor already placed 10-17 features and they are simply more varied now. */
   let duergar=[];
   if(theme.name==='Duergar'){
+    const KINDS=[['pillar',0.30],['torch',0.26],['rack',0.12],
+                 ['forge',0.11],['chains',0.11],['shrine',0.10]];
+    const pickKind=()=>{
+      let r=Math.random();
+      for(const [k,w] of KINDS){if((r-=w)<=0)return k;}
+      return 'pillar';
+    };
     const nD=10+rnd(8);
     let dTries=400;
     while(duergar.length<nD&&dTries-->0){
@@ -4014,8 +4087,7 @@ function tryGen(depth,targetWalk,theme){
       if(!wd.length)continue;
       if(duergar.some(c=>Math.abs(c.x-x)+Math.abs(c.y-y)<2))continue;
       const [dx,dy]=pick(wd);
-      // pillars are the commoner sight; a hall is lit but not blazing
-      duergar.push({x,y,dx,dy,kind:Math.random()<0.55?'pillar':'torch'});
+      duergar.push({x,y,dx,dy,kind:pickKind()});
     }
   }
   /* A duergar hall of any size carries its roof on a colonnade: a ring of free
@@ -4077,7 +4149,7 @@ function tryGen(depth,targetWalk,theme){
     if(bm)bm.atk=Math.max(bm.atk,monsters.reduce((a,m)=>m.boss?a:Math.max(a,m.atk),0));
   }
   return {w:W,h:H,grid:g,start,stairs,traps,items,monsters,secrets,theme,depth,
-    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,lurkers,duergar,pillars,drow};
+    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,forge,lurkers,duergar,pillars,drow};
 }
 /* ---------- difficulty curve ----------
    Depth, not party level, drives everything. One documented scalar grows every
@@ -4637,6 +4709,38 @@ function addCond(ch,cond){
 }
 function removeCond(ch,kind){ch.conditions=ch.conditions.filter(c=>c.kind!==kind);}
 const COND_ICONS={poison:'☠',disease:'🦠',paralysis:'⛓',hold:'⛓',sleep:'💤',stunned:'✶',shaken:'😨',bleeding:'🩸',drained:'🕳',faerie:'✧'};
+/* A buff used to be an anonymous shimmer: the portrait showed a ✦ per buff and
+   the status window did not mention them at all, so a party three wards deep
+   could not tell which ward was about to lapse. The buff object is the only
+   record there is, so it has to be able to describe itself — name, what it is
+   doing, and how long is left. `name` is new; saves written before it fall
+   back to the stacking tag, which for everything but Mage Armor IS the name. */
+function buffName(b){return b.name||b.tag||'Blessing';}
+function liveBuffs(ch){return ch.buffs.filter(b=>b.until>G.time);}
+function fmtSecs(s){
+  s=Math.max(0,Math.ceil(s));
+  return s>=60?Math.floor(s/60)+'m'+String(s%60).padStart(2,'0')+'s':s+'s';
+}
+function buffEffects(b){
+  const bits=[];
+  if(b.ac)bits.push('AC '+fmtMod(b.ac));
+  if(b.atk)bits.push('attack '+fmtMod(b.atk));
+  if(b.dmg)bits.push('damage '+fmtMod(b.dmg));
+  if(b.saves)bits.push('saves '+fmtMod(b.saves));
+  for(const a of ABILITIES)if(b[a])bits.push(ABIL_LBL[a]+' '+fmtMod(b[a]));
+  if(b.haste)bits.push('hasted');
+  if(b.freedom)bits.push('no holds');
+  if(b.images)bits.push(b.images+' image'+(b.images===1?'':'s'));
+  // stoneskin is spent by damage, not only by time, so its pool is the number
+  // that actually tells you how much ward is left
+  if(b.dr)bits.push('DR '+b.dr+(b.pool!==undefined?' ('+b.pool+' hp left)':''));
+  if(b.fireshield)bits.push(fmtDice(b.fireshield[0],b.fireshield[1])+' fire to attackers');
+  return bits.join(', ');
+}
+function buffLabel(b){
+  const eff=buffEffects(b);
+  return buffName(b)+(eff?' ('+eff+')':'')+' — '+fmtSecs(b.until-G.time);
+}
 function canAct(ch){
   return !ch.dead&&ch.hp>0&&!hasCond(ch,'paralysis')&&!hasCond(ch,'sleep')
     &&!hasCond(ch,'stunned')&&!hasCond(ch,'hold');
@@ -4672,6 +4776,9 @@ const R3={ // renderer state
   camAnim:null,shake:0,liquidFlows:[],liquidShaders:[],candleFlames:[],cryptGroups:[],lurkerMeshes:{},
 };
 const TILE=1,WALLH=1.3,EYE=0.62;
+// how many pieces of duergar furniture may cast a real light. Everything still
+// burns; past this only the flame sprites are drawn. See buildLevel.
+const FURNITURE_LIGHTS=6;
 const TEXSS=2; // supersample factor: textures are drawn in 128-space but backed at 128*TEXSS px
 // a canvas backed at higher resolution, with the context pre-scaled so all
 // drawing code keeps using the logical 128x128 coordinate space unchanged
@@ -5780,6 +5887,136 @@ function dethekGlyph(ctx,x,y,h,seed){
   if(rr()<0.35){const at=y+h*(0.2+rr()*0.6);ctx.moveTo(x-h*0.18,at);ctx.lineTo(x+h*0.18,at);}
   ctx.stroke();
 }
+/* The two gods, carved rather than written, so unlike Dethek they are allowed
+   curves. Both are cut the same way the runes are — a dark stroke for the groove,
+   then a lit stroke offset up and left for the face of the cut — which is what
+   makes an incision read as depth instead of as paint.
+
+   Laduguer's is a broken crossbow bolt on a grey shield: the Grey Protector's
+   mark, and the one thing in the theme that has earned its gold. Deep Duerra's
+   is a mind flayer skull split by a crack across the crown — the duergar were
+   enslaved by illithids and she stole psionics from them, so her symbol is a
+   trophy taken off the thing that owned her people. */
+function laduguerMark(ctx,cx,cy,r,gold){
+  const shield=()=>{
+    ctx.beginPath();
+    ctx.moveTo(cx-r,cy-r*0.95);
+    ctx.lineTo(cx+r,cy-r*0.95);
+    ctx.lineTo(cx+r,cy+r*0.15);
+    ctx.quadraticCurveTo(cx+r*0.92,cy+r*0.95,cx,cy+r*1.25);
+    ctx.quadraticCurveTo(cx-r*0.92,cy+r*0.95,cx-r,cy+r*0.15);
+    ctx.closePath();
+  };
+  shield();ctx.fillStyle='rgba(0,0,0,0.34)';ctx.fill();     // the sunk field
+  shield();ctx.strokeStyle='rgba(0,0,0,0.62)';ctx.lineWidth=2.6;ctx.stroke();
+  shield();ctx.strokeStyle=gold;ctx.lineWidth=1.5;ctx.stroke();
+  ctx.save();ctx.translate(-0.5,-0.6);
+  shield();ctx.strokeStyle='rgba(255,244,205,0.34)';ctx.lineWidth=0.7;ctx.stroke();
+  ctx.restore();
+  /* The bolt, laid across the shield and snapped. Drawn in its own rotated frame
+     with +x toward the head, which is the only way the asymmetry survives: the
+     first attempt put a solid triangle on BOTH ends — a head at the point and
+     the "fletching" as a second triangle at the butt — and it read unmistakably
+     as a double-headed arrow with no break in it at all. A bolt is read from its
+     asymmetry: one narrow head, longer than it is wide, and vanes that sweep
+     BACK along the shaft rather than flaring off the end of it. And a break is
+     read from misalignment, not from a gap: the head half is kicked out of line
+     about the break so the two lengths visibly no longer belong to one shaft. */
+  const L=r*1.10, SH=r*0.10, BRK=r*0.10, KICK=0.30;
+  const bolt=(col)=>{
+    ctx.fillStyle=col;
+    ctx.beginPath();                                    // butt half of the shaft
+    ctx.rect(-L,-SH,L-BRK,SH*2);
+    ctx.fill();
+    for(const s of [-1,1]){                             // vanes, swept back
+      ctx.beginPath();
+      ctx.moveTo(-L+r*0.44,s*SH);
+      ctx.lineTo(-L+r*0.06,s*SH*3.4);
+      ctx.lineTo(-L-r*0.08,s*SH*3.0);
+      ctx.lineTo(-L+r*0.30,s*SH*0.6);
+      ctx.closePath();ctx.fill();
+    }
+    ctx.beginPath();                                    // the splintered butt face
+    ctx.moveTo(-BRK,-SH);ctx.lineTo(-BRK+r*0.09,0);ctx.lineTo(-BRK,SH);
+    ctx.closePath();ctx.fill();
+    ctx.save();ctx.translate(BRK,0);ctx.rotate(KICK);    // head half, kicked out of line
+    ctx.beginPath();ctx.rect(0,-SH,L*0.66,SH*2);ctx.fill();
+    ctx.beginPath();                                    // a long narrow head
+    ctx.moveTo(L*0.66,-SH*1.9);ctx.lineTo(L*1.02,0);ctx.lineTo(L*0.66,SH*1.9);
+    ctx.closePath();ctx.fill();
+    ctx.restore();
+  };
+  ctx.save();ctx.translate(cx,cy);ctx.rotate(-0.72);
+  bolt('rgba(0,0,0,0.70)');
+  ctx.translate(-0.6,-0.7);bolt(gold);
+  ctx.restore();
+}
+/* An illithid skull is read from three things and none of them is the outline:
+   a cranium taller than it is wide with no jaw under it, sockets set low and
+   slanted, and four tentacles hanging clear of each other. Drawn as outlines of
+   even weight it comes out as a cartoon face — the first attempt had round eyes,
+   a chin, and four inward-curling tentacles that merged into one shape reading
+   unmistakably as a mouth with a tongue in it. Solid silhouette, filled sockets,
+   and tentacles splayed OUTWARD and well below the skull is what fixes it. */
+function duerraMark(ctx,cx,cy,r){
+  const skull=()=>{
+    ctx.beginPath();
+    ctx.moveTo(cx,cy-r*1.00);                                   // the crown
+    ctx.bezierCurveTo(cx+r*0.86,cy-r*0.92, cx+r*0.80,cy-r*0.02, cx+r*0.40,cy+r*0.30);
+    ctx.bezierCurveTo(cx+r*0.20,cy+r*0.44, cx-r*0.20,cy+r*0.44, cx-r*0.40,cy+r*0.30);
+    ctx.bezierCurveTo(cx-r*0.80,cy-r*0.02, cx-r*0.86,cy-r*0.92, cx,cy-r*1.00);
+    ctx.closePath();
+  };
+  const tent=(s,k)=>{
+    const x0=cx+s*r*(0.08+k*0.26), y0=cy+r*0.22, w=r*0.13*(1-k*0.22);
+    const x1=cx+s*r*(0.44+k*0.44), y1=cy+r*0.74;
+    const x2=cx+s*r*(0.34+k*0.34), y2=cy+r*1.22;
+    ctx.beginPath();
+    ctx.moveTo(x0-w,y0);
+    ctx.quadraticCurveTo(x1-w*0.7,y1,x2,y2);
+    ctx.quadraticCurveTo(x1+w*0.7,y1,x0+w,y0);
+    ctx.closePath();
+  };
+  const body=(col)=>{
+    ctx.fillStyle=col;
+    skull();ctx.fill();
+    for(const s of [-1,1])for(const k of [0,1]){tent(s,k);ctx.fill();}
+  };
+  // the sunk field it is cut into, then the silhouette twice: dark, then a lit
+  // face offset up and left, which is the same incision the runes use
+  ctx.fillStyle='rgba(0,0,0,0.30)';
+  ctx.beginPath();ctx.ellipse(cx,cy+r*0.16,r*1.10,r*1.34,0,0,7);ctx.fill();
+  body('rgba(0,0,0,0.70)');
+  ctx.save();ctx.translate(-0.9,-1.0);body('rgba(226,220,202,0.34)');ctx.restore();
+  // sockets: filled, slanted, and set low — an outline here draws an eye
+  ctx.fillStyle='rgba(0,0,0,0.78)';
+  for(const s of [-1,1]){
+    ctx.beginPath();
+    ctx.moveTo(cx+s*r*0.13,cy-r*0.02);
+    ctx.quadraticCurveTo(cx+s*r*0.36,cy-r*0.36,cx+s*r*0.58,cy-r*0.10);
+    ctx.quadraticCurveTo(cx+s*r*0.38,cy+r*0.10,cx+s*r*0.13,cy-r*0.02);
+    ctx.closePath();ctx.fill();
+  }
+  // and the crack that makes it hers: one fissure off the crown, not a symmetric
+  // zigzag across it, which reads as a pair of eyebrows
+  ctx.strokeStyle='rgba(0,0,0,0.72)';ctx.lineWidth=2.2;ctx.lineJoin='miter';
+  ctx.beginPath();
+  ctx.moveTo(cx-r*0.30,cy-r*0.96);
+  ctx.lineTo(cx-r*0.05,cy-r*0.62);
+  ctx.lineTo(cx+r*0.34,cy-r*0.74);
+  ctx.lineTo(cx+r*0.55,cy-r*0.40);
+  ctx.lineTo(cx+r*0.82,cy-r*0.46);
+  ctx.stroke();
+  ctx.strokeStyle='rgba(226,220,202,0.32)';ctx.lineWidth=0.9;
+  ctx.save();ctx.translate(-0.7,-0.8);
+  ctx.beginPath();
+  ctx.moveTo(cx-r*0.30,cy-r*0.96);
+  ctx.lineTo(cx-r*0.05,cy-r*0.62);
+  ctx.lineTo(cx+r*0.34,cy-r*0.74);
+  ctx.lineTo(cx+r*0.55,cy-r*0.40);
+  ctx.lineTo(cx+r*0.82,cy-r*0.46);
+  ctx.stroke();ctx.restore();
+}
 function duergarWallCanvas(th,variant,base){
   const {cv,ctx}=newCanvas(128);
   const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
@@ -5802,10 +6039,19 @@ function duergarWallCanvas(th,variant,base){
       ctx.save();ctx.translate(-0.5,-0.6);dethekGlyph(ctx,gx,y,h,seed);ctx.restore();
     }
   }
-  // per-variant metalwork and wear on the block faces
+  /* Per-variant work on the block faces. Keyed on the variant itself rather than
+     on variant%4, because there are eight of them and the four spare slots were
+     repeats: the theme was showing the same three treatments twice each and one
+     of those three — a roundel with a meaningless star in it — said nothing about
+     whose hall this is. The eight now run plain, studs, chevrons, Laduguer, Deep
+     Duerra, a slave quota, an ore seam and the mason's roundel, so a long wall
+     carries the faith, the work and the mine rather than ornament alone.
+     `variant 0` is deliberately bare: with a device on every tile the frieze has
+     nothing to be read against. */
   const rr0=(variant*2654435761)>>>0;
   let sd=rr0;const rr=()=>{sd=(sd*1664525+1013904223)>>>0;return sd/4294967296;};
-  if(variant%4===1){                              // gold studs at the block corners
+  const BOT=base.rh*2.5;                          // the middle of the bottom course
+  if(variant===1){                                // gold studs at the block corners
     for(let r=0;r<base.rows;r++){
       const y=r*base.rh, phase=(r%2)?base.bw/2:0;
       for(let k=-1;k<=base.cols;k++){
@@ -5820,7 +6066,7 @@ function duergarWallCanvas(th,variant,base){
         }
       }
     }
-  }else if(variant%4===2){                        // a chevron course cut into the top band
+  }else if(variant===2){                          // a chevron course cut into the top band
     const y=base.rh*0.5, w=8;
     ctx.lineWidth=1.6;
     for(let x=-w;x<=128+w;x+=w){
@@ -5829,8 +6075,96 @@ function duergarWallCanvas(th,variant,base){
       ctx.strokeStyle='rgba(255,246,225,0.16)';
       ctx.beginPath();ctx.moveTo(x,y+3.2);ctx.lineTo(x+w/2,y-4.8);ctx.lineTo(x+w,y+3.2);ctx.stroke();
     }
-  }else if(variant%4===3){                        // a carved boss on one block of the bottom course
-    const cx=(variant%2?0.28:0.72)*128, cy=base.rh*2.5;
+  }else if(variant===3){                          // Laduguer, the Grey Protector
+    wrapX(()=>laduguerMark(ctx,0.30*128,BOT,12,gold));
+  }else if(variant===4){                          // Deep Duerra, and what she took it from
+    wrapX(()=>duerraMark(ctx,0.70*128,BOT-3,11.5));
+  }else if(variant===5){
+    /* A slave quota, cut where the overseer could reach it: fours struck through
+       by a fifth, in blocks, with the finished blocks scored out. Kept small and
+       high-contrast — at two tiles this has to read as writing rather than as
+       wear, and wear is what the wall already has plenty of. */
+    for(const [gx,gy] of [[0.12*128,BOT-11],[0.12*128,BOT+3],[0.66*128,BOT-4]]){
+      const groups=2+Math.floor(rr()*2);
+      for(let g=0;g<groups;g++){
+        const x0=gx+g*17, done=rr()<0.4;
+        wrapX(()=>{
+          for(let k=0;k<4;k++){
+            const x=x0+k*3.2;
+            ctx.strokeStyle='rgba(0,0,0,0.66)';ctx.lineWidth=1.9;
+            ctx.beginPath();ctx.moveTo(x,gy);ctx.lineTo(x+0.6,gy+10);ctx.stroke();
+            ctx.strokeStyle='rgba(255,246,225,0.34)';ctx.lineWidth=0.9;
+            ctx.beginPath();ctx.moveTo(x-0.7,gy-0.7);ctx.lineTo(x-0.1,gy+9.3);ctx.stroke();
+          }
+          ctx.strokeStyle='rgba(0,0,0,0.66)';ctx.lineWidth=1.9;
+          ctx.beginPath();ctx.moveTo(x0-1.8,gy+9.6);ctx.lineTo(x0+11.4,gy+0.6);ctx.stroke();
+          ctx.strokeStyle='rgba(255,246,225,0.34)';ctx.lineWidth=0.9;
+          ctx.beginPath();ctx.moveTo(x0-2.5,gy+8.9);ctx.lineTo(x0+10.7,gy-0.1);ctx.stroke();
+          if(done){                              // the tally paid off, scored out
+            ctx.strokeStyle='rgba(0,0,0,0.50)';ctx.lineWidth=2.6;
+            ctx.beginPath();ctx.moveTo(x0-3,gy+5);ctx.lineTo(x0+13,gy+5);ctx.stroke();
+          }
+        });
+      }
+    }
+  }else if(variant===6){
+    /* Where the hall was driven through a vein the dressing simply stops: the
+       facing is broken out, the raw rock behind it shows, and the ore is gone.
+       What is left is the ghost of the seam and the chisel marks of the men who
+       took it. Kept clear of the frieze, which is cut into the finished stone and
+       would not survive the hole. */
+    const cx=0.5*128, cy=BOT-2, R=26;
+    const body=genBlob(cx,cy,R,0.62);
+    wrapX(()=>{
+      pathBlob(ctx,body);
+      ctx.fillStyle=shade(th.wall,-0.52);ctx.fill();
+      /* The edge is a broken lip of stone, not a cut line. One even stroke round
+         the whole thing reads as a sticker pasted on the wall; what makes it a
+         hole is a shadow inside the top edge, a lit lip along the bottom where
+         the break catches the torch, and an outline that varies segment to
+         segment as a fracture does. */
+      ctx.save();pathBlob(ctx,body);ctx.clip();
+      ctx.strokeStyle='rgba(0,0,0,0.55)';ctx.lineWidth=6;pathBlob(ctx,body);ctx.stroke();
+      ctx.restore();
+      body.forEach(([px,py],i)=>{
+        const [qx,qy]=body[(i+1)%body.length];
+        const down=(py+qy)/2>cy;
+        ctx.strokeStyle=down?'rgba(255,246,225,0.16)':'rgba(0,0,0,0.5)';
+        ctx.lineWidth=down?1.6:1.2;
+        ctx.beginPath();ctx.moveTo(px,py+(down?1:0));ctx.lineTo(qx,qy+(down?1:0));ctx.stroke();
+      });
+      ctx.save();pathBlob(ctx,body);ctx.clip();
+      // broken rock inside the hole: angular facets, no courses
+      for(let i=0;i<26;i++){
+        const fx=cx+(rr()-0.5)*R*2, fy=cy+(rr()-0.5)*R*1.6, fr=2+rr()*6;
+        pathBlob(ctx,genBlob(fx,fy,fr,0.9));
+        ctx.fillStyle=shade(th.wall,-0.34-rr()*0.34);ctx.fill();
+        ctx.strokeStyle='rgba(0,0,0,0.28)';ctx.lineWidth=0.8;ctx.stroke();
+      }
+      // the seam itself: a band of dull metal wandering across the break
+      ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=4.2;
+      ctx.beginPath();ctx.moveTo(cx-R,cy+5);
+      ctx.bezierCurveTo(cx-R*0.3,cy-9,cx+R*0.3,cy+11,cx+R,cy-6);ctx.stroke();
+      ctx.strokeStyle='rgba(150,146,132,0.42)';ctx.lineWidth=2.4;
+      ctx.beginPath();ctx.moveTo(cx-R,cy+4.4);
+      ctx.bezierCurveTo(cx-R*0.3,cy-9.6,cx+R*0.3,cy+10.4,cx+R,cy-6.6);ctx.stroke();
+      for(let i=0;i<14;i++){                     // flecks the pick missed
+        const t=rr(), px=cx-R+t*R*2, py=cy+4-Math.sin(t*3.1)*8+(rr()-0.5)*4;
+        ctx.fillStyle=`rgba(214,208,188,${0.22+rr()*0.3})`;
+        ctx.fillRect(px,py,1+rr()*1.6,1);
+      }
+      ctx.restore();
+      // chisel marks radiating off the edge, into the dressed stone
+      for(let i=0;i<30;i++){
+        const a=rr()*Math.PI*2, r0=R*(0.86+rr()*0.26);
+        const x0=cx+Math.cos(a)*r0, y0=cy+Math.sin(a)*r0*0.8, l=2+rr()*4;
+        ctx.strokeStyle='rgba(0,0,0,0.30)';ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(x0,y0);
+        ctx.lineTo(x0+Math.cos(a)*l,y0+Math.sin(a)*l*0.8);ctx.stroke();
+      }
+    });
+  }else if(variant===7){                          // the mason's roundel
+    const cx=(variant%2?0.28:0.72)*128, cy=BOT;
     wrapX(()=>{
       ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=2;
       ctx.beginPath();ctx.arc(cx,cy,9,0,7);ctx.stroke();
@@ -5899,6 +6233,237 @@ function duergarFloorCanvas(th){
     ctx.fillRect(rnd(128),rnd(128),1,1);
   }
   return cv;
+}
+/* The roof of a duergar hall is built, not dug, and it is under permanent smoke:
+   the one surface the forges never stop working on.
+
+   Each tile is one bay of groin vaulting. Ribs run along all four edges — so
+   neighbouring tiles share a rib line rather than each printing its own — and
+   across both diagonals, dividing the bay into four webs. The courses in each
+   web run parallel to its own outer edge, which is how a real groin vault is
+   laid, and the whole thing is then blackened from the crown outward: carbon
+   pools where the smoke does, and the ribs stand proud enough for the draught to
+   keep them comparatively clean.
+
+   Unlike the other themes the per-tile repeat is wanted here. A flagstone map
+   repeated per tile prints a lattice on the ground and that is a bug; a vault
+   repeated per tile prints a rib at every bay, and that is architecture. */
+function duergarCeilCanvas(th){
+  const {cv,ctx}=newCanvas(128);
+  const wrap9=(fn)=>{for(const oy of [-128,0,128])for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0+oy);fn();ctx.restore();}};
+  const C=64, RIB=7, DIAG=5;
+  ctx.fillStyle=shade(th.wall,-0.74);ctx.fillRect(0,0,128,128);
+  // the four webs, each with its own courses running parallel to its outer edge
+  const webs=[[[0,0],[128,0]],[[128,0],[128,128]],[[128,128],[0,128]],[[0,128],[0,0]]];
+  webs.forEach(([a,b],wi)=>{
+    ctx.save();
+    ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.lineTo(C,C);ctx.closePath();ctx.clip();
+    ctx.fillStyle=shade(th.wall,wi%2?-0.66:-0.62);ctx.fillRect(0,0,128,128);
+    // courses: parallel to the outer edge, tightening toward the crown the way
+    // voussoirs do as the ring closes
+    const horiz=(wi%2)===0;
+    for(let d=6;d<64;d+=7){
+      const t=d/64, off=horiz?(wi===0?d:128-d):(wi===1?128-d:d);
+      ctx.strokeStyle=`rgba(0,0,0,${0.34-t*0.12})`;ctx.lineWidth=1.2;
+      ctx.beginPath();
+      if(horiz){ctx.moveTo(0,off);ctx.lineTo(128,off);}else{ctx.moveTo(off,0);ctx.lineTo(off,128);}
+      ctx.stroke();
+      ctx.strokeStyle=`rgba(255,246,225,${0.07-t*0.03})`;ctx.lineWidth=0.7;
+      ctx.beginPath();
+      if(horiz){ctx.moveTo(0,off+(wi===0?1:-1));ctx.lineTo(128,off+(wi===0?1:-1));}
+      else{ctx.moveTo(off+(wi===3?1:-1),0);ctx.lineTo(off+(wi===3?1:-1),128);}
+      ctx.stroke();
+      // the joints between voussoirs, staggered course to course
+      const n=6+((d/7)|0);
+      for(let k=0;k<n;k++){
+        const p=((k+(d%2?0.5:0))/n)*128;
+        ctx.strokeStyle='rgba(0,0,0,0.26)';ctx.lineWidth=1;
+        ctx.beginPath();
+        if(horiz){ctx.moveTo(p,off);ctx.lineTo(p,off+(wi===0?7:-7));}
+        else{ctx.moveTo(off,p);ctx.lineTo(off+(wi===3?7:-7),p);}
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  });
+  // the diagonal ribs, drawn as a dark body with one lit arris
+  for(const [dx,dy] of [[1,1],[1,-1]]){
+    ctx.save();ctx.translate(C,C);ctx.rotate(Math.atan2(dy,dx));
+    ctx.fillStyle=shade(th.wall,-0.50);ctx.fillRect(-100,-DIAG/2,200,DIAG);
+    ctx.fillStyle='rgba(255,246,225,0.055)';ctx.fillRect(-100,-DIAG/2,200,1.2);
+    ctx.fillStyle='rgba(0,0,0,0.42)';ctx.fillRect(-100,DIAG/2-1.2,200,1.2);
+    ctx.restore();
+  }
+  // the wall ribs: half a rib on each edge, so two tiles make one
+  const edge=(x,y,w,h,lit)=>{
+    ctx.fillStyle=shade(th.wall,-0.44);ctx.fillRect(x,y,w,h);
+    ctx.fillStyle='rgba(255,246,225,0.06)';
+    if(w>h)ctx.fillRect(x,lit?y+h-1.2:y,w,1.2);else ctx.fillRect(lit?x+w-1.2:x,y,1.2,h);
+    ctx.fillStyle='rgba(0,0,0,0.40)';
+    if(w>h)ctx.fillRect(x,lit?y+h:y-1.2,w,1.2);else ctx.fillRect(lit?x+w:x-1.2,y,1.2,h);
+  };
+  edge(0,0,128,RIB/2,true); edge(0,128-RIB/2,128,RIB/2,false);
+  edge(0,0,RIB/2,128,true); edge(128-RIB/2,0,RIB/2,128,false);
+  // the boss where the diagonals cross, and the springing blocks at the corners.
+  // Both are kept nearly as dark as the rib they interrupt: in perspective a pale
+  // block at a corner stops reading as masonry and starts reading as a hatch
+  // hanging in the roof.
+  ctx.fillStyle=shade(th.wall,-0.38);ctx.beginPath();ctx.arc(C,C,6.5,0,7);ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.45)';ctx.lineWidth=1.4;
+  ctx.beginPath();ctx.arc(C,C,6.5,0,7);ctx.stroke();
+  ctx.strokeStyle='rgba(255,246,225,0.07)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.arc(C-0.6,C-0.7,5.2,0,7);ctx.stroke();
+  for(const [sx,sy] of [[0,0],[128,0],[0,128],[128,128]]){
+    wrap9(()=>{ctx.fillStyle=shade(th.wall,-0.40);ctx.fillRect(sx-4.5,sy-4.5,9,9);
+      ctx.strokeStyle='rgba(0,0,0,0.34)';ctx.lineWidth=1;ctx.strokeRect(sx-5,sy-5,10,10);});
+  }
+  // and then the smoke of a thousand years. It is heaviest at the crown, where it
+  // pools, but nothing escapes it — the ribs only stand out because the draught
+  // works hardest over them, not because they are clean.
+  const so=ctx.createRadialGradient(C,C,3,C,C,78);
+  so.addColorStop(0,'rgba(8,7,6,0.88)');
+  so.addColorStop(0.42,'rgba(8,7,6,0.70)');
+  so.addColorStop(1,'rgba(8,7,6,0.42)');
+  ctx.fillStyle=so;ctx.fillRect(0,0,128,128);
+  for(let i=0;i<34;i++){
+    const a=rnd(628)/100, r0=10+rnd(30), r1=r0+14+rnd(28);
+    wrap9(()=>{
+      ctx.strokeStyle=`rgba(6,5,4,${0.10+Math.random()*0.16})`;
+      ctx.lineWidth=3+rnd(7);ctx.lineCap='round';
+      ctx.beginPath();
+      ctx.moveTo(C+Math.cos(a)*r0,C+Math.sin(a)*r0);
+      ctx.lineTo(C+Math.cos(a+0.2)*r1,C+Math.sin(a+0.2)*r1);
+      ctx.stroke();
+    });
+  }
+  ctx.lineCap='butt';
+  for(let i=0;i<600;i++){
+    ctx.fillStyle=Math.random()<0.45?'rgba(255,255,255,0.020)':'rgba(0,0,0,0.06)';
+    ctx.fillRect(rnd(128),rnd(128),1,1);
+  }
+  return cv;
+}
+/* Surfaces for the halls' furniture. Everything built out of `Bins` was a flat
+   colour, and a 40cm box of flat colour reads as a shape rather than an object —
+   worst on the anvil and the forge, because they are the biggest solid things in
+   the theme and the eye has nothing to measure them by.
+
+   All three are MODULATION maps, not colour maps: they sit around white and are
+   multiplied into the material's own colour, so a texture can be handed to iron,
+   stone or wood without any of them changing tone. They double as bump maps. */
+function duergarWorkedStoneCanvas(){
+  const {cv,ctx}=newCanvas(128);
+  ctx.fillStyle='#efefef';ctx.fillRect(0,0,128,128);
+  // tooling: short chisel strokes running roughly one way, as a mason works
+  for(let i=0;i<460;i++){
+    const x=rnd(128),y=rnd(128),l=2+rnd(5);
+    wrap9(ctx,()=>{
+      ctx.strokeStyle=Math.random()<0.5?'rgba(255,255,255,0.30)':'rgba(0,0,0,0.07)';
+      ctx.lineWidth=0.9;
+      ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+l*0.92,y+l*0.36);ctx.stroke();
+    });
+  }
+  // chips knocked out of it, each with a lit upper lip. Shallow: at 12% black
+  // these are pocks in dressed stone, at 20% they were cobbles.
+  for(let i=0;i<30;i++){
+    const x=rnd(128),y=rnd(128),r=1.2+rnd(2.8);
+    const body=genBlob(x,y,r,0.85);
+    wrap9(ctx,()=>{
+      pathBlob(ctx,body);ctx.fillStyle='rgba(0,0,0,0.12)';ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,0.26)';ctx.lineWidth=0.8;ctx.stroke();
+    });
+  }
+  for(let i=0;i<1600;i++){
+    ctx.fillStyle=Math.random()<0.5?'rgba(255,255,255,0.13)':'rgba(0,0,0,0.04)';
+    ctx.fillRect(rnd(128),rnd(128),1,1);
+  }
+  // soot gathering in patches — this is a forge hall, nothing here stays clean
+  for(let i=0;i<5;i++){
+    const x=rnd(128),y=rnd(128),r=18+rnd(30);
+    wrap9(ctx,()=>{
+      const g2=ctx.createRadialGradient(x,y,2,x,y,r);
+      g2.addColorStop(0,'rgba(0,0,0,0.11)');g2.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g2;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+    });
+  }
+  return cv;
+}
+function duergarIronCanvas(){
+  const {cv,ctx}=newCanvas(128);
+  ctx.fillStyle='#e6e6e6';ctx.fillRect(0,0,128,128);
+  /* Hammer dimples — this is wrought iron, beaten, not cast smooth. Two things
+     kept these reading as bubble wrap rather than as a beaten surface, and both
+     had to go: the contrast (30% black at the rim, then 11%, now 5%) and the
+     REGULARITY. A perfect circle with a lit top-left and a dark rim is the
+     canonical "sphere" cue, so however faint it gets the eye still counts balls;
+     stretched and rotated at random they finally read as undulation. */
+  for(let i=0;i<48;i++){
+    const x=rnd(128),y=rnd(128),r=5+rnd(10),e=0.5+Math.random()*0.9,a=Math.random()*6.3;
+    wrap9(ctx,()=>{
+      ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.scale(1,e);
+      const g2=ctx.createRadialGradient(-r*0.30,-r*0.34,r*0.08,0,0,r);
+      g2.addColorStop(0,'rgba(255,255,255,0.18)');
+      g2.addColorStop(0.6,'rgba(255,255,255,0.03)');
+      g2.addColorStop(1,'rgba(0,0,0,0.05)');
+      ctx.fillStyle=g2;ctx.beginPath();ctx.arc(0,0,r,0,7);ctx.fill();
+      ctx.restore();
+    });
+  }
+  // pitting, and long scratches from the file
+  for(let i=0;i<220;i++){
+    const x=rnd(128),y=rnd(128);
+    wrap9(ctx,()=>{ctx.fillStyle='rgba(0,0,0,0.16)';ctx.fillRect(x,y,1,1);});
+  }
+  for(let i=0;i<46;i++){
+    const x=rnd(128),y=rnd(128),l=4+rnd(16),a=(Math.random()-0.5)*1.4;
+    wrap9(ctx,()=>{
+      ctx.strokeStyle=Math.random()<0.5?'rgba(255,255,255,0.28)':'rgba(0,0,0,0.10)';
+      ctx.lineWidth=0.8;ctx.beginPath();ctx.moveTo(x,y);
+      ctx.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l);ctx.stroke();
+    });
+  }
+  // rust, sparingly. It is a working forge, not a wreck
+  for(let i=0;i<8;i++){
+    const x=rnd(128),y=rnd(128),r=3+rnd(8);
+    const body=genBlob(x,y,r,0.9);
+    wrap9(ctx,()=>{pathBlob(ctx,body);ctx.fillStyle='rgba(150,86,40,0.12)';ctx.fill();});
+  }
+  return cv;
+}
+function duergarWoodCanvas(){
+  const {cv,ctx}=newCanvas(128);
+  ctx.fillStyle='#ececec';ctx.fillRect(0,0,128,128);
+  // grain: long fibres, a few of them dark enough to read as splits
+  for(let i=0;i<110;i++){
+    const x=rnd(128),w=0.6+Math.random()*2.2,dark=Math.random()<0.4;
+    wrap9(ctx,()=>{
+      ctx.strokeStyle=dark?'rgba(0,0,0,0.16)':'rgba(255,255,255,0.42)';
+      ctx.lineWidth=w;ctx.beginPath();
+      let px=x;ctx.moveTo(px,-8);
+      for(let y=-8;y<136;y+=14){px+=(Math.random()-0.5)*2.4;ctx.lineTo(px,y);}
+      ctx.stroke();
+    });
+  }
+  for(let i=0;i<5;i++){                       // knots
+    const x=rnd(128),y=rnd(128),r=2+rnd(4);
+    wrap9(ctx,()=>{
+      for(let k=3;k>=1;k--){
+        ctx.strokeStyle=k%2?'rgba(0,0,0,0.20)':'rgba(255,255,255,0.30)';
+        ctx.lineWidth=1.1;ctx.beginPath();ctx.ellipse(x,y,r*k*0.45,r*k*0.62,0.3,0,7);ctx.stroke();
+      }
+    });
+  }
+  return cv;
+}
+// one copy each per run: these are shared by every piece of duergar furniture
+function duergarTex(kind){
+  const key='duerTex_'+kind;
+  if(R3.texCache[key])return R3.texCache[key];
+  const cv=kind==='iron'?duergarIronCanvas():kind==='wood'?duergarWoodCanvas():duergarWorkedStoneCanvas();
+  const t=texFromCanvas(cv);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  R3.texCache[key]=t;
+  return t;
 }
 function caveFloorCanvas(th){
   const base=caveBaseCanvas(th,th.floor,0.72);
@@ -6766,6 +7331,107 @@ function disposeLevel(){
   R3.doorMeshes={};R3.secretMeshes={};R3.trapDecals={};R3.itemSprites={};R3.monsterSprites={};R3.monsterGlows={};R3.monsterShadows={};R3.prewarmQ=[];R3.prewarmT=0;R3.stairsGroup=null;
   R3.candleFlames=[];R3.cryptGroups=[];R3.lurkerMeshes={};R3.wallMats=null;R3.webMeshes=[];
 }
+/* Scenery welding. A piece of furniture is a dozen little boxes and cylinders,
+   and built as a dozen meshes it costs a dozen draw calls apiece — which for
+   seventeen features on a floor is more than the room they decorate. `Bins`
+   collects transformed geometries per material and hands back one mesh each, so
+   a forge or a weapon rack is three or four calls however many parts it has.
+
+   Position and normal only: none of this is textured, it is all flat stone,
+   iron and wood, which is why the weld can be this short. */
+/* The weld carries UVs, and they are PROJECTED FROM POSITION rather than taken
+   from the source geometry. A BoxGeometry's own uv runs 0..1 across each face
+   however big that face is, so a shared map would be smeared once over a whole
+   hearth and printed postage-stamp size on a rivet — which is worse than no
+   texture at all. Projecting along whichever axis the face points down gives
+   every part the same texel density for free, and nothing needs a per-piece
+   repeat (which a merged mesh could not carry anyway).
+
+   `density` is repeats per world unit. A dungeon tile is one unit. */
+function weldGeos(list,density){
+  const D=density||2.4;
+  const pos=[],nrm=[],uv=[];
+  for(const g of list){
+    const P=g.attributes.position,N=g.attributes.normal;
+    for(let i=0;i<P.count;i++){
+      const x=P.getX(i),y=P.getY(i),z=P.getZ(i);
+      const nx=N.getX(i),ny=N.getY(i),nz=N.getZ(i);
+      pos.push(x,y,z);nrm.push(nx,ny,nz);
+      const ax=Math.abs(nx),ay=Math.abs(ny),az=Math.abs(nz);
+      if(ay>=ax&&ay>=az)uv.push(x*D,z*D);        // a face looking up or down
+      else if(ax>=az)uv.push(z*D,y*D);           // ...along X
+      else uv.push(x*D,y*D);                     // ...along Z
+    }
+  }
+  const out=new THREE.BufferGeometry();
+  out.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pos),3));
+  out.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(nrm),3));
+  out.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(uv),2));
+  return out;
+}
+/* `density` is repeats per world unit for the projected UVs, and furniture wants
+   a much finer grain than a wall does: these are 20–50cm objects, so a map that
+   repeats twice a tile puts hammer dimples the size of a fist on an anvil. The
+   default here is tuned for props. */
+function Bins(density){
+  const bins=new Map(),D=density||5.0;
+  return {
+    // geo placed at (x,y,z) with an optional Euler rotation, filed under `mat`
+    at(mat,geo,x,y,z,rx,ry,rz){
+      const m=new THREE.Matrix4();
+      if(rx||ry||rz)m.makeRotationFromEuler(new THREE.Euler(rx||0,ry||0,rz||0));
+      m.setPosition(x||0,y||0,z||0);
+      if(!bins.has(mat))bins.set(mat,[]);
+      bins.get(mat).push(geo.toNonIndexed().applyMatrix4(m));
+      return this;
+    },
+    addTo(group){
+      for(const [mat,list] of bins)if(list.length)group.add(new THREE.Mesh(weldGeos(list,D),mat));
+      return group;
+    }
+  };
+}
+/* A London-pattern anvil, shared by the wall forge and the forge hall so the two
+   are the same object at two sizes.
+
+   Three stacked boxes is what it was, and three stacked boxes is a doorstop. An
+   anvil is read from its WAIST: the spread foot, the narrow neck, and the body
+   swelling back out to a face wider than the neck it stands on. Add the horn
+   tapering off one end, the step below it, and the two holes in the heel, and the
+   silhouette is unmistakable at any range. Everything is laid out here at unit
+   height (face at y=0.317) and scaled by `s` at the call site.
+
+   `M` carries {iron, dark, hole}. Drawn along +X with the horn to the right. */
+function addAnvil(B,M,x,y,z,s){
+  const S=(a,b,c)=>new THREE.BoxGeometry(a*s,b*s,c*s);
+  const at=(mat,g,dx,dy,dz,rx,ry,rz)=>B.at(mat,g,x+dx*s,y+dy*s,z+dz*s,rx,ry,rz);
+  at(M.dark,S(0.58,0.045,0.32), 0,0.023,0);                   // the foot, spread wide
+  at(M.iron,S(0.50,0.040,0.26), 0,0.066,0);                   // its chamfer course
+  at(M.iron,S(0.21,0.100,0.17), 0,0.138,0);                   // the waist — the whole tell
+  at(M.iron,S(0.40,0.045,0.25), 0,0.211,0);                   // shoulder
+  at(M.iron,S(0.52,0.055,0.27), 0,0.262,0);                   // the body
+  at(M.iron,S(0.54,0.028,0.28), 0,0.303,0);                   // the hardened face
+  // the horn, tapering off the right, with the step under its root
+  at(M.iron,new THREE.ConeGeometry(0.115*s,0.30*s,7),0.40,0.285,0,0,0,-Math.PI/2);
+  at(M.iron,S(0.10,0.030,0.20), 0.245,0.258,0);               // the step
+  // the heel: a hardie hole and a pritchel hole, both punched clean through
+  at(M.hole,S(0.058,0.014,0.058),-0.19,0.316,0);
+  at(M.hole,new THREE.CylinderGeometry(0.022*s,0.022*s,0.014*s,8),-0.245,0.316,0);
+  // and the chamfers down the long edges of the face, which is where an anvil
+  // catches the light — a square-edged slab reads as a plank
+  for(const sd of [-1,1])
+    at(M.dark,S(0.54,0.016,0.020),0,0.296,sd*0.132);
+  return B;
+}
+// a line of rivet heads along a strap, which is what makes a strap read as iron
+// bolted on rather than as a stripe painted across the thing it is holding
+function addRivets(B,mat,x,y,z,n,dx,dy,dz,r){
+  for(let i=0;i<n;i++){
+    const t=n===1?0:(i/(n-1)-0.5);
+    B.at(mat,new THREE.SphereGeometry(r,5,4),x+dx*t,y+dy*t,z+dz*t);
+  }
+  return B;
+}
 function buildLevel(L){
   disposeLevel();
   const th=L.theme;
@@ -6844,6 +7510,7 @@ function buildLevel(L){
   const FLOOR_SPAN=4;
   const ceilTex=texFromCanvas(myco?myconidCeilCanvas(th)
                              :cave?caveFloorCanvas(th)
+                             :duer?duergarCeilCanvas(th)
                                   :noiseCanvas(th.ceil,'#000',false,null));
   floorTex.wrapS=floorTex.wrapT=THREE.RepeatWrapping;floorTex.repeat.set(1,1);
   ceilTex.wrapS=ceilTex.wrapT=THREE.RepeatWrapping;
@@ -6852,7 +7519,8 @@ function buildLevel(L){
     bumpScale:cave?0.03:(duer?0.006:(myco?0.035:(drow?0.005:0.015))),   // gravel has real tooth
     specular:duer?0x24211a:(drow?0x262a36:0x120e08),shininess:cave?3:(duer?18:(drow?26:4))});
   const ceilMat=new THREE.MeshPhongMaterial({map:ceilTex,bumpMap:ceilTex,
-    bumpScale:cave?0.03:0.012,color:cave?0x8c8c8c:0xffffff,
+    // a vault has real relief; a plain dark wash has none to find
+    bumpScale:cave?0.03:(duer?0.028:0.012),color:cave?0x8c8c8c:0xffffff,
     specular:0x0c0a06,shininess:3});
   // floor: one unit plane per non-wall tile. holes fall out naturally at the
   // stairs shaft and at sewer lake pits.
@@ -7657,36 +8325,207 @@ function buildLevel(L){
   }
   if(th.name==='Duergar'&&L.duergar&&L.duergar.length){
     const gold=new THREE.Color(th.gold||'#c9a227');
-    const stoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.06),
-      specular:0x24211a,shininess:16});
-    const darkMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall2).multiplyScalar(1.15),
-      specular:0x1a1813,shininess:10});
+    // Every one of these carries a grain and a bump. They were flat colours, and
+    // a big box of flat colour reads as a shape rather than a made thing.
+    const stoneT=duergarTex('stone'),ironT=duergarTex('iron'),woodT=duergarTex('wood');
+    const stoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.10),
+      map:stoneT,bumpMap:stoneT,bumpScale:0.010,specular:0x24211a,shininess:16});
+    const darkMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall2).multiplyScalar(1.20),
+      map:stoneT,bumpMap:stoneT,bumpScale:0.012,specular:0x1a1813,shininess:10});
     const goldMat=new THREE.MeshPhongMaterial({color:gold,specular:0xfff0c0,shininess:70});
-    const ironMat=new THREE.MeshPhongMaterial({color:0x2b2b2e,specular:0x6a6a70,shininess:34});
+    /* Iron, and the specular is the whole story. Two passes got this wrong before
+       the cause was isolated by forcing the specular black and re-rendering, which
+       took the weapon heads straight from near-white to a believable grey — the
+       diffuse term was never the problem.
+
+       The trap: three.js Blinn-Phong normalises the specular lobe by roughly
+       (shininess+2)/8, so a HIGHER shininess makes the highlight narrower AND
+       BRIGHTER at its peak. Shininess 48 multiplies the specular colour by about
+       six. And since the torch sits at the eye, every face turned toward the
+       player sits on that peak at once. "Narrow the highlight" is therefore
+       exactly the wrong fix and made it worse; the specular COLOUR has to come
+       down. A big flat face square-on to a torch is the brightest case any surface
+       can be — the same thing that made the cave door look pale — and on metal
+       that lands multiplied. */
+    const ironMat=new THREE.MeshPhongMaterial({color:0x32323a,map:ironT,bumpMap:ironT,
+      bumpScale:0.004,specular:0x0e0e12,shininess:26});
+    // hafts and staves: worked wood, not stone, and duller than either
+    const woodMat=new THREE.MeshPhongMaterial({color:0x33261a,map:woodT,bumpMap:woodT,
+      bumpScale:0.005,specular:0x1a1206,shininess:6});
+    // the black of a recess or a firebox mouth. Unlit on purpose: it is meant to
+    // be a hole, and a lit material fills a hole in with the torch.
+    const voidMat=new THREE.MeshBasicMaterial({color:0x000000});
+    const emberMat=new THREE.MeshBasicMaterial({color:0xff4a12});
+    const ANV={iron:ironMat,dark:darkMat,hole:voidMat};
     const flames=R3.candleFlames||[];
+    const pend=[];
+    /* One column of flame per registered entry, and it must live in its own
+       subgroup. The flicker loop writes each sprite's local `position.x` every
+       frame, so two flames parented to the same group would both be dragged to
+       x=0 — a shrine's pair of candles would merge into one. The subgroup carries
+       the offset and the loop only ever moves the sprite within it. */
+    const flameAt=(parent,x,y,z,cols,base,col,dist)=>{
+      const sub=new THREE.Group();sub.position.set(x,0,z);parent.add(sub);
+      const layer=(c,w,h,dy,op)=>{
+        const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:fxGlowTex(c),
+          transparent:true,opacity:op,depthWrite:false,blending:THREE.AdditiveBlending}));
+        sp.scale.set(w,h,1);sp.position.set(0,y+dy,0);sp.userData={w,h,dy};
+        sub.add(sp);return sp;
+      };
+      const fire=cols.map(([c,w,h,dy,op])=>layer(c,w,h,dy,op));
+      return {fire,y,sub,base,col,dist};
+    };
     for(const f of L.duergar){
       const g0=new THREE.Group();
+      const B=Bins();
       if(f.kind==='pillar'){
         // a half-round column standing proud of the wall, with base and capital
         const H=WALLH;
-        const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.145,H*0.78,12,1,false,-Math.PI/2,Math.PI),stoneMat);
-        shaft.position.set(0,H*0.5,0.02);g0.add(shaft);
-        // flutes, cut as thin dark ribs down the face of the shaft
-        for(let i=-2;i<=2;i++){
-          const fl=new THREE.Mesh(new THREE.BoxGeometry(0.012,H*0.74,0.02),darkMat);
-          fl.position.set(i*0.045,H*0.5,0.02+0.128);g0.add(fl);
+        const half=(r0,r1,h)=>new THREE.CylinderGeometry(r0,r1,h,12,1,false,-Math.PI/2,Math.PI);
+        B.at(stoneMat,half(0.13,0.145,H*0.78),0,H*0.50,0.02);
+        for(let i=-2;i<=2;i++)                     // flutes, as thin dark ribs
+          B.at(darkMat,new THREE.BoxGeometry(0.012,H*0.74,0.02),i*0.045,H*0.50,0.148);
+        B.at(stoneMat,new THREE.BoxGeometry(0.36,H*0.10,0.20),0,H*0.05,0.06);   // base
+        B.at(darkMat,new THREE.BoxGeometry(0.42,H*0.045,0.24),0,H*0.022,0.07);  // plinth
+        B.at(stoneMat,new THREE.BoxGeometry(0.38,H*0.09,0.22),0,H*0.90,0.065);  // capital
+        B.at(darkMat,new THREE.BoxGeometry(0.44,H*0.04,0.26),0,H*0.965,0.075);  // abacus
+        B.at(goldMat,half(0.15,0.15,0.022),0,H*0.845,0.02);                     // gold band
+        B.addTo(g0);
+      }else if(f.kind==='forge'){
+        /* A smith's station: the firebox in the wall with its flue running up
+           into the roof, an anvil on its stump beside it, and the quench trough
+           at its foot. This is the thing the whole theme is about — Laduguer's
+           temples are built over the mine shafts and heated by their own forges —
+           and it is the only furniture here that is still working. */
+        /* An open hearth, not a firebox. The first pass built a closed mass with
+           a dark mouth on its front face and the coals inside — which put the
+           mouth panel physically in front of the coals and hid the fire
+           completely, so the one working thing in the theme rendered as a black
+           rectangle. A smith's hearth is open on top: you lay the work IN the
+           coals, so the coals go on the upper face where they can be seen. */
+        /* Laid up in COURSES rather than modelled as one box. Masonry is read
+           from its joints — a single 50cm slab has no scale to it and is the main
+           reason this thing looked like a flat shape — and four short blocks per
+           course, offset row to row, costs nothing once the piece is welded. */
+        const RIM=0.30;                                       // the top of the hearth mass
+        B.at(darkMat,new THREE.BoxGeometry(0.54,0.05,0.30),-0.10,0.025,0.14);   // its footing
+        for(let r=0;r<3;r++){
+          const yy=0.05+r*((RIM-0.05)/3), hh=(RIM-0.05)/3-0.008;
+          const n=r%2?3:4, w=0.49/n;
+          for(let k=0;k<n;k++)
+            B.at(stoneMat,new THREE.BoxGeometry(w-0.010,hh,0.255),
+                 -0.345+w*(k+0.5),yy+hh/2+0.004,0.13);
         }
-        const base=new THREE.Mesh(new THREE.BoxGeometry(0.36,H*0.10,0.20),stoneMat);
-        base.position.set(0,H*0.05,0.06);g0.add(base);
-        const plinth=new THREE.Mesh(new THREE.BoxGeometry(0.42,H*0.045,0.24),darkMat);
-        plinth.position.set(0,H*0.022,0.07);g0.add(plinth);
-        const cap=new THREE.Mesh(new THREE.BoxGeometry(0.38,H*0.09,0.22),stoneMat);
-        cap.position.set(0,H*0.90,0.065);g0.add(cap);
-        const abac=new THREE.Mesh(new THREE.BoxGeometry(0.44,H*0.04,0.26),darkMat);
-        abac.position.set(0,H*0.965,0.075);g0.add(abac);
-        // a gold band where the capital meets the shaft
-        const band=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,0.022,12,1,false,-Math.PI/2,Math.PI),goldMat);
-        band.position.set(0,H*0.845,0.02);g0.add(band);
+        B.at(emberMat,new THREE.BoxGeometry(0.36,0.03,0.18),-0.10,RIM+0.012,0.13); // the coal bed
+        for(const s of [-1,1])                                                  // the kerb round it
+          B.at(darkMat,new THREE.BoxGeometry(0.05,0.045,0.26),-0.10+s*0.225,RIM+0.02,0.13);
+        B.at(darkMat,new THREE.BoxGeometry(0.50,0.045,0.05),-0.10,RIM+0.02,0.245);
+        // an iron strap round the mass, riveted, holding the courses together
+        B.at(ironMat,new THREE.BoxGeometry(0.52,0.022,0.275),-0.10,0.185,0.13);
+        addRivets(B,ironMat,-0.10,0.185,0.268,4,0.40,0,0,0.011);
+        B.at(darkMat,new THREE.BoxGeometry(0.46,0.075,0.20),-0.10,0.86,0.11);   // the hood over it
+        B.at(stoneMat,new THREE.BoxGeometry(0.50,0.024,0.225),-0.10,0.908,0.115); // its lip
+        B.at(ironMat,new THREE.BoxGeometry(0.11,WALLH-0.90,0.09),-0.10,0.90+(WALLH-0.90)/2,0.05); // flue
+        B.at(darkMat,new THREE.BoxGeometry(0.135,0.03,0.11),-0.10,1.22,0.05);   // one band on it
+        // the stump, hooped with iron the way a real one is or it splits
+        B.at(woodMat,new THREE.CylinderGeometry(0.078,0.092,0.30,10),0.30,0.15,0.28);
+        for(const yy of [0.055,0.255])
+          B.at(ironMat,new THREE.CylinderGeometry(0.083,0.086,0.022,10),0.30,yy,0.28);
+        addAnvil(B,ANV,0.30,0.30,0.28,0.36);
+        // the smith's hammer left across the face, and tongs hooked on the stump
+        B.at(woodMat,new THREE.CylinderGeometry(0.012,0.014,0.20,6),0.335,0.428,0.255,0,0.5,Math.PI/2);
+        B.at(ironMat,new THREE.BoxGeometry(0.075,0.042,0.042),0.235,0.428,0.235,0,0.5,0);
+        for(const sd of [-1,1])
+          B.at(ironMat,new THREE.CylinderGeometry(0.008,0.010,0.26,5),0.415,0.19,0.335,0.22,0,sd*0.10);
+        B.addTo(g0);
+        // the trough, open on top: four walls and a dark still surface inside
+        const T=Bins();
+        T.at(darkMat,new THREE.BoxGeometry(0.30,0.02,0.16),-0.24,0.01,0.34);
+        for(const s of [-1,1])T.at(darkMat,new THREE.BoxGeometry(0.02,0.11,0.16),-0.24+s*0.14,0.055,0.34);
+        for(const s of [-1,1])T.at(darkMat,new THREE.BoxGeometry(0.30,0.11,0.02),-0.24,0.055,0.34+s*0.07);
+        T.at(voidMat,new THREE.BoxGeometry(0.26,0.005,0.12),-0.24,0.085,0.34);
+        T.addTo(g0);
+        // the fire itself, low and red: coals, not a torch
+        const fl=flameAt(g0,-0.10,RIM+0.02,0.13,[
+          ['#ff3c08',0.36,0.15,0.03,0.44],
+          ['#ff7a1e',0.23,0.13,0.04,0.52],
+          ['#ffc25a',0.12,0.10,0.05,0.62]],0.55,0xff5a1e,3.2);
+        g0.userData.flame=fl;
+      }else if(f.kind==='chains'){
+        /* Manacles on a wall ring. Nothing in the theme said out loud that these
+           halls run on slaves; this does, and it costs four boxes and a run of
+           links. The chain hangs with a slack curve rather than straight down —
+           a plumb-straight chain reads as a rod. */
+        const link=new THREE.TorusGeometry(0.026,0.007,4,8);
+        for(const [rx,ry0,n,sw] of [[-0.16,1.16,7,1],[0.17,1.06,5,-1]]){
+          B.at(ironMat,new THREE.BoxGeometry(0.07,0.07,0.035),rx,ry0,0.018);    // the plate
+          B.at(ironMat,new THREE.TorusGeometry(0.034,0.009,4,10),rx,ry0,0.045,Math.PI/2);
+          let px=rx,py=ry0-0.05;
+          for(let i=0;i<n;i++){
+            px+=sw*0.006*i; py-=0.044;
+            B.at(ironMat,link,px,py,0.052,i%2?0:Math.PI/2,0,sw*0.10*i);
+          }
+          B.at(ironMat,new THREE.TorusGeometry(0.042,0.011,5,12),px+sw*0.01,py-0.05,0.052,0.5,0,sw*0.6);
+        }
+        B.addTo(g0);
+      }else if(f.kind==='shrine'){
+        /* A niche to Laduguer. A wall tile is a solid box, so the recess is the
+           trick the crypt and the sewer culverts use: a dead-black panel on the
+           face with a surround standing proud of it, and everything inside sits
+           slightly forward of the wall plane rather than behind it. */
+        const Y=0.86, W=0.34, H=0.46;
+        B.at(voidMat,new THREE.BoxGeometry(W,H,0.02),0,Y,0.012);
+        for(const [w,h,x,y] of [[W+0.14,0.055,0,Y+H/2+0.03],[W+0.14,0.055,0,Y-H/2-0.03],
+                                [0.055,H+0.11,-W/2-0.03,Y],[0.055,H+0.11,W/2+0.03,Y]])
+          B.at(stoneMat,new THREE.BoxGeometry(w,h,0.06),x,y,0.03);
+        B.at(darkMat,new THREE.BoxGeometry(W+0.22,0.05,0.14),0,Y-H/2-0.085,0.07); // the shelf
+        /* The shield with the broken bolt across it: the same mark the wall
+           variants carry, so the faith reads as one thing wherever it shows.
+
+           The point is STEPPED rather than coned. A three-sided cone under a box
+           reads as two objects — a square with a separate triangle below it — and
+           a four-sided one is far too deep for a plate 35mm thick. Three boxes of
+           falling width give a heater shield's taper in silhouette, which is all
+           that survives at this size anyway. Grey, not pale: Laduguer's shield is
+           described grey, and against a dead-black niche the mid tone reads while
+           the bright one glares. */
+        for(const [w,h,dy] of [[0.19,0.19,0.055],[0.13,0.05,-0.065],[0.065,0.035,-0.105]])
+          B.at(darkMat,new THREE.BoxGeometry(w,h,0.035),0,Y+dy,0.045);
+        B.at(goldMat,new THREE.BoxGeometry(0.15,0.016,0.012),-0.025,Y+0.055,0.066,0,0,0.7);
+        B.at(goldMat,new THREE.BoxGeometry(0.032,0.032,0.012),0.032,Y+0.115,0.066,0,0,0.7);
+        B.at(goldMat,new THREE.BoxGeometry(0.075,0.016,0.012),0.055,Y-0.02,0.066,0,0,0.34);
+        for(const s of [-1,1])                                                  // candle stubs
+          B.at(darkMat,new THREE.CylinderGeometry(0.019,0.023,0.10,6),s*0.21,Y-H/2-0.005,0.075);
+        B.addTo(g0);
+        for(const s of [-1,1]){
+          const fl=flameAt(g0,s*0.21,Y-H/2+0.055,0.075,[
+            ['#ff8a2a',0.085,0.115,0.014,0.55],
+            ['#ffe0a0',0.042,0.062,0.022,0.75]],0.30,0xffb066,2.1);
+          (g0.userData.flames||(g0.userData.flames=[])).push(fl);
+        }
+      }else if(f.kind==='rack'){
+        /* A rack of picks and hammers. Duergar work is mining and war and the
+           same tools do both, so the rack is a barracks and a toolshed at once. */
+        for(const yy of [0.26,1.06])                                            // rails
+          B.at(woodMat,new THREE.BoxGeometry(0.62,0.035,0.045),0,yy,0.10);
+        for(const s of [-1,1])                                                  // uprights
+          B.at(woodMat,new THREE.BoxGeometry(0.045,0.86,0.045),s*0.29,0.66,0.10);
+        const haft=new THREE.CylinderGeometry(0.013,0.015,0.80,6);
+        for(let i=0;i<5;i++){
+          const x=-0.22+i*0.11, lean=(i%2?1:-1)*0.055;
+          B.at(woodMat,haft,x,0.50,0.13,0,0,lean);
+          const hy=0.88, hx=x+lean*0.42;
+          if(i%3===0){                                                          // a hammer
+            B.at(ironMat,new THREE.BoxGeometry(0.13,0.055,0.055),hx,hy,0.13,0,0,lean);
+          }else if(i%3===1){                                                    // a pick
+            B.at(ironMat,new THREE.BoxGeometry(0.20,0.026,0.03),hx,hy,0.13,0,0,lean+0.30);
+            B.at(ironMat,new THREE.BoxGeometry(0.05,0.05,0.05),hx,hy,0.13);
+          }else{                                                                // a broad axe
+            B.at(ironMat,new THREE.BoxGeometry(0.05,0.14,0.02),hx+0.045,hy-0.01,0.13,0,0,lean);
+            B.at(ironMat,new THREE.BoxGeometry(0.05,0.05,0.045),hx,hy,0.13);
+          }
+        }
+        B.addTo(g0);
       }else{
         // torch: an iron bracket out of the wall, a socket, and a live flame
         const Y=0.92;
@@ -7726,14 +8565,293 @@ function buildLevel(L){
       g0.rotation.y=Math.atan2(-f.dx,-f.dy);
       g0.position.set(f.x+0.5+f.dx*0.5,0,f.y+0.5+f.dy*0.5);
       grp.add(g0);
-      if(f.kind==='torch'){
-        const l=new THREE.PointLight(0xffa855,0.85,3.6,2);
-        l.position.set(f.x+0.5+f.dx*0.5-f.dx*0.30,1.16,f.y+0.5+f.dy*0.5-f.dy*0.30);
-        grp.add(l);
-        flames.push({light:l,base:0.85,fire:g0.userData.fire,embers:g0.userData.embers,y:0.92});
+      /* Everything that burns is COLLECTED here rather than lit here, because
+         three.js Phong pays for every light on every fragment of every material.
+         A furnished hall was reaching fourteen point lights before the party's own
+         torch, fill and spell light were counted. The crypt already caps its
+         candles at four for the same reason.
+
+         Priority, not proximity: a wall torch is the room's light and comes first,
+         then a forge, then votive candles, which are the most numerous and the
+         least missed. Everything keeps its flame sprites either way — only the
+         cast light is rationed, so nothing visibly goes out. */
+      if(f.kind==='torch')
+        pend.push({pri:0,base:0.85,col:0xffa855,dist:3.6,y:0.92,
+          pos:new THREE.Vector3(f.x+0.5+f.dx*0.5-f.dx*0.30,1.16,f.y+0.5+f.dy*0.5-f.dy*0.30),
+          fire:g0.userData.fire,embers:g0.userData.embers});
+      const lit=[].concat(g0.userData.flame||[],g0.userData.flames||[]);
+      for(const fl of lit){
+        // the light sits in world space beside the piece rather than inside it,
+        // so it reaches the wall and the floor around it
+        const w=new THREE.Vector3(fl.sub.position.x,fl.y+0.06,fl.sub.position.z+0.10);
+        w.applyEuler(g0.rotation).add(g0.position);
+        pend.push({pri:f.kind==='forge'?1:2,base:fl.base,col:fl.col,dist:fl.dist,
+          y:fl.y,pos:w,fire:fl.fire});
       }
     }
+    pend.sort((a,b)=>a.pri-b.pri);
+    for(const q of pend.slice(0,FURNITURE_LIGHTS)){
+      const l=new THREE.PointLight(q.col,q.base,q.dist,2);
+      l.position.copy(q.pos);grp.add(l);
+      flames.push({light:l,base:q.base,fire:q.fire,embers:q.embers,y:q.y});
+    }
+    for(const q of pend.slice(FURNITURE_LIGHTS))     // still burns, just casts nothing
+      flames.push({base:q.base,fire:q.fire,embers:q.embers,y:q.y});
     R3.candleFlames=flames;
+  }
+  /* The forge hall: the theme's set-piece, built the way the crypt's ossuary is.
+     A great hearth in the wall still burning, and the anvil block in the middle
+     of the room carrying the smith's stock until somebody takes it.
+
+     The hearth is the only light in the game that is not a torch or a candle: it
+     is deep red, it reaches further than a wall torch, and it sits at knee height
+     so the room is lit from below. That is the whole point of the chamber — every
+     other room in the dungeon is lit from the party's own lantern at eye level. */
+  if(th.name==='Duergar'&&L.forge){
+    const f=L.forge;
+    const stoneT=duergarTex('stone'),ironT=duergarTex('iron'),woodT=duergarTex('wood');
+    const stoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.08),
+      map:stoneT,bumpMap:stoneT,bumpScale:0.011,specular:0x1e1c16,shininess:12});
+    const darkMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall2).multiplyScalar(1.18),
+      map:stoneT,bumpMap:stoneT,bumpScale:0.013,specular:0x161409,shininess:8});
+    const ironMat=new THREE.MeshPhongMaterial({color:0x32323a,map:ironT,bumpMap:ironT,
+      bumpScale:0.004,specular:0x0e0e12,shininess:26});
+    const woodMat=new THREE.MeshPhongMaterial({color:0x33261a,map:woodT,bumpMap:woodT,
+      bumpScale:0.005,specular:0x1a1206,shininess:6});
+    /* Gold, but not the pillars' gold. That one is specular 0xfff0c0 at shininess
+       70 — about nine times the specular colour once Blinn-Phong normalises it —
+       which is right for a thin band catching a glint round a column and turns a
+       solid ingot into a white brick. Same trap as the iron, third time. */
+    const goldMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.gold||'#c9a227'),
+      specular:0x3a3018,shininess:20});
+    const emberMat=new THREE.MeshBasicMaterial({color:0xff4a12});
+    const voidMat=new THREE.MeshBasicMaterial({color:0x000000});
+    const H=WALLH;
+    // --- the hearth, in the wall's own local frame like every other wall feature
+    {
+      const g0=new THREE.Group(),B=Bins();
+      /* Open-fronted, and that is not a style choice. The first build put a kerb
+         all the way round; from anywhere in the room the eye is above the fire
+         bed, so the front kerb stood in front of the coals and hid the only lit
+         thing in the chamber. A smith works at the fire from the front — there is
+         nothing there to climb over. */
+      const RIM=0.46;
+      /* Laid up in COURSES. A hearth this size modelled as one box has no scale
+         to it at all — the eye has nothing to measure it against and it reads as
+         a painted flat, which is exactly how it was reported. Five blocks to a
+         course, offset row to row, with the joints doing all the work. */
+      B.at(darkMat,new THREE.BoxGeometry(0.92,0.06,0.40),0,0.03,0.19);           // footing
+      for(let r=0;r<4;r++){
+        const hh=(RIM-0.06)/4, yy=0.06+r*hh;
+        const n=r%2?4:5, w=0.86/n;
+        for(let k=0;k<n;k++)
+          B.at(r%2?darkMat:stoneMat,new THREE.BoxGeometry(w-0.012,hh-0.010,0.335),
+               -0.43+w*(k+0.5),yy+hh/2,0.17);
+      }
+      B.at(emberMat,new THREE.BoxGeometry(0.68,0.05,0.26),0,RIM+0.014,0.17);     // the fire bed
+      for(const s of [-1,1])                                                     // kerb, sides only
+        B.at(stoneMat,new THREE.BoxGeometry(0.06,0.06,0.34),s*0.40,RIM+0.03,0.17);
+      // an iron lintel across the mouth of it, strapped and riveted into the
+      // masonry — the piece that makes it read as built rather than extruded
+      B.at(ironMat,new THREE.BoxGeometry(0.94,0.05,0.055),0,RIM-0.05,0.345);
+      addRivets(B,ironMat,0,RIM-0.05,0.375,5,0.80,0,0,0.014);
+      for(const s of [-1,1]){                                                    // its uprights
+        B.at(ironMat,new THREE.BoxGeometry(0.045,RIM-0.10,0.05),s*0.44,(RIM-0.10)/2+0.06,0.345);
+        addRivets(B,ironMat,s*0.44,(RIM-0.10)/2+0.06,0.372,3,0,RIM-0.20,0,0.012);
+      }
+      B.at(darkMat,new THREE.BoxGeometry(0.80,0.10,0.30),0,H*0.62,0.15);         // the hood
+      B.at(stoneMat,new THREE.BoxGeometry(0.84,0.03,0.32),0,H*0.62+0.065,0.16);  // its lip
+      B.at(ironMat,new THREE.BoxGeometry(0.86,0.022,0.315),0,H*0.62-0.048,0.155); // its strap
+      addRivets(B,ironMat,0,H*0.62-0.048,0.312,5,0.72,0,0,0.012);
+      B.at(darkMat,new THREE.BoxGeometry(0.20,H*0.34,0.15),0,H*0.83,0.075);      // the flue
+      for(const yy of [H*0.72,H*0.92])
+        B.at(stoneMat,new THREE.BoxGeometry(0.24,0.04,0.17),0,yy,0.075);
+      // the tuyere and its bellows, the reason it is still hot
+      B.at(ironMat,new THREE.CylinderGeometry(0.045,0.045,0.24,8),-0.52,RIM*0.72,0.14,0,0,Math.PI/2);
+      B.at(woodMat,new THREE.BoxGeometry(0.26,0.20,0.22),-0.70,RIM*0.72,0.14,0,0,0.18);
+      B.at(ironMat,new THREE.BoxGeometry(0.27,0.02,0.23),-0.70,RIM*0.72+0.10,0.14,0,0,0.18);
+      B.at(woodMat,new THREE.CylinderGeometry(0.014,0.016,0.30,6),-0.78,RIM*0.72+0.20,0.14,0,0,0.5);
+      // fire irons stood against the mass: a poker and a rake
+      for(let i=0;i<2;i++)
+        B.at(ironMat,new THREE.CylinderGeometry(0.010,0.012,0.62,6),
+             0.55+i*0.07,0.31,0.30+i*0.03,0.30,0,0.16-i*0.05);
+      // Laduguer's mark on the hood: this is a temple as much as a workshop
+      B.at(goldMat,new THREE.BoxGeometry(0.16,0.020,0.014),-0.01,H*0.62,0.305,0,0,0.7);
+      B.at(goldMat,new THREE.BoxGeometry(0.08,0.020,0.014),0.07,H*0.62-0.06,0.305,0,0,0.34);
+      B.addTo(g0);
+      const sub=new THREE.Group();sub.position.set(0,0,0.17);g0.add(sub);
+      const fire=[['#ff3208',0.72,0.26,0.05,0.46],['#ff6e18',0.46,0.22,0.07,0.54],
+                  ['#ffbe4e',0.24,0.17,0.09,0.64]].map(([c,w,h,dy,op])=>{
+        const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:fxGlowTex(c),
+          transparent:true,opacity:op,depthWrite:false,blending:THREE.AdditiveBlending}));
+        sp.scale.set(w,h,1);sp.position.set(0,RIM+0.02+dy,0);sp.userData={w,h,dy};
+        sub.add(sp);return sp;});
+      g0.rotation.y=Math.atan2(-f.hdx,-f.hdy);
+      g0.position.set(f.hx+0.5+f.hdx*0.5,0,f.hy+0.5+f.hdy*0.5);
+      grp.add(g0);
+      const l=new THREE.PointLight(0xff5410,1.15,5.6,2);
+      l.position.set(f.hx+0.5+f.hdx*0.5-f.hdx*0.34,RIM+0.12,f.hy+0.5+f.hdy*0.5-f.hdy*0.34);
+      grp.add(l);
+      (R3.candleFlames||(R3.candleFlames=[])).push({light:l,base:1.15,fire,y:RIM+0.02});
+    }
+    // --- the anvil block at the centre, with the stock on it until it is taken
+    {
+      const g0=new THREE.Group(),B=Bins();
+      // dark stone with a lit course at the top, not a pale cube: at a tile's
+      // range this thing fills the lower half of the frame, and a blank bright
+      // block there reads as a packing crate rather than as masonry
+      /* Three courses of dressed stone with iron corner straps, not one cube. At a
+         tile's range this thing fills the lower half of the frame, so it is the
+         piece with the least excuse for having no joints in it — and the straps
+         and their rivets are what say the duergar built it rather than that it was
+         extruded. Each course is a hair narrower than the one below, which reads
+         as batter and stops the silhouette being a perfect prism. */
+      B.at(darkMat,new THREE.BoxGeometry(0.64,0.075,0.64),0,0.038,0);        // plinth
+      B.at(stoneMat,new THREE.BoxGeometry(0.58,0.025,0.58),0,0.088,0);       // its wash
+      const CO=[[0.52,0.095,0.108],[0.495,0.090,0.205],[0.47,0.085,0.294]];
+      for(const [w,h,yy] of CO)
+        B.at(darkMat,new THREE.BoxGeometry(w,h-0.008,w),0,yy,0);
+      B.at(stoneMat,new THREE.BoxGeometry(0.55,0.040,0.55),0,0.357,0);       // capping course
+      for(const sx of [-1,1])for(const sz of [-1,1]){                        // corner straps
+        B.at(ironMat,new THREE.BoxGeometry(0.035,0.235,0.10),sx*0.245,0.215,sz*0.16);
+        B.at(ironMat,new THREE.BoxGeometry(0.10,0.235,0.035),sx*0.16,0.215,sz*0.245);
+        addRivets(B,ironMat,sx*0.263,0.215,sz*0.16,3,0,0.17,0,0.013);
+        addRivets(B,ironMat,sx*0.16,0.215,sz*0.263,3,0,0.17,0,0.013);
+      }
+      addAnvil(B,{iron:ironMat,dark:darkMat,hole:voidMat},0,0.377,0,0.50);
+      if(!f.opened){
+        /* The stock stacks on the capping course along the FRONT EDGE of the
+           block, beside the anvil rather than on it.
+
+           Two placements failed first. On the anvil face it hid behind the
+           anvil's own silhouette from every approach — and once the anvil got its
+           real shape there was no room up there anyway. On the floor in front of
+           the block it fell out of the bottom of the frame: at a tile's range the
+           eye is 0.62 up and looking level, so the ground at the near edge of the
+           next tile is simply not in shot. Waist height on the front edge is the
+           one place that is both unobscured and framed. */
+        for(let i=0;i<4;i++){
+          const row=i>1?1:0, k=row?i-2:i;
+          B.at(ironMat,new THREE.BoxGeometry(0.30,0.038,0.062),
+               -0.02+row*0.012,0.396+row*0.040,0.185+k*0.070,0,(i%2?0.05:-0.04),0);
+        }
+        B.at(goldMat,new THREE.BoxGeometry(0.095,0.05,0.095),0.16,0.402,0.205,0,0.5,0);
+      }
+      B.addTo(g0);
+      // every part of it answers the tap — the block, the anvil and the stock are
+      // one thing to reach for. Tagged after the weld rather than through an
+      // invisible hit box, because an invisible mesh is still raycastable and
+      // relying on that is a trap waiting for a three.js version bump.
+      for(const c of g0.children)c.userData={kind:'anvil',x:f.ax,y:f.ay};
+      g0.position.set(f.ax+0.5,0,f.ay+0.5);
+      grp.add(g0);
+    }
+  }
+  /* Duergar floor dressing: haulage track, slag, spilled ore and dropped tools.
+     Built on the crypt's terms — seeded from each tile's own coordinates so a
+     rebuild never reshuffles it, instanced down to a handful of draw calls, flat
+     to the ground so it never blocks a path, and every mesh marked `decor` so a
+     tap goes through it to whatever is lying on the same tile. */
+  if(th.name==='Duergar'){
+    const litter=new THREE.Group();
+    const railMat=new THREE.MeshPhongMaterial({color:0x35353c,specular:0x101014,shininess:22});
+    const sleepMat=new THREE.MeshPhongMaterial({color:0x352718,specular:0x120c04,shininess:4});
+    // Clinker: fired waste, and the one thing down here that is genuinely black.
+    // Its sheen is what says "glassy" rather than "sooty", so it keeps a small
+    // narrow highlight where the iron deliberately does not.
+    // ...but only a little of one, and this is the same trap the iron fell into:
+    // shininess 40 multiplies the specular colour by about five, which put a
+    // blazing white facet on every lump the torch happened to face.
+    const slagMat=new THREE.MeshPhongMaterial({color:0x14131a,specular:0x16151e,shininess:20});
+    const oreMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,-0.46)),
+      specular:0x14120c,shininess:8});
+    const veinMat=new THREE.MeshPhongMaterial({color:0x7d796a,specular:0x201e18,shininess:16});
+    const boxU=new THREE.BoxGeometry(1,1,1);
+    /* Rock is ANGULAR, and a smooth sphere is the difference between a spoil heap
+       and a bowl of pearls — which is exactly what the first pass looked like:
+       pale rounded beads sitting on the flagstones. A 20-face icosahedron given a
+       tumbled rotation on all three axes and an uneven scale reads as broken
+       stone at a fraction of the vertices. */
+    const rockU=new THREE.IcosahedronGeometry(1,0);
+    const cylU=new THREE.CylinderGeometry(1,1,1,6);
+    const QID=new THREE.Quaternion();
+    const yawQ=(a)=>new THREE.Quaternion().setFromEuler(new THREE.Euler(0,a,0));
+    const tumbleQ=(f)=>new THREE.Quaternion().setFromEuler(
+      new THREE.Euler(f()*6.3,f()*6.3,f()*6.3));
+    const loc=(px,py,pz,q,sx,sy,sz)=>new THREE.Matrix4().compose(
+      new THREE.Vector3(px,py,pz),q,new THREE.Vector3(sx,sy,sz));
+    const rails=[],sleepers=[],slag=[],ore=[],veins=[],hafts=[],heads=[];
+    const walk=(x,y)=>{const t=L.grid[y*L.w+x];
+      return t===T_FLOOR||t===T_DOOR||t===T_DOOR_OPEN||t===T_DOOR_LOCKED;};
+    const busy=new Set((L.duergar||[]).map(f=>f.x+','+f.y));
+    /* The track is chosen per ROW and per COLUMN, not per tile. A tile-by-tile
+       roll gives disconnected two-foot fragments of rail lying about, which is
+       the one thing track cannot be; hashing the row means every horizontal
+       corridor tile on that row carries it and the run comes out continuous.
+       Junction tiles are neither purely horizontal nor vertical and take no
+       rails, so a line simply ends where it meets another passage. */
+    const lineHash=(v,salt)=>{let h=((v*2654435761)^(salt*40503))>>>0;
+      h=(h*1664525+1013904223)>>>0;return h/4294967296;};
+    for(let y=1;y<L.h-1;y++)for(let x=1;x<L.w-1;x++){
+      if(L.grid[y*L.w+x]!==T_FLOOR)continue;
+      let hsh=((x*374761393)^(y*668265263))>>>0;
+      const rr=()=>{hsh=(hsh*1664525+1013904223)>>>0;return hsh/4294967296;};
+      const cx=x+0.5,cz=y+0.5;
+      const horiz=walk(x-1,y)&&walk(x+1,y)&&!walk(x,y-1)&&!walk(x,y+1);
+      const vert =walk(x,y-1)&&walk(x,y+1)&&!walk(x-1,y)&&!walk(x+1,y);
+      const onRail=(horiz&&lineHash(y,17)<0.34)||(vert&&lineHash(x,91)<0.34);
+      if(onRail){
+        const a=horiz?0:Math.PI/2, q=yawQ(a);
+        for(const s of [-1,1])                              // the two rails
+          rails.push(loc(cx+(horiz?0:s*0.16),0.030,cz+(horiz?s*0.16:0),q,1.0,0.026,0.034));
+        for(let k=0;k<4;k++){                               // sleepers under them
+          const t=-0.375+k*0.25;
+          sleepers.push(loc(cx+(horiz?t:0),0.012,cz+(horiz?0:t),q,0.08,0.024,0.44));
+        }
+        continue;                                           // nothing else on a track tile
+      }
+      if(busy.has(x+','+y))continue;                        // furniture stands here
+      const roll=rr();
+      if(roll<0.075){                                       // a heap of clinker
+        const n=3+Math.floor(rr()*4);
+        for(let k=0;k<n;k++){
+          const s=0.045+rr()*0.075;
+          slag.push(loc(cx+(rr()-0.5)*0.5,s*0.38,cz+(rr()-0.5)*0.5,tumbleQ(rr),s,s*0.66,s*0.88));
+        }
+      }else if(roll<0.125){                                 // ore spilled off a barrow
+        const ox=cx+(rr()-0.5)*0.4, oz=cz+(rr()-0.5)*0.4;
+        const n=3+Math.floor(rr()*4);
+        for(let k=0;k<n;k++){
+          const s=0.026+rr()*0.030;
+          ore.push(loc(ox+(rr()-0.5)*0.34,s*0.45,oz+(rr()-0.5)*0.34,tumbleQ(rr),s,s*0.78,s*0.92));
+        }
+        // and the metal that was worth carting it for, in a couple of the pieces:
+        // its own smaller chunks rather than a cap on a rock, which just read as a
+        // highlight sitting on top of a bead
+        const nv=1+Math.floor(rr()*2);
+        for(let k=0;k<nv;k++){
+          const s=0.014+rr()*0.014;
+          veins.push(loc(ox+(rr()-0.5)*0.32,s*0.45,oz+(rr()-0.5)*0.32,tumbleQ(rr),s,s*0.7,s));
+        }
+      }else if(roll<0.155){                                 // a tool dropped and left
+        const a=rr()*Math.PI*2, hx=cx+(rr()-0.5)*0.4, hz=cz+(rr()-0.5)*0.4;
+        const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,a,Math.PI/2));
+        hafts.push(loc(hx,0.017,hz,q,0.017,0.44,0.017));
+        // the head has to have some bulk or the whole thing is a stick on the floor
+        heads.push(loc(hx+Math.cos(a)*0.21,0.030,hz-Math.sin(a)*0.21,yawQ(a),
+                       rr()<0.5?0.15:0.06,0.058,0.058));
+      }
+    }
+    const mk=(mats,geo,mat)=>{ if(!mats.length)return;
+      const inst=new THREE.InstancedMesh(geo,mat,mats.length);
+      mats.forEach((m,i)=>inst.setMatrixAt(i,m));inst.instanceMatrix.needsUpdate=true;
+      inst.userData.decor=true;   // never blocks a tap to the item on the same tile
+      litter.add(inst); };
+    mk(rails,boxU,railMat); mk(sleepers,boxU,sleepMat);
+    mk(slag,rockU,slagMat); mk(ore,rockU,oreMat); mk(veins,rockU,veinMat);
+    mk(hafts,cylU,new THREE.MeshPhongMaterial({color:0x3a2a1c,specular:0x140e04,shininess:5}));
+    mk(heads,boxU,railMat);
+    grp.add(litter);
   }
   // drow houses: rose windows, and stalactites the builders never bothered to
   // cut down. A wall tile is a solid box, so the window is the same trick the
@@ -9730,9 +10848,19 @@ function castSpell(ch,key,opts){
     return true;
   }
   if(sp.target==='allies'){
+    // one casting, one row: the tally collects who it reached and what each of
+    // them got, and the detail line carries the per-character numbers that used
+    // to be a row apiece. With one member still standing it reads as what it
+    // is — a spell cast on that one person.
+    const sink={names:[],parts:[],healed:0};
     let any=false;
-    for(const t of G.party)if(!t.dead&&applySpellToAlly(ch,t,sp,cl))any=true;
-    if(any){commit();friendlyFx(sp);}
+    for(const t of G.party)if(!t.dead&&applySpellToAlly(ch,t,sp,cl,sink))any=true;
+    if(any){
+      const who=sink.names.length===1?sink.names[0]:'the party';
+      logAdd('spell',ch.name+' casts '+sp.name+' on '+who+(sp.healFn?' — heals '+sink.healed:''),
+        'circle '+sp.circle+(sink.parts.length?'  ·  '+sink.parts.join(', '):''));
+      commit();friendlyFx(sp);
+    }
     return any;
   }
   // offensive: the spell flies as a glowing bolt and resolves on impact
@@ -9863,7 +10991,12 @@ function castSpell(ch,key,opts){
     }});
   return true;
 }
-function applySpellToAlly(caster,t,sp,cl){
+/* `sink`, when the caller passes one, turns the per-target log line into an
+   entry in a tally the caller writes out as a single row. A party spell is one
+   casting of one slot, and a row per member buried the rest of the fight under
+   four copies of the same sentence. Everything else — the healing, the wards,
+   the floats — is still per character, because that is what it acts on. */
+function applySpellToAlly(caster,t,sp,cl,sink){
   if(sp.raise){
     if(!t.dead){UI.toast(t.name+' is not dead. The slot is spared.');return false;}
     t.dead=false;t.level=Math.max(1,t.level-1);t.xp=XP_FOR_LEVEL(t.level);
@@ -9874,7 +11007,11 @@ function applySpellToAlly(caster,t,sp,cl){
   if(t.dead){UI.toast(t.name+' is dead. Only Raise Dead can help.');return false;}
   if(sp.healFn){
     const bag=traceRoll(()=>sp.healFn(cl));
-    logAdd('spell',caster.name+' casts '+sp.name+' on '+t.name+' — heals '+bag.value,
+    if(sink){
+      sink.names.push(t.name);sink.healed+=bag.value;
+      sink.parts.push(t.name+' '+bag.value+(bag.dice.length?' ('+fmtTrace(bag.dice)+')':''));
+    }
+    else logAdd('spell',caster.name+' casts '+sp.name+' on '+t.name+' — heals '+bag.value,
       'circle '+sp.circle+(bag.dice.length?'  ·  '+fmtTrace(bag.dice):''));
     healChar(t,bag.value);
   }
@@ -9905,9 +11042,11 @@ function applySpellToAlly(caster,t,sp,cl){
   }
   if(sp.restoreLevels&&t.negLevels>0){t.negLevels=0;removeCond(t,'drained');recalcHp(t,false);UI.toast('Lost life-force floods back into '+t.name+'.');}
   if(sp.buff){
-    logAdd('spell',caster.name+' casts '+sp.name+' on '+t.name,'circle '+sp.circle);
+    if(sink){sink.names.push(t.name);sink.parts.push(t.name);}
+    else logAdd('spell',caster.name+' casts '+sp.name+' on '+t.name,'circle '+sp.circle);
     const b=Object.assign({},sp.buff);
     b.tag=b.tag||sp.name;
+    b.name=sp.name;   // the tag is a stacking key ('magearmor'); this is what the UI says
     b.until=G.time+(b.dur||60);delete b.dur;
     t.buffs=t.buffs.filter(x=>x.tag!==b.tag); // recasting refreshes, never stacks
     t.buffs.push(b);
@@ -12194,6 +13333,30 @@ function openBier(){
   if(coffinNoise(os.bx,os.by,8))setTimeout(()=>UI.toast('The whole chamber has heard it…'),900);
   saveGame();
 }
+/* The anvil block carries the smith's stock, and it is robbed once. Written on
+   openBier's terms — the same reach check, the same rebuild so the scenery
+   changes, the same spill onto a neighbouring tile because the block itself is
+   unwalkable, and the same noise so the chamber hears it. */
+function openForge(){
+  const L=G.L,f=L.forge;
+  if(!f)return;
+  if(Math.abs(f.ax-G.px)+Math.abs(f.ay-G.py)>1){UI.toast('Too far to reach the anvil.');return;}
+  if(f.opened){UI.toast('The anvil is bare; the stock is gone.');return;}
+  f.opened=true;
+  SFX.secret();
+  buildLevel(L); // the stock is one mesh among many; rebuild so the block clears
+  const spill=[];
+  for(let k=0;k<2+rnd(2);k++)spill.push(randLoot(G.depth+2,true,true,true));
+  const near=DIRS.map(([dx,dy])=>({x:f.ax+dx,y:f.ay+dy}))
+    .filter(p=>walkableTile(tileAt(p.x,p.y)));
+  const drop=near.length?near[0]:{x:G.px,y:G.py};
+  const di=drop.y*L.w+drop.x;
+  (L.items[di]=L.items[di]||[]).push(...spill);
+  refreshItemSprite(L,di);
+  UI.toast('The smith’s stock is yours: '+spill.map(itemName).join(', ')+'.');
+  if(coffinNoise(f.ax,f.ay,8))setTimeout(()=>UI.toast('The whole hall has heard it…'),900);
+  saveGame();
+}
 // camp on a floor a third time and something comes looking for you
 function summonHuntingPack(){
   const L=G.L;
@@ -12261,7 +13424,7 @@ function serializeGame(){
       traps:Object.values(L.traps),items:Object.keys(L.items).map(i=>[+i,L.items[i]]),
       monsters:L.monsters.map(m=>{const c=Object.assign({},m);delete c._sc;delete c._regenT;delete c.dot;return c;}),
       secrets:L.secrets,lockedRoom:L.lockedRoom,restCount:L.restCount||{},restsHere:L.restsHere||0,
-      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,lurkers:L.lurkers||[],duergar:L.duergar||[],pillars:L.pillars||[],drow:L.drow||[],
+      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,forge:L.forge||null,lurkers:L.lurkers||[],duergar:L.duergar||[],pillars:L.pillars||[],drow:L.drow||[],
     },
   };
 }
@@ -12281,7 +13444,7 @@ function deserializeGame(o){
     w:lv.w,h:lv.h,grid:b64ToU8(lv.grid),explored:b64ToU8(lv.explored),
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
     traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
-    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],pillars:lv.pillars||[],drow:lv.drow||[],
+    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,forge:lv.forge||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],pillars:lv.pillars||[],drow:lv.drow||[],
   };
   clearFx();
   G.L=L;G.over=false;
@@ -12609,7 +13772,7 @@ const UI=(()=>{
       div.querySelector('.p-hptxt').textContent=ch.dead?'DEAD':`${ch.hp}/${ch.maxHp}`;
       const conds=div.querySelector('.p-conds');
       conds.innerHTML=ch.conditions.map(c=>`<span class="cond-ico" title="${c.kind}">${COND_ICONS[c.kind]||'?'}</span>`).join('')
-        +ch.buffs.filter(b=>b.until>G.time).map(b=>`<span class="cond-ico" style="border-color:#4a5a7a">✦</span>`).join('')
+        +liveBuffs(ch).map(b=>`<span class="cond-ico" style="border-color:#4a5a7a" title="${buffLabel(b)}">✦</span>`).join('')
         +(ch.negLevels?`<span class="cond-ico" style="border-color:#6a4a8a">🕳${ch.negLevels}</span>`:'');
       div.querySelectorAll('.hand').forEach(h=>{
         const cd=h.querySelector('.cd');
@@ -13286,6 +14449,8 @@ const UI=(()=>{
     if(c.sneak)extra+=`<b>Sneak attack</b> +${Math.floor((ch.level+1)/2)}d6 vs foes that have not yet acted<br>`;
     if(c.favored)extra+=`<b>Favored enemies</b> +2 damage vs beasts and humanoids<br>`;
     if(ch.negLevels)extra+=`<b style="color:#b48ae0">Negative levels</b> ${ch.negLevels} (Restoration cures)<br>`;
+    const wards=liveBuffs(ch);
+    if(wards.length)extra+=`<b style="color:#7aa0c0">Blessings</b> ${wards.map(buffLabel).join(' · ')}<br>`;
     if(ch.conditions.length)extra+=`<b style="color:#a05545">Afflictions</b> ${ch.conditions.map(x=>x.kind+(x.name?' ('+x.name+')':'')).join(', ')}<br>`;
     $('st-body').innerHTML=`
       <b>${RACES[ch.race].name} ${CLASSES[ch.cls].name}</b>, level ${ch.level}<br>
@@ -13388,6 +14553,40 @@ function bindPad(id,fn){
   el.addEventListener('pointerleave',stop);
   el.addEventListener('pointercancel',stop);
 }
+/* Keys are read by PHYSICAL POSITION (e.code) rather than by the letter printed on
+   them, so the WASD cluster stays under the same fingers on AZERTY and QWERTZ —
+   where reading e.key would put "strafe left" on the far side of the keyboard.
+   KEY_LETTER is the fallback for anything that reports no code. */
+const KEY_ACTION={
+  KeyW:'fwd',   ArrowUp:'fwd',
+  KeyS:'back',  ArrowDown:'back',
+  KeyA:'sleft', KeyD:'sright',
+  KeyQ:'ccw',   ArrowLeft:'ccw',
+  KeyE:'cw',    ArrowRight:'cw',
+  KeyM:'map',   KeyL:'log',      KeyR:'rest',   Escape:'close'
+};
+const KEY_LETTER={w:'fwd',arrowup:'fwd',s:'back',arrowdown:'back',a:'sleft',d:'sright',
+  q:'ccw',arrowleft:'ccw',e:'cw',arrowright:'cw',m:'map',l:'log',r:'rest',escape:'close'};
+// Escape dismisses a panel through the panel's own button, so a rest that is
+// waiting on a spell loadout still continues afterwards. Character creation and
+// the death screen have no entry: they must be answered.
+const OVL_DISMISS={'ovl-inv':'inv-close','ovl-stats':'st-close','ovl-spells':'sp-close',
+  'ovl-memo':'memo-done','ovl-log':'log-close','ovl-map':'map-close','ovl-target':'tg-cancel'};
+function topOverlay(){
+  const open=[...document.querySelectorAll('.ovl.show')].filter(o=>o.id!=='ovl-rotate');
+  return open[open.length-1]||null;
+}
+function closeTopOverlay(){
+  const o=topOverlay();
+  if(!o)return false;
+  if(o.id==='ovl-menu'){ // no dismiss button of its own, and nothing to return to before the game starts
+    if(!G.started||G.over)return false;
+    UI.hide('ovl-menu');return true;
+  }
+  const b=OVL_DISMISS[o.id]&&document.getElementById(OVL_DISMISS[o.id]);
+  if(!b)return false;
+  b.click();return true;
+}
 function initInput(){
   document.getElementById('b-fwd').innerHTML=UI_ICONS.fwd;
   document.getElementById('b-back').innerHTML=UI_ICONS.back;
@@ -13410,17 +14609,32 @@ function initInput(){
   });
   document.getElementById('b-menu').addEventListener('click',()=>{refreshMenu();UI.show('ovl-menu');});
   window.addEventListener('keydown',(e)=>{
-    if(UI.anyOverlayOpen())return;
-    switch(e.key.toLowerCase()){
-      case 'w':case 'arrowup':tryMove('fwd');break;
-      case 's':case 'arrowdown':tryMove('back');break;
-      case 'a':tryMove('sleft');break;
-      case 'd':tryMove('sright');break;
-      case 'q':case 'arrowleft':tryRotate(-1);break;
-      case 'e':case 'arrowright':tryRotate(1);break;
-      case 'm':if(G.started&&!G.over)UI.openMap();break;
-      case 'l':if(G.started)UI.openLog();break;
-      case 'r':tryRest();break;
+    if(e.ctrlKey||e.metaKey||e.altKey)return;  // leave the browser's own shortcuts alone
+    const t=e.target;
+    if(t&&/^(input|textarea|select)$/i.test(t.tagName))return; // a save code is being typed
+    const act=KEY_ACTION[e.code]||KEY_LETTER[(e.key||'').toLowerCase()];
+    if(!act)return;
+    if(UI.anyOverlayOpen()){
+      // Escape closes the panel; so does the key that opened it, so a look at the
+      // map is one keystroke each way.
+      const top=topOverlay();
+      if(act==='close'||(act==='map'&&top&&top.id==='ovl-map')||(act==='log'&&top&&top.id==='ovl-log')){
+        if(closeTopOverlay())e.preventDefault();
+      }
+      return;
+    }
+    e.preventDefault();                        // arrows would otherwise scroll the page
+    switch(act){
+      case 'fwd':tryMove('fwd');break;
+      case 'back':tryMove('back');break;
+      case 'sleft':tryMove('sleft');break;
+      case 'sright':tryMove('sright');break;
+      case 'ccw':tryRotate(-1);break;
+      case 'cw':tryRotate(1);break;
+      case 'map':if(G.started&&!G.over)UI.openMap();break;
+      case 'log':if(G.started)UI.openLog();break;
+      case 'rest':tryRest();break;
+      case 'close':refreshMenu();UI.show('ovl-menu');break;
     }
   });
   // tap in 3D view: pick up items / open doors / disarm found traps
@@ -13460,6 +14674,7 @@ function initInput(){
       if(u.kind==='trap'){disarmAttempt(u.x,u.y);return;}
       if(u.kind==='coffin'){openCoffin(u.ci,u.slot);return;}
       if(u.kind==='bier'){openBier();return;}
+      if(u.kind==='anvil'){openForge();return;}
       if(u.kind==='plaque'){readEpitaph(u.x,u.y,u.n);return;}
       if(u.kind==='monster')return; // attacks come from hands
     }

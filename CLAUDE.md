@@ -44,7 +44,7 @@ the repo, so treat the committed file as authoritative.
 
 There is no test suite in the repo either. Sessions have built throwaway
 node harnesses that stub `window`/`document`/`THREE`, load the pure-logic
-part of the file, and assert on it (the T1–T33 series referenced in the
+part of the file, and assert on it (the T1–T56 series referenced in the
 git log). If you make a behavioural change, expect to rebuild a harness
 rather than find one — and note that the numbering only ever grows, so the
 git log is the index of what each one covers.
@@ -675,14 +675,108 @@ three themes carry real machinery:
   corpse whatever floor it is standing on.
 
 - **`Duergar`** — halls, not caves: the highest `roomBias` of any theme,
-  because they are built. Eight wall variants over one shared base that
-  carries the courses, the gold fillets and the channel the inscription
-  runs in — a band on only some variants would stop dead at a tile join,
-  so only the runes inside it vary. Runes are Dethek, which is chiselled
-  and so has no curves. Polished slab floor, stone doors, and wall
-  furniture in `L.duergar`: engaged fluted half-columns, and torches whose
-  point light is registered in `R3.candleFlames` (the flicker loop reads
-  each flame's own `base` intensity, so a wall torch is not a candle).
+  because they are built, and the theme with the most machinery of any.
+  Eight wall variants over one shared base that carries the courses, the gold
+  fillets and the channel the inscription runs in — a band on only some
+  variants would stop dead at a tile join, so only what sits inside it varies.
+  Runes are Dethek, which is chiselled and so has no curves. Polished slab
+  floor and stone doors.
+
+  **The eight variants each carry something different**, keyed on the variant
+  itself rather than `variant%4` (which showed three treatments twice each, one
+  of them a roundel with a meaningless star in it): plain, gold studs, a chevron
+  course, **Laduguer** (a broken crossbow bolt on a grey shield), **Deep Duerra**
+  (a cracked illithid skull — the duergar were enslaved by mind flayers and she
+  stole psionics from them, so her mark is a trophy taken off the thing that
+  owned her people), a **slave quota tally**, an **ore seam** where the dressing
+  stops and the raw rock shows, and the mason's roundel. Variant 0 is
+  deliberately bare: with a device on every tile the frieze has nothing to be
+  read against. Both gods are *carved* rather than written and so are allowed
+  curves, but are cut the same way the runes are — dark stroke for the groove,
+  lit stroke offset up and left for the face of it.
+
+  **The roof is groin vaulting under permanent smoke** (`duergarCeilCanvas`):
+  ribs on all four edges so two tiles make one rib, ribs across both diagonals,
+  four webs with courses laid parallel to their own outer edge. Note the
+  per-tile repeat is *wanted* here and that is the opposite of the cave floor's
+  rule — a flagstone map per tile prints a lattice on the ground and that is a
+  bug; a vault per tile prints a rib at every bay, and that is architecture.
+
+  **Wall furniture in `L.duergar`**, six kinds, weighted rather than even:
+  engaged fluted half-columns and iron torches are the *fabric* of the hall and
+  stay the common sight (0.30/0.26); a working **forge**, a **rack** of picks
+  and hammers, a **shrine** niche to Laduguer and wall **chains** are what the
+  hall is for. The count is unchanged at 10–17 a floor, so the variety is free.
+
+  **Floor dressing** on the crypt litter's terms — seeded per tile, instanced,
+  `decor:true`. Slag, spilled ore, dropped tools, and **haulage track**. The
+  track is chosen **per row and per column, not per tile**: a tile-by-tile roll
+  gives disconnected two-foot fragments of rail, and hashing the row instead
+  means every horizontal corridor tile on it carries the track and the run comes
+  out continuous. Junctions are neither purely horizontal nor vertical and take
+  no rails, so a line ends where it meets another passage.
+
+  **The forge hall in `L.forge`** is the theme's set-piece and the ossuary's
+  analogue, with the same hazards and the same answers: the anvil block is
+  `T_PIT` (placed after the connectivity check, where a single centre tile
+  cannot cut a 3×3 room in two), it **shoves aside** whatever loot is under it
+  rather than deleting it — the level's only key is one of the things it can
+  land on — and it never lands on the stairs. Its smith is an elite duergar,
+  like the ossuary's keeper. The great hearth is registered in
+  `R3.candleFlames` and is **the only light in the game that is not at eye
+  level**: deep red, at knee height, reaching further than a wall torch, so the
+  chamber is lit from below. The anvil is robbed once through `openForge`,
+  written on `openBier`'s terms. T56 covers all of it.
+
+  **`FURNITURE_LIGHTS` caps how many pieces cast a real light** (6). three.js
+  Phong pays for every light on every fragment of every material, and a furnished
+  hall reached fourteen point lights before the party's own torch, fill and spell
+  light were counted — the crypt already caps its candles at four for the same
+  reason. The cap is by **priority, not proximity**: a wall torch is the room's
+  light and comes first, then a forge, then votive candles. Everything keeps its
+  flame sprites either way, so nothing visibly goes out.
+
+  Two mechanical notes. `Bins`/`weldGeos` merge a piece of furniture down to one
+  mesh per material — built naively each is a dozen draw calls and seventeen of
+  them cost more than the room they decorate; all six kinds together are 40
+  meshes. And **a registered flame must live in its own subgroup**, because the
+  flicker loop writes each sprite's local `position.x` every frame and two flames
+  parented to the same group would both be dragged to x=0 — a shrine's pair of
+  candles would merge into one.
+
+  ### The furniture is textured, and the UVs are projected
+
+  Everything built through `Bins` was flat colour to begin with, and a 40cm box of
+  flat colour reads as a *shape* rather than a made thing. `duergarTex` supplies
+  worked stone, wrought iron and grained wood, all three as **modulation maps
+  around white** rather than colour maps, so one texture can be handed to any of
+  them without changing its tone, and each doubles as its own bump map.
+
+  **`weldGeos` projects the UVs from position rather than copying them.** A
+  `BoxGeometry`'s own uv runs 0..1 across each face however big the face is, so a
+  shared map would be smeared once over a whole hearth and printed postage-stamp
+  size on a rivet. Projecting along whichever axis the face points down gives every
+  part the same texel density for free — which a merged mesh needs, because it
+  cannot carry a per-piece `repeat`. `Bins(density)` is repeats per world unit and
+  defaults to 5 for props; a wall's 2-ish puts hammer dimples the size of a fist on
+  an anvil.
+
+  Three things about the art itself:
+
+  - **Masonry is read from its joints.** The hearth and the anvil block were each
+    one box, which is the main reason they read as flat: a 50cm slab has no scale
+    to it. They are laid up in courses now, four or five blocks to a course, offset
+    row to row, with each course a hair narrower than the one below.
+  - **An anvil is read from its waist.** `addAnvil` builds the London pattern once
+    for both the wall forge and the hall — spread foot, narrow neck, body swelling
+    back out to a face wider than the neck, horn, step, hardie and pritchel holes.
+    Three stacked boxes is a doorstop.
+  - **A hammered surface must not be regular.** The iron's dimples read as bubble
+    wrap through two rounds of softening, because a perfect circle with a lit
+    top-left and a dark rim is the canonical *sphere* cue and the eye keeps
+    counting balls however faint it gets. Stretching and rotating them at random
+    is what finally made them undulation. Rivets are real spheres, and those are
+    meant to read as spheres.
 
 - **`Myconid`** — a grove that grew rather than one that was built, and the
   only theme that replaces the **ceiling** as well as the walls and floor:
@@ -772,10 +866,41 @@ theme fields its own roster and nothing else — so they assert 100% and 0%
 rather than a band, and cannot drift as rosters are added.
 
 Each theme with machinery writes an array onto the level (`rivers`/`pipes`,
-`crypts`/`ossuary`, `lurkers`) in `tryGen` and reads it back in
-`buildLevel`; anything you add that way must also be carried through
-`serializeGame` and `loadGame`, or a reloaded floor comes back stripped
-of it.
+`crypts`/`ossuary`, `lurkers`, `duergar`/`pillars`/`forge`, `drow`) in `tryGen`
+and reads it back in `buildLevel`; anything you add that way must also be
+carried through `serializeGame` and `loadGame`, or a reloaded floor comes back
+stripped of it.
+
+## Specular is what blows a surface out, not albedo
+
+This cost three separate fixes in one session — the forge flue, the weapon heads
+on a rack, and the clinker underfoot all rendered near-white with dark diffuse
+colours — and the arithmetic is the reason it keeps happening.
+
+three.js Blinn-Phong **normalises the specular lobe by roughly
+`(shininess + 2) / 8`**. So a higher shininess is narrower *and brighter at its
+peak*: shininess 48 multiplies the material's specular colour by about six, and
+shininess 70 (which the pillars' gold uses, correctly, for a thin band) by about
+nine. Meanwhile **the party's torch sits at the eye**, so every face turned
+toward the player is on that peak at once.
+
+Two consequences worth knowing before touching any material:
+
+- **"Narrow the highlight" is the wrong fix and makes it worse.** Raising
+  shininess to tighten a blown-out sheen raises the peak it is blowing out at.
+  The specular *colour* has to come down.
+- **A material that looks right on a thin band looks wrong on a slab.** The
+  pillars' gold is `0xfff0c0`/70 and is perfect on a 22mm ring round a column;
+  the same material on a forge ingot is a white brick. Gold, iron and clinker all
+  needed their own calmer variants.
+
+Diagnose it by forcing `material.specular` to black and re-rendering. If the
+surface drops to a believable tone, the diffuse was never the problem.
+
+Note this is a different failure from the cave door's, which was the *opposite*
+mistake — a flat surface square-on to the torch is the brightest case any
+surface can be, so a door can look pale while being genuinely dark. Sample the
+pixels before darkening anything.
 
 Wall features are built in a local frame — +X along the wall, +Y up, +Z
 out into the room — and then turned to face the tile they were placed
@@ -884,8 +1009,9 @@ the dungeon grows:
 
 ## Crypt interactions
 
-Two tappable things route through the `userData.kind` raycast dispatcher
-in the boot file, alongside doors, traps, items and secrets:
+Three tappable things route through the `userData.kind` raycast dispatcher
+in the boot file, alongside doors, traps, items and secrets (a fourth,
+`anvil`, belongs to the duergar forge hall and is written on `bier`'s terms):
 
 - **`coffin`** — 55% dust, 25% grave goods, 20% wakes an undead. One shot
   each (`c.opened` is a list of slot indices, so a stacked pair opens
@@ -1123,6 +1249,105 @@ walks every living preparer through `UI.openMemo` and only then calls
 `doRest`. `G._preparing` guards the re-entry. Putting it anywhere else
 would let a player re-prepare between fights, which is the decision the
 whole system exists to make.
+
+## The keyboard reads positions, not letters
+
+`KEY_ACTION` in `09_boot.js` is keyed by **`e.code`** — the physical key — and
+`KEY_LETTER` is only the fallback for anything that reports no code. WASD is a
+*shape* rather than four letters: on AZERTY the keys in those positions are
+labelled ZQSD, and reading `e.key` would put "strafe left" on the far side of
+the keyboard. Q/E rotate, the arrows duplicate forward/back and the two
+rotations, and M/L/R open the map, the log and a camp.
+
+Three guards around it, each of which was a live misfire:
+
+- **Modifiers are left to the browser.** `Ctrl+A` used to strafe and `Cmd+R`
+  used to make camp on the way to reloading the page.
+- **Typing is not steering.** A keystroke whose target is an `input`,
+  `textarea` or `select` is ignored, so a save code can contain the letter W.
+- **Handled keys `preventDefault`.** Otherwise the arrows scroll the page out
+  from under the viewport.
+
+Escape is the way out of every panel, and it dismisses through the panel's
+**own button** rather than calling `UI.hide` — `ovl-memo` is the reason: a rest
+is blocked waiting on the wizard's loadout, and only `memo-done` runs the
+continuation. `OVL_DISMISS` maps each overlay to that button; anything absent
+from it cannot be escaped, which is deliberate for character creation and the
+death screen. `ovl-menu` has no button of its own and is closed directly, but
+only once a game is running — before that there is nothing to return to.
+M and L also close the panel they opened, so a look at the map is one keystroke
+each way.
+
+## Buffs cover the party, and say so
+
+**No buff spell targets `self` any more.** Shield, Mage Armor, Mirror
+Image, Fire Shield and Divine Power were `target:'self'`, which meant the
+one character who could least use them — the caster, standing in the back
+rank behind two people being hit — was the only one who got them. They are
+`target:'allies'` now, and `castSpell`'s existing allies branch does the
+rest: it walks `G.party`, skips the dead, and burns one slot for the whole
+sweep. `'self'` is still a supported target in `castSpell`; nothing uses it.
+
+The buff data needed no change for this, because every buff was already
+per-character. `ac`/`atk`/`dmg`/`saves`/`str` are summed out of `ch.buffs`
+by `charAC`/`attackBonus`/`charSaves`/`abilMod`, `images` and `dr`/`pool`
+are spent in `hurtChar`, `fireshield` fires from the struck character's own
+list in the monster's attack, and `freedom` is read by `addCond`. Four
+copies of a buff are four independent ledgers, which is what you want:
+Stoneskin's pool drains on whoever is actually being hit.
+
+**`target:'ally'` spells still pick one friend**, and that is deliberate:
+Stoneskin, Shield of Faith, Protection from Evil, Bull's Strength and
+Freedom of Movement are a choice about *who*, and the `UI.pickAlly` prompt
+is that choice. They are not self-buffs and were never the complaint.
+
+**One casting writes one row.** `applySpellToAlly` logs per character, so a
+party spell used to put four copies of the same sentence in the log and
+bury the rest of the fight — a cost Bless, Prayer and Mass Cure had been
+paying all along, and one that got five spells worse here. The allies
+branch now passes a `sink` (`{names,parts,healed}`); given one,
+`applySpellToAlly` files its line as a tally entry instead of writing it,
+and the branch emits the single row afterwards:
+
+```
+Sable casts Mass Cure Light Wounds on the party — heals 46
+circle 5  ·  Ulma 11 (1d8+9 = 11), Sable 10 (1d8+9 = 10), …
+```
+
+Nothing is lost to the collapse — every per-character roll is still in the
+detail, which is where `fmtTrace` output has always lived. A heal keeps its
+total in the headline because that is the number read at a glance. With one
+member still standing the row names them rather than "the party", and
+without a `sink` the function logs exactly as it did, which is what every
+`target:'ally'` cast still does.
+
+**A buff can describe itself.** It used to be an anonymous `✦` on the
+portrait and nothing at all on the status sheet, so a party three wards
+deep could not tell which ward was about to lapse. `applySpellToAlly` now
+stamps `b.name` (the spell's display name) alongside `b.tag` (the stacking
+key — the two differ only for Mage Armor, whose tag is `magearmor`), and
+three helpers read it:
+
+- **`buffName(b)`** — `name`, falling back to `tag` for buffs in saves
+  written before the field existed.
+- **`buffEffects(b)`** — the bonuses as prose, built by probing the same
+  fields the rules read. Stoneskin reports its remaining `pool` rather
+  than only its time, because damage is what actually spends it.
+- **`buffLabel(b)`** — name, effects, and `fmtSecs(b.until - G.time)`.
+
+`liveBuffs(ch)` is the `until > G.time` filter, shared by both readouts:
+`openStats` prints a **Blessings** line above Afflictions, and
+`refreshParty` hangs the same label off each `✦` as a `title`. The portrait
+tooltip's countdown is only as fresh as the last `refreshParty` — that is
+fine for a tooltip, and the status sheet rebuilds on open.
+
+T56 covers this: that no buff spell targets `self`, that a cast lands on
+every living member and lifts each of their ACs, that the dead are skipped
+and a recast refreshes rather than stacks, that every buff in `SPELLS`
+produces a non-empty `buffEffects`, that the sheet grows a Blessings line
+only when there is something to put in it, and that one party casting
+writes exactly one log row whose per-character rolls still sum to the
+headline total.
 
 ## Hands and their timers
 
