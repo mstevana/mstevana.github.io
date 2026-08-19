@@ -500,14 +500,14 @@ const SPELLS={
     dmgFn:(cl)=>{let n=clamp(Math.floor((cl+1)/2),1,5),s=0;for(let i=0;i<n;i++)s+=roll(1,4,1);return s;}},
   burninghands:{name:'Burning Hands',circle:1,list:'arcane',target:'foe',save:{type:'ref',half:true},desc:'Fan of flame: 1d4/level (max 5d4), Reflex half.',
     dmgFn:(cl)=>roll(clamp(cl,1,5),4)},
-  shieldsp:{name:'Shield',circle:1,list:'arcane',target:'self',buff:{ac:4,dur:60},desc:'+4 AC for 60s.'},
-  magearmor:{name:'Mage Armor',circle:1,list:'arcane',target:'self',buff:{ac:4,dur:600,tag:'magearmor'},desc:'+4 armor for 10 min.'},
+  shieldsp:{name:'Shield',circle:1,list:'arcane',target:'allies',buff:{ac:4,dur:60},desc:'+4 AC for the party, 60s.'},
+  magearmor:{name:'Mage Armor',circle:1,list:'arcane',target:'allies',buff:{ac:4,dur:600,tag:'magearmor'},desc:'+4 armor for the party, 10 min.'},
   sleep:{name:'Sleep',circle:1,list:'arcane',target:'foe',save:{type:'will',negate:true},sleep:true,desc:'A weak foe (4 HD or less) falls asleep. Will negates.'},
   rayfrost:{name:'Ray of Enfeebling Frost',circle:1,list:'arcane',target:'foe',save:{type:'fort',half:true},desc:'1d6+2 cold, Fortitude half.',dmgFn:()=>roll(1,6,2)},
   // wizard 2
   scorchingray:{name:'Scorching Ray',circle:2,list:'arcane',target:'foe',auto:true,desc:'Ray of fire: 4d6, no save (ranged touch).',dmgFn:()=>roll(4,6)},
   acidarrow:{name:'Acid Arrow',circle:2,list:'arcane',target:'foe',auto:true,dot:{dmg:[2,4],ticks:2,label:'acid'},desc:'2d4 acid now and again each round for 2 rounds.',dmgFn:()=>roll(2,4)},
-  mirrorimage:{name:'Mirror Image',circle:2,list:'arcane',target:'self',buff:{images:3,dur:90},desc:'3 illusory doubles absorb blows meant for you.'},
+  mirrorimage:{name:'Mirror Image',circle:2,list:'arcane',target:'allies',buff:{images:3,dur:90},desc:'3 illusory doubles guard each of the party, absorbing blows meant for them.'},
   websp:{name:'Web',circle:2,list:'arcane',target:'foe',save:{type:'ref',negate:true},hold:8,desc:'Sticky webs hold the foe for 8s. Reflex negates.'},
   flamingsphere:{name:'Flaming Sphere',circle:2,list:'arcane',target:'foe',save:{type:'ref',half:true},desc:'Rolling ball of fire: 3d6, Reflex half.',dmgFn:()=>roll(3,6)},
   // wizard 3
@@ -524,7 +524,7 @@ const SPELLS={
   phantasmalkiller:{name:'Phantasmal Killer',circle:4,list:'arcane',target:'foe',save:{type:'will',half:true},desc:'Nightmare made real: 6d6, Will half (fear pierces the mind).',dmgFn:()=>roll(6,6)},
   stoneskin:{name:'Stoneskin',circle:4,list:'arcane',target:'ally',buff:{dr:10,pool:60,dur:300},desc:'Grants DR 10 until 60 damage is absorbed.'},
   enervation:{name:'Enervation',circle:4,list:'arcane',target:'foe',auto:true,negLevels:2,desc:'Black ray: foe suffers 2 negative levels (weaker attacks, −10 hp).'},
-  fireshield:{name:'Fire Shield',circle:4,list:'arcane',target:'self',buff:{fireshield:[2,6],dur:60},desc:'Attackers who strike you take 2d6 fire, for 60s.'},
+  fireshield:{name:'Fire Shield',circle:4,list:'arcane',target:'allies',buff:{fireshield:[2,6],dur:60},desc:'Attackers who strike anyone in the party take 2d6 fire, for 60s.'},
   // wizard 5
   conecold:{name:'Cone of Cold',circle:5,list:'arcane',target:'foes',area:{kind:'cone',len:6},save:{type:'ref',half:true},desc:'A widening cone six tiles deep: 1d6/level (max 15d6). Reflex half.',
     dmgFn:(cl)=>roll(clamp(cl,9,15),6)},
@@ -554,7 +554,7 @@ const SPELLS={
   // cleric 4
   ccw:{name:'Cure Critical Wounds',circle:4,list:'divine',target:'ally',healFn:(cl)=>roll(4,8,clamp(cl,7,20)),desc:'Heals 4d8 + level (max +20).'},
   neutralize:{name:'Neutralize Poison',circle:4,list:'divine',target:'ally',cures:['poison'],restoreAbility:99,desc:'Cures poison and restores poisoned ability damage.'},
-  divinepower:{name:'Divine Power',circle:4,list:'divine',target:'self',buff:{atk:3,str:2,dur:45},desc:'+3 attack, +2 STR for 45s.'},
+  divinepower:{name:'Divine Power',circle:4,list:'divine',target:'allies',buff:{atk:3,str:2,dur:45},desc:'+3 attack, +2 STR for the party, 45s.'},
   freedommove:{name:'Freedom of Movement',circle:4,list:'divine',target:'ally',buff:{freedom:true,dur:120},cures:['paralysis','hold'],desc:'Immune to paralysis and holds for 2 min.'},
   // cleric 5
   flamestrike:{name:'Flame Strike',circle:5,list:'divine',target:'foes',area:{kind:'column',r:1},save:{type:'ref',half:true},desc:'A pillar of divine fire one tile about where it falls: 1d6/level (max 15d6). Reflex half.',
@@ -4709,6 +4709,38 @@ function addCond(ch,cond){
 }
 function removeCond(ch,kind){ch.conditions=ch.conditions.filter(c=>c.kind!==kind);}
 const COND_ICONS={poison:'☠',disease:'🦠',paralysis:'⛓',hold:'⛓',sleep:'💤',stunned:'✶',shaken:'😨',bleeding:'🩸',drained:'🕳',faerie:'✧'};
+/* A buff used to be an anonymous shimmer: the portrait showed a ✦ per buff and
+   the status window did not mention them at all, so a party three wards deep
+   could not tell which ward was about to lapse. The buff object is the only
+   record there is, so it has to be able to describe itself — name, what it is
+   doing, and how long is left. `name` is new; saves written before it fall
+   back to the stacking tag, which for everything but Mage Armor IS the name. */
+function buffName(b){return b.name||b.tag||'Blessing';}
+function liveBuffs(ch){return ch.buffs.filter(b=>b.until>G.time);}
+function fmtSecs(s){
+  s=Math.max(0,Math.ceil(s));
+  return s>=60?Math.floor(s/60)+'m'+String(s%60).padStart(2,'0')+'s':s+'s';
+}
+function buffEffects(b){
+  const bits=[];
+  if(b.ac)bits.push('AC '+fmtMod(b.ac));
+  if(b.atk)bits.push('attack '+fmtMod(b.atk));
+  if(b.dmg)bits.push('damage '+fmtMod(b.dmg));
+  if(b.saves)bits.push('saves '+fmtMod(b.saves));
+  for(const a of ABILITIES)if(b[a])bits.push(ABIL_LBL[a]+' '+fmtMod(b[a]));
+  if(b.haste)bits.push('hasted');
+  if(b.freedom)bits.push('no holds');
+  if(b.images)bits.push(b.images+' image'+(b.images===1?'':'s'));
+  // stoneskin is spent by damage, not only by time, so its pool is the number
+  // that actually tells you how much ward is left
+  if(b.dr)bits.push('DR '+b.dr+(b.pool!==undefined?' ('+b.pool+' hp left)':''));
+  if(b.fireshield)bits.push(fmtDice(b.fireshield[0],b.fireshield[1])+' fire to attackers');
+  return bits.join(', ');
+}
+function buffLabel(b){
+  const eff=buffEffects(b);
+  return buffName(b)+(eff?' ('+eff+')':'')+' — '+fmtSecs(b.until-G.time);
+}
 function canAct(ch){
   return !ch.dead&&ch.hp>0&&!hasCond(ch,'paralysis')&&!hasCond(ch,'sleep')
     &&!hasCond(ch,'stunned')&&!hasCond(ch,'hold');
@@ -9522,12 +9554,17 @@ function itemTexKey(it){return 'it_'+it.base+'_'+it.bonus+'_'+(it.tint||'')+'_'+
 // single source of truth for monster frame textures (cache key + raster options)
 function monsterFrameTex(sprKey,boss,pose,elite){
   const tint=elite&&ELITES[elite]?ELITES[elite].tint:null;
+  // 640px, not 384: a large creature one tile away fills ~750 physical pixels on
+  // a DPR-3 phone, so a 384px raster was magnified ~2x and read as blurry up
+  // close. 640 brings that down to ~1.2x — near its native resolution — at the
+  // cost of ~2.8x the raster time and texture memory per frame.
   return svgToTexture(monsterSVG(sprKey,boss,pose,tint),
-    'mon_'+sprKey+(boss?'_b':'')+(elite?'_'+elite:'')+'_'+pose,{size:384,mipmap:true});
+    'mon_'+sprKey+(boss?'_b':'')+(elite?'_'+elite:'')+'_'+pose,{size:640,mipmap:true});
 }
 /* Every pose is rasterised the first time it is used, and a frame costs about
-   25ms of main thread to decode now that it carries the rim and contact-shadow
-   filters (11ms without them, measured over 36 frames at 384px). Paid lazily
+   25ms of main thread to decode at 384px once it carries the rim and contact-
+   shadow filters (11ms without them, over 36 frames); at the 640px raster the
+   frames now use, budget roughly 2.8x that. Paid lazily
    that lands as a stutter the first time a creature winds up — mid-fight, which
    is the worst possible moment. So a floor pre-warms every pose of every kind
    standing on it while the level is being built, where a hitch is expected and
@@ -9545,10 +9582,12 @@ function prewarmMonsterFrames(L){
       queue.push([MONSTERS[m.key].spr,m.boss,pose,m.elite]);
   }
   /* Drained a couple at a time rather than in one block. A frame costs about
-     30ms of main thread to rasterise once it carries the rim, the contact
-     shadow and its detail, and a floor holds five or six kinds — done together
-     that is a second of dead air on the level transition, and several times
-     that on a phone. Spread over idle callbacks it is invisible, and anything
+     30ms of main thread to rasterise at 384px once it carries the rim, the
+     contact shadow and its detail — and roughly 2.8x that at the 640px raster
+     these frames now use — and a floor holds five or six kinds, so done
+     together that is well over a second of dead air on the level transition,
+     several times that on a phone. Spreading it over idle callbacks matters
+     more at 640 than it did, not less. Spread that way it is invisible, and anything
      the player reaches before its turn comes up still rasterises lazily on
      first use exactly as it always did. */
   R3.prewarmQ=queue;
@@ -10802,9 +10841,19 @@ function castSpell(ch,key,opts){
     return true;
   }
   if(sp.target==='allies'){
+    // one casting, one row: the tally collects who it reached and what each of
+    // them got, and the detail line carries the per-character numbers that used
+    // to be a row apiece. With one member still standing it reads as what it
+    // is — a spell cast on that one person.
+    const sink={names:[],parts:[],healed:0};
     let any=false;
-    for(const t of G.party)if(!t.dead&&applySpellToAlly(ch,t,sp,cl))any=true;
-    if(any){commit();friendlyFx(sp);}
+    for(const t of G.party)if(!t.dead&&applySpellToAlly(ch,t,sp,cl,sink))any=true;
+    if(any){
+      const who=sink.names.length===1?sink.names[0]:'the party';
+      logAdd('spell',ch.name+' casts '+sp.name+' on '+who+(sp.healFn?' — heals '+sink.healed:''),
+        'circle '+sp.circle+(sink.parts.length?'  ·  '+sink.parts.join(', '):''));
+      commit();friendlyFx(sp);
+    }
     return any;
   }
   // offensive: the spell flies as a glowing bolt and resolves on impact
@@ -10935,7 +10984,12 @@ function castSpell(ch,key,opts){
     }});
   return true;
 }
-function applySpellToAlly(caster,t,sp,cl){
+/* `sink`, when the caller passes one, turns the per-target log line into an
+   entry in a tally the caller writes out as a single row. A party spell is one
+   casting of one slot, and a row per member buried the rest of the fight under
+   four copies of the same sentence. Everything else — the healing, the wards,
+   the floats — is still per character, because that is what it acts on. */
+function applySpellToAlly(caster,t,sp,cl,sink){
   if(sp.raise){
     if(!t.dead){UI.toast(t.name+' is not dead. The slot is spared.');return false;}
     t.dead=false;t.level=Math.max(1,t.level-1);t.xp=XP_FOR_LEVEL(t.level);
@@ -10946,7 +11000,11 @@ function applySpellToAlly(caster,t,sp,cl){
   if(t.dead){UI.toast(t.name+' is dead. Only Raise Dead can help.');return false;}
   if(sp.healFn){
     const bag=traceRoll(()=>sp.healFn(cl));
-    logAdd('spell',caster.name+' casts '+sp.name+' on '+t.name+' — heals '+bag.value,
+    if(sink){
+      sink.names.push(t.name);sink.healed+=bag.value;
+      sink.parts.push(t.name+' '+bag.value+(bag.dice.length?' ('+fmtTrace(bag.dice)+')':''));
+    }
+    else logAdd('spell',caster.name+' casts '+sp.name+' on '+t.name+' — heals '+bag.value,
       'circle '+sp.circle+(bag.dice.length?'  ·  '+fmtTrace(bag.dice):''));
     healChar(t,bag.value);
   }
@@ -10977,9 +11035,11 @@ function applySpellToAlly(caster,t,sp,cl){
   }
   if(sp.restoreLevels&&t.negLevels>0){t.negLevels=0;removeCond(t,'drained');recalcHp(t,false);UI.toast('Lost life-force floods back into '+t.name+'.');}
   if(sp.buff){
-    logAdd('spell',caster.name+' casts '+sp.name+' on '+t.name,'circle '+sp.circle);
+    if(sink){sink.names.push(t.name);sink.parts.push(t.name);}
+    else logAdd('spell',caster.name+' casts '+sp.name+' on '+t.name,'circle '+sp.circle);
     const b=Object.assign({},sp.buff);
     b.tag=b.tag||sp.name;
+    b.name=sp.name;   // the tag is a stacking key ('magearmor'); this is what the UI says
     b.until=G.time+(b.dur||60);delete b.dur;
     t.buffs=t.buffs.filter(x=>x.tag!==b.tag); // recasting refreshes, never stacks
     t.buffs.push(b);
@@ -13705,7 +13765,7 @@ const UI=(()=>{
       div.querySelector('.p-hptxt').textContent=ch.dead?'DEAD':`${ch.hp}/${ch.maxHp}`;
       const conds=div.querySelector('.p-conds');
       conds.innerHTML=ch.conditions.map(c=>`<span class="cond-ico" title="${c.kind}">${COND_ICONS[c.kind]||'?'}</span>`).join('')
-        +ch.buffs.filter(b=>b.until>G.time).map(b=>`<span class="cond-ico" style="border-color:#4a5a7a">✦</span>`).join('')
+        +liveBuffs(ch).map(b=>`<span class="cond-ico" style="border-color:#4a5a7a" title="${buffLabel(b)}">✦</span>`).join('')
         +(ch.negLevels?`<span class="cond-ico" style="border-color:#6a4a8a">🕳${ch.negLevels}</span>`:'');
       div.querySelectorAll('.hand').forEach(h=>{
         const cd=h.querySelector('.cd');
@@ -14382,6 +14442,8 @@ const UI=(()=>{
     if(c.sneak)extra+=`<b>Sneak attack</b> +${Math.floor((ch.level+1)/2)}d6 vs foes that have not yet acted<br>`;
     if(c.favored)extra+=`<b>Favored enemies</b> +2 damage vs beasts and humanoids<br>`;
     if(ch.negLevels)extra+=`<b style="color:#b48ae0">Negative levels</b> ${ch.negLevels} (Restoration cures)<br>`;
+    const wards=liveBuffs(ch);
+    if(wards.length)extra+=`<b style="color:#7aa0c0">Blessings</b> ${wards.map(buffLabel).join(' · ')}<br>`;
     if(ch.conditions.length)extra+=`<b style="color:#a05545">Afflictions</b> ${ch.conditions.map(x=>x.kind+(x.name?' ('+x.name+')':'')).join(', ')}<br>`;
     $('st-body').innerHTML=`
       <b>${RACES[ch.race].name} ${CLASSES[ch.cls].name}</b>, level ${ch.level}<br>

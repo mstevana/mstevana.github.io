@@ -344,7 +344,12 @@ in any individual creature, so all 78 get them at once.
 
 **Filters are the expensive half of rasterising a frame, and it is paid on the
 main thread during play.** Measured over 36 frames at 384px: 11.3ms plain,
-+5.9ms for the contact shadow, +7.4ms for the rim, 24.6ms for both. That lands
++5.9ms for the contact shadow, +7.4ms for the rim, 24.6ms for both. **Monster
+frames now rasterise at 640px, not 384** (`monsterFrameTex`), because a large
+creature one tile away fills ~750 physical pixels on a DPR-3 phone and a 384px
+raster was magnified ~2x into visible blur up close; 640 costs roughly 2.8x the
+raster time and texture memory per frame, so treat the figures above as a
+per-pixel baseline and scale them. That cost lands
 as a stutter the first time a creature winds up, which is the worst possible
 moment — so `prewarmMonsterFrames` rasterises all six poses of every kind on a
 floor while the level is being built, where a hitch is expected. The texture
@@ -1272,6 +1277,77 @@ death screen. `ovl-menu` has no button of its own and is closed directly, but
 only once a game is running — before that there is nothing to return to.
 M and L also close the panel they opened, so a look at the map is one keystroke
 each way.
+
+## Buffs cover the party, and say so
+
+**No buff spell targets `self` any more.** Shield, Mage Armor, Mirror
+Image, Fire Shield and Divine Power were `target:'self'`, which meant the
+one character who could least use them — the caster, standing in the back
+rank behind two people being hit — was the only one who got them. They are
+`target:'allies'` now, and `castSpell`'s existing allies branch does the
+rest: it walks `G.party`, skips the dead, and burns one slot for the whole
+sweep. `'self'` is still a supported target in `castSpell`; nothing uses it.
+
+The buff data needed no change for this, because every buff was already
+per-character. `ac`/`atk`/`dmg`/`saves`/`str` are summed out of `ch.buffs`
+by `charAC`/`attackBonus`/`charSaves`/`abilMod`, `images` and `dr`/`pool`
+are spent in `hurtChar`, `fireshield` fires from the struck character's own
+list in the monster's attack, and `freedom` is read by `addCond`. Four
+copies of a buff are four independent ledgers, which is what you want:
+Stoneskin's pool drains on whoever is actually being hit.
+
+**`target:'ally'` spells still pick one friend**, and that is deliberate:
+Stoneskin, Shield of Faith, Protection from Evil, Bull's Strength and
+Freedom of Movement are a choice about *who*, and the `UI.pickAlly` prompt
+is that choice. They are not self-buffs and were never the complaint.
+
+**One casting writes one row.** `applySpellToAlly` logs per character, so a
+party spell used to put four copies of the same sentence in the log and
+bury the rest of the fight — a cost Bless, Prayer and Mass Cure had been
+paying all along, and one that got five spells worse here. The allies
+branch now passes a `sink` (`{names,parts,healed}`); given one,
+`applySpellToAlly` files its line as a tally entry instead of writing it,
+and the branch emits the single row afterwards:
+
+```
+Sable casts Mass Cure Light Wounds on the party — heals 46
+circle 5  ·  Ulma 11 (1d8+9 = 11), Sable 10 (1d8+9 = 10), …
+```
+
+Nothing is lost to the collapse — every per-character roll is still in the
+detail, which is where `fmtTrace` output has always lived. A heal keeps its
+total in the headline because that is the number read at a glance. With one
+member still standing the row names them rather than "the party", and
+without a `sink` the function logs exactly as it did, which is what every
+`target:'ally'` cast still does.
+
+**A buff can describe itself.** It used to be an anonymous `✦` on the
+portrait and nothing at all on the status sheet, so a party three wards
+deep could not tell which ward was about to lapse. `applySpellToAlly` now
+stamps `b.name` (the spell's display name) alongside `b.tag` (the stacking
+key — the two differ only for Mage Armor, whose tag is `magearmor`), and
+three helpers read it:
+
+- **`buffName(b)`** — `name`, falling back to `tag` for buffs in saves
+  written before the field existed.
+- **`buffEffects(b)`** — the bonuses as prose, built by probing the same
+  fields the rules read. Stoneskin reports its remaining `pool` rather
+  than only its time, because damage is what actually spends it.
+- **`buffLabel(b)`** — name, effects, and `fmtSecs(b.until - G.time)`.
+
+`liveBuffs(ch)` is the `until > G.time` filter, shared by both readouts:
+`openStats` prints a **Blessings** line above Afflictions, and
+`refreshParty` hangs the same label off each `✦` as a `title`. The portrait
+tooltip's countdown is only as fresh as the last `refreshParty` — that is
+fine for a tooltip, and the status sheet rebuilds on open.
+
+T56 covers this: that no buff spell targets `self`, that a cast lands on
+every living member and lifts each of their ACs, that the dead are skipped
+and a recast refreshes rather than stacks, that every buff in `SPELLS`
+produces a non-empty `buffEffects`, that the sheet grows a Blessings line
+only when there is something to put in it, and that one party casting
+writes exactly one log row whose per-character rolls still sum to the
+headline total.
 
 ## Hands and their timers
 
