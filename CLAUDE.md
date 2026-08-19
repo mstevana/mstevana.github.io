@@ -1054,6 +1054,42 @@ mistake — a flat surface square-on to the torch is the brightest case any
 surface can be, so a door can look pale while being genuinely dark. Sample the
 pixels before darkening anything.
 
+## Surfaces that meet must overlap, never abut
+
+Door slabs are built at `WALLH + 0.06`, taller than the doorway on purpose, so
+the slab's flat top and bottom caps end up buried behind the opaque floor and
+ceiling planes. Cut to exactly `WALLH` those caps are coplanar with floor and
+ceiling and z-fight into a flashing seam — reported as "flashing artifacts at
+floor and ceiling" on cave doors.
+
+**The instinct to fix it by shortening the slab is wrong, and was tried first.**
+Cut a hair short the caps stop fighting, but they are then *exposed* as grazing
+slivers with a gap under the door, which flashes nearly as badly. Only
+interpenetration removes the shared plane entirely. Measured over a camera sweep
+at a cave door, counting pixels that oscillate rather than change smoothly:
+**2415** at exactly `WALLH`, **783** cut short by 0.02, **469** overlapping by
+0.06.
+
+It reads in Caves first because the plank texture is opaque top to bottom, while
+the sewer and drow grates are see-through at their edges and `alphaTest` throws
+those cap pixels away — so the same bug was always present there and invisible.
+
+Two notes for anyone measuring this class of bug:
+
+- **A camera-nudge diff does not work.** Moving the camera changes every pixel
+  through parallax, and the cave walls' own texture shimmer swamps the signal —
+  measured with the door hidden entirely, the diff was *larger* than with it. The
+  instrument that works is a slow camera sweep looking for pixels whose
+  luminance **oscillates** (sign reversals frame to frame) rather than changing
+  monotonically, restricted to the door's own projected screen rect.
+- **Pin `R3.torch.intensity` first.** The torch flicker otherwise reads as
+  fighting, the same trap the sprite-shading work hit.
+
+A residual shimmer along the plank gaps survives this and is a *different*
+problem: `alphaTest` against a mipmapped alpha channel crosses the threshold
+differently per mip level, so the gap edges sparkle as distance changes. Nobody
+has taken it.
+
 Wall features are built in a local frame — +X along the wall, +Y up, +Z
 out into the room — and then turned to face the tile they were placed
 against. **The sign depends on which way the scan ran**: crypt furniture

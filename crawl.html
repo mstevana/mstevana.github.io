@@ -70,8 +70,23 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
   border:1px solid var(--btn-line);color:var(--ink);display:flex;align-items:center;justify-content:center;font-size:20px;z-index:5;}
 .topbtn:active{background:#3a2f1d;}
 #b-map{left:8px;} #b-log{left:58px;} #b-rest{left:108px;} #b-mute{left:158px;} #b-menu{left:208px;}
-#memo-body{height:min(48vh,300px);overflow-y:auto;text-align:left;background:#0d0b07;
-  border:1px solid var(--btn-line);border-radius:6px;padding:6px 8px;margin-bottom:8px;font-size:12px;}
+/* two panes: the book on the left, what the selected spell does on the right.
+   The descendant selectors below still match through #memo-list, so the row
+   styling did not have to move with it. */
+#memo-body{display:flex;gap:8px;align-items:stretch;margin-bottom:8px;font-size:12px;text-align:left;}
+#memo-list{flex:1 1 58%;min-width:0;height:min(48vh,300px);overflow-y:auto;background:#0d0b07;
+  border:1px solid var(--btn-line);border-radius:6px;padding:6px 8px;}
+#memo-detail{flex:1 1 42%;min-width:0;height:min(48vh,300px);overflow-y:auto;background:#0d0b07;
+  border:1px solid var(--btn-line);border-radius:6px;padding:8px;color:var(--ink-dim);}
+#memo-body .mrow .mname{cursor:pointer;}
+#memo-body .mrow.sel{background:#241d13;border-radius:4px;}
+#memo-body .mrow.sel .mname{color:#e0cf9e;}
+#memo-detail .dt-name{color:#e0cf9e;font-size:14px;margin-bottom:1px;}
+#memo-detail .dt-sub{color:#8a7f66;margin-bottom:6px;}
+#memo-detail .dt-desc{color:var(--ink);line-height:1.5;margin-bottom:7px;}
+#memo-detail .dt-row{display:flex;gap:6px;padding:3px 0;border-top:1px solid #1d1811;}
+#memo-detail .dt-k{flex:0 0 66px;color:#8a7f66;}
+#memo-detail .dt-v{flex:1 1 auto;min-width:0;color:#c9b98a;}
 #memo-body .mcirc{color:#e0cf9e;font-weight:bold;margin:6px 0 3px;border-bottom:1px solid #241d13;padding-bottom:2px;}
 #memo-body .mcirc .full{color:#8a7f66;font-weight:normal;float:right;}
 #memo-body .mrow{display:flex;align-items:center;gap:6px;padding:3px 2px;}
@@ -125,6 +140,19 @@ h1{font-size:26px;text-align:center;} h2{font-size:17px;}
 .mbtn:disabled{opacity:.4;}
 .mbtn.small{padding:6px;font-size:13px;margin:3px 0;}
 .row{display:flex;gap:8px;align-items:center;}
+/* bestiary: the portrait column is sized in script to the pixel height the
+   creature would cover standing one tile away, so the art is shown at the size
+   it is actually met at; the stats sit beside it. */
+.best-row{display:flex;gap:12px;align-items:center;padding:8px 2px;border-bottom:1px solid #2a2318;}
+.best-row:last-child{border-bottom:none;}
+.best-art{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:center;}
+.best-art img{display:block;image-rendering:auto;}
+.best-info{flex:1 1 0;min-width:0;}
+.best-name{color:var(--ink);font-size:16px;margin-bottom:3px;}
+.best-stats{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:13px;color:#c9b98a;}
+.best-stats b{color:var(--ink);font-weight:normal;}
+.best-tag{font-size:12px;color:#9c8f6e;margin-top:4px;line-height:1.45;}
+.best-tag em{color:#c9b98a;font-style:normal;}
 input[type=text]{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font-family:inherit;
   font-size:16px;padding:6px;border-radius:4px;width:100%;user-select:text;-webkit-user-select:text;}
 textarea{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font-family:monospace;font-size:11px;
@@ -239,8 +267,9 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   <button class="mbtn" id="m-continue">Continue the descent</button>
   <button class="mbtn" id="m-new">New party</button>
   <button class="mbtn" id="m-quick">Quick start (auto party)</button>
-  <button class="mbtn small" id="m-export">Export save code</button>
-  <button class="mbtn small" id="m-import">Import save code</button>
+  <button class="mbtn" id="m-bestiary">Bestiary</button>
+  <button class="mbtn" id="m-export">Export save code</button>
+  <button class="mbtn" id="m-import">Import save code</button>
   <div id="m-io" class="hidden"><textarea id="m-io-text"></textarea>
     <div class="row"><button class="mbtn small" id="m-io-ok">Load</button><button class="mbtn small" id="m-io-close">Close</button></div></div>
   <div class="dim-note" style="text-align:center;margin-top:6px">D&amp;D 3.5 rules · real-time · landscape</div>
@@ -290,6 +319,12 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   <button class="mbtn small" id="st-close">Close</button>
 </div></div>
 
+<div class="ovl" id="ovl-bestiary"><div class="panel" style="width:min(760px,96vw)">
+  <h2 id="best-title">Bestiary</h2>
+  <div id="best-body"></div>
+  <button class="mbtn small" id="best-close">Close</button>
+</div></div>
+
 <div class="ovl" id="ovl-spells"><div class="panel">
   <h2 id="sp-title">Spells</h2>
   <div id="spell-list"></div>
@@ -300,7 +335,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 <div class="ovl" id="ovl-memo"><div class="panel" style="width:min(620px,94vw)">
   <h2 id="memo-title">Memorise</h2>
   <div class="dim-note" id="memo-sub"></div>
-  <div id="memo-body"></div>
+  <div id="memo-body"><div id="memo-list"></div><div id="memo-detail"></div></div>
   <div class="row">
     <button class="mbtn small" id="memo-clear">Clear all</button>
     <button class="mbtn small" id="memo-auto">Fill</button>
@@ -4841,6 +4876,91 @@ function buffLabel(b){
   const eff=buffEffects(b);
   return buffName(b)+(eff?' ('+eff+')':'')+' — '+fmtSecs(b.until-G.time);
 }
+/* What a spell does, as structured rows, for the memorise panel's detail pane.
+   Everything is probed off the same fields the rules themselves read, so a
+   spell describes itself correctly the moment it is written — there is no
+   second table to keep in step. The prose `desc` carries the damage dice
+   (a dmgFn cannot be asked what it rolls without rolling it), so these rows
+   deliberately cover the mechanics AROUND the damage rather than repeating it. */
+const SAVE_LBL={ref:'Reflex',fort:'Fortitude',will:'Will'};
+const TARGET_LBL={foe:'One foe',foes:'Every foe in the area',ally:'One companion',
+  allies:'The whole party',self:'The caster'};
+function spellAreaText(a){
+  if(!a)return null;
+  if(a.kind==='burst')return 'Burst — everything within '+a.r+' tiles';
+  if(a.kind==='column')return 'Column — a pillar '+a.r+' tiles across';
+  if(a.kind==='line')return 'Line — '+a.len+' tiles straight ahead, one wide';
+  if(a.kind==='cone')return 'Cone — '+a.len+' tiles deep, widening';
+  return a.kind;
+}
+/* Dice notation out of a traced roll, runs of the same die collapsed — magic
+   missile fires five separate 1d4+1 rolls and should read as such rather than
+   as the same line five times. */
+function diceNotation(dice){
+  if(!dice||!dice.length)return null;
+  const parts=[];
+  for(const r of dice){
+    const s=fmtDice(r.n,r.d,r.mod),last=parts[parts.length-1];
+    if(last&&last.s===s)last.n++;else parts.push({s,n:1});
+  }
+  return parts.map(p=>p.n>1?p.n+' × '+p.s:p.s).join(' + ');
+}
+/* A dmgFn/healFn carries no notation to read off, so ask it the same way the
+   log does: arm the roll trace, call it, and report the dice it asked for
+   rather than the number it returned. The result is level-dependent, so it is
+   reported at the caster's own level — more use than the prose's "1d6/level". */
+function spellDice(fn,cl){
+  if(typeof fn!=='function')return null;
+  try{return diceNotation(traceRoll(()=>fn(cl||1)).dice);}catch(e){return null;}
+}
+function spellEffects(sp,cl){
+  const rows=[];
+  const add=(k,v)=>{if(v)rows.push({k,v});};
+  const atLvl=cl?' (at level '+cl+')':'';
+  add('Target',TARGET_LBL[sp.target]||sp.target);
+  add('Area',spellAreaText(sp.area));
+  add('Damage',sp.dmgFn?(spellDice(sp.dmgFn,cl)||'')+atLvl:null);
+  add('Heals',sp.healFn?(spellDice(sp.healFn,cl)||'')+atLvl
+    +(sp.target==='allies'?', to every living companion':''):null);
+  if(sp.dot)add('Then',fmtDice(sp.dot.dmg[0],sp.dot.dmg[1])+' '+sp.dot.label+' a round for '+sp.dot.ticks+' rounds');
+  add('Save',sp.save
+    ? (SAVE_LBL[sp.save.type]||sp.save.type)+(sp.save.half?' — half on a success':sp.save.negate?' — negates':'')
+    : (sp.auto?'None — it always lands':'None'));
+  if(sp.buff){
+    // the template's `pool` is a budget to spend, not a remainder, so it is
+    // worded here rather than borrowing buffEffects' "hp left"
+    const b=Object.assign({},sp.buff);delete b.pool;
+    add('Grants',buffEffects(b));
+    if(sp.buff.pool)add('Absorbs',sp.buff.pool+' damage');
+  }
+  // what it does, and separately how long it holds: every timed effect reports
+  // its duration on the same row rather than hiding it inside the prose
+  const holds=[],durs=[];
+  const timed=(text,secs)=>{holds.push(text);if(secs)durs.push(secs);};
+  if(sp.sleep)holds.push('puts it to sleep');
+  if(sp.hold)timed('holds it fast',sp.hold);
+  if(sp.stun)timed('stuns',sp.stun);
+  if(sp.slow)timed('halves its speed',sp.slow);
+  if(sp.slowAll)timed('halves the speed of every foe caught',sp.slowAll);
+  if(sp.shaken)timed('leaves it shaken',sp.shaken);
+  if(sp.negLevels)holds.push(sp.negLevels+' negative level'+(sp.negLevels>1?'s':''));
+  if(sp.drain)holds.push('the caster gains the life taken');
+  add('Effect',holds.join(', '));
+  if(sp.buff&&sp.buff.dur)durs.push(sp.buff.dur);
+  add('Lasts',[...new Set(durs)].map(fmtSecs).join(' / '));
+  const mends=[];
+  if(sp.cures&&sp.cures.length)mends.push('cures '+sp.cures.join(', '));
+  if(sp.restoreAbility)mends.push(sp.restoreAbility>=99?'restores drained ability scores':'restores up to '+sp.restoreAbility+' points of drained ability');
+  if(sp.restoreLevels)mends.push('restores lost levels');
+  if(sp.dispel)mends.push('strips magical effects');
+  if(sp.raise)mends.push('returns the dead to life');
+  add('Mends',mends.join(', '));
+  const only=[];
+  if(sp.humanoidOnly)only.push('humanoids');
+  if(sp.vsUndead)only.push('undead');
+  add('Only vs',only.join(', '));
+  return rows;
+}
 function canAct(ch){
   return !ch.dead&&ch.hp>0&&!hasCond(ch,'paralysis')&&!hasCond(ch,'sleep')
     &&!hasCond(ch,'stunned')&&!hasCond(ch,'hold');
@@ -8099,7 +8219,20 @@ function buildLevel(L){
     // a plank, not a block: at tile scale 0.22 read as a foot and a half of
     // timber, which looked like a wall segment rather than a door
     const DOORTH=0.07;
-    const geo=new THREE.BoxGeometry(passageX?DOORTH:TILE,WALLH,passageX?TILE:DOORTH);
+    /* Deliberately TALLER than the doorway, so the slab's flat top and bottom
+       caps end up buried behind the opaque floor and ceiling planes instead of
+       meeting them. Cut to exactly WALLH those caps are coplanar with floor and
+       ceiling and z-fight into a flashing seam; cut a hair SHORT they stop
+       fighting but are then exposed as grazing slivers with daylight under the
+       door, which flashes nearly as badly. Measured over a camera sweep at a
+       cave door, counting pixels that oscillate rather than change smoothly:
+       2415 at exactly WALLH, 669 cut short by 0.02, 441 overlapping by 0.04.
+       Interpenetrating is the standard answer and the only one that has no seam
+       to fight over. It reads in Caves first because the plank texture is opaque
+       top to bottom, while the sewer and drow grates are see-through at the
+       edges and alphaTest throws those pixels away. */
+    const DOORH=WALLH+0.06;
+    const geo=new THREE.BoxGeometry(passageX?DOORTH:TILE,DOORH,passageX?TILE:DOORTH);
     const mesh=new THREE.Mesh(geo,t===T_DOOR_LOCKED?doorMatLocked:doorMatBase);
     const pv=new THREE.Group();
     if(passageX){pv.position.set(x+0.5,WALLH/2,y);mesh.position.set(0,0,0.5);}
@@ -10674,6 +10807,13 @@ function prewarmMonsterFrames(L){
   };
   R3.prewarmT=idle(drain);
 }
+/* How tall a creature's billboard stands, in world units. Extracted so the
+   bestiary can show a creature at exactly the size it is met at — a second copy
+   of this list would silently drift the moment a big creature is added. */
+const BIG_SPRITES=['ogre','troll','minotaur','ogremage','dragon',
+  'bonecolossus','deathknight','bonedrake','lich',
+  'umberhulk','purpleworm','roper','otyugh','cavebear','duergarlord','myelder','mylord','mysovereign','shrieker','drider','drowmatron','blackpud','ochrejelly','scrag','ettin','hillgiant','stonegiant','giantking'];
+function monsterSpriteScale(key,boss){return boss?1.05:(BIG_SPRITES.includes(key)?0.95:0.72);}
 function addMonsterSprite(m){
   const sprKey=MONSTERS[m.key].spr;
   // only the resting frame up front; walk/windup/strike rasterize lazily on first
@@ -10686,9 +10826,7 @@ function addMonsterSprite(m){
      were nearly invisible anyway. */
   const mat=new THREE.SpriteMaterial({map:frames.idle0,transparent:true,alphaTest:0.08});
   const spr=new THREE.Sprite(mat);
-  const sc=m.boss?1.05:(['ogre','troll','minotaur','ogremage','dragon',
-    'bonecolossus','deathknight','bonedrake','lich',
-    'umberhulk','purpleworm','roper','otyugh','cavebear','duergarlord','myelder','mylord','mysovereign','shrieker','drider','drowmatron','blackpud','ochrejelly','scrag','ettin','hillgiant','stonegiant','giantking'].includes(m.key)?0.95:0.72);
+  const sc=monsterSpriteScale(m.key,m.boss);
   spr.scale.set(sc,sc,1);
   spr.position.set(m.x+0.5,sc/2+0.02,m.y+0.5);
   spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss,elite:m.elite};
@@ -10899,7 +11037,19 @@ const G={
   party:null,L:null,depth:1,px:0,py:0,facing:0,
   time:0,paused:true,over:false,started:false,
   moveCd:0,distField:null,lastSave:0,fx:[],resting:false,
+  seen:{},   // bestiary: monster keys the party has laid eyes on, ever
 };
+/* The bestiary is meta-progression, not run state: it rides in its own
+   localStorage key beside `crawl_best` rather than in the save, so it survives
+   a wipe and is readable from the menu before any game is loaded. */
+function loadSeen(){
+  try{const s=localStorage.getItem('crawl_seen');G.seen=s?JSON.parse(s)||{}:{};}catch(e){G.seen={};}
+}
+function noteSeen(key){
+  if(!key||G.seen[key])return;
+  G.seen[key]=1;
+  try{localStorage.setItem('crawl_seen',JSON.stringify(G.seen));}catch(e){}
+}
 function tileAt(x,y){if(x<0||y<0||x>=G.L.w||y>=G.L.h)return T_WALL;return G.L.grid[y*G.L.w+x];}
 function setTile(x,y,t){G.L.grid[y*G.L.w+x]=t;}
 function aheadTile(n){const [dx,dy]=DIRS[G.facing];return {x:G.px+dx*(n||1),y:G.py+dy*(n||1)};}
@@ -12193,6 +12343,16 @@ function updateMonsters(dt){
   const L=G.L;
   for(const m of L.monsters.slice()){
     if(m.hp<=0)continue;
+    /* Bestiary discovery, on the same terms the wake check uses: a true sight
+       line at any range the distance field reaches, or within two steps. It has
+       to sit ABOVE the sleep/held/stunned early-outs below — a sleeping creature
+       is still one the party can stand there and look at, and gating it on the
+       AI running would have quietly missed most first sightings. Costs a hash
+       lookup once a creature is known. */
+    if(!G.seen[m.key]){
+      const sdi=G.distField?G.distField[m.y*L.w+m.x]:-1;
+      if(sdi>=0&&(sdi<=2||sightClear(m.x,m.y,G.px,G.py)))noteSeen(m.key);
+    }
     if(m.dot){m.dot.t-=dt;if(m.dot.t<=0){m.dot.ticks--;m.dot.t=1.5;damageMonster(m,roll(m.dot.dmg[0],m.dot.dmg[1]),null,false);if(m.dot&&m.dot.ticks<=0)m.dot=null;}}
     if(m.hp<=0)continue;
     if(m.special.regen&&m.hp<m.maxHp){m._regenT=(m._regenT||0)+dt;if(m._regenT>2){m._regenT=0;m.hp=Math.min(m.maxHp,m.hp+m.special.regen);}}
@@ -15011,13 +15171,24 @@ const UI=(()=>{
   // The wizard sets their loadout here and it holds until the next camp. What
   // is shown is the book, one block per circle, with the slots for that circle
   // as the budget. Rebuilt on every change: the whole panel is a dozen rows.
-  let memoCh=null,memoThen=null;
+  let memoCh=null,memoThen=null,memoSel=null;
+  /* the right-hand pane: what the spell picked on the left actually does */
+  function renderMemoDetail(){
+    const box=$('memo-detail');
+    const sp=memoSel&&SPELLS[memoSel];
+    if(!sp){box.innerHTML='<div class="dt-sub">Tap a spell to read what it does.</div>';return;}
+    const rows=spellEffects(sp,memoCh&&memoCh.level).map(r=>
+      '<div class="dt-row"><div class="dt-k">'+r.k+'</div><div class="dt-v">'+r.v+'</div></div>').join('');
+    box.innerHTML='<div class="dt-name">'+sp.name+'</div>'+
+      '<div class="dt-sub">'+sp.circle+ordSuffix(sp.circle)+' circle · '+sp.list+'</div>'+
+      '<div class="dt-desc">'+sp.desc+'</div>'+rows;
+  }
   function renderMemo(){
     const ch=memoCh;if(!ch)return;
     const slots=charSlots(ch);
     $('memo-title').textContent=ch.name+' — memorise';
     $('memo-sub').textContent='Chosen now, carried until the next camp. Only what is memorised can be cast.';
-    const body=$('memo-body');
+    const body=$('memo-list');
     body.innerHTML='';
     let anything=false;
     for(let c=1;c<=5;c++){
@@ -15038,12 +15209,17 @@ const UI=(()=>{
         const sp=SPELLS[key];
         const n=ch.memo[c-1].filter(k=>k===key).length;
         const row=document.createElement('div');
-        row.className='mrow';
+        row.className='mrow'+(memoSel===key?' sel':'');
         row.innerHTML='<button class="mbtn2" data-d="-1">−</button>'+
           '<span class="mcount">'+n+'</span>'+
           '<button class="mbtn2" data-d="1">+</button>'+
           '<span class="mname">'+sp.name+'</span>';
         row.title=sp.desc;
+        // tapping the NAME reads the spell; the ± buttons are left alone, so
+        // choosing a loadout and reading about it never fight over one tap
+        row.querySelector('.mname').addEventListener('click',()=>{
+          memoSel=key;renderMemo();
+        });
         const [minus,plus]=row.querySelectorAll('.mbtn2');
         minus.disabled=n<=0;
         plus.disabled=used>=slots[c-1];
@@ -15062,11 +15238,13 @@ const UI=(()=>{
     if(!anything&&!body.children.length){
       body.innerHTML='<div class="none">'+ch.name+' has no spells they can prepare.</div>';
     }
+    renderMemoDetail();
   }
   // `then` is how the rest flow waits for the loadout before it sleeps
   function openMemo(ch,then){
     memoCh=ensureBook(ch);memoThen=then||null;
     ch.memo=trimMemo(ch);
+    memoSel=null;   // a fresh camp opens on the hint, not on the last wizard's pick
     renderMemo();show('ovl-memo');
   }
   function closeMemo(){
@@ -15571,6 +15749,84 @@ const UI=(()=>{
     show('ovl-stats');
   }
   $('st-close').addEventListener('click',()=>hide('ovl-stats'));
+  /* ---------- bestiary ---------- */
+  /* A creature is drawn at the size it is actually met at: the height in screen
+     pixels its billboard covers standing one tile off. That is the renderer's
+     own projection — the view shows 2*tan(fov/2) world units of height at one
+     unit of distance — so this tracks the real camera instead of guessing a
+     thumbnail size, and a creature that towers over you in a corridor towers
+     over you here too. */
+  function bestiaryPx(sc){
+    const wrap=document.getElementById('view-wrap');
+    const vh=(wrap&&wrap.clientHeight)||360;
+    const fov=(R3.camera&&R3.camera.fov)||68;
+    return Math.max(40,Math.round(vh*sc/(2*Math.tan(fov*Math.PI/360))));
+  }
+  const dmgStr=(d)=>d?d[0]+'d'+d[1]+(d[2]>0?'+'+d[2]:d[2]<0?d[2]:''):'—';
+  const crStr=(cr)=>cr<1?('1/'+Math.round(1/cr)):String(cr);
+  /* What the creature can do to you, in the same words the game uses when it
+     does it. Read off the definition's own flags, so a creature gains its line
+     here the moment it gains the ability rather than needing a second table. */
+  function monsterAbilities(d){
+    const out=[];
+    if(d.ranged)out.push('Ranged attack ('+d.ranged+' tiles)');
+    if(d.reach)out.push('Reach — strikes from the back rank');
+    if(d.poison)out.push('Poison (Fort DC '+d.poison.dc+', '+d.poison.abil.toUpperCase()+' damage)');
+    if(d.disease)out.push('Disease — '+d.disease.name+' (Fort DC '+d.disease.dc+')');
+    if(d.paralysis)out.push('Paralysis (Fort DC '+d.paralysis.dc+')');
+    if(d.gaze)out.push('Confusing gaze — stuns (Will DC '+d.gaze.dc+')');
+    if(d.hold)out.push('Tendrils — holds fast (Reflex DC '+d.hold.dc+')');
+    if(d.spores)out.push('Spores — '+(d.spores.kind==='stun'?'stuns':'roots')+' (Fort DC '+d.spores.dc+')');
+    if(d.drowpoison)out.push('Drow poison — sleep (Fort DC '+d.drowpoison.dc+')');
+    if(d.faerie)out.push('Faerie fire — outlines its target (Reflex DC '+d.faerie.dc+')');
+    if(d.energyDrain)out.push('Energy drain ('+d.energyDrain+' negative level'+(d.energyDrain>1?'s':'')+')');
+    if(d.regen)out.push('Regenerates '+d.regen+' hp');
+    if(d.skeletal)out.push('Skeletal — half damage from piercing, extra from bludgeoning');
+    if(d.incorporeal)out.push('Incorporeal — halves damage from unenchanted weapons');
+    if(d.lurk)out.push('Ambusher — lies in wait as rock');
+    if(d.shriek)out.push('Shrieks — wakes the grove');
+    if(d.distress)out.push('Distress — its pain calls other myconids');
+    return out;
+  }
+  function renderBestiary(){
+    const keys=Object.keys(MONSTERS).filter(k=>G.seen[k]);
+    // by threat, then by name: the order a player thinks of them in
+    keys.sort((a,b)=>(MONSTERS[a].cr-MONSTERS[b].cr)||MONSTERS[a].name.localeCompare(MONSTERS[b].name));
+    $('best-title').textContent='Bestiary — '+keys.length+' of '+Object.keys(MONSTERS).length+' discovered';
+    if(!keys.length){
+      $('best-body').innerHTML='<div class="dim-note" style="padding:10px 2px">Nothing has been seen yet. Creatures are recorded here the moment the party lays eyes on one.</div>';
+      show('ovl-bestiary');return;
+    }
+    const rows=keys.map(k=>{
+      const d=MONSTERS[k];
+      const px=bestiaryPx(monsterSpriteScale(k,false));
+      const svg=monsterSVG(d.spr,false,'idle0',null);
+      const src='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg)));
+      const stats=['<span><b>CR</b> '+crStr(d.cr)+'</span>',
+        '<span><b>HP</b> '+d.hp+'</span>',
+        '<span><b>AC</b> '+d.ac+'</span>',
+        '<span><b>Atk</b> +'+d.atk+' ('+dmgStr(d.dmg)+')</span>'].join('');
+      const sp=d.caster
+        ? '<div class="best-tag"><em>Spells:</em> '+dmgStr(d.caster.dmg)+' at '+d.caster.ranged+
+          ' tiles, every '+d.caster.cd+'s'+(d.caster.elem?' ('+d.caster.elem+')':'')+'</div>'
+        : '';
+      const ab=monsterAbilities(d);
+      const abl=ab.length?'<div class="best-tag"><em>Special:</em> '+ab.join(' · ')+'</div>':'';
+      return '<div class="best-row">'+
+        '<div class="best-art" style="width:'+px+'px;height:'+px+'px">'+
+          '<img src="'+src+'" width="'+px+'" height="'+px+'" alt="">'+
+        '</div>'+
+        '<div class="best-info">'+
+          '<div class="best-name">'+d.name+'</div>'+
+          '<div class="best-stats">'+stats+'</div>'+
+          sp+abl+
+        '</div></div>';
+    });
+    $('best-body').innerHTML=rows.join('');
+    show('ovl-bestiary');
+  }
+  function openBestiary(){renderBestiary();}
+  $('best-close').addEventListener('click',()=>hide('ovl-bestiary'));
   /* ---------- automap ---------- */
   function openMap(){
     const cv=$('map-cv'),ctx=cv.getContext('2d');
@@ -15647,7 +15903,7 @@ const UI=(()=>{
     refreshMenu();
   });
   return {buildPartyDom,refreshParty,tickCooldowns,charFlash,float,floatAtMonster,vignette,trapFlash,toast,
-    refreshDepthTag,pickAlly,paladinMenu,openSpells,spellFlash,openInventory,openStats,openMap,openLog,openMemo,gameOver,show,hide,anyOverlayOpen,refreshInv};
+    refreshDepthTag,pickAlly,paladinMenu,openSpells,spellFlash,openInventory,openStats,openBestiary,openMap,openLog,openMemo,gameOver,show,hide,anyOverlayOpen,refreshInv};
 })();
 /* ============================== INPUT ============================== */
 function bindPad(id,fn){
@@ -15678,7 +15934,8 @@ const KEY_LETTER={w:'fwd',arrowup:'fwd',s:'back',arrowdown:'back',a:'sleft',d:'s
 // waiting on a spell loadout still continues afterwards. Character creation and
 // the death screen have no entry: they must be answered.
 const OVL_DISMISS={'ovl-inv':'inv-close','ovl-stats':'st-close','ovl-spells':'sp-close',
-  'ovl-memo':'memo-done','ovl-log':'log-close','ovl-map':'map-close','ovl-target':'tg-cancel'};
+  'ovl-memo':'memo-done','ovl-log':'log-close','ovl-map':'map-close','ovl-target':'tg-cancel',
+  'ovl-bestiary':'best-close'};
 function topOverlay(){
   const open=[...document.querySelectorAll('.ovl.show')].filter(o=>o.id!=='ovl-rotate');
   return open[open.length-1]||null;
@@ -15865,6 +16122,9 @@ function initMenu(){
     else refreshMenu(); // loadGame explains any failure itself
   });
   $('m-new').addEventListener('click',()=>{goFull();UI.hide('ovl-menu');startCreation();});
+  // the bestiary layers over the menu rather than replacing it, so Escape (or
+  // Close) drops the player back where they were
+  $('m-bestiary').addEventListener('click',()=>UI.openBestiary());
   $('m-quick').addEventListener('click',()=>{
     goFull();
     UI.hide('ovl-menu');
@@ -16050,6 +16310,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     return;
   }
   initRenderer();
+  loadSeen();   // the bestiary outlives any one run, so it is read before the menu opens
   initInput();
   initMenu();
   initCreation();
