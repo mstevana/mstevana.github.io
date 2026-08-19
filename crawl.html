@@ -5936,6 +5936,101 @@ function drowWallCanvas(th,variant,base){
   }
   return {cv,glow:em.cv};
 }
+/* The roof of a drow house: bare cavern rock, and web.
+
+   A TANGLE, not an orb web, and that is a tiling decision as much as an artistic
+   one. An orb has an obvious centre, and a centre repeated once a tile prints a
+   lattice overhead — the same failure the cave floor exists to avoid. A sheet
+   tangle has no focal point, so it survives being repeated; it is also what
+   actually accumulates in the corners of a place nobody has swept for a century.
+
+   Spanning three tiles rather than one (see `repeat` in buildLevel) breaks the
+   period up further: at one tile per repeat even a tangle starts to rhyme.
+
+   Like the walls this returns {cv,glow}. Drow silk catches the faerzress, so the
+   strands carry a little light of their own — a colour map alone can only make
+   them pale. */
+function drowCeilCanvas(th){
+  const {cv,ctx}=newCanvas(128);
+  const em=newCanvas(128);
+  em.ctx.fillStyle='#000';em.ctx.fillRect(0,0,128,128);
+  ctx.fillStyle=shade(th.ceil,-0.30);ctx.fillRect(0,0,128,128);
+  // the rock first — mottled, so the bare patches between the web read as stone
+  for(let i=0;i<40;i++){
+    const x=rnd(128),y=rnd(128),r=6+rnd(20);
+    wrap9(ctx,()=>{
+      const g=ctx.createRadialGradient(x,y,1,x,y,r);
+      g.addColorStop(0,Math.random()<0.5?'rgba(255,255,255,0.035)':'rgba(0,0,0,0.20)');
+      g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+    });
+  }
+  const col=th.frieze||'#a86ce8';
+  // anchors the tangle is slung between
+  const A=[];for(let i=0;i<26;i++)A.push([rnd(128),rnd(128)]);
+  const strand=(target,c,lw,al)=>{
+    target.save();target.globalAlpha=al;target.strokeStyle=c;target.lineWidth=lw;
+    target.lineCap='round';
+    for(let i=0;i<A.length;i++){
+      // each anchor is guyed to two others, with the line sagging between them
+      for(const j of [(i+3)%A.length,(i+7)%A.length]){
+        const [x0,y0]=A[i],[x1,y1]=A[j];
+        const mx=(x0+x1)/2+((i*37+j*11)%9-4), my=(y0+y1)/2+((i*17+j*23)%11-4)+3;
+        target.beginPath();target.moveTo(x0,y0);target.quadraticCurveTo(mx,my,x1,y1);target.stroke();
+      }
+    }
+    // and the fine stuff webbing the guys together, thinner than the guys are
+    target.lineWidth=lw*0.6;
+    let s=0x9e3779b9;const rr=()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};
+    for(let k=0;k<220;k++){
+      const i=Math.floor(rr()*A.length), j=Math.floor(rr()*A.length);
+      if(i===j)continue;
+      const t0=0.15+rr()*0.7, t1=0.15+rr()*0.7;
+      const [x0,y0]=A[i],[x1,y1]=A[j];
+      const px=x0+(x1-x0)*t0+(rr()-0.5)*11, py=y0+(y1-y0)*t0+(rr()-0.5)*11;
+      const qx=x0+(x1-x0)*t1+(rr()-0.5)*11, qy=y0+(y1-y0)*t1+(rr()-0.5)*11;
+      target.beginPath();target.moveTo(px,py);
+      target.quadraticCurveTo((px+qx)/2+(rr()-0.5)*7,(py+qy)/2+(rr()-0.5)*7+3,qx,qy);
+      target.stroke();
+    }
+    target.restore();
+  };
+  wrap9(ctx,()=>{
+    strand(ctx,'rgba(0,0,0,0.34)',1.05,1);       // the shadow the silk throws
+    ctx.save();ctx.translate(-0.4,-0.5);
+    strand(ctx,'rgba(226,232,252,0.30)',0.5,1);  // and the strand itself
+    ctx.restore();
+  });
+  // The faerzress the silk catches, kept very low. At 0.13 the roof read as a
+  // lit net rather than as cobweb with a little light caught in it.
+  wrap9(em.ctx,()=>strand(em.ctx,col,0.55,0.055));
+  /* Bare rock back through it in places. Webbed edge to edge the roof reads as a
+     net stretched over the room rather than as neglect — silk gathers where it is
+     undisturbed and thins where it is not, and the patchiness is what makes it
+     look accumulated rather than installed. Painted in the rock's own colour over
+     the finished web, which suppresses the strands without touching the stone. */
+  for(let i=0;i<7;i++){
+    const x=rnd(128),y=rnd(128),r=16+rnd(26);
+    wrap9(ctx,()=>{
+      const g=ctx.createRadialGradient(x,y,1,x,y,r);
+      g.addColorStop(0,shadeA(th.ceil,-0.30,0.72));
+      g.addColorStop(0.6,shadeA(th.ceil,-0.30,0.34));
+      g.addColorStop(1,shadeA(th.ceil,-0.30,0));
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+    });
+  }
+  // a few knots where enough of it has gathered to be opaque
+  for(let i=0;i<12;i++){
+    const x=rnd(128),y=rnd(128),r=2+rnd(4);
+    wrap9(ctx,()=>{
+      const g=ctx.createRadialGradient(x,y,0.5,x,y,r);
+      g.addColorStop(0,'rgba(226,232,252,0.17)');
+      g.addColorStop(1,'rgba(226,232,252,0)');
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+    });
+  }
+  return {cv,glow:em.cv};
+}
 // The floor is the same stone, laid in large slabs and polished until it holds
 // the wall-light. Nothing grows on it.
 function drowFloorCanvas(th){
@@ -7668,20 +7763,33 @@ function buildLevel(L){
      the very thing the merged floor mesh exists to avoid. Dividing by FLOOR_SPAN
      spans it over the same four tiles the ground does. */
   const FLOOR_SPAN=4;
-  const ceilTex=texFromCanvas(myco?myconidCeilCanvas(th)
-                             :cave?caveFloorCanvas(th)
-                             :duer?duergarCeilCanvas(th)
-                                  :noiseCanvas(th.ceil,'#000',false,null));
+  /* The drow roof is the second builder to return {cv,glow}, after their walls —
+     their silk carries the faerzress and a colour map alone can only make it
+     pale. Everything else here hands back a bare canvas, so the branch keys off
+     `.glow` exactly as the wall loop does. */
+  const WEB_SPAN=3;
+  const ceilBuilt=myco?myconidCeilCanvas(th)
+                 :cave?caveFloorCanvas(th)
+                 :duer?duergarCeilCanvas(th)
+                 :drow?drowCeilCanvas(th)
+                      :noiseCanvas(th.ceil,'#000',false,null);
+  const ceilTex=texFromCanvas(ceilBuilt.glow?ceilBuilt.cv:ceilBuilt);
   floorTex.wrapS=floorTex.wrapT=THREE.RepeatWrapping;floorTex.repeat.set(1,1);
   ceilTex.wrapS=ceilTex.wrapT=THREE.RepeatWrapping;
-  ceilTex.repeat.set(cave?L.w/FLOOR_SPAN:L.w,cave?L.h/FLOOR_SPAN:L.h);
+  ceilTex.repeat.set(cave?L.w/FLOOR_SPAN:(drow?L.w/WEB_SPAN:L.w),
+                     cave?L.h/FLOOR_SPAN:(drow?L.h/WEB_SPAN:L.h));
   const floorMat=new THREE.MeshPhongMaterial({map:floorTex,bumpMap:floorTex,
     bumpScale:cave?0.03:(duer?0.006:(myco?0.035:(drow?0.005:0.015))),   // gravel has real tooth
     specular:duer?0x24211a:(drow?0x262a36:0x120e08),shininess:cave?3:(duer?18:(drow?26:4))});
   const ceilMat=new THREE.MeshPhongMaterial({map:ceilTex,bumpMap:ceilTex,
     // a vault has real relief; a plain dark wash has none to find
-    bumpScale:cave?0.03:(duer?0.028:0.012),color:cave?0x8c8c8c:0xffffff,
+    bumpScale:cave?0.03:(duer?0.028:(drow?0.016:0.012)),color:cave?0x8c8c8c:0xffffff,
     specular:0x0c0a06,shininess:3});
+  if(ceilBuilt.glow){
+    const gt=texFromCanvas(ceilBuilt.glow);
+    gt.wrapS=gt.wrapT=THREE.RepeatWrapping;gt.repeat.copy(ceilTex.repeat);
+    ceilMat.emissiveMap=gt;ceilMat.emissive=new THREE.Color(0xffffff);
+  }
   // floor: one unit plane per non-wall tile. holes fall out naturally at the
   // stairs shaft and at sewer lake pits.
   {
