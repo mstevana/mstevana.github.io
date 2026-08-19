@@ -4013,6 +4013,66 @@ function tryGen(depth,targetWalk,theme){
       }
     }
   }
+  /* The chapel of Lolth: one chamber a floor given over to the goddess the whole
+     house answers to. The throne stands at the centre, the altar against a wall,
+     and a priestess of the house keeps both.
+
+     Built on the ossuary's and the forge hall's terms, because the hazards are
+     the same three every time:
+     - the throne block is T_PIT — not a wall, but not walkable. One tile at the
+       centre of a 3x3-or-larger room cannot cut the level in two, so it is safe
+       after the connectivity check.
+     - whatever is lying on that tile is SHOVED ASIDE, never deleted. Loot is
+       placed before this runs, and the level's only key is one of the things it
+       can land on; swallowing it seals the locked room for good.
+     - the stairs are never built over. */
+  let chapel=null;
+  if(theme.name==='Drow'){
+    const cand=rooms.slice(1).filter(r=>r.w>=3&&r.h>=3&&!(lockedRoom&&r.x===lockedRoom.x&&r.y===lockedRoom.y));
+    if(cand.length){
+      const r=pick(cand);
+      const tx=r.x+(r.w>>1), ty=r.y+(r.h>>1);
+      const edges=[];
+      for(let x=r.x;x<r.x+r.w;x++){
+        if(g[idx(x,r.y-1)]===T_WALL&&g[idx(x,r.y)]===T_FLOOR)edges.push({x,y:r.y,dx:0,dy:-1});
+        if(g[idx(x,r.y+r.h)]===T_WALL&&g[idx(x,r.y+r.h-1)]===T_FLOOR)edges.push({x,y:r.y+r.h-1,dx:0,dy:1});
+      }
+      for(let y=r.y;y<r.y+r.h;y++){
+        if(g[idx(r.x-1,y)]===T_WALL&&g[idx(r.x,y)]===T_FLOOR)edges.push({x:r.x,y,dx:-1,dy:0});
+        if(g[idx(r.x+r.w,y)]===T_WALL&&g[idx(r.x+r.w-1,y)]===T_FLOOR)edges.push({x:r.x+r.w-1,y,dx:1,dy:0});
+      }
+      const spot=edges.filter(e=>!(e.x===tx&&e.y===ty)&&!(e.x===sx&&e.y===sy));
+      if(spot.length&&!(tx===sx&&ty===sy)){
+        const a=pick(spot);
+        chapel={x:r.x,y:r.y,w:r.w,h:r.h,tx,ty,ax:a.x,ay:a.y,adx:a.dx,ady:a.dy,opened:false};
+        g[idx(tx,ty)]=T_PIT;
+        const under=items[idx(tx,ty)];
+        if(under&&under.length){
+          let to=DIRS.map(([dx,dy])=>[tx+dx,ty+dy]).find(([x,y])=>g[idx(x,y)]===T_FLOOR);
+          if(!to)for(let yy=r.y;yy<r.y+r.h&&!to;yy++)
+            for(let xx=r.x;xx<r.x+r.w&&!to;xx++)
+              if(g[idx(xx,yy)]===T_FLOOR)to=[xx,yy];
+          if(to){const j=idx(to[0],to[1]);(items[j]=items[j]||[]).push(...under);}
+        }
+        delete items[idx(tx,ty)];
+        delete traps[idx(tx,ty)];
+        for(let i=monsters.length-1;i>=0;i--)if(monsters[i].x===tx&&monsters[i].y===ty)monsters.splice(i,1);
+        // her priestess, at the altar and already aware of them
+        const spots=DIRS.map(([dx,dy])=>[a.x+dx,a.y+dy]).filter(([x,y])=>g[idx(x,y)]===T_FLOOR);
+        if(spots.length){
+          const [gx,gy]=pick(spots);
+          const pool=spawnPool(depth).filter(([k])=>MONSTERS[k].drow);
+          // a chapel is kept by a caster if the depth allows one at all
+          const holy=pool.filter(([k])=>MONSTERS[k].caster);
+          const key=holy.length?pickWeighted(holy):(pool.length?pickWeighted(pool):'drowpriest');
+          const keeper=mkMonster(key,gx,gy,depth);
+          makeElite(keeper,pick(ELITE_KEYS));
+          keeper.slot=0;keeper.chapel=true;
+          monsters.push(keeper);
+        }
+      }
+    }
+  }
   // lurkers: a cave's ambushers wait as scenery rather than standing about.
   // Each one placed removes an ordinary monster from the floor, so a cave
   // carries the same total threat as any floor at its depth — the ambush
@@ -4189,7 +4249,7 @@ function tryGen(depth,targetWalk,theme){
     if(bm)bm.atk=Math.max(bm.atk,monsters.reduce((a,m)=>m.boss?a:Math.max(a,m.atk),0));
   }
   return {w:W,h:H,grid:g,start,stairs,traps,items,monsters,secrets,theme,depth,
-    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,forge,lurkers,duergar,pillars,drow};
+    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,forge,chapel,lurkers,duergar,pillars,drow};
 }
 /* ---------- difficulty curve ----------
    Depth, not party level, drives everything. One documented scalar grows every
@@ -9114,6 +9174,113 @@ function buildLevel(L){
       grp.add(g0);
     }
   }
+  /* The chapel of Lolth: the theme's set-piece, built the way the crypt's
+     ossuary and the duergar forge hall are. Her throne stands at the centre of
+     the room and her altar against a wall, and one of the house's priestesses
+     keeps both.
+
+     The throne is the spider. The sources give a drow house's seat as adamantine
+     shaped as a giant spider, so it is not a chair with a spider carved on it —
+     the body IS the back, the forelegs ARE the arms, and the thing you would sit
+     in is the gap between them. */
+  if(th.name==='Drow'&&L.chapel){
+    const c=L.chapel;
+    const stoneT=duergarTex('stone'),ironT=duergarTex('iron');
+    const cStone=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.10),
+      map:stoneT,bumpMap:stoneT,bumpScale:0.010,specular:0x1a1c24,shininess:14});
+    const cDark=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall2).multiplyScalar(1.22),
+      map:stoneT,bumpMap:stoneT,bumpScale:0.012,specular:0x141620,shininess:10});
+    /* Adamantine: darker than the iron and colder, with a blue-grey sheen rather
+       than a warm one. Its specular is held down for the reason every metal in
+       this dungeon has had to be — Blinn-Phong multiplies it by about
+       (shininess+2)/8 and the torch sits at the eye. */
+    const adam=new THREE.MeshPhongMaterial({color:0x1b1d25,map:ironT,bumpMap:ironT,
+      bumpScale:0.005,specular:0x101420,shininess:20});
+    const silverM=new THREE.MeshPhongMaterial({color:new THREE.Color(th.silver||'#8c93a8'),
+      map:ironT,bumpMap:ironT,bumpScale:0.003,specular:0x3a3f52,shininess:30});
+    const burn=new THREE.MeshBasicMaterial({color:new THREE.Color(th.frieze||'#a86ce8')});
+    const voidM=new THREE.MeshBasicMaterial({color:0x000000});
+    // --- the throne
+    {
+      const g0=new THREE.Group(),B=Bins(4.0);
+      B.at(cDark,new THREE.BoxGeometry(0.74,0.075,0.74),0,0.038,0);      // dais
+      B.at(cStone,new THREE.BoxGeometry(0.62,0.065,0.62),0,0.108,0);
+      B.at(cDark,new THREE.BoxGeometry(0.50,0.055,0.50),0,0.168,0);
+      /* The CHAIR has to be legible first. The first build hung eight thick legs
+         off a big body and at a tile's range it was a tangle of scaffolding poles
+         with nothing to sit in — the throne read as a spider standing on a
+         plinth, which is the wrong way round. So: a real seat with a real back,
+         the body rearing BEHIND that back rather than in place of it, and legs
+         thin enough to be a frame around the chair instead of a thicket in front
+         of it. Half the leg radius and two thirds the spread. */
+      B.at(adam,new THREE.BoxGeometry(0.42,0.055,0.34),0,0.318,0.06);    // the seat
+      B.at(adam,new THREE.BoxGeometry(0.40,0.30,0.05),0,0.47,-0.115);    // its back
+      B.at(silverM,new THREE.BoxGeometry(0.42,0.014,0.055),0,0.625,-0.115);
+      for(const sx of [-1,1]){
+        B.at(adam,new THREE.CylinderGeometry(0.020,0.026,0.29,6),sx*0.17,0.175,0.185);
+        B.at(adam,new THREE.CylinderGeometry(0.020,0.026,0.14,6),sx*0.17,0.245,-0.09);
+        B.at(adam,new THREE.BoxGeometry(0.045,0.035,0.30),sx*0.20,0.40,0.05); // the arms
+      }
+      // and only then the goddess, rearing over the back of it
+      B.at(adam,new THREE.SphereGeometry(0.185,11,9),0,0.76,-0.30);      // abdomen
+      B.at(adam,new THREE.SphereGeometry(0.105,10,8),0,0.66,-0.12);      // cephalothorax
+      for(const sd of [-1,1])for(let i=0;i<4;i++){
+        const fwd=1.5-i;
+        const hip=[sd*0.06,0.66,-0.12+fwd*0.03];
+        const knee=[sd*(0.19+0.028*i),0.90-0.03*i,-0.10+fwd*0.10];
+        const tip=[sd*(0.24+0.030*i),i<2?0.40:0.16,0.02+fwd*0.17];
+        addSeg(B,adam,...hip,...knee,0.019,0.014);
+        addSeg(B,adam,...knee,...tip,0.014,0.008);
+      }
+      for(const sd of [-1,1])                                            // her eyes
+        B.at(burn,new THREE.SphereGeometry(0.022,7,6),sd*0.042,0.695,-0.035);
+      B.addTo(g0);
+      for(const ch2 of g0.children)ch2.userData={kind:'altar',x:c.tx,y:c.ty};
+      g0.position.set(c.tx+0.5,0,c.ty+0.5);
+      g0.rotation.y=Math.atan2(c.ax-c.tx,c.ay-c.ty)+Math.PI;   // she faces her altar
+      grp.add(g0);
+    }
+    // --- the altar, in the wall's own local frame like every other wall feature
+    {
+      const g0=new THREE.Group(),B=Bins(4.5);
+      B.at(cDark,new THREE.BoxGeometry(0.66,0.07,0.34),0,0.035,0.18);    // footing
+      for(let r=0;r<3;r++){                                              // coursed, like every
+        const hh=0.085, yy=0.07+r*hh;                                    // built thing down here
+        const n=r%2?3:4, w=0.60/n;
+        for(let k=0;k<n;k++)
+          B.at(r%2?cDark:cStone,new THREE.BoxGeometry(w-0.012,hh-0.008,0.30),
+               -0.30+w*(k+0.5),yy+hh/2,0.18);
+      }
+      B.at(cStone,new THREE.BoxGeometry(0.72,0.055,0.38),0,0.353,0.18);  // the mensa
+      B.at(silverM,new THREE.BoxGeometry(0.66,0.010,0.33),0,0.383,0.18); // its silver top
+      // her mark burning on the front of it, cut through to the light behind
+      B.at(voidM,new THREE.BoxGeometry(0.26,0.20,0.02),0,0.20,0.332);
+      const SP=(px,py,r2)=>B.at(burn,new THREE.SphereGeometry(r2,6,5),px,py,0.342);
+      SP(0,0.235,0.030);SP(0,0.185,0.045);                               // body
+      for(const sd of [-1,1])for(let i=0;i<4;i++){                       // legs
+        const a=-0.5+i*0.42;
+        addSeg(B,burn,sd*0.02,0.205,0.342,
+               sd*(0.055+Math.cos(a)*0.085),0.205+Math.sin(a)*0.075,0.342,0.010,0.006);
+      }
+      if(!c.opened){
+        // what the house has laid on her table
+        B.at(silverM,new THREE.CylinderGeometry(0.05,0.062,0.055,9),-0.19,0.416,0.16);
+        B.at(silverM,new THREE.CylinderGeometry(0.036,0.030,0.10,8),0.17,0.438,0.20);
+        B.at(burn,new THREE.SphereGeometry(0.032,7,6),0.02,0.425,0.14);
+        B.at(silverM,new THREE.TorusGeometry(0.042,0.008,4,10),0.02,0.396,0.14,Math.PI/2);
+      }
+      B.addTo(g0);
+      for(const ch2 of g0.children)ch2.userData={kind:'altar',x:c.ax,y:c.ay};
+      g0.rotation.y=Math.atan2(-c.adx,-c.ady);
+      g0.position.set(c.ax+0.5+c.adx*0.5,0,c.ay+0.5+c.ady*0.5);
+      grp.add(g0);
+      // the one light in the chapel, and it is hers: violet, low, at the altar
+      const l=new THREE.PointLight(0xa86ce8,0.85,4.4,2);
+      l.position.set(c.ax+0.5+c.adx*0.5-c.adx*0.34,0.62,c.ay+0.5+c.ady*0.5-c.ady*0.34);
+      grp.add(l);
+      (R3.candleFlames||(R3.candleFlames=[])).push({light:l,base:0.85,y:0.62});
+    }
+  }
   /* Drow floor dressing: web caught in the corners, egg sacs, shed chitin and
      spent hand-crossbow bolts. Same terms as the crypt's and the duergar's —
      seeded from each tile's own coordinates so a rebuild never reshuffles it,
@@ -13993,6 +14160,32 @@ function openForge(){
   if(coffinNoise(f.ax,f.ay,8))setTimeout(()=>UI.toast('The whole hall has heard it…'),900);
   saveGame();
 }
+/* Lolth's altar carries what the house has laid on it, and it is robbed once.
+   Written on openBier's and openForge's terms — the same reach check, the same
+   rebuild so the scenery changes, the same spill onto a walkable neighbour (the
+   altar tile itself is against a wall but the throne block is not walkable), and
+   the same noise, because taking the offerings off a goddess's table is not a
+   quiet thing to do. */
+function openAltar(){
+  const L=G.L,c=L.chapel;
+  if(!c)return;
+  if(Math.abs(c.ax-G.px)+Math.abs(c.ay-G.py)>1){UI.toast('Too far to reach the altar.');return;}
+  if(c.opened){UI.toast('The altar is bare. Nothing has been left for you.');return;}
+  c.opened=true;
+  SFX.secret();
+  buildLevel(L);
+  const spill=[];
+  for(let k=0;k<2+rnd(2);k++)spill.push(randLoot(G.depth+2,true,true,true));
+  const near=DIRS.map(([dx,dy])=>({x:c.ax+dx,y:c.ay+dy}))
+    .filter(p=>walkableTile(tileAt(p.x,p.y)));
+  const drop=near.length?near[0]:{x:G.px,y:G.py};
+  const di=drop.y*L.w+drop.x;
+  (L.items[di]=L.items[di]||[]).push(...spill);
+  refreshItemSprite(L,di);
+  UI.toast('You take what was laid before her: '+spill.map(itemName).join(', ')+'.');
+  if(coffinNoise(c.ax,c.ay,8))setTimeout(()=>UI.toast('The whole chapel has heard it…'),900);
+  saveGame();
+}
 // camp on a floor a third time and something comes looking for you
 function summonHuntingPack(){
   const L=G.L;
@@ -14060,7 +14253,7 @@ function serializeGame(){
       traps:Object.values(L.traps),items:Object.keys(L.items).map(i=>[+i,L.items[i]]),
       monsters:L.monsters.map(m=>{const c=Object.assign({},m);delete c._sc;delete c._regenT;delete c.dot;return c;}),
       secrets:L.secrets,lockedRoom:L.lockedRoom,restCount:L.restCount||{},restsHere:L.restsHere||0,
-      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,forge:L.forge||null,lurkers:L.lurkers||[],duergar:L.duergar||[],pillars:L.pillars||[],drow:L.drow||[],
+      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,forge:L.forge||null,chapel:L.chapel||null,lurkers:L.lurkers||[],duergar:L.duergar||[],pillars:L.pillars||[],drow:L.drow||[],
     },
   };
 }
@@ -14080,7 +14273,7 @@ function deserializeGame(o){
     w:lv.w,h:lv.h,grid:b64ToU8(lv.grid),explored:b64ToU8(lv.explored),
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
     traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
-    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,forge:lv.forge||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],pillars:lv.pillars||[],drow:lv.drow||[],
+    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,forge:lv.forge||null,chapel:lv.chapel||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],pillars:lv.pillars||[],drow:lv.drow||[],
   };
   clearFx();
   G.L=L;G.over=false;
@@ -15312,6 +15505,7 @@ function initInput(){
       if(u.kind==='coffin'){openCoffin(u.ci,u.slot);return;}
       if(u.kind==='bier'){openBier();return;}
       if(u.kind==='anvil'){openForge();return;}
+      if(u.kind==='altar'){openAltar();return;}
       if(u.kind==='plaque'){readEpitaph(u.x,u.y,u.n);return;}
       if(u.kind==='monster')return; // attacks come from hands
     }

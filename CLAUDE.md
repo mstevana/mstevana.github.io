@@ -44,7 +44,7 @@ the repo, so treat the committed file as authoritative.
 
 There is no test suite in the repo either. Sessions have built throwaway
 node harnesses that stub `window`/`document`/`THREE`, load the pure-logic
-part of the file, and assert on it (the T1–T56 series referenced in the
+part of the file, and assert on it (the T1–T57 series referenced in the
 git log). If you make a behavioural change, expect to rebuild a harness
 rather than find one — and note that the numbering only ever grows, so the
 git log is the index of what each one covers.
@@ -850,6 +850,79 @@ three themes carry real machinery:
     exactly how it was reported. It needs a shaded shaft, a shadow thrown onto
     the brick beside it, mouldings top and bottom, and the frieze stopping at it.
 
+  ### The spider, and the rest of the house
+
+  The theme shipped without a single spider in it — `grep -c spider` over the
+  engine returned one comment — which for the City of Spiders is the whole game.
+  It is now the motif everywhere, on the same terms the duergar iconography got.
+
+  **The eight wall variants** are keyed on the variant itself, not `variant%4`
+  (four treatments twice each, none of them drow): plain, an engaged pilaster, an
+  **obsidian spider**, an older worn hand, **Lolth's own mark**, **web in the
+  spandrels**, a **house sigil**, and **a sigil chiselled out**. Lolth's mark and
+  the spandrel web are painted onto the emissive sheet too, so they burn like the
+  inscription — hers is the only device in the house that carries the script's
+  light.
+
+  Three shape lessons, all found by looking:
+  - **A spider is read from the KINK in its legs** — out and up to a knee, then
+    out and down to the tip. Straight rays from a blob is a *sun*, which is what
+    the old house sigil looked like, and in the round it gives radial spikes.
+  - **The house sigil failed twice as an EYE.** A ring with radiating legs is a
+    sunburst; a ring inside a *pointed oval* is a pupil inside an eyelid. Straight
+    lozenge edges are what make it read as heraldry.
+  - **A defaced mark needs its ghost legible**, or the gouge over it is a scratch
+    in the brick. It is the same spider variant 6 bears, hacked off — drow houses
+    annihilate each other and erase the name.
+
+  **The roof** (`drowCeilCanvas`) is bare cavern rock hung with web, and it is the
+  second builder after the walls to return `{cv,glow}` — drow silk catches the
+  faerzress and a colour map can only make it pale, so `buildLevel` keys off
+  `.glow` for the ceiling as well. A **tangle, not an orb web**: an orb has a
+  centre, and a centre repeated once a tile prints a lattice overhead. It spans
+  three tiles to break the period further. Bare rock is painted back through it in
+  patches, because webbed edge to edge it reads as something installed rather than
+  accumulated.
+
+  **Furniture on `L.drow`** — the rose window keeps the largest share (it was the
+  only kind before, and at an even six-way draw a floor would have had one), plus
+  a jade **guardian**, a Lolth **shrine**, a silk **fence**, a cold-fire
+  **brazier** and a **wall web** with something in it.
+
+  **Floor dressing**: web in the corners, egg sacs, shed chitin, spent bolts. The
+  corner web spans from one wall to the other **across** the corner — laid out as
+  rays from the corner it came out as metre-long rods lying flat on the floor,
+  neither a web nor in the corner.
+
+  **The web snare** is the theme's one rules change. It **extends** the trap pool
+  on drow floors rather than replacing anything, so `nTraps` is untouched and a
+  snare displaces some other trap instead of adding to the tally. Reflex or
+  `hold`, no attack roll and no damage; `hold` is already read by both `canAct`
+  and `charAC`, so nothing new had to be taught to the rules.
+
+  **The descent simulator is blind to traps** — it fights monsters and nothing
+  else — so a before/after on its median proves nothing about any trap change, and
+  reads 10 either way. `trapcost_body.js` measures the table directly instead:
+  fire each kind thousands of times at a levelled party, price a held round and
+  ability drain on one scale, and compare. At depth 19 that gives dart 21, gas 25,
+  spike 17, pdart 11, sleepdart 10, **websnare 11** — level with the venom dart
+  and below everything that draws blood, which is where a no-damage snare belongs.
+  It was 4 seconds first and measured 9, under everything; 5 matches the
+  sleepdart.
+
+  **The chapel of Lolth in `L.chapel`** is the ossuary's and forge hall's third
+  sibling and is built on their exact terms: the throne block is `T_PIT` after the
+  connectivity check, it **shoves aside** whatever loot is under it rather than
+  deleting it, and it never lands on the stairs. Its keeper is an elite drow,
+  preferring a caster. `openAltar` is `openBier` rewritten. T57 covers it.
+
+  **The throne is the spider**, not a chair with one carved on it — but the CHAIR
+  has to be legible first. The first build hung eight thick legs off a big body
+  and at a tile's range it was a tangle of scaffolding poles with nothing to sit
+  in. It needs a real seat with a real back, the body rearing *behind* that back,
+  and legs at half the radius and two thirds the spread so they frame the chair
+  instead of filling the view.
+
 Search for `theme.name==='Sewers'`, `th.name==='Crypt'`, `th.name==='Caves'`,
 `th.name==='Duergar'`, `th.name==='Myconid'` and `th.name==='Drow'`
 (plus the `cave`/`duer`/`myco`/`drow` flags in `buildLevel`) to find every hook
@@ -866,7 +939,7 @@ theme fields its own roster and nothing else — so they assert 100% and 0%
 rather than a band, and cannot drift as rosters are added.
 
 Each theme with machinery writes an array onto the level (`rivers`/`pipes`,
-`crypts`/`ossuary`, `lurkers`, `duergar`/`pillars`/`forge`, `drow`) in `tryGen`
+`crypts`/`ossuary`, `lurkers`, `duergar`/`pillars`/`forge`, `drow`/`chapel`) in `tryGen`
 and reads it back in `buildLevel`; anything you add that way must also be
 carried through `serializeGame` and `loadGame`, or a reloaded floor comes back
 stripped of it.
@@ -1010,8 +1083,9 @@ the dungeon grows:
 ## Crypt interactions
 
 Three tappable things route through the `userData.kind` raycast dispatcher
-in the boot file, alongside doors, traps, items and secrets (a fourth,
-`anvil`, belongs to the duergar forge hall and is written on `bier`'s terms):
+in the boot file, alongside doors, traps, items and secrets. Two more,
+`anvil` (the duergar forge hall) and `altar` (the drow chapel of Lolth), are
+written on `bier`'s terms and live with their own themes:
 
 - **`coffin`** — 55% dust, 25% grave goods, 20% wakes an undead. One shot
   each (`c.opened` is a list of slot indices, so a stacked pair opens
