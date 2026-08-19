@@ -4121,18 +4121,36 @@ function tryGen(depth,targetWalk,theme){
   // drow houses: rose windows set into the wall, glazed in faerzress-lit glass.
   // Occasional, unlike the duergar's torches — this light is a statement, not a
   // way of seeing, and a wall with one every few paces would be a shopfront.
+  /* Drow houses: wall features, weighted rather than picked evenly.
+
+     The rose window keeps the largest share and its old spacing rule. It is the
+     theme's statement piece and there were 3-6 of them before this; at an even
+     draw across six kinds a floor would have had one. Everything else is the
+     house around it — the guardian at the door, the shrine, the silk fence, a
+     brazier of cold fire, and a web with something in it. */
   let drow=[];
   if(theme.name==='Drow'){
-    const nW=3+rnd(4);
-    let wTries=300;
+    const KINDS=[['rose',0.26],['fence',0.16],['wallweb',0.16],
+                 ['guardian',0.14],['shrine',0.14],['brazier',0.14]];
+    const pickKind=()=>{
+      let r=Math.random();
+      for(const [k,w] of KINDS){if((r-=w)<=0)return k;}
+      return 'rose';
+    };
+    const nW=10+rnd(6);
+    let wTries=400;
     while(drow.length<nW&&wTries-->0){
       const x=1+rnd(W-2),y=1+rnd(H-2);
       if(g[idx(x,y)]!==T_FLOOR)continue;
       const wd=DIRS.filter(([dx,dy])=>g[idx(x+dx,y+dy)]===T_WALL);
       if(!wd.length)continue;
-      if(drow.some(c=>Math.abs(c.x-x)+Math.abs(c.y-y)<4))continue;   // never two on one wall
+      const kind=pickKind();
+      // a rose window is a statement and never shares a wall; the rest of the
+      // furniture only needs room to stand
+      const near=kind==='rose'?4:2;
+      if(drow.some(c=>Math.abs(c.x-x)+Math.abs(c.y-y)<(c.kind==='rose'?4:near)))continue;
       const [dx,dy]=pick(wd);
-      drow.push({x,y,dx,dy,kind:'rose',hue:rnd(3)});
+      drow.push({x,y,dx,dy,kind,hue:rnd(3)});
     }
   }
   /* A boss swings at least as well as the best warrior standing on its own
@@ -6710,6 +6728,72 @@ function duergarWoodCanvas(){
   }
   return cv;
 }
+// Silk: fibrous, laid one way, and like the duergar's maps a modulation around
+// white so it can be handed to a strand, a bolt of it or a wrapped body alike.
+function drowSilkCanvas(){
+  const {cv,ctx}=newCanvas(128);
+  ctx.fillStyle='#ededed';ctx.fillRect(0,0,128,128);
+  for(let i=0;i<220;i++){
+    const y=rnd(128),w=0.5+Math.random()*1.6;
+    wrap9(ctx,()=>{
+      ctx.strokeStyle=Math.random()<0.55?'rgba(255,255,255,0.42)':'rgba(0,0,0,0.10)';
+      ctx.lineWidth=w;ctx.beginPath();
+      let py=y;ctx.moveTo(-8,py);
+      for(let x=-8;x<136;x+=16){py+=(Math.random()-0.5)*3.0;ctx.lineTo(x,py);}
+      ctx.stroke();
+    });
+  }
+  for(let i=0;i<9;i++){                          // the odd matted patch
+    const x=rnd(128),y=rnd(128),r=4+rnd(9);
+    wrap9(ctx,()=>{
+      const g=ctx.createRadialGradient(x,y,1,x,y,r);
+      g.addColorStop(0,'rgba(0,0,0,0.13)');g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+    });
+  }
+  return cv;
+}
+function drowTex(kind){
+  const key='drowTex_'+kind;
+  if(R3.texCache[key])return R3.texCache[key];
+  const t=texFromCanvas(drowSilkCanvas());
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  R3.texCache[key]=t;
+  return t;
+}
+/* Place a tapered cylinder BETWEEN two points. Composing the orientation by hand
+   out of Euler angles is what turned the first spider's legs into straight radial
+   spikes — the rotation that takes +Y onto an arbitrary direction is not two
+   angles you can guess. Derive it from the direction vector and let three.js
+   convert to the Euler that `Bins.at` wants. */
+function addSeg(B,mat,ax,ay,az,bx,by,bz,r0,r1){
+  const d=new THREE.Vector3(bx-ax,by-ay,bz-az);
+  const len=d.length();
+  if(len<1e-5)return B;
+  const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),d.clone().normalize());
+  const e=new THREE.Euler().setFromQuaternion(q,'XYZ');
+  return B.at(mat,new THREE.CylinderGeometry(r1,r0,len,5),
+              (ax+bx)/2,(ay+by)/2,(az+bz)/2,e.x,e.y,e.z);
+}
+/* A spider in the round, shared by the jade guardian at a door and the smaller
+   idol in a shrine niche. Built on the same reading the wall relief is: the KINK
+   is what makes it a spider, so each leg is a femur going out and UP to a raised
+   knee and a tibia coming back out and DOWN to the tip it stands on. Built facing
+   +Z, which in a wall feature's local frame is out into the room. */
+function addSpiderBody(B,mat,x,y,z,s){
+  const P=(dx,dy,dz)=>[x+dx*s,y+dy*s,z+dz*s];
+  B.at(mat,new THREE.SphereGeometry(0.115*s,9,7),...P(0,0.155,-0.07));   // abdomen
+  B.at(mat,new THREE.SphereGeometry(0.072*s,8,6),...P(0,0.145,0.085));   // cephalothorax
+  for(const sd of [-1,1])for(let i=0;i<4;i++){
+    const fwd=1.5-i;                                   // fore legs forward, hind back
+    const hip=P(sd*0.05,0.135,0.02+fwd*0.045);
+    const knee=P(sd*(0.15+0.028*i),0.215,0.05+fwd*0.105);
+    const tip=P(sd*(0.23+0.05*i),0.0,0.06+fwd*0.20);
+    addSeg(B,mat,...hip,...knee,0.017*s,0.013*s);
+    addSeg(B,mat,...knee,...tip,0.013*s,0.007*s);
+  }
+  return B;
+}
 // one copy each per run: these are shared by every piece of duergar furniture
 function duergarTex(kind){
   const key='duerTex_'+kind;
@@ -9130,8 +9214,152 @@ function buildLevel(L){
     // is set in — which is exactly what happened the first time.
     const leadMat=new THREE.MeshPhongMaterial({color:0x0e0f13,specular:0x1c1e26,shininess:8});
     const silverMat=new THREE.MeshPhongMaterial({color:silver,specular:0x6a7088,shininess:28});
+    // the furniture's own surfaces. Stone and metal borrow the duergar's
+    // modulation maps — they sit around white and carry no tone of their own, so
+    // grain is grain whoever cut it — and the silk is the drow's own.
+    const stoneT=duergarTex('stone'),ironT=duergarTex('iron'),silkT=drowTex('silk');
+    const fStoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.14),
+      map:stoneT,bumpMap:stoneT,bumpScale:0.009,specular:0x1a1c24,shininess:14});
+    const fDarkMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall2).multiplyScalar(1.25),
+      map:stoneT,bumpMap:stoneT,bumpScale:0.011,specular:0x141620,shininess:10});
+    const fIronMat=new THREE.MeshPhongMaterial({color:0x2a2b33,map:ironT,bumpMap:ironT,
+      bumpScale:0.004,specular:0x0e0e12,shininess:26});
+    const fSilverMat=new THREE.MeshPhongMaterial({color:silver,map:ironT,bumpMap:ironT,
+      bumpScale:0.003,specular:0x3a3f52,shininess:30});
+    /* Jade, and its specular is the thing to watch. A polished green stone wants
+       a sheen, but the torch sits at the eye and Blinn-Phong multiplies the
+       specular by roughly (shininess+2)/8 — the trap the duergar ironwork fell
+       into three times. A modest colour at a modest shininess. */
+    const jadeMat=new THREE.MeshPhongMaterial({color:0x2f6f57,map:stoneT,bumpMap:stoneT,
+      bumpScale:0.004,specular:0x223a30,shininess:24});
+    // Silk, and it has to be DIM. At 0x9aa2bc under a torch at the eye every
+    // strand came out white and the fence read as a jail window.
+    const silkMat=new THREE.MeshPhongMaterial({color:0x5c6376,map:silkT,bumpMap:silkT,
+      bumpScale:0.004,specular:0x1a1e28,shininess:10});
+    const flames=R3.candleFlames||[];
+    const pend=[];
     if(L.drow)for(const f of L.drow){
       const hue=HUES[(f.hue||0)%HUES.length];
+      if(f.kind&&f.kind!=='rose'){
+        const g0=new THREE.Group(),B=Bins();
+        if(f.kind==='guardian'){
+          /* A jade spider on a plinth. The sources put these at the gates and the
+             important doors of a drow city, so it is the one piece that reads as
+             a sentry rather than as ornament. */
+          B.at(fDarkMat,new THREE.BoxGeometry(0.44,0.06,0.34),0,0.03,0.19);
+          B.at(fStoneMat,new THREE.BoxGeometry(0.38,0.30,0.28),0,0.21,0.19);
+          B.at(fDarkMat,new THREE.BoxGeometry(0.44,0.045,0.34),0,0.378,0.19);
+          B.at(fSilverMat,new THREE.BoxGeometry(0.40,0.012,0.30),0,0.404,0.19);
+          B.addTo(g0);
+          const S=Bins();
+          addSpiderBody(S,jadeMat,0,0.41,0.17,1.22);           // it is built facing the room
+          S.addTo(g0);
+        }else if(f.kind==='shrine'){
+          /* A niche to Lolth. A wall tile is a solid box, so the recess is the
+             trick the crypt and the sewer culverts use: a dead-black panel on the
+             face with a surround standing proud, and everything inside sitting a
+             hair forward of the wall plane rather than behind it. */
+          const Y=0.80, W=0.36, H=0.50;
+          B.at(voidMat,new THREE.BoxGeometry(W,H,0.02),0,Y,0.012);
+          for(const [w,h,x2,y2] of [[W+0.13,0.05,0,Y+H/2+0.028],[W+0.13,0.05,0,Y-H/2-0.028],
+                                    [0.05,H+0.10,-W/2-0.028,Y],[0.05,H+0.10,W/2+0.028,Y]])
+            B.at(fStoneMat,new THREE.BoxGeometry(w,h,0.055),x2,y2,0.028);
+          B.at(fSilverMat,new THREE.BoxGeometry(W+0.16,0.014,0.065),0,Y+H/2+0.058,0.032);
+          B.at(fDarkMat,new THREE.BoxGeometry(W+0.18,0.045,0.13),0,Y-H/2-0.075,0.065); // the shelf
+          B.at(fSilverMat,new THREE.CylinderGeometry(0.055,0.042,0.035,10),0,Y-H/2-0.035,0.075); // offering bowl
+          B.addTo(g0);
+          const S=Bins();
+          addSpiderBody(S,fSilverMat,0,Y-0.17,0.045,0.72);
+          S.addTo(g0);
+        }else if(f.kind==='fence'){
+          /* A panel of the silk fence that rings a compound — the twenty-foot
+             silvery web you cannot pass without a spider mask. Stretched on a
+             frame and standing off the wall, so it reads as a barrier somebody
+             put there rather than as cobweb that grew. */
+          /* An ORB WEB stretched on a frame, not a lattice. A regular grid of
+             warp and weft is a jail window, which is exactly what the first one
+             looked like; radials and a spiral are what say spider. */
+          const Y=0.66, W=0.80, H=0.98, N=8;
+          for(const [w,h,x2,y2] of [[W,0.04,0,Y+H/2],[W,0.04,0,Y-H/2],
+                                    [0.04,H,-W/2,Y],[0.04,H,W/2,Y]])
+            B.at(fIronMat,new THREE.BoxGeometry(w,h,0.045),x2,y2,0.07);
+          const rim=(a)=>{                        // where a radial meets the frame
+            const cs=Math.cos(a),sn2=Math.sin(a);
+            const t=Math.min(Math.abs((W/2-0.03)/(cs||1e-6)),Math.abs((H/2-0.03)/(sn2||1e-6)));
+            return [cs*t,Y+sn2*t];
+          };
+          for(let i=0;i<N;i++){
+            const a=i*Math.PI*2/N+0.19, [ex,ey]=rim(a);
+            addSeg(B,silkMat,0,Y,0.07,ex,ey,0.07,0.007,0.005);
+          }
+          for(let k=1;k<=4;k++){                  // the spiral, sagging between radials
+            const f2=k/4.6;
+            for(let i=0;i<N;i++){
+              const a0=i*Math.PI*2/N+0.19, a1=(i+1)*Math.PI*2/N+0.19;
+              const [x0,y0]=rim(a0),[x1,y1]=rim(a1);
+              addSeg(B,silkMat,x0*f2,Y+(y0-Y)*f2,0.07,x1*f2,Y+(y1-Y)*f2,0.07,0.005,0.005);
+            }
+          }
+          for(const sd of [-1,1])                 // two braces off the wall
+            B.at(fIronMat,new THREE.BoxGeometry(0.028,0.028,0.085),sd*W/2,Y,0.030);
+          B.addTo(g0);
+        }else if(f.kind==='brazier'){
+          // cold fire in a bowl on a tripod. The one drow furniture that lights
+          // anything, and it lights it violet.
+          B.at(fIronMat,new THREE.CylinderGeometry(0.10,0.13,0.03,8),0,0.015,0.26);
+          for(let i=0;i<3;i++){
+            const a=i*Math.PI*2/3+0.5;
+            B.at(fIronMat,new THREE.CylinderGeometry(0.016,0.020,0.52,5),
+                 Math.cos(a)*0.055,0.27,0.26+Math.sin(a)*0.055,
+                 Math.sin(a)*0.16,0,-Math.cos(a)*0.16);
+          }
+          B.at(fIronMat,new THREE.CylinderGeometry(0.145,0.075,0.11,10),0,0.575,0.26);
+          B.at(fSilverMat,new THREE.TorusGeometry(0.145,0.011,5,12),0,0.625,0.26,Math.PI/2);
+          B.addTo(g0);
+          const sub=new THREE.Group();sub.position.set(0,0,0.26);g0.add(sub);
+          const fire=[['#7a3fc0',0.30,0.20,0.03,0.42],['#a86ce8',0.19,0.16,0.05,0.50],
+                      ['#dcb4ff',0.10,0.11,0.07,0.60]].map(([c,w,h,dy,op])=>{
+            const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:fxGlowTex(c),
+              transparent:true,opacity:op,depthWrite:false,blending:THREE.AdditiveBlending}));
+            sp.scale.set(w,h,1);sp.position.set(0,0.63+dy,0);sp.userData={w,h,dy};
+            sub.add(sp);return sp;});
+          g0.userData.flame={fire,y:0.63,base:0.62,col:0xa86ce8,dist:3.4,z:0.26};
+        }else{ // wallweb
+          /* Web strung across the wall with something in it. The grimmest thing
+             in the theme and the cheapest: a fan of strands and one wrapped
+             bundle hanging in them. */
+          const Y=0.92;
+          for(let i=0;i<9;i++){                   // strands fanning from a high anchor
+            const a=-1.15+i*0.29, len=0.62+((i*7)%5)*0.06;
+            addSeg(B,silkMat,0,Y,0.045,Math.sin(a)*len,Y-Math.cos(a)*len,0.045,0.006,0.004);
+          }
+          for(let i=0;i<4;i++){                   // and the cross-threads
+            const d2=0.16+i*0.145;
+            for(let k=0;k<8;k++){
+              const a0=-1.15+k*0.29, a1=-1.15+(k+1)*0.29, sag=d2*1.03;
+              addSeg(B,silkMat,Math.sin(a0)*d2,Y-Math.cos(a0)*d2,0.048,
+                              Math.sin(a1)*sag,Y-Math.cos(a1)*sag,0.048,0.0045,0.0045);
+            }
+          }
+          const bx=-0.09, by=Y-0.44;              // the bundle, wrapped and hung
+          B.at(silkMat,new THREE.SphereGeometry(0.105,9,7),bx,by,0.075,0,0,0.22);
+          B.at(silkMat,new THREE.SphereGeometry(0.072,8,6),bx+0.035,by-0.18,0.072,0,0,0.22);
+          for(let i=0;i<4;i++)                    // the wrapping, banded round it
+            B.at(silkMat,new THREE.TorusGeometry(0.088-i*0.014,0.010,4,9),
+                 bx+i*0.012,by+0.06-i*0.06,0.075,Math.PI/2,0,0.22);
+          B.addTo(g0);
+        }
+        g0.rotation.y=Math.atan2(-f.dx,-f.dy);
+        g0.position.set(f.x+0.5+f.dx*0.5,0,f.y+0.5+f.dy*0.5);
+        grp.add(g0);
+        const fl=g0.userData.flame;
+        if(fl){
+          const w=new THREE.Vector3(0,fl.y+0.05,fl.z+0.10);
+          w.applyEuler(g0.rotation).add(g0.position);
+          pend.push({pri:0,base:fl.base,col:fl.col,dist:fl.dist,y:fl.y,pos:w,fire:fl.fire});
+        }
+        continue;
+      }
       // Unlit, on purpose. A lit material adds the torch to its own colour and a
       // violet pane comes out white; the glass is the one thing here that is a
       // source rather than a surface, so it is drawn at its own colour flat.
@@ -9177,10 +9405,23 @@ function buildLevel(L){
       grp.add(g0);
       // faint: the window colours the wall around it and no more. A rose window
       // that lit the room would make the party's own torch pointless.
-      const l=new THREE.PointLight(hue.c,0.42,3.0,2);
-      l.position.set(f.x+0.5+f.dx*0.5-f.dx*0.34,Y,f.y+0.5+f.dy*0.5-f.dy*0.34);
-      grp.add(l);
+      pend.push({pri:1,base:0.42,col:hue.c,dist:3.0,y:Y,
+        pos:new THREE.Vector3(f.x+0.5+f.dx*0.5-f.dx*0.34,Y,f.y+0.5+f.dy*0.5-f.dy*0.34)});
     }
+    /* Same ration the duergar halls run under, and for the same reason: three.js
+       Phong pays for every light on every fragment of every material, and a
+       furnished floor now has braziers as well as windows. A brazier is a fire
+       and outranks a window, which the theme itself calls a statement rather than
+       a way of seeing. Everything keeps its flame sprites either way. */
+    pend.sort((a,b)=>a.pri-b.pri);
+    for(const q of pend.slice(0,FURNITURE_LIGHTS)){
+      const l=new THREE.PointLight(q.col,q.base,q.dist,2);
+      l.position.copy(q.pos);grp.add(l);
+      if(q.fire)flames.push({light:l,base:q.base,fire:q.fire,y:q.y});
+    }
+    for(const q of pend.slice(FURNITURE_LIGHTS))
+      if(q.fire)flames.push({base:q.base,fire:q.fire,y:q.y});
+    R3.candleFlames=flames;
     // Stalactites. The house was cut out of living rock and the masons stopped
     // at the walls, so the roof still hangs. Seeded from tile coordinates like
     // the cave gems, so nothing about them needs saving and a rebuild puts the
