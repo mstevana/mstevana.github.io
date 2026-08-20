@@ -3307,6 +3307,20 @@ const TRAP_ART={
     `<path d="M93 53 Q99 62 93 69 Q87 62 93 53 Z" fill="#b48ae0"/>`+
     `<path d="M60 27 L72 27 L60 37 L72 37 M75 15 L83 15 L75 22 L83 22" stroke="#b48ae0" stroke-width="2.6" fill="none" opacity="0.9"/>`+ // drowsy Z's
     `</g></svg>`,
+  // A snare: a corner web with the strand across the passage snapped taut, and
+  // the thing that set it waiting at the hub. Every other card in this table
+  // shows the mechanism, so this one shows the web rather than the victim.
+  websnare:()=>`<svg xmlns="${SVGNS}" viewBox="0 0 100 100"><g stroke="#0d0b08" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">`+
+    `<path d="M6 6 L94 40 M6 6 L82 62 M6 6 L60 84 M6 6 L34 94 M6 6 L96 16" stroke="#d8d2ea" stroke-width="2.2" fill="none" opacity="0.85"/>`+
+    `<path d="M40 12 Q34 26 22 34 M62 20 Q52 42 32 54 M84 30 Q70 58 44 76" stroke="#c6bede" stroke-width="2.6" fill="none" opacity="0.8"/>`+
+    `<path d="M8 78 Q46 62 96 74" stroke="#efeaff" stroke-width="3.4" fill="none"/>`+   // the strand across the way
+    `<circle cx="52" cy="68" r="3" fill="#efeaff" stroke="none"/>`+
+    `<g transform="translate(70,46) scale(0.9)">`+
+      `<path d="M-14 -8 Q-22 -16 -26 -6 M14 -8 Q22 -16 26 -6 M-14 2 Q-24 2 -27 10 M14 2 Q24 2 27 10" stroke="#1b1720" stroke-width="3" fill="none"/>`+
+      `<ellipse cx="0" cy="4" rx="10" ry="12" fill="#2a2333"/><ellipse cx="0" cy="-8" rx="6" ry="6" fill="#3a3145"/>`+
+      `<circle cx="-2.6" cy="-9" r="1.6" fill="#c9a8e8" stroke="none"/><circle cx="2.6" cy="-9" r="1.6" fill="#c9a8e8" stroke="none"/>`+
+    `</g>`+
+    `</g></svg>`,
 };
 const STAIRS_SVG=`<svg xmlns="${SVGNS}" viewBox="0 0 64 64"><g stroke="#080706" stroke-width="1.6"><rect x="8" y="8" width="48" height="48" fill="#12100c"/><path d="M8 8 L56 8 L56 20 L44 20 L44 32 L32 32 L32 44 L20 44 L20 56 L8 56 Z" fill="#3a352c"/><path d="M56 20 L44 20 L44 32 L32 32 L32 44 L20 44 L20 56 L56 56 Z" fill="#1e1b15"/></g></svg>`;
 /* ============================== ITEM REGISTRY & LOOT ============================== */
@@ -3731,12 +3745,20 @@ function tryGen(depth,targetWalk,theme){
     // venom darts join the roster a little deeper: a paralysis or sleep dart on
     // the tank at level 1 is a wipe waiting to happen, so they wait until the
     // party has the levels and the cures to answer them
-    const kind=pick(depth>=4?['dart','spike','gas','pdart','sleepdart']:['dart','spike','gas']);
+    /* The drow set snares of their own, and the pool is EXTENDED rather than
+       replaced: the count is untouched, so a web snare displaces some other trap
+       on the floor instead of adding to the tally. It does no damage at all —
+       being held in a drow house is the whole of the threat — which puts it at
+       the gentler end of a table that otherwise runs dart, spike, gas and two
+       venoms. */
+    const pool=depth>=4?['dart','spike','gas','pdart','sleepdart']:['dart','spike','gas'];
+    if(theme.name==='Drow')pool.push('websnare');
+    const kind=pick(pool);
     const venom=kind==='pdart'||kind==='sleepdart';
     traps[i]={kind,found:false,armed:true,dc:trapDC(depth),
       // a venom dart wounds lightly — the toxin is the threat, not the puncture
-      dmg:kind==='gas'?null:venom?[1,4]:[trapDice(depth),6],
-      dur:kind==='pdart'?4:kind==='sleepdart'?5:0,
+      dmg:(kind==='gas'||kind==='websnare')?null:venom?[1,4]:[trapDice(depth),6],
+      dur:kind==='pdart'?4:kind==='sleepdart'?5:kind==='websnare'?5:0,
       x,y};
     placedTraps++;
   }
@@ -4031,6 +4053,66 @@ function tryGen(depth,targetWalk,theme){
       }
     }
   }
+  /* The chapel of Lolth: one chamber a floor given over to the goddess the whole
+     house answers to. The throne stands at the centre, the altar against a wall,
+     and a priestess of the house keeps both.
+
+     Built on the ossuary's and the forge hall's terms, because the hazards are
+     the same three every time:
+     - the throne block is T_PIT — not a wall, but not walkable. One tile at the
+       centre of a 3x3-or-larger room cannot cut the level in two, so it is safe
+       after the connectivity check.
+     - whatever is lying on that tile is SHOVED ASIDE, never deleted. Loot is
+       placed before this runs, and the level's only key is one of the things it
+       can land on; swallowing it seals the locked room for good.
+     - the stairs are never built over. */
+  let chapel=null;
+  if(theme.name==='Drow'){
+    const cand=rooms.slice(1).filter(r=>r.w>=3&&r.h>=3&&!(lockedRoom&&r.x===lockedRoom.x&&r.y===lockedRoom.y));
+    if(cand.length){
+      const r=pick(cand);
+      const tx=r.x+(r.w>>1), ty=r.y+(r.h>>1);
+      const edges=[];
+      for(let x=r.x;x<r.x+r.w;x++){
+        if(g[idx(x,r.y-1)]===T_WALL&&g[idx(x,r.y)]===T_FLOOR)edges.push({x,y:r.y,dx:0,dy:-1});
+        if(g[idx(x,r.y+r.h)]===T_WALL&&g[idx(x,r.y+r.h-1)]===T_FLOOR)edges.push({x,y:r.y+r.h-1,dx:0,dy:1});
+      }
+      for(let y=r.y;y<r.y+r.h;y++){
+        if(g[idx(r.x-1,y)]===T_WALL&&g[idx(r.x,y)]===T_FLOOR)edges.push({x:r.x,y,dx:-1,dy:0});
+        if(g[idx(r.x+r.w,y)]===T_WALL&&g[idx(r.x+r.w-1,y)]===T_FLOOR)edges.push({x:r.x+r.w-1,y,dx:1,dy:0});
+      }
+      const spot=edges.filter(e=>!(e.x===tx&&e.y===ty)&&!(e.x===sx&&e.y===sy));
+      if(spot.length&&!(tx===sx&&ty===sy)){
+        const a=pick(spot);
+        chapel={x:r.x,y:r.y,w:r.w,h:r.h,tx,ty,ax:a.x,ay:a.y,adx:a.dx,ady:a.dy,opened:false};
+        g[idx(tx,ty)]=T_PIT;
+        const under=items[idx(tx,ty)];
+        if(under&&under.length){
+          let to=DIRS.map(([dx,dy])=>[tx+dx,ty+dy]).find(([x,y])=>g[idx(x,y)]===T_FLOOR);
+          if(!to)for(let yy=r.y;yy<r.y+r.h&&!to;yy++)
+            for(let xx=r.x;xx<r.x+r.w&&!to;xx++)
+              if(g[idx(xx,yy)]===T_FLOOR)to=[xx,yy];
+          if(to){const j=idx(to[0],to[1]);(items[j]=items[j]||[]).push(...under);}
+        }
+        delete items[idx(tx,ty)];
+        delete traps[idx(tx,ty)];
+        for(let i=monsters.length-1;i>=0;i--)if(monsters[i].x===tx&&monsters[i].y===ty)monsters.splice(i,1);
+        // her priestess, at the altar and already aware of them
+        const spots=DIRS.map(([dx,dy])=>[a.x+dx,a.y+dy]).filter(([x,y])=>g[idx(x,y)]===T_FLOOR);
+        if(spots.length){
+          const [gx,gy]=pick(spots);
+          const pool=spawnPool(depth).filter(([k])=>MONSTERS[k].drow);
+          // a chapel is kept by a caster if the depth allows one at all
+          const holy=pool.filter(([k])=>MONSTERS[k].caster);
+          const key=holy.length?pickWeighted(holy):(pool.length?pickWeighted(pool):'drowpriest');
+          const keeper=mkMonster(key,gx,gy,depth);
+          makeElite(keeper,pick(ELITE_KEYS));
+          keeper.slot=0;keeper.chapel=true;
+          monsters.push(keeper);
+        }
+      }
+    }
+  }
   // lurkers: a cave's ambushers wait as scenery rather than standing about.
   // Each one placed removes an ordinary monster from the floor, so a cave
   // carries the same total threat as any floor at its depth — the ambush
@@ -4161,18 +4243,36 @@ function tryGen(depth,targetWalk,theme){
   // drow houses: rose windows set into the wall, glazed in faerzress-lit glass.
   // Occasional, unlike the duergar's torches — this light is a statement, not a
   // way of seeing, and a wall with one every few paces would be a shopfront.
+  /* Drow houses: wall features, weighted rather than picked evenly.
+
+     The rose window keeps the largest share and its old spacing rule. It is the
+     theme's statement piece and there were 3-6 of them before this; at an even
+     draw across six kinds a floor would have had one. Everything else is the
+     house around it — the guardian at the door, the shrine, the silk fence, a
+     brazier of cold fire, and a web with something in it. */
   let drow=[];
   if(theme.name==='Drow'){
-    const nW=3+rnd(4);
-    let wTries=300;
+    const KINDS=[['rose',0.26],['fence',0.16],['wallweb',0.16],
+                 ['guardian',0.14],['shrine',0.14],['brazier',0.14]];
+    const pickKind=()=>{
+      let r=Math.random();
+      for(const [k,w] of KINDS){if((r-=w)<=0)return k;}
+      return 'rose';
+    };
+    const nW=10+rnd(6);
+    let wTries=400;
     while(drow.length<nW&&wTries-->0){
       const x=1+rnd(W-2),y=1+rnd(H-2);
       if(g[idx(x,y)]!==T_FLOOR)continue;
       const wd=DIRS.filter(([dx,dy])=>g[idx(x+dx,y+dy)]===T_WALL);
       if(!wd.length)continue;
-      if(drow.some(c=>Math.abs(c.x-x)+Math.abs(c.y-y)<4))continue;   // never two on one wall
+      const kind=pickKind();
+      // a rose window is a statement and never shares a wall; the rest of the
+      // furniture only needs room to stand
+      const near=kind==='rose'?4:2;
+      if(drow.some(c=>Math.abs(c.x-x)+Math.abs(c.y-y)<(c.kind==='rose'?4:near)))continue;
       const [dx,dy]=pick(wd);
-      drow.push({x,y,dx,dy,kind:'rose',hue:rnd(3)});
+      drow.push({x,y,dx,dy,kind,hue:rnd(3)});
     }
   }
   /* A boss swings at least as well as the best warrior standing on its own
@@ -4189,7 +4289,7 @@ function tryGen(depth,targetWalk,theme){
     if(bm)bm.atk=Math.max(bm.atk,monsters.reduce((a,m)=>m.boss?a:Math.max(a,m.atk),0));
   }
   return {w:W,h:H,grid:g,start,stairs,traps,items,monsters,secrets,theme,depth,
-    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,forge,lurkers,duergar,pillars,drow};
+    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,forge,chapel,lurkers,duergar,pillars,drow};
 }
 /* ---------- difficulty curve ----------
    Depth, not party level, drives everything. One documented scalar grows every
@@ -5747,6 +5847,57 @@ function espruarGlyph(ctx,x,y,h,seed){
   if(rr()<0.4){ctx.moveTo(x-w*0.22,y-h*0.10);ctx.quadraticCurveTo(x,y-h*0.22,x+w*0.24,y-h*0.08);}
   ctx.stroke();
 }
+/* The spider, which the theme had none of at all — `grep -c spider` over the
+   whole engine returned a single comment. It is the city's main motif, cut into
+   everything the drow build in honour of Lolth, so it belongs on the walls before
+   anything else does.
+
+   Drawn legs-first so the body sits over them, and shaped by the classic
+   silhouette rather than by anatomy: each leg goes OUT AND UP to a knee, then out
+   and DOWN to the tip. That kink is the whole recognition cue — legs drawn as
+   straight rays from a blob read as a sun, which is exactly what the old house
+   sigil looked like. Stroked twice, dark then lit and offset up-left, the same
+   incision every carved thing in this dungeon uses. */
+function drowSpiderPath(ctx,cx,cy,r,lolth){
+  for(const s of [-1,1])for(let i=0;i<4;i++){
+    const a=-0.98+i*0.60;                       // fore legs high, hind legs low
+    const hipX=cx+s*r*0.22, hipY=cy-r*0.10+i*r*0.11;
+    const kx=hipX+s*Math.cos(a)*r*1.05, ky=hipY+Math.sin(a)*r*1.05;
+    const tx=hipX+s*Math.cos(a+0.62)*r*1.75, ty=hipY+Math.sin(a+0.62)*r*1.75;
+    ctx.moveTo(hipX,hipY);
+    ctx.quadraticCurveTo(kx,ky,tx,ty);
+  }
+  if(lolth){
+    /* Lolth's own mark: the spider with a drow woman for a body. At this size a
+       face on the abdomen is four pixels of mush, so the WOMAN is the body —
+       a head with hair sweeping back, and the eight legs radiating from behind
+       it. The silhouette does the work. */
+    ctx.moveTo(cx+r*0.30,cy);
+    ctx.bezierCurveTo(cx+r*0.30,cy-r*0.52, cx-r*0.30,cy-r*0.52, cx-r*0.30,cy);
+    ctx.bezierCurveTo(cx-r*0.30,cy+r*0.36, cx+r*0.30,cy+r*0.36, cx+r*0.30,cy);
+    for(const s of [-1,1]){                     // the hair, swept out and down
+      ctx.moveTo(cx+s*r*0.26,cy-r*0.28);
+      ctx.bezierCurveTo(cx+s*r*0.72,cy-r*0.34, cx+s*r*0.66,cy+r*0.34, cx+s*r*0.34,cy+r*0.62);
+    }
+  }else{
+    ctx.moveTo(cx+r*0.40,cy+r*0.34);            // abdomen
+    ctx.bezierCurveTo(cx+r*0.40,cy+r*0.98, cx-r*0.40,cy+r*0.98, cx-r*0.40,cy+r*0.34);
+    ctx.bezierCurveTo(cx-r*0.40,cy-r*0.10, cx+r*0.40,cy-r*0.10, cx+r*0.40,cy+r*0.34);
+    ctx.moveTo(cx+r*0.26,cy-r*0.22);            // cephalothorax
+    ctx.bezierCurveTo(cx+r*0.26,cy-r*0.62, cx-r*0.26,cy-r*0.62, cx-r*0.26,cy-r*0.22);
+    ctx.bezierCurveTo(cx-r*0.26,cy+r*0.06, cx+r*0.26,cy+r*0.06, cx+r*0.26,cy-r*0.22);
+  }
+}
+function drowSpider(ctx,cx,cy,r,silver,lolth){
+  ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.strokeStyle='rgba(0,0,0,0.66)';ctx.lineWidth=2.3;
+  ctx.beginPath();drowSpiderPath(ctx,cx,cy,r,lolth);ctx.stroke();
+  ctx.save();ctx.translate(-0.6,-0.7);
+  ctx.strokeStyle=silver;ctx.globalAlpha=0.62;ctx.lineWidth=1.0;
+  ctx.beginPath();drowSpiderPath(ctx,cx,cy,r,lolth);ctx.stroke();
+  ctx.restore();
+  ctx.lineCap='butt';ctx.lineJoin='miter';
+}
 /* The inscriptions genuinely glow, which no other theme's do. A colour map can
    only ever be *pale* in torchlight; light of its own needs an emissive map, so
    a drow wall canvas comes back as a pair — the stone, and a black sheet with
@@ -5785,10 +5936,19 @@ function drowWallCanvas(th,variant,base){
     draw(col,2.2,0,0,0.42,em.ctx);
     draw('#ffffff',0.7,0,0,0.55,em.ctx);
   }
-  // per-variant stonework. A drow wall is not decorated so much as punctuated.
+  /* Per-variant stonework. A drow wall is not decorated so much as punctuated.
+
+     Keyed on the variant itself rather than variant%4, which showed four
+     treatments twice each over eight variants — the same duplication the duergar
+     walls had, and worse here because none of the four said "drow". The eight now
+     run plain, pilaster, an obsidian spider, an older worn hand, Lolth's own mark,
+     a web fan in the spandrels, a house sigil in its cartouche, and a sigil that
+     has been chiselled out. Variant 0 stays bare so the frieze has something to be
+     read against. */
   let sd=(variant*2654435761)>>>0;
   const rr=()=>{sd=(sd*1664525+1013904223)>>>0;return sd/4294967296;};
-  if(variant%4===1){
+  const LOW=base.rh*6.1;                        // the middle of the lower courses
+  if(variant===1){
     /* An engaged pilaster: a shallow shaft standing proud of the wall, with a
        spread capital under the roof and a plinth at the floor.
 
@@ -5851,31 +6011,131 @@ function drowWallCanvas(th,variant,base){
       em.ctx.save();em.ctx.globalAlpha=0.5;em.ctx.strokeStyle=col;em.ctx.lineWidth=1.6;
       em.ctx.beginPath();em.ctx.arc(px+ox,by,3.7,0,7);em.ctx.stroke();em.ctx.restore();
     }
-  }else if(variant%4===2){
-    // a house sigil cut into the lower courses: a ring with radiating legs,
-    // struck in the same curved hand as the script
-    const cx=(variant%8<4?0.34:0.66)*128, cy=base.rh*6.1, R=10;
+  }else if(variant===2){
+    /* An obsidian spider, set into the lower courses. The sources have the drow
+       casting these in obsidian all over the city, so it is a black inlay in
+       black brick: what separates it from the wall is the polish, which is why
+       it gets a sunk field behind it and a silver edge and no fill of its own. */
+    const cx=0.34*128;
     wrapX(()=>{
-      ctx.strokeStyle='rgba(0,0,0,0.55)';ctx.lineWidth=2.4;
-      ctx.beginPath();ctx.arc(cx+0.5,cy+0.5,R,0,7);ctx.stroke();
-      ctx.strokeStyle=silver;ctx.lineWidth=1.1;
-      ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.stroke();
-      for(let a=0;a<8;a++){
-        const t=a*Math.PI/4+0.2;
-        ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=1.8;
-        ctx.beginPath();ctx.moveTo(cx+Math.cos(t)*R*0.3,cy+Math.sin(t)*R*0.3);
-        ctx.quadraticCurveTo(cx+Math.cos(t+0.5)*R*0.9,cy+Math.sin(t+0.5)*R*0.9,
-                             cx+Math.cos(t)*R*1.5,cy+Math.sin(t)*R*1.5);ctx.stroke();
-        ctx.strokeStyle='rgba(206,214,236,0.30)';ctx.lineWidth=0.8;
-        ctx.beginPath();ctx.moveTo(cx+Math.cos(t)*R*0.3,cy+Math.sin(t)*R*0.3);
-        ctx.quadraticCurveTo(cx+Math.cos(t+0.5)*R*0.9,cy+Math.sin(t+0.5)*R*0.9,
-                             cx+Math.cos(t)*R*1.5,cy+Math.sin(t)*R*1.5);ctx.stroke();
+      ctx.save();ctx.globalAlpha=0.42;ctx.fillStyle='#000';
+      ctx.beginPath();ctx.ellipse(cx,LOW+1,16,15,0,0,7);ctx.fill();ctx.restore();
+      drowSpider(ctx,cx,LOW,11.5,silver,false);
+    });
+  }else if(variant===4){
+    // Lolth herself, and this one is allowed to burn: her mark is the only
+    // device in the house that carries the same light as the script
+    const cx=0.66*128;
+    wrapX(()=>{
+      ctx.save();ctx.globalAlpha=0.46;ctx.fillStyle='#000';
+      ctx.beginPath();ctx.ellipse(cx,LOW+1,18,17,0,0,7);ctx.fill();ctx.restore();
+      drowSpider(ctx,cx,LOW,13,col,true);
+    });
+    for(const ox of [-128,0,128]){
+      em.ctx.save();em.ctx.globalAlpha=0.34;em.ctx.strokeStyle=col;em.ctx.lineWidth=2.2;
+      em.ctx.beginPath();drowSpiderPath(em.ctx,cx+ox,LOW,13,true);em.ctx.stroke();
+      em.ctx.globalAlpha=0.7;em.ctx.lineWidth=0.8;
+      em.ctx.beginPath();drowSpiderPath(em.ctx,cx+ox,LOW,13,true);em.ctx.stroke();
+      em.ctx.restore();
+    }
+  }else if(variant===5){
+    /* Web slung into the spandrels — the corners above the frieze, where a wall
+       meets the roof and nobody has swept for a century. Radials from the corner,
+       then spirals crossing them, and the strands take a little of the faerzress
+       because drow silk does. */
+    const anchors=[[0,0],[128,0]];
+    wrapX(()=>{
+      for(const [ax,ay] of anchors){
+        const dir=ax?Math.PI:0, n=7;
+        ctx.lineCap='round';
+        for(const [c,lw,al] of [['rgba(0,0,0,0.42)',1.5,1],['rgba(214,222,246,0.30)',0.7,1]]){
+          ctx.save();ctx.globalAlpha=al;ctx.strokeStyle=c;ctx.lineWidth=lw;
+          ctx.beginPath();
+          for(let i=0;i<=n;i++){                 // radials
+            const t=dir+(ax?-1:1)*(i/n)*(Math.PI/2);
+            ctx.moveTo(ax,ay);
+            ctx.lineTo(ax+Math.cos(t)*30,ay+Math.sin(t)*30);
+          }
+          for(let k=1;k<=3;k++){                 // and the spiral crossing them
+            const R=9+k*7;
+            ctx.moveTo(ax+Math.cos(dir)*R,ay);
+            for(let i=1;i<=n;i++){
+              const t=dir+(ax?-1:1)*(i/n)*(Math.PI/2), rr2=R*(0.88+0.12*Math.cos(i*1.7));
+              ctx.lineTo(ax+Math.cos(t)*rr2,ay+Math.sin(t)*rr2);
+            }
+          }
+          ctx.stroke();ctx.restore();
+        }
+        ctx.lineCap='butt';
       }
     });
-  }else if(variant%4===3){
+    for(const ox of [-128,0,128])for(const [ax,ay] of anchors){
+      const dir=ax?Math.PI:0, n=7;
+      em.ctx.save();em.ctx.globalAlpha=0.16;em.ctx.strokeStyle=col;em.ctx.lineWidth=0.9;
+      em.ctx.beginPath();
+      for(let i=0;i<=n;i++){
+        const t=dir+(ax?-1:1)*(i/n)*(Math.PI/2);
+        em.ctx.moveTo(ax+ox,ay);em.ctx.lineTo(ax+ox+Math.cos(t)*30,ay+Math.sin(t)*30);
+      }
+      em.ctx.stroke();em.ctx.restore();
+    }
+  }else if(variant===6){
+    /* A house sigil: the house's own spider on a lozenge.
+
+       Two shapes failed here first, and both failed the same way — as an EYE. A
+       ring with radiating legs is a sunburst; put a ring inside a pointed oval and
+       it is a pupil inside an eyelid, which is what the curved cartouche gave.
+       Straight edges are what make a lozenge read as heraldry rather than as
+       anatomy, and a spider on it is what a drow house actually bears. */
+    const cx=0.34*128, W=17, H=13;
+    wrapX(()=>{
+      const lozenge=()=>{
+        ctx.beginPath();
+        ctx.moveTo(cx,LOW-H);ctx.lineTo(cx+W,LOW);
+        ctx.lineTo(cx,LOW+H);ctx.lineTo(cx-W,LOW);ctx.closePath();
+      };
+      lozenge();ctx.fillStyle='rgba(0,0,0,0.44)';ctx.fill();
+      lozenge();ctx.strokeStyle='rgba(0,0,0,0.62)';ctx.lineWidth=2.4;ctx.stroke();
+      ctx.save();ctx.translate(-0.6,-0.7);
+      lozenge();ctx.strokeStyle=silver;ctx.globalAlpha=0.72;ctx.lineWidth=1.0;ctx.stroke();
+      ctx.restore();
+      drowSpider(ctx,cx,LOW-1,6.4,silver,false);
+    });
+  }else if(variant===7){
+    /* A sigil that has been chiselled out. Drow houses annihilate each other and
+       then erase the name, and a defaced mark says more about the place than an
+       intact one does — you are walking through somebody's victory. The device is
+       drawn faint and then destroyed: cross-hatched chisel work over it, and one
+       deep gouge taken clean through. */
+    const cx=0.66*128, R=9.5;
+    wrapX(()=>{
+      /* The ghost is the SAME spider variant 6 bears, and it has to stay readable.
+         Drawn at a third alpha it was invisible and the gouge over it read as a
+         stray scratch in the brick — you cannot see that something was destroyed
+         unless you can still see what it was. Making it the house spider is what
+         tells the story: this wall carried a house's mark and somebody took it
+         off. */
+      ctx.save();ctx.globalAlpha=0.80;
+      drowSpider(ctx,cx,LOW-1,8.2,'rgba(206,214,236,0.55)',false);
+      ctx.restore();
+      for(let i=0;i<34;i++){                     // the chisel work that took it off
+        const a=rr()*Math.PI*2, d=rr()*R*1.55;
+        const x0=cx+Math.cos(a)*d, y0=LOW+Math.sin(a)*d, l=2+rr()*4, t=0.7+rr()*0.5;
+        ctx.strokeStyle='rgba(0,0,0,0.42)';ctx.lineWidth=1.5;
+        ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+Math.cos(t)*l,y0+Math.sin(t)*l);ctx.stroke();
+        ctx.strokeStyle='rgba(214,222,246,0.24)';ctx.lineWidth=0.7;
+        ctx.beginPath();ctx.moveTo(x0-0.5,y0-0.6);ctx.lineTo(x0-0.5+Math.cos(t)*l,y0-0.6+Math.sin(t)*l);ctx.stroke();
+      }
+      ctx.strokeStyle='rgba(0,0,0,0.60)';ctx.lineWidth=3.2;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(cx-R*1.5,LOW+R*0.9);ctx.lineTo(cx+R*1.4,LOW-R*1.0);ctx.stroke();
+      ctx.strokeStyle='rgba(214,222,246,0.22)';ctx.lineWidth=1.1;
+      ctx.beginPath();ctx.moveTo(cx-R*1.5-0.6,LOW+R*0.9-0.7);ctx.lineTo(cx+R*1.4-0.6,LOW-R*1.0-0.7);ctx.stroke();
+      ctx.lineCap='butt';
+    });
+  }else if(variant===3){
     // a second, fainter band of script low on the wall — an older hand, worn
     const h=base.rh*0.46, y=base.rh*6.5;
-    ctx.save();ctx.globalAlpha=0.5;ctx.lineCap='round';
+    ctx.save();ctx.globalAlpha=0.72;ctx.lineCap='round';
     for(let x=-9;x<=137;x+=9){
       ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=1.6;
       espruarGlyph(ctx,x+((variant*5)%9),y,h,(variant*104729)^(Math.round(x)*7919));
@@ -5897,6 +6157,101 @@ function drowWallCanvas(th,variant,base){
     wrapX(()=>{
       ctx.strokeStyle='rgba(0,0,0,0.26)';ctx.lineWidth=0.9;
       ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.cos(a)*len,y+Math.sin(a)*len);ctx.stroke();
+    });
+  }
+  return {cv,glow:em.cv};
+}
+/* The roof of a drow house: bare cavern rock, and web.
+
+   A TANGLE, not an orb web, and that is a tiling decision as much as an artistic
+   one. An orb has an obvious centre, and a centre repeated once a tile prints a
+   lattice overhead — the same failure the cave floor exists to avoid. A sheet
+   tangle has no focal point, so it survives being repeated; it is also what
+   actually accumulates in the corners of a place nobody has swept for a century.
+
+   Spanning three tiles rather than one (see `repeat` in buildLevel) breaks the
+   period up further: at one tile per repeat even a tangle starts to rhyme.
+
+   Like the walls this returns {cv,glow}. Drow silk catches the faerzress, so the
+   strands carry a little light of their own — a colour map alone can only make
+   them pale. */
+function drowCeilCanvas(th){
+  const {cv,ctx}=newCanvas(128);
+  const em=newCanvas(128);
+  em.ctx.fillStyle='#000';em.ctx.fillRect(0,0,128,128);
+  ctx.fillStyle=shade(th.ceil,-0.30);ctx.fillRect(0,0,128,128);
+  // the rock first — mottled, so the bare patches between the web read as stone
+  for(let i=0;i<40;i++){
+    const x=rnd(128),y=rnd(128),r=6+rnd(20);
+    wrap9(ctx,()=>{
+      const g=ctx.createRadialGradient(x,y,1,x,y,r);
+      g.addColorStop(0,Math.random()<0.5?'rgba(255,255,255,0.035)':'rgba(0,0,0,0.20)');
+      g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+    });
+  }
+  const col=th.frieze||'#a86ce8';
+  // anchors the tangle is slung between
+  const A=[];for(let i=0;i<26;i++)A.push([rnd(128),rnd(128)]);
+  const strand=(target,c,lw,al)=>{
+    target.save();target.globalAlpha=al;target.strokeStyle=c;target.lineWidth=lw;
+    target.lineCap='round';
+    for(let i=0;i<A.length;i++){
+      // each anchor is guyed to two others, with the line sagging between them
+      for(const j of [(i+3)%A.length,(i+7)%A.length]){
+        const [x0,y0]=A[i],[x1,y1]=A[j];
+        const mx=(x0+x1)/2+((i*37+j*11)%9-4), my=(y0+y1)/2+((i*17+j*23)%11-4)+3;
+        target.beginPath();target.moveTo(x0,y0);target.quadraticCurveTo(mx,my,x1,y1);target.stroke();
+      }
+    }
+    // and the fine stuff webbing the guys together, thinner than the guys are
+    target.lineWidth=lw*0.6;
+    let s=0x9e3779b9;const rr=()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};
+    for(let k=0;k<220;k++){
+      const i=Math.floor(rr()*A.length), j=Math.floor(rr()*A.length);
+      if(i===j)continue;
+      const t0=0.15+rr()*0.7, t1=0.15+rr()*0.7;
+      const [x0,y0]=A[i],[x1,y1]=A[j];
+      const px=x0+(x1-x0)*t0+(rr()-0.5)*11, py=y0+(y1-y0)*t0+(rr()-0.5)*11;
+      const qx=x0+(x1-x0)*t1+(rr()-0.5)*11, qy=y0+(y1-y0)*t1+(rr()-0.5)*11;
+      target.beginPath();target.moveTo(px,py);
+      target.quadraticCurveTo((px+qx)/2+(rr()-0.5)*7,(py+qy)/2+(rr()-0.5)*7+3,qx,qy);
+      target.stroke();
+    }
+    target.restore();
+  };
+  wrap9(ctx,()=>{
+    strand(ctx,'rgba(0,0,0,0.34)',1.05,1);       // the shadow the silk throws
+    ctx.save();ctx.translate(-0.4,-0.5);
+    strand(ctx,'rgba(226,232,252,0.30)',0.5,1);  // and the strand itself
+    ctx.restore();
+  });
+  // The faerzress the silk catches, kept very low. At 0.13 the roof read as a
+  // lit net rather than as cobweb with a little light caught in it.
+  wrap9(em.ctx,()=>strand(em.ctx,col,0.55,0.055));
+  /* Bare rock back through it in places. Webbed edge to edge the roof reads as a
+     net stretched over the room rather than as neglect — silk gathers where it is
+     undisturbed and thins where it is not, and the patchiness is what makes it
+     look accumulated rather than installed. Painted in the rock's own colour over
+     the finished web, which suppresses the strands without touching the stone. */
+  for(let i=0;i<7;i++){
+    const x=rnd(128),y=rnd(128),r=16+rnd(26);
+    wrap9(ctx,()=>{
+      const g=ctx.createRadialGradient(x,y,1,x,y,r);
+      g.addColorStop(0,shadeA(th.ceil,-0.30,0.72));
+      g.addColorStop(0.6,shadeA(th.ceil,-0.30,0.34));
+      g.addColorStop(1,shadeA(th.ceil,-0.30,0));
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+    });
+  }
+  // a few knots where enough of it has gathered to be opaque
+  for(let i=0;i<12;i++){
+    const x=rnd(128),y=rnd(128),r=2+rnd(4);
+    wrap9(ctx,()=>{
+      const g=ctx.createRadialGradient(x,y,0.5,x,y,r);
+      g.addColorStop(0,'rgba(226,232,252,0.17)');
+      g.addColorStop(1,'rgba(226,232,252,0)');
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
     });
   }
   return {cv,glow:em.cv};
@@ -6579,6 +6934,72 @@ function duergarWoodCanvas(){
     });
   }
   return cv;
+}
+// Silk: fibrous, laid one way, and like the duergar's maps a modulation around
+// white so it can be handed to a strand, a bolt of it or a wrapped body alike.
+function drowSilkCanvas(){
+  const {cv,ctx}=newCanvas(128);
+  ctx.fillStyle='#ededed';ctx.fillRect(0,0,128,128);
+  for(let i=0;i<220;i++){
+    const y=rnd(128),w=0.5+Math.random()*1.6;
+    wrap9(ctx,()=>{
+      ctx.strokeStyle=Math.random()<0.55?'rgba(255,255,255,0.42)':'rgba(0,0,0,0.10)';
+      ctx.lineWidth=w;ctx.beginPath();
+      let py=y;ctx.moveTo(-8,py);
+      for(let x=-8;x<136;x+=16){py+=(Math.random()-0.5)*3.0;ctx.lineTo(x,py);}
+      ctx.stroke();
+    });
+  }
+  for(let i=0;i<9;i++){                          // the odd matted patch
+    const x=rnd(128),y=rnd(128),r=4+rnd(9);
+    wrap9(ctx,()=>{
+      const g=ctx.createRadialGradient(x,y,1,x,y,r);
+      g.addColorStop(0,'rgba(0,0,0,0.13)');g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+    });
+  }
+  return cv;
+}
+function drowTex(kind){
+  const key='drowTex_'+kind;
+  if(R3.texCache[key])return R3.texCache[key];
+  const t=texFromCanvas(drowSilkCanvas());
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  R3.texCache[key]=t;
+  return t;
+}
+/* Place a tapered cylinder BETWEEN two points. Composing the orientation by hand
+   out of Euler angles is what turned the first spider's legs into straight radial
+   spikes — the rotation that takes +Y onto an arbitrary direction is not two
+   angles you can guess. Derive it from the direction vector and let three.js
+   convert to the Euler that `Bins.at` wants. */
+function addSeg(B,mat,ax,ay,az,bx,by,bz,r0,r1){
+  const d=new THREE.Vector3(bx-ax,by-ay,bz-az);
+  const len=d.length();
+  if(len<1e-5)return B;
+  const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),d.clone().normalize());
+  const e=new THREE.Euler().setFromQuaternion(q,'XYZ');
+  return B.at(mat,new THREE.CylinderGeometry(r1,r0,len,5),
+              (ax+bx)/2,(ay+by)/2,(az+bz)/2,e.x,e.y,e.z);
+}
+/* A spider in the round, shared by the jade guardian at a door and the smaller
+   idol in a shrine niche. Built on the same reading the wall relief is: the KINK
+   is what makes it a spider, so each leg is a femur going out and UP to a raised
+   knee and a tibia coming back out and DOWN to the tip it stands on. Built facing
+   +Z, which in a wall feature's local frame is out into the room. */
+function addSpiderBody(B,mat,x,y,z,s){
+  const P=(dx,dy,dz)=>[x+dx*s,y+dy*s,z+dz*s];
+  B.at(mat,new THREE.SphereGeometry(0.115*s,9,7),...P(0,0.155,-0.07));   // abdomen
+  B.at(mat,new THREE.SphereGeometry(0.072*s,8,6),...P(0,0.145,0.085));   // cephalothorax
+  for(const sd of [-1,1])for(let i=0;i<4;i++){
+    const fwd=1.5-i;                                   // fore legs forward, hind back
+    const hip=P(sd*0.05,0.135,0.02+fwd*0.045);
+    const knee=P(sd*(0.15+0.028*i),0.215,0.05+fwd*0.105);
+    const tip=P(sd*(0.23+0.05*i),0.0,0.06+fwd*0.20);
+    addSeg(B,mat,...hip,...knee,0.017*s,0.013*s);
+    addSeg(B,mat,...knee,...tip,0.013*s,0.007*s);
+  }
+  return B;
 }
 // one copy each per run: these are shared by every piece of duergar furniture
 function duergarTex(kind){
@@ -7408,6 +7829,44 @@ function initRenderer(){
 const SPRITE_GAIN=0.55, SPRITE_FLOOR=0.13;
 const _sprC=new THREE.Color();
 const WEB_BASE=new THREE.Color(0xbfc4ca); // a cobweb's own pale colour, before the torch dims it
+/* A corner cobweb built from real threads rather than a flat pane: an apex at
+   the top, radial spokes fanning down from it, sagging cross-threads webbing
+   them together, and a couple of broken strands trailing off.
+
+   This lived inside the crypt's dressing block until the drow wanted it too.
+   It takes a seeded `rnd` and a size and returns bare line geometry, so the
+   caller decides the material, the tint and where it hangs — which is the whole
+   of the difference between a crypt's cobweb and a drow house's. */
+function cobwebGeo(rnd,size){
+  const v=[],add=(ax,ay,bx,by)=>v.push(ax,ay,0,bx,by,0);
+  const hy=size*0.52;                        // apex, top-centre
+  const n=6+Math.floor(rnd()*3),span=1.25;   // spokes fan downward from it
+  const tips=[];
+  for(let i=0;i<n;i++){
+    const a=-span+2*span*(i/(n-1))+(rnd()-0.5)*0.08, r=size*(0.9+rnd()*0.25);
+    const tx=Math.sin(a)*r,ty=hy-Math.cos(a)*r;
+    tips.push([tx,ty]);add(0,hy,tx,ty);       // radial spoke
+  }
+  const rings=4+Math.floor(rnd()*2);          // concentric cross-threads
+  for(let k=1;k<=rings;k++){
+    const f=k/(rings+1);
+    for(let i=0;i<tips.length-1;i++){
+      const ax=tips[i][0]*f,ay=hy+(tips[i][1]-hy)*f;
+      const bx=tips[i+1][0]*f,by=hy+(tips[i+1][1]-hy)*f;
+      const mx=(ax+bx)/2,my=(ay+by)/2;         // sag the chord toward the apex
+      const dx=-mx,dy=hy-my,dl=Math.hypot(dx,dy)||1,s=size*0.12*(0.6+rnd()*0.7);
+      const cx=mx+dx/dl*s,cy=my+dy/dl*s;
+      add(ax,ay,cx,cy);add(cx,cy,bx,by);
+    }
+  }
+  for(let i=0;i<2+Math.floor(rnd()*3);i++){    // stray broken threads
+    const t=tips[Math.floor(rnd()*tips.length)];
+    add(t[0],t[1],t[0]+(rnd()-0.5)*size*0.35,t[1]-rnd()*size*0.5);
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));
+  return g;
+}
 function lightAt(x,y,z){
   const t=R3.torch,f=R3.torchFill,a=R3.ambient;
   const att=(L)=>{
@@ -7439,8 +7898,12 @@ function shadeSprites(){
   }
   // cobwebs are unlit line geometry, so without this a web ten tiles off is as
   // bright as one overhead; multiply their pale colour by the same torch falloff
+  // `webBase` lets a theme keep its own silk colour through this: the drow's
+  // catches the faerzress and is cooler than a crypt's dust-grey, and without
+  // it the shared WEB_BASE written here every frame would flatten the two.
   if(R3.webMeshes)for(const w of R3.webMeshes){
-    if(w.material)w.material.color.copy(WEB_BASE).multiply(lightAt(w.position.x,w.position.y,w.position.z));
+    if(w.material)w.material.color.copy(w.userData.webBase||WEB_BASE)
+      .multiply(lightAt(w.position.x,w.position.y,w.position.z));
   }
 }
 function onResize(){
@@ -7633,20 +8096,33 @@ function buildLevel(L){
      the very thing the merged floor mesh exists to avoid. Dividing by FLOOR_SPAN
      spans it over the same four tiles the ground does. */
   const FLOOR_SPAN=4;
-  const ceilTex=texFromCanvas(myco?myconidCeilCanvas(th)
-                             :cave?caveFloorCanvas(th)
-                             :duer?duergarCeilCanvas(th)
-                                  :noiseCanvas(th.ceil,'#000',false,null));
+  /* The drow roof is the second builder to return {cv,glow}, after their walls —
+     their silk carries the faerzress and a colour map alone can only make it
+     pale. Everything else here hands back a bare canvas, so the branch keys off
+     `.glow` exactly as the wall loop does. */
+  const WEB_SPAN=3;
+  const ceilBuilt=myco?myconidCeilCanvas(th)
+                 :cave?caveFloorCanvas(th)
+                 :duer?duergarCeilCanvas(th)
+                 :drow?drowCeilCanvas(th)
+                      :noiseCanvas(th.ceil,'#000',false,null);
+  const ceilTex=texFromCanvas(ceilBuilt.glow?ceilBuilt.cv:ceilBuilt);
   floorTex.wrapS=floorTex.wrapT=THREE.RepeatWrapping;floorTex.repeat.set(1,1);
   ceilTex.wrapS=ceilTex.wrapT=THREE.RepeatWrapping;
-  ceilTex.repeat.set(cave?L.w/FLOOR_SPAN:L.w,cave?L.h/FLOOR_SPAN:L.h);
+  ceilTex.repeat.set(cave?L.w/FLOOR_SPAN:(drow?L.w/WEB_SPAN:L.w),
+                     cave?L.h/FLOOR_SPAN:(drow?L.h/WEB_SPAN:L.h));
   const floorMat=new THREE.MeshPhongMaterial({map:floorTex,bumpMap:floorTex,
     bumpScale:cave?0.03:(duer?0.006:(myco?0.035:(drow?0.005:0.015))),   // gravel has real tooth
     specular:duer?0x24211a:(drow?0x262a36:0x120e08),shininess:cave?3:(duer?18:(drow?26:4))});
   const ceilMat=new THREE.MeshPhongMaterial({map:ceilTex,bumpMap:ceilTex,
     // a vault has real relief; a plain dark wash has none to find
-    bumpScale:cave?0.03:(duer?0.028:0.012),color:cave?0x8c8c8c:0xffffff,
+    bumpScale:cave?0.03:(duer?0.028:(drow?0.016:0.012)),color:cave?0x8c8c8c:0xffffff,
     specular:0x0c0a06,shininess:3});
+  if(ceilBuilt.glow){
+    const gt=texFromCanvas(ceilBuilt.glow);
+    gt.wrapS=gt.wrapT=THREE.RepeatWrapping;gt.repeat.copy(ceilTex.repeat);
+    ceilMat.emissiveMap=gt;ceilMat.emissive=new THREE.Color(0xffffff);
+  }
   // floor: one unit plane per non-wall tile. holes fall out naturally at the
   // stairs shaft and at sewer lake pits.
   {
@@ -8188,39 +8664,6 @@ function buildLevel(L){
       const webMat=new THREE.MeshBasicMaterial({color:0x9aa0a6,transparent:true,opacity:0.13,
         side:THREE.DoubleSide,depthWrite:false});
       const webLineMat=new THREE.LineBasicMaterial({color:0xbfc4ca,transparent:true,opacity:0.32,depthWrite:false});
-      // a corner cobweb built from real threads rather than a flat pane: an apex
-      // at the top, radial spokes fanning down, sagging cross-threads webbing
-      // them together, and a couple of broken strands trailing off
-      const cobwebGeo=(rnd,size)=>{
-        const v=[],add=(ax,ay,bx,by)=>v.push(ax,ay,0,bx,by,0);
-        const hy=size*0.52;                        // apex, top-centre
-        const n=6+Math.floor(rnd()*3),span=1.25;   // spokes fan downward from it
-        const tips=[];
-        for(let i=0;i<n;i++){
-          const a=-span+2*span*(i/(n-1))+(rnd()-0.5)*0.08, r=size*(0.9+rnd()*0.25);
-          const tx=Math.sin(a)*r,ty=hy-Math.cos(a)*r;
-          tips.push([tx,ty]);add(0,hy,tx,ty);       // radial spoke
-        }
-        const rings=4+Math.floor(rnd()*2);          // concentric cross-threads
-        for(let k=1;k<=rings;k++){
-          const f=k/(rings+1);
-          for(let i=0;i<tips.length-1;i++){
-            const ax=tips[i][0]*f,ay=hy+(tips[i][1]-hy)*f;
-            const bx=tips[i+1][0]*f,by=hy+(tips[i+1][1]-hy)*f;
-            const mx=(ax+bx)/2,my=(ay+by)/2;         // sag the chord toward the apex
-            const dx=-mx,dy=hy-my,dl=Math.hypot(dx,dy)||1,s=size*0.12*(0.6+rnd()*0.7);
-            const cx=mx+dx/dl*s,cy=my+dy/dl*s;
-            add(ax,ay,cx,cy);add(cx,cy,bx,by);
-          }
-        }
-        for(let i=0;i<2+Math.floor(rnd()*3);i++){    // stray broken threads
-          const t=tips[Math.floor(rnd()*tips.length)];
-          add(t[0],t[1],t[0]+(rnd()-0.5)*size*0.35,t[1]-rnd()*size*0.5);
-        }
-        const g=new THREE.BufferGeometry();
-        g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));
-        return g;
-      };
       // Dressing is built as instanced primitives — one draw call per shape
       // however many tiles carry it — so the detail below stays cheap. Each
       // feature composes a base transform (tile position + a seeded yaw) and
@@ -8878,6 +9321,478 @@ function buildLevel(L){
       grp.add(g0);
     }
   }
+  /* The chapel of Lolth: the theme's set-piece, built the way the crypt's
+     ossuary and the duergar forge hall are. Her throne stands at the centre of
+     the room and her altar against a wall, and one of the house's priestesses
+     keeps both.
+
+     The throne is the spider. The sources give a drow house's seat as adamantine
+     shaped as a giant spider, so it is not a chair with a spider carved on it —
+     the body IS the back, the forelegs ARE the arms, and the thing you would sit
+     in is the gap between them. */
+  if(th.name==='Drow'&&L.chapel){
+    const c=L.chapel;
+    const stoneT=duergarTex('stone'),ironT=duergarTex('iron');
+    const cStone=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.10),
+      map:stoneT,bumpMap:stoneT,bumpScale:0.010,specular:0x1a1c24,shininess:14});
+    const cDark=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall2).multiplyScalar(1.22),
+      map:stoneT,bumpMap:stoneT,bumpScale:0.012,specular:0x141620,shininess:10});
+    /* Adamantine: darker than the iron and colder, with a blue-grey sheen rather
+       than a warm one. Its specular is held down for the reason every metal in
+       this dungeon has had to be — Blinn-Phong multiplies it by about
+       (shininess+2)/8 and the torch sits at the eye. */
+    const adam=new THREE.MeshPhongMaterial({color:0x1b1d25,map:ironT,bumpMap:ironT,
+      bumpScale:0.005,specular:0x101420,shininess:20});
+    const silverM=new THREE.MeshPhongMaterial({color:new THREE.Color(th.silver||'#8c93a8'),
+      map:ironT,bumpMap:ironT,bumpScale:0.003,specular:0x3a3f52,shininess:30});
+    const burn=new THREE.MeshBasicMaterial({color:new THREE.Color(th.frieze||'#a86ce8')});
+    const voidM=new THREE.MeshBasicMaterial({color:0x000000});
+    /* Two more, both learned from the first build of this pair.
+
+       `groove` is a cut rather than a surface. Bands modelled in the SAME
+       material as the thing they are cut into are invisible however many of
+       them there are — the abdomen's three rings were `adam` on `adam` and the
+       body still read as a smooth ball from a tile away. A groove has to be
+       darker than anything the light can make the surface, so it is unlit.
+
+       `silverD` is the calm silver, for anything with a broad flat face. The
+       bright one is right on a 10mm fillet and wrong on a 60cm table top: the
+       altar's mensa and rim came out as one white band, which is the specular
+       trap this dungeon keeps setting (see CLAUDE.md) — a face square-on to a
+       torch at the eye sits on the peak of the lobe. Same colour, a third of
+       the specular, half the shininess. */
+    const groove=new THREE.MeshBasicMaterial({color:0x05060a});
+    const silverD=new THREE.MeshPhongMaterial({color:new THREE.Color(th.silver||'#8c93a8')
+      .multiplyScalar(0.72),map:ironT,bumpMap:ironT,bumpScale:0.004,
+      specular:0x14161e,shininess:16});
+    const wax=new THREE.MeshPhongMaterial({color:0xa89ec0,specular:0x0e0c14,shininess:8});
+    // --- the throne
+    {
+      const g0=new THREE.Group(),B=Bins(4.0);
+      /* The dais is laid up in COURSES, like everything else built down here. As
+         three plain slabs it was the same mistake the forge hearth made: a 70cm
+         step has no scale to it, and the eye has nothing to measure the throne
+         against. Eight blocks to a tier, offset tier to tier. */
+      const TIER=[[0.74,0.075,0.038,8],[0.62,0.065,0.108,7],[0.50,0.055,0.168,6]];
+      TIER.forEach(([w,h,yy,n],ti)=>{
+        const mat=ti%2?cStone:cDark, half=w/2, per=w/n;
+        for(let k=0;k<n;k++){                    // front and back runs
+          for(const sd of [-1,1])
+            B.at(mat,new THREE.BoxGeometry(per-0.012,h-0.008,0.09),
+                 -half+per*(k+0.5)+(ti%2?per*0.5:0),yy,sd*(half-0.045));
+        }
+        for(let k=1;k<n-1;k++){                  // and the two sides
+          for(const sd of [-1,1])
+            B.at(mat,new THREE.BoxGeometry(0.09,h-0.008,per-0.012),
+                 sd*(half-0.045),yy,-half+per*(k+0.5)+(ti%2?per*0.5:0));
+        }
+        B.at(mat,new THREE.BoxGeometry(w-0.19,h-0.008,w-0.19),0,yy,0);   // the field
+        B.at(ti%2?cDark:cStone,new THREE.BoxGeometry(w+0.012,0.012,w+0.012),0,yy+h/2,0);
+      });
+      /* A step up to it at the front, and a corner marker on the top tier.
+         These were tall silver cones and read as four lit candles standing in
+         front of the chair — a pale vertical at eye height is the strongest
+         thing in a dark frame, and these were competing with the throne they
+         were supposed to be edging. They are squat, dark, and carry the silver
+         as a cap and a collar rather than as the whole piece. */
+      B.at(cStone,new THREE.BoxGeometry(0.34,0.055,0.13),0,0.027,0.42);
+      for(const sx of [-1,1])for(const sz of [-1,1]){
+        B.at(adam,new THREE.CylinderGeometry(0.030,0.038,0.052,8),sx*0.30,0.226,sz*0.30);
+        B.at(silverD,new THREE.TorusGeometry(0.031,0.006,4,10),sx*0.30,0.246,sz*0.30,Math.PI/2);
+        B.at(silverD,new THREE.SphereGeometry(0.026,8,6),sx*0.30,0.266,sz*0.30);
+      }
+      /* The CHAIR has to be legible first. The first build hung eight thick legs
+         off a big body and at a tile's range it was a tangle of scaffolding poles
+         with nothing to sit in — the throne read as a spider standing on a
+         plinth, which is the wrong way round. So: a real seat with a real back,
+         the body rearing BEHIND that back rather than in place of it, and legs
+         thin enough to be a frame around the chair instead of a thicket in front
+         of it. Half the leg radius and two thirds the spread. */
+      B.at(adam,new THREE.BoxGeometry(0.42,0.055,0.34),0,0.318,0.06);    // the seat
+      B.at(adam,new THREE.BoxGeometry(0.44,0.022,0.36),0,0.352,0.06);    // its lip
+      B.at(silverD,new THREE.BoxGeometry(0.45,0.010,0.014),0,0.352,0.235);
+      B.at(adam,new THREE.BoxGeometry(0.40,0.30,0.05),0,0.47,-0.115);    // the back
+      B.at(silverD,new THREE.BoxGeometry(0.42,0.014,0.055),0,0.625,-0.115);
+      /* A web cut into the back of it. The back was a bare slab, and a bare slab
+         is the one surface on a throne that nobody leaves bare — it is the panel
+         the whole room looks at. Radials from the middle, three arcs crossing
+         them, in silver against the adamantine. */
+      {
+        const wy=0.47, wz=-0.086, RR=0.145;
+        const P=(a,r)=>[Math.cos(a)*r*1.30,wy+Math.sin(a)*r,wz];
+        for(let i=0;i<8;i++){
+          const a=i*Math.PI/4+Math.PI/8;
+          addSeg(B,silverM,0,wy,wz,...P(a,RR),0.006,0.004);
+        }
+        for(const rr2 of [RR*0.42,RR*0.72,RR*0.98])for(let i=0;i<8;i++){
+          const a0=i*Math.PI/4+Math.PI/8, a1=a0+Math.PI/4;
+          addSeg(B,silverM,...P(a0,rr2),...P(a1,rr2*0.93),0.0045,0.0045);
+        }
+        B.at(silverM,new THREE.SphereGeometry(0.017,7,6),0,wy,wz);
+      }
+      for(const sx of [-1,1]){
+        B.at(adam,new THREE.CylinderGeometry(0.020,0.026,0.29,6),sx*0.17,0.175,0.185);
+        B.at(adam,new THREE.CylinderGeometry(0.020,0.026,0.14,6),sx*0.17,0.245,-0.09);
+        B.at(adam,new THREE.BoxGeometry(0.045,0.035,0.30),sx*0.20,0.40,0.05); // the arms
+        // each arm ends in a claw, which is what says the chair is the creature
+        for(const c2 of [-1,1])
+          addSeg(B,adam,sx*0.20,0.40,0.195, sx*(0.20+c2*0.035),0.365,0.265,0.014,0.005);
+        B.at(silverD,new THREE.TorusGeometry(0.030,0.008,4,10),sx*0.20,0.40,0.115,0,Math.PI/2,0);
+      }
+      /* And only then the goddess, rearing over the back of it. The abdomen is
+         BANDED: a smooth sphere is a ball however big it is, and the rings are
+         what make it a body. */
+      B.at(adam,new THREE.SphereGeometry(0.185,13,10),0,0.76,-0.30);     // abdomen
+      /* The rings are CUT, not raised, and unlit — see `groove` above. Sunk
+         just inside the surface so the sphere's own silhouette is untouched
+         and only the band goes dark. */
+      for(const dy of [-0.095,-0.012,0.072]){
+        const rr2=Math.sqrt(Math.max(0.0001,0.185*0.185-dy*dy))-0.004;
+        B.at(groove,new THREE.TorusGeometry(rr2,0.011,5,16),0,0.76+dy,-0.30,Math.PI/2);
+      }
+      /* And her mark on the back of it. A spider carries its pattern on the
+         abdomen and that is what the eye reads a species off; three rings alone
+         still leave a banded ball. Silver, so it catches the altar's light from
+         behind the chair. */
+      for(let i=0;i<3;i++){
+        /* On the CROWN, not the front. She rears behind the chair and her own
+           head hides everything below the top of the abdomen from anyone
+           standing in front of the throne — the mark's first placement was on
+           the forward face, where exactly one of the three chevrons could be
+           seen. */
+        const w2=0.078-i*0.018, yy=0.902-i*0.042;
+        const dy2=yy-0.76;
+        const rr2=Math.sqrt(Math.max(0.0001,0.185*0.185-dy2*dy2))-0.002;
+        for(const sd of [-1,1])
+          addSeg(B,silverM,0,yy+0.012,-0.30+rr2*0.30,
+                 sd*w2,yy-0.014,-0.30+rr2*0.92,0.015,0.006);
+      }
+      for(let i=0;i<3;i++)                                               // spinnerets
+        B.at(adam,new THREE.ConeGeometry(0.020,0.055,5),(i-1)*0.032,0.70,-0.455,-1.15,0,0);
+      B.at(adam,new THREE.SphereGeometry(0.105,10,8),0,0.66,-0.12);      // cephalothorax
+      B.at(adam,new THREE.SphereGeometry(0.055,8,7),0,0.635,-0.015);     // her face
+      for(const sd of [-1,1]){                                           // chelicerae
+        addSeg(B,adam,sd*0.030,0.615,-0.02, sd*0.042,0.545,0.020,0.020,0.008);
+      }
+      /* Eight eyes, not two — the count is what makes it read as a spider. But
+         they have to be in ROWS: scattered over the face at four different
+         heights they read as a rash rather than as eyes, which is what the
+         first arrangement did. A real spider carries a row of four small ones
+         above a row of four with the middle pair much the largest, and it is
+         that big central pair the eye actually fixes on. */
+      for(const sd of [-1,1]){
+        B.at(burn,new THREE.SphereGeometry(0.020,8,7),sd*0.026,0.652,0.020);   // the front pair
+        B.at(burn,new THREE.SphereGeometry(0.012,6,5),sd*0.062,0.650,-0.008);
+        B.at(burn,new THREE.SphereGeometry(0.010,6,5),sd*0.024,0.692,0.010);   // the row above
+        B.at(burn,new THREE.SphereGeometry(0.009,6,5),sd*0.056,0.688,-0.014);
+      }
+      for(const sd of [-1,1])for(let i=0;i<4;i++){
+        const fwd=1.5-i;
+        /* Where the hips SIT is the whole difference between a spider and a
+           starburst. All eight used to leave the body within 9cm of each other
+           and from the front the femurs read as a fan of straight rods behind
+           the head — a deck chair rather than a creature. A spider's coxae are
+           spaced right along the side of the cephalothorax, so the legs leave
+           it in four different places and at four different heights, and the
+           knees stay near the top of the body instead of towering over it. */
+        const hip=[sd*(0.075+0.004*i),0.685-0.022*i,-0.185+fwd*0.055];
+        const knee=[sd*(0.20+0.036*i),0.855-0.048*i,-0.135+fwd*0.115];
+        const tip=[sd*(0.24+0.030*i),i<2?0.40:0.16,0.02+fwd*0.17];
+        /* A leg is read from its JOINTS. These were two even tubes with a bead
+           where they met and at a tile's range that is a bent pipe; a real limb
+           is thick at the hip, waisted at the knee and tapers to a point, and
+           the knuckle has to be plainly fatter than either segment it joins. */
+        addSeg(B,adam,...hip,...knee,0.026,0.013);
+        addSeg(B,adam,...knee,...tip,0.015,0.005);
+        B.at(adam,new THREE.SphereGeometry(0.029,8,7),...knee);          // the joint
+        B.at(groove,new THREE.TorusGeometry(0.027,0.005,4,10),...knee);  // and its seam
+        B.at(adam,new THREE.SphereGeometry(0.024,7,6),...hip);           // the coxa
+        // a spur halfway down the femur, the way a real leg carries them
+        const mx=(hip[0]+knee[0])/2,my=(hip[1]+knee[1])/2,mz=(hip[2]+knee[2])/2;
+        addSeg(B,adam,mx,my,mz,mx+sd*0.018,my+0.052,mz-0.024,0.009,0.002);
+        // and the tarsal claw it stands on, turned in toward the dais
+        const tx2=tip[0]-sd*0.030,ty2=tip[1]-0.030,tz2=tip[2]-0.026;
+        addSeg(B,adam,...tip,tx2,ty2,tz2,0.007,0.002);
+      }
+      B.addTo(g0);
+      for(const ch2 of g0.children)ch2.userData={kind:'altar',x:c.tx,y:c.ty};
+      g0.position.set(c.tx+0.5,0,c.ty+0.5);
+      g0.rotation.y=Math.atan2(c.ax-c.tx,c.ay-c.ty)+Math.PI;   // she faces her altar
+      grp.add(g0);
+    }
+    // --- the altar, in the wall's own local frame like every other wall feature
+    {
+      const g0=new THREE.Group(),B=Bins(4.5);
+      B.at(cDark,new THREE.BoxGeometry(0.66,0.07,0.34),0,0.035,0.18);    // footing
+      for(let r=0;r<3;r++){                                              // coursed, like every
+        const hh=0.085, yy=0.07+r*hh;                                    // built thing down here
+        const n=r%2?3:4, w=0.60/n;
+        for(let k=0;k<n;k++)
+          B.at(r%2?cDark:cStone,new THREE.BoxGeometry(w-0.012,hh-0.008,0.30),
+               -0.30+w*(k+0.5),yy+hh/2,0.18);
+      }
+      // the mensa, on a moulding rather than sitting flat on the courses
+      B.at(cDark,new THREE.BoxGeometry(0.66,0.022,0.34),0,0.336,0.18);
+      B.at(cStone,new THREE.BoxGeometry(0.72,0.048,0.38),0,0.371,0.18);
+      B.at(cDark,new THREE.BoxGeometry(0.74,0.014,0.40),0,0.399,0.18);   // its drip edge
+      /* The working surface is STONE, with silver only at its edges. Built as a
+         silver slab with a silver rim on top of it the whole table came out as
+         one white band across the picture — a broad face turned square-on to a
+         torch that sits at the eye is the brightest case there is, and a bright
+         metal there swallows everything standing on it. */
+      B.at(cStone,new THREE.BoxGeometry(0.64,0.010,0.31),0,0.410,0.18);
+      for(const sd of [-1,1])                                            // a raised rim
+        B.at(silverD,new THREE.BoxGeometry(0.64,0.014,0.014),0,0.417,0.18+sd*0.148);
+      B.at(silverD,new THREE.BoxGeometry(0.014,0.014,0.31),-0.312,0.417,0.18);
+      /* Channels cut in the top, running to a spout over the front edge. What an
+         altar is FOR is the detail it should carry, and hers is not a table.
+         Herringbone into the two mains, so the top is worked rather than scored
+         with a pair of parallel lines. */
+      /* Sunk FLUSH with the stone, at 0.410 against a top face at 0.415. The
+         first cut of these sat at 0.417 — 7mm proud of the surface — and a
+         pure-black box standing above a lit table is not a channel, it is a
+         rail: seen from standing height its sides showed and the whole top of
+         the altar read as a black slab. A groove shows one face and no sides. */
+      for(const sd of [-1,1]){
+        B.at(voidM,new THREE.BoxGeometry(0.011,0.010,0.24),sd*0.10,0.410,0.19);
+        for(let i=0;i<4;i++)                                 // feeders into the mains
+          B.at(voidM,new THREE.BoxGeometry(0.052,0.010,0.008),
+               sd*0.132,0.410,0.118+i*0.050,0,sd*0.6,0);
+      }
+      B.at(voidM,new THREE.BoxGeometry(0.22,0.010,0.011),0,0.410,0.30);
+      // and a lip over the front edge for it to run off, not a knob
+      B.at(silverD,new THREE.BoxGeometry(0.070,0.010,0.055),0,0.409,0.360,0.30,0,0);
+      B.at(silverD,new THREE.BoxGeometry(0.070,0.022,0.010),0,0.404,0.382);
+      B.at(silverD,new THREE.TorusGeometry(0.030,0.008,4,10),0,0.418,0.09,Math.PI/2); // the ring
+      // her mark burning on the front of it, cut through to the light behind, and
+      // a silver frame round it so it reads as set in rather than painted on
+      B.at(voidM,new THREE.BoxGeometry(0.26,0.20,0.02),0,0.20,0.332);
+      for(const [w,h,px,py] of [[0.30,0.020,0,0.310],[0.30,0.020,0,0.090],
+                                [0.020,0.24,-0.14,0.20],[0.020,0.24,0.14,0.20]])
+        B.at(silverM,new THREE.BoxGeometry(w,h,0.028),px,py,0.336);
+      const SP=(px,py,r2)=>B.at(burn,new THREE.SphereGeometry(r2,6,5),px,py,0.342);
+      SP(0,0.250,0.022);SP(0,0.234,0.014);SP(0,0.196,0.038);             // head, waist, body
+      /* Her legs BEND. Eight straight rays off a blob is a sunburst, which is
+         the same thing the house sigil failed as twice before it was allowed a
+         knee — out and up to the joint, then out and down to the foot. */
+      for(const sd of [-1,1])for(let i=0;i<4;i++){
+        /* Wide, and each leg from its own point on the body. Bent legs bunched
+           into a tight arc off one hip do not read as legs either — they merge
+           into a filled triangle and the mark comes out as a moth with two
+           wings, which is what the first attempt at the bend produced. */
+        const a=-0.58+i*0.48, R=0.050+0.008*Math.abs(1.5-i);
+        const hx=sd*0.020, hy=0.240-i*0.020;
+        const kx=hx+sd*Math.cos(a)*R, ky=hy+Math.sin(a)*R*0.90+0.024;
+        const fx=hx+sd*Math.cos(a)*R*2.10, fy=ky-0.056-0.014*i;
+        addSeg(B,burn,hx,hy,0.342,kx,ky,0.342,0.008,0.005);
+        addSeg(B,burn,kx,ky,0.342,fx,fy,0.342,0.005,0.003);
+      }
+      /* Votive candles at the corners. The first pair were a silver stick on a
+         wide silver saucer and read as two white posts on funnels — a candle is
+         WAX on a small pricket, and the flame is a teardrop, not a bead. The
+         saucer is narrower than the stick is tall, which is what stops it
+         reading as a base for something else. */
+      for(const sd of [-1,1]){
+        B.at(silverD,new THREE.CylinderGeometry(0.024,0.030,0.012,8),sd*0.27,0.421,0.18);
+        B.at(silverD,new THREE.TorusGeometry(0.022,0.004,4,10),sd*0.27,0.428,0.18,Math.PI/2);
+        B.at(wax,new THREE.CylinderGeometry(0.015,0.017,0.090,8),sd*0.27,0.478,0.18);
+        B.at(wax,new THREE.CylinderGeometry(0.017,0.011,0.016,8),sd*0.27,0.529,0.18); // its melt
+        B.at(burn,new THREE.ConeGeometry(0.012,0.040,6),sd*0.27,0.556,0.18);
+      }
+      if(!c.opened){
+        /* What the house has laid on her table. Three cylinders read as three
+           cylinders; a chalice needs a foot, a stem and a bowl, and a knife needs
+           a blade you can tell from its handle. */
+        /* The chalice. Its bowl was a 55mm cone flaring upward with a flat
+           coloured lid on top, which is a funnel — the widest part of a cup is
+           not the very top, and what says "full" is the liquid sitting DOWN
+           inside the rim rather than capping it. Foot, knop, waisted bowl,
+           a lip rolled over, and the wine below it. */
+        B.at(silverM,new THREE.CylinderGeometry(0.038,0.046,0.012,10),-0.17,0.420,0.15);
+        B.at(silverM,new THREE.CylinderGeometry(0.012,0.012,0.036,7),-0.17,0.444,0.15);
+        B.at(silverM,new THREE.SphereGeometry(0.019,8,6),-0.17,0.464,0.15);       // the knop
+        /* The bowl is nearly straight-sided over a rounded base. A cone is a
+           funnel however small it is — the flare is the tell, and a cup that
+           widens hard from a thin stem is read as one every time. */
+        B.at(silverM,new THREE.SphereGeometry(0.036,10,7,0,6.3,0,1.05),-0.17,0.512,0.15,Math.PI);
+        B.at(silverM,new THREE.CylinderGeometry(0.038,0.034,0.030,10),-0.17,0.516,0.15);
+        B.at(silverM,new THREE.TorusGeometry(0.038,0.005,4,12),-0.17,0.531,0.15,Math.PI/2);
+        B.at(burn,new THREE.CylinderGeometry(0.033,0.033,0.006,10),-0.17,0.521,0.15);
+        B.at(silverM,new THREE.CylinderGeometry(0.062,0.020,0.038,10),0.16,0.434,0.22);  // a bowl
+        B.at(groove,new THREE.CylinderGeometry(0.052,0.052,0.004,10),0.16,0.451,0.22);
+        /* The knife was adamantine on adamantine on a dark table and simply was
+           not there. A blade is bright and a hilt is not: that contrast is the
+           whole of how a knife is recognised. */
+        B.at(silverM,new THREE.BoxGeometry(0.018,0.008,0.105),0.15,0.419,0.095);
+        B.at(silverM,new THREE.ConeGeometry(0.013,0.052,4),0.15,0.419,0.174,Math.PI/2);
+        B.at(silverD,new THREE.BoxGeometry(0.034,0.010,0.012),0.15,0.419,0.038);   // its guard
+        B.at(adam,new THREE.CylinderGeometry(0.013,0.011,0.048,7),0.15,0.419,0.008,Math.PI/2);
+        B.at(silverD,new THREE.SphereGeometry(0.015,7,6),0.15,0.419,-0.020);       // the pommel
+        for(let i=0;i<7;i++)                                                       // coins
+          B.at(silverD,new THREE.CylinderGeometry(0.021,0.021,0.005,8),
+               -0.02+((i*37)%9-4)*0.014,0.417+(i>>2)*0.005,0.24+((i*53)%7-3)*0.012);
+      }
+      B.addTo(g0);
+      for(const ch2 of g0.children)ch2.userData={kind:'altar',x:c.ax,y:c.ay};
+      g0.rotation.y=Math.atan2(-c.adx,-c.ady);
+      g0.position.set(c.ax+0.5+c.adx*0.5,0,c.ay+0.5+c.ady*0.5);
+      grp.add(g0);
+      // the one light in the chapel, and it is hers: violet, low, at the altar
+      const l=new THREE.PointLight(0xa86ce8,0.85,4.4,2);
+      l.position.set(c.ax+0.5+c.adx*0.5-c.adx*0.34,0.62,c.ay+0.5+c.ady*0.5-c.ady*0.34);
+      grp.add(l);
+      (R3.candleFlames||(R3.candleFlames=[])).push({light:l,base:0.85,y:0.62});
+    }
+  }
+  /* Drow floor dressing: web caught in the corners, egg sacs, shed chitin and
+     spent hand-crossbow bolts. Same terms as the crypt's and the duergar's —
+     seeded from each tile's own coordinates so a rebuild never reshuffles it,
+     instanced, flat enough never to block a path, and `decor` so a tap goes
+     through to whatever is lying on the same tile. */
+  if(th.name==='Drow'){
+    const litter=new THREE.Group();
+    const silkT=drowTex('silk');
+    const dSilkMat=new THREE.MeshPhongMaterial({color:0x555c6e,map:silkT,bumpMap:silkT,
+      bumpScale:0.003,specular:0x181c26,shininess:10});
+    const sacMat=new THREE.MeshPhongMaterial({color:0x51503f,map:silkT,bumpMap:silkT,
+      bumpScale:0.004,specular:0x201e18,shininess:14});
+    // chitin: dark and lacquered, the one thing down here with a real sheen —
+    // kept modest all the same, since a small hard curve is a specular trap
+    const chitMat=new THREE.MeshPhongMaterial({color:0x1c1720,specular:0x252030,shininess:22});
+    const boltMat=new THREE.MeshPhongMaterial({color:0x2b2c34,specular:0x101218,shininess:24});
+    const boxU=new THREE.BoxGeometry(1,1,1);
+    const rockU=new THREE.IcosahedronGeometry(1,0);
+    const sphU=new THREE.SphereGeometry(1,7,5);
+    const cylU=new THREE.CylinderGeometry(1,1,1,5);
+    const QID=new THREE.Quaternion();
+    const yawQ=(a)=>new THREE.Quaternion().setFromEuler(new THREE.Euler(0,a,0));
+    const tumbleQ=(f)=>new THREE.Quaternion().setFromEuler(new THREE.Euler(f()*6.3,f()*6.3,f()*6.3));
+    const loc=(px,py,pz,q,sx,sy,sz)=>new THREE.Matrix4().compose(
+      new THREE.Vector3(px,py,pz),q,new THREE.Vector3(sx,sy,sz));
+    // a unit box stretched between two points — the instanced equivalent of addSeg
+    const segM=(ax,ay,az,bx,by,bz,t)=>{
+      const d=new THREE.Vector3(bx-ax,by-ay,bz-az), len=d.length();
+      const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());
+      return new THREE.Matrix4().compose(
+        new THREE.Vector3((ax+bx)/2,(ay+by)/2,(az+bz)/2),q,new THREE.Vector3(t,len,t));
+    };
+    const strands=[],sacs=[],chit=[],bolts=[];
+    const wall=(x,y)=>{const t=L.grid[y*L.w+x];return t===T_WALL||t===T_SECRET;};
+    const busy=new Set((L.drow||[]).map(f=>f.x+','+f.y));
+    /* Hanging cobwebs, the crypt's own geometry hung on the drow's terms. The
+       corner sheets above are silk that was SPUN — flat, taut, in the one place
+       a strand has two anchors — and the house needed the other kind too: old
+       tangle up in the dark that nobody has swept, which is what actually reads
+       as a spider city when you walk down a corridor.
+
+       Cooler and a touch brighter than a crypt's dust-grey, because everything
+       in here is lit by faerzress. `webBase` carries that through `shadeSprites`.
+
+       Each web is its own LineSegments with its own material clone, so each can
+       be dimmed by its own distance — which is why the count is CAPPED. The
+       crypt's 4% of tiles is about sixteen draw calls on a big floor; a house
+       thick enough with web to notice runs three times that, and DROW_WEBS is
+       what stops a large open level turning into a hundred. */
+    const DROW_WEBS=30;
+    const dWebBase=new THREE.Color(0xc6c2e0);
+    const dWebMat=new THREE.LineBasicMaterial({color:0xc6c2e0,transparent:true,
+      opacity:0.30,depthWrite:false});
+    /* The budget is spent as a RATE rather than as a running total. Counting up
+       to a cap inside a scan that runs top-left to bottom-right puts every web
+       in the first rooms it meets and leaves the bottom of a large floor bare —
+       the cap has to be turned into a per-tile probability against the floor's
+       own size before the loop, so the thirty are spread over the whole level.
+       A hard stop is still kept, as a backstop rather than as the mechanism. */
+    let nFloor=0;
+    for(let i=0;i<L.grid.length;i++)if(L.grid[i]===T_FLOOR)nFloor++;
+    const webP=Math.min(0.13,DROW_WEBS/Math.max(1,nFloor));
+    let nWebs=0;
+    for(let y=1;y<L.h-1;y++)for(let x=1;x<L.w-1;x++){
+      if(L.grid[y*L.w+x]!==T_FLOOR)continue;
+      let hsh=((x*2246822519)^(y*3266489917))>>>0;
+      const rr=()=>{hsh=(hsh*1664525+1013904223)>>>0;return hsh/4294967296;};
+      const cx=x+0.5,cz=y+0.5;
+      /* Web gathers in a CORNER, where two walls meet, because that is the only
+         place a strand has two anchors close enough together. Laying it on open
+         floor instead would read as a net somebody dropped. */
+      for(const [dx,dz] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
+        if(!wall(x+dx,y)||!wall(x,y+dz))continue;
+        if(rr()>0.55)continue;
+        const ax=cx+dx*0.5, az=cz+dz*0.5;           // the corner post itself
+        /* Strands span from one wall to the other ACROSS the corner, which is a
+           triangular sheet a hand's breadth wide. Laid out as rays from the
+           corner instead they came out over a metre long and lying flat across
+           the floor — straight rods radiating into the room, which is neither a
+           web nor in the corner. */
+        for(let k=0;k<5;k++){
+          const t=0.10+k*0.062, h=0.025+k*0.042;
+          strands.push(segM(ax-dx*t,h,az, ax,h,az-dz*t, 0.0055));
+        }
+        for(let k=0;k<4;k++){                       // the guys holding it up
+          const a=(k+0.5)/4*(Math.PI/2), t=0.33;
+          strands.push(segM(ax,0.018,az,
+                            ax-dx*Math.cos(a)*t,0.235,az-dz*Math.sin(a)*t, 0.0045));
+        }
+      }
+      /* Hung BEFORE the furniture check, and it is the one piece of dressing
+         that may share a tile with a wall feature: these ride up near the roof
+         and a rose window or a brazier is down on the wall face, so nothing
+         collides. Against a wall it hangs off that wall; in the open it swings
+         from the ceiling, because drow silk spans whatever it likes. */
+      if(nWebs<DROW_WEBS*1.6&&rr()<webP){
+        const near=[[-1,0],[1,0],[0,-1],[0,1]].filter(([dx,dz])=>wall(x+dx,y+dz));
+        const n2=1+(rr()<0.30?1:0);
+        for(let k=0;k<n2;k++){
+          const w2=new THREE.LineSegments(cobwebGeo(rr,0.42+rr()*0.40),dWebMat.clone());
+          const a2=near.length?near[Math.floor(rr()*near.length)]:null;
+          // high, but not all at one height — a row of webs level with each
+          // other reads as a fitting rather than as neglect
+          const hy2=WALLH-0.14-rr()*0.52;
+          w2.position.set(cx+(a2?a2[0]*0.34:(rr()-0.5)*0.5),hy2,
+                          cz+(a2?a2[1]*0.34:(rr()-0.5)*0.5));
+          w2.rotation.set((rr()-0.5)*0.6,a2?Math.atan2(-a2[0],-a2[1]):rr()*Math.PI*2,
+                          (rr()-0.5)*0.7);
+          w2.userData.decor=true;w2.userData.webBase=dWebBase;
+          litter.add(w2);
+          (R3.webMeshes||(R3.webMeshes=[])).push(w2);
+          nWebs++;
+        }
+      }
+      if(busy.has(x+','+y))continue;                // a wall feature stands here
+      const roll=rr();
+      if(roll<0.055){                               // a clutch of egg sacs
+        const n=2+Math.floor(rr()*4);
+        const ox=cx+(rr()-0.5)*0.44, oz=cz+(rr()-0.5)*0.44;
+        for(let k=0;k<n;k++){
+          const s=0.045+rr()*0.045;
+          sacs.push(loc(ox+(rr()-0.5)*0.26,s*0.75,oz+(rr()-0.5)*0.26,tumbleQ(rr),s,s*1.15,s));
+        }
+      }else if(roll<0.10){                          // shed chitin, curled and dark
+        const n=2+Math.floor(rr()*3);
+        for(let k=0;k<n;k++){
+          const s=0.035+rr()*0.055;
+          chit.push(loc(cx+(rr()-0.5)*0.55,s*0.3,cz+(rr()-0.5)*0.55,tumbleQ(rr),s,s*0.42,s*0.8));
+        }
+      }else if(roll<0.135){                         // bolts, shot and never recovered
+        const n=1+Math.floor(rr()*3);
+        for(let k=0;k<n;k++){
+          const a=rr()*Math.PI*2;
+          const bx=cx+(rr()-0.5)*0.5, bz=cz+(rr()-0.5)*0.5;
+          const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,a,Math.PI/2));
+          bolts.push(loc(bx,0.012,bz,q,0.011,0.20,0.011));
+          bolts.push(loc(bx+Math.cos(a)*0.10,0.016,bz-Math.sin(a)*0.10,yawQ(a),0.028,0.026,0.026));
+        }
+      }
+    }
+    const mk=(mats,geo,mat)=>{ if(!mats.length)return;
+      const inst=new THREE.InstancedMesh(geo,mat,mats.length);
+      mats.forEach((m,i)=>inst.setMatrixAt(i,m));inst.instanceMatrix.needsUpdate=true;
+      inst.userData.decor=true;
+      litter.add(inst); };
+    mk(strands,boxU,dSilkMat); mk(sacs,sphU,sacMat);
+    mk(chit,rockU,chitMat); mk(bolts,cylU,boltMat);
+    grp.add(litter);
+  }
   /* Duergar floor dressing: haulage track, slag, spilled ore and dropped tools.
      Built on the crypt's terms — seeded from each tile's own coordinates so a
      rebuild never reshuffles it, instanced down to a handful of draw calls, flat
@@ -9000,8 +9915,152 @@ function buildLevel(L){
     // is set in — which is exactly what happened the first time.
     const leadMat=new THREE.MeshPhongMaterial({color:0x0e0f13,specular:0x1c1e26,shininess:8});
     const silverMat=new THREE.MeshPhongMaterial({color:silver,specular:0x6a7088,shininess:28});
+    // the furniture's own surfaces. Stone and metal borrow the duergar's
+    // modulation maps — they sit around white and carry no tone of their own, so
+    // grain is grain whoever cut it — and the silk is the drow's own.
+    const stoneT=duergarTex('stone'),ironT=duergarTex('iron'),silkT=drowTex('silk');
+    const fStoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.14),
+      map:stoneT,bumpMap:stoneT,bumpScale:0.009,specular:0x1a1c24,shininess:14});
+    const fDarkMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall2).multiplyScalar(1.25),
+      map:stoneT,bumpMap:stoneT,bumpScale:0.011,specular:0x141620,shininess:10});
+    const fIronMat=new THREE.MeshPhongMaterial({color:0x2a2b33,map:ironT,bumpMap:ironT,
+      bumpScale:0.004,specular:0x0e0e12,shininess:26});
+    const fSilverMat=new THREE.MeshPhongMaterial({color:silver,map:ironT,bumpMap:ironT,
+      bumpScale:0.003,specular:0x3a3f52,shininess:30});
+    /* Jade, and its specular is the thing to watch. A polished green stone wants
+       a sheen, but the torch sits at the eye and Blinn-Phong multiplies the
+       specular by roughly (shininess+2)/8 — the trap the duergar ironwork fell
+       into three times. A modest colour at a modest shininess. */
+    const jadeMat=new THREE.MeshPhongMaterial({color:0x2f6f57,map:stoneT,bumpMap:stoneT,
+      bumpScale:0.004,specular:0x223a30,shininess:24});
+    // Silk, and it has to be DIM. At 0x9aa2bc under a torch at the eye every
+    // strand came out white and the fence read as a jail window.
+    const silkMat=new THREE.MeshPhongMaterial({color:0x5c6376,map:silkT,bumpMap:silkT,
+      bumpScale:0.004,specular:0x1a1e28,shininess:10});
+    const flames=R3.candleFlames||[];
+    const pend=[];
     if(L.drow)for(const f of L.drow){
       const hue=HUES[(f.hue||0)%HUES.length];
+      if(f.kind&&f.kind!=='rose'){
+        const g0=new THREE.Group(),B=Bins();
+        if(f.kind==='guardian'){
+          /* A jade spider on a plinth. The sources put these at the gates and the
+             important doors of a drow city, so it is the one piece that reads as
+             a sentry rather than as ornament. */
+          B.at(fDarkMat,new THREE.BoxGeometry(0.44,0.06,0.34),0,0.03,0.19);
+          B.at(fStoneMat,new THREE.BoxGeometry(0.38,0.30,0.28),0,0.21,0.19);
+          B.at(fDarkMat,new THREE.BoxGeometry(0.44,0.045,0.34),0,0.378,0.19);
+          B.at(fSilverMat,new THREE.BoxGeometry(0.40,0.012,0.30),0,0.404,0.19);
+          B.addTo(g0);
+          const S=Bins();
+          addSpiderBody(S,jadeMat,0,0.41,0.17,1.22);           // it is built facing the room
+          S.addTo(g0);
+        }else if(f.kind==='shrine'){
+          /* A niche to Lolth. A wall tile is a solid box, so the recess is the
+             trick the crypt and the sewer culverts use: a dead-black panel on the
+             face with a surround standing proud, and everything inside sitting a
+             hair forward of the wall plane rather than behind it. */
+          const Y=0.80, W=0.36, H=0.50;
+          B.at(voidMat,new THREE.BoxGeometry(W,H,0.02),0,Y,0.012);
+          for(const [w,h,x2,y2] of [[W+0.13,0.05,0,Y+H/2+0.028],[W+0.13,0.05,0,Y-H/2-0.028],
+                                    [0.05,H+0.10,-W/2-0.028,Y],[0.05,H+0.10,W/2+0.028,Y]])
+            B.at(fStoneMat,new THREE.BoxGeometry(w,h,0.055),x2,y2,0.028);
+          B.at(fSilverMat,new THREE.BoxGeometry(W+0.16,0.014,0.065),0,Y+H/2+0.058,0.032);
+          B.at(fDarkMat,new THREE.BoxGeometry(W+0.18,0.045,0.13),0,Y-H/2-0.075,0.065); // the shelf
+          B.at(fSilverMat,new THREE.CylinderGeometry(0.055,0.042,0.035,10),0,Y-H/2-0.035,0.075); // offering bowl
+          B.addTo(g0);
+          const S=Bins();
+          addSpiderBody(S,fSilverMat,0,Y-0.17,0.045,0.72);
+          S.addTo(g0);
+        }else if(f.kind==='fence'){
+          /* A panel of the silk fence that rings a compound — the twenty-foot
+             silvery web you cannot pass without a spider mask. Stretched on a
+             frame and standing off the wall, so it reads as a barrier somebody
+             put there rather than as cobweb that grew. */
+          /* An ORB WEB stretched on a frame, not a lattice. A regular grid of
+             warp and weft is a jail window, which is exactly what the first one
+             looked like; radials and a spiral are what say spider. */
+          const Y=0.66, W=0.80, H=0.98, N=8;
+          for(const [w,h,x2,y2] of [[W,0.04,0,Y+H/2],[W,0.04,0,Y-H/2],
+                                    [0.04,H,-W/2,Y],[0.04,H,W/2,Y]])
+            B.at(fIronMat,new THREE.BoxGeometry(w,h,0.045),x2,y2,0.07);
+          const rim=(a)=>{                        // where a radial meets the frame
+            const cs=Math.cos(a),sn2=Math.sin(a);
+            const t=Math.min(Math.abs((W/2-0.03)/(cs||1e-6)),Math.abs((H/2-0.03)/(sn2||1e-6)));
+            return [cs*t,Y+sn2*t];
+          };
+          for(let i=0;i<N;i++){
+            const a=i*Math.PI*2/N+0.19, [ex,ey]=rim(a);
+            addSeg(B,silkMat,0,Y,0.07,ex,ey,0.07,0.007,0.005);
+          }
+          for(let k=1;k<=4;k++){                  // the spiral, sagging between radials
+            const f2=k/4.6;
+            for(let i=0;i<N;i++){
+              const a0=i*Math.PI*2/N+0.19, a1=(i+1)*Math.PI*2/N+0.19;
+              const [x0,y0]=rim(a0),[x1,y1]=rim(a1);
+              addSeg(B,silkMat,x0*f2,Y+(y0-Y)*f2,0.07,x1*f2,Y+(y1-Y)*f2,0.07,0.005,0.005);
+            }
+          }
+          for(const sd of [-1,1])                 // two braces off the wall
+            B.at(fIronMat,new THREE.BoxGeometry(0.028,0.028,0.085),sd*W/2,Y,0.030);
+          B.addTo(g0);
+        }else if(f.kind==='brazier'){
+          // cold fire in a bowl on a tripod. The one drow furniture that lights
+          // anything, and it lights it violet.
+          B.at(fIronMat,new THREE.CylinderGeometry(0.10,0.13,0.03,8),0,0.015,0.26);
+          for(let i=0;i<3;i++){
+            const a=i*Math.PI*2/3+0.5;
+            B.at(fIronMat,new THREE.CylinderGeometry(0.016,0.020,0.52,5),
+                 Math.cos(a)*0.055,0.27,0.26+Math.sin(a)*0.055,
+                 Math.sin(a)*0.16,0,-Math.cos(a)*0.16);
+          }
+          B.at(fIronMat,new THREE.CylinderGeometry(0.145,0.075,0.11,10),0,0.575,0.26);
+          B.at(fSilverMat,new THREE.TorusGeometry(0.145,0.011,5,12),0,0.625,0.26,Math.PI/2);
+          B.addTo(g0);
+          const sub=new THREE.Group();sub.position.set(0,0,0.26);g0.add(sub);
+          const fire=[['#7a3fc0',0.30,0.20,0.03,0.42],['#a86ce8',0.19,0.16,0.05,0.50],
+                      ['#dcb4ff',0.10,0.11,0.07,0.60]].map(([c,w,h,dy,op])=>{
+            const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:fxGlowTex(c),
+              transparent:true,opacity:op,depthWrite:false,blending:THREE.AdditiveBlending}));
+            sp.scale.set(w,h,1);sp.position.set(0,0.63+dy,0);sp.userData={w,h,dy};
+            sub.add(sp);return sp;});
+          g0.userData.flame={fire,y:0.63,base:0.62,col:0xa86ce8,dist:3.4,z:0.26};
+        }else{ // wallweb
+          /* Web strung across the wall with something in it. The grimmest thing
+             in the theme and the cheapest: a fan of strands and one wrapped
+             bundle hanging in them. */
+          const Y=0.92;
+          for(let i=0;i<9;i++){                   // strands fanning from a high anchor
+            const a=-1.15+i*0.29, len=0.62+((i*7)%5)*0.06;
+            addSeg(B,silkMat,0,Y,0.045,Math.sin(a)*len,Y-Math.cos(a)*len,0.045,0.006,0.004);
+          }
+          for(let i=0;i<4;i++){                   // and the cross-threads
+            const d2=0.16+i*0.145;
+            for(let k=0;k<8;k++){
+              const a0=-1.15+k*0.29, a1=-1.15+(k+1)*0.29, sag=d2*1.03;
+              addSeg(B,silkMat,Math.sin(a0)*d2,Y-Math.cos(a0)*d2,0.048,
+                              Math.sin(a1)*sag,Y-Math.cos(a1)*sag,0.048,0.0045,0.0045);
+            }
+          }
+          const bx=-0.09, by=Y-0.44;              // the bundle, wrapped and hung
+          B.at(silkMat,new THREE.SphereGeometry(0.105,9,7),bx,by,0.075,0,0,0.22);
+          B.at(silkMat,new THREE.SphereGeometry(0.072,8,6),bx+0.035,by-0.18,0.072,0,0,0.22);
+          for(let i=0;i<4;i++)                    // the wrapping, banded round it
+            B.at(silkMat,new THREE.TorusGeometry(0.088-i*0.014,0.010,4,9),
+                 bx+i*0.012,by+0.06-i*0.06,0.075,Math.PI/2,0,0.22);
+          B.addTo(g0);
+        }
+        g0.rotation.y=Math.atan2(-f.dx,-f.dy);
+        g0.position.set(f.x+0.5+f.dx*0.5,0,f.y+0.5+f.dy*0.5);
+        grp.add(g0);
+        const fl=g0.userData.flame;
+        if(fl){
+          const w=new THREE.Vector3(0,fl.y+0.05,fl.z+0.10);
+          w.applyEuler(g0.rotation).add(g0.position);
+          pend.push({pri:0,base:fl.base,col:fl.col,dist:fl.dist,y:fl.y,pos:w,fire:fl.fire});
+        }
+        continue;
+      }
       // Unlit, on purpose. A lit material adds the torch to its own colour and a
       // violet pane comes out white; the glass is the one thing here that is a
       // source rather than a surface, so it is drawn at its own colour flat.
@@ -9047,10 +10106,23 @@ function buildLevel(L){
       grp.add(g0);
       // faint: the window colours the wall around it and no more. A rose window
       // that lit the room would make the party's own torch pointless.
-      const l=new THREE.PointLight(hue.c,0.42,3.0,2);
-      l.position.set(f.x+0.5+f.dx*0.5-f.dx*0.34,Y,f.y+0.5+f.dy*0.5-f.dy*0.34);
-      grp.add(l);
+      pend.push({pri:1,base:0.42,col:hue.c,dist:3.0,y:Y,
+        pos:new THREE.Vector3(f.x+0.5+f.dx*0.5-f.dx*0.34,Y,f.y+0.5+f.dy*0.5-f.dy*0.34)});
     }
+    /* Same ration the duergar halls run under, and for the same reason: three.js
+       Phong pays for every light on every fragment of every material, and a
+       furnished floor now has braziers as well as windows. A brazier is a fire
+       and outranks a window, which the theme itself calls a statement rather than
+       a way of seeing. Everything keeps its flame sprites either way. */
+    pend.sort((a,b)=>a.pri-b.pri);
+    for(const q of pend.slice(0,FURNITURE_LIGHTS)){
+      const l=new THREE.PointLight(q.col,q.base,q.dist,2);
+      l.position.copy(q.pos);grp.add(l);
+      if(q.fire)flames.push({light:l,base:q.base,fire:q.fire,y:q.y});
+    }
+    for(const q of pend.slice(FURNITURE_LIGHTS))
+      if(q.fire)flames.push({base:q.base,fire:q.fire,y:q.y});
+    R3.candleFlames=flames;
     // Stalactites. The house was cut out of living rock and the masons stopped
     // at the walls, so the roof still hangs. Seeded from tile coordinates like
     // the cave gems, so nothing about them needs saving and a rebuild puts the
@@ -10426,6 +11498,21 @@ function triggerTrap(tr){
     const dmg=roll(tr.dmg[0],tr.dmg[1]);
     if(d20()+sv>=tr.dc){hurtChar(ch,Math.floor(dmg/2),'spike trap');UI.toast(ch.name+' twists aside — half damage!');}
     else {hurtChar(ch,dmg,'spike trap');UI.toast('Spikes lance up from the floor!');}
+  }else if(tr.kind==='websnare'){
+    /* A strand strung across the passage at ankle height. One save, no attack
+       roll and no damage: whoever walks into it is simply held, which in a house
+       full of drow is quite enough. Reflex rather than Fortitude — you get clear
+       of a web by being quick, not by being tough — and `hold` is a condition
+       both canAct and charAC already read, so nothing new has to be taught to
+       the rules to make it bite. */
+    const ch=pick(alive);
+    const sv=charSaves(ch).ref+foundBonus;
+    if(d20()+sv>=tr.dc){
+      UI.toast(ch.name+' catches the strand and steps clear of it.');
+    }else if(addCond(ch,{kind:'hold',dur:tr.dur})){
+      UI.float(ch,'held!','#c9a8e8');
+      UI.toast('Silk snaps taut round '+ch.name+' — they are held fast!');
+    }else UI.toast('A snare closes on '+ch.name+' and finds no purchase.'); // freedom
   }else if(tr.kind==='pdart'||tr.kind==='sleepdart'){
     // the dart must hit (dodge it by AC), and then the venom must take (resist
     // it by Fortitude) — two layers, because paralysis and sleep are that bad
@@ -13515,6 +14602,32 @@ function openForge(){
   if(coffinNoise(f.ax,f.ay,8))setTimeout(()=>UI.toast('The whole hall has heard it…'),900);
   saveGame();
 }
+/* Lolth's altar carries what the house has laid on it, and it is robbed once.
+   Written on openBier's and openForge's terms — the same reach check, the same
+   rebuild so the scenery changes, the same spill onto a walkable neighbour (the
+   altar tile itself is against a wall but the throne block is not walkable), and
+   the same noise, because taking the offerings off a goddess's table is not a
+   quiet thing to do. */
+function openAltar(){
+  const L=G.L,c=L.chapel;
+  if(!c)return;
+  if(Math.abs(c.ax-G.px)+Math.abs(c.ay-G.py)>1){UI.toast('Too far to reach the altar.');return;}
+  if(c.opened){UI.toast('The altar is bare. Nothing has been left for you.');return;}
+  c.opened=true;
+  SFX.secret();
+  buildLevel(L);
+  const spill=[];
+  for(let k=0;k<2+rnd(2);k++)spill.push(randLoot(G.depth+2,true,true,true));
+  const near=DIRS.map(([dx,dy])=>({x:c.ax+dx,y:c.ay+dy}))
+    .filter(p=>walkableTile(tileAt(p.x,p.y)));
+  const drop=near.length?near[0]:{x:G.px,y:G.py};
+  const di=drop.y*L.w+drop.x;
+  (L.items[di]=L.items[di]||[]).push(...spill);
+  refreshItemSprite(L,di);
+  UI.toast('You take what was laid before her: '+spill.map(itemName).join(', ')+'.');
+  if(coffinNoise(c.ax,c.ay,8))setTimeout(()=>UI.toast('The whole chapel has heard it…'),900);
+  saveGame();
+}
 // camp on a floor a third time and something comes looking for you
 function summonHuntingPack(){
   const L=G.L;
@@ -13582,7 +14695,7 @@ function serializeGame(){
       traps:Object.values(L.traps),items:Object.keys(L.items).map(i=>[+i,L.items[i]]),
       monsters:L.monsters.map(m=>{const c=Object.assign({},m);delete c._sc;delete c._regenT;delete c.dot;return c;}),
       secrets:L.secrets,lockedRoom:L.lockedRoom,restCount:L.restCount||{},restsHere:L.restsHere||0,
-      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,forge:L.forge||null,lurkers:L.lurkers||[],duergar:L.duergar||[],pillars:L.pillars||[],drow:L.drow||[],
+      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,forge:L.forge||null,chapel:L.chapel||null,lurkers:L.lurkers||[],duergar:L.duergar||[],pillars:L.pillars||[],drow:L.drow||[],
     },
   };
 }
@@ -13602,7 +14715,7 @@ function deserializeGame(o){
     w:lv.w,h:lv.h,grid:b64ToU8(lv.grid),explored:b64ToU8(lv.explored),
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
     traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
-    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,forge:lv.forge||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],pillars:lv.pillars||[],drow:lv.drow||[],
+    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,forge:lv.forge||null,chapel:lv.chapel||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],pillars:lv.pillars||[],drow:lv.drow||[],
   };
   clearFx();
   G.L=L;G.over=false;
@@ -14025,6 +15138,7 @@ const UI=(()=>{
     const tint=kind==='gas'?'rgba(120,200,80,0.22)'
       :kind==='pdart'?'rgba(80,220,200,0.22)'
       :kind==='sleepdart'?'rgba(165,125,220,0.22)'
+      :kind==='websnare'?'rgba(200,168,232,0.20)'   // faerzress violet: it draws no blood
       :'rgba(200,45,30,0.20)';
     el.style.background='radial-gradient(circle at center, '+tint+', transparent 60%),'
       +'radial-gradient(circle at center, rgba(0,0,0,0.30), rgba(0,0,0,0.52) 78%)';
@@ -14966,6 +16080,7 @@ function initInput(){
       if(u.kind==='coffin'){openCoffin(u.ci,u.slot);return;}
       if(u.kind==='bier'){openBier();return;}
       if(u.kind==='anvil'){openForge();return;}
+      if(u.kind==='altar'){openAltar();return;}
       if(u.kind==='plaque'){readEpitaph(u.x,u.y,u.n);return;}
       if(u.kind==='monster')return; // attacks come from hands
     }

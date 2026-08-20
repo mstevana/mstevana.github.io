@@ -44,7 +44,7 @@ the repo, so treat the committed file as authoritative.
 
 There is no test suite in the repo either. Sessions have built throwaway
 node harnesses that stub `window`/`document`/`THREE`, load the pure-logic
-part of the file, and assert on it (the T1–T56 series referenced in the
+part of the file, and assert on it (the T1–T57 series referenced in the
 git log). If you make a behavioural change, expect to rebuild a harness
 rather than find one — and note that the numbering only ever grows, so the
 git log is the index of what each one covers.
@@ -850,6 +850,158 @@ three themes carry real machinery:
     exactly how it was reported. It needs a shaded shaft, a shadow thrown onto
     the brick beside it, mouldings top and bottom, and the frieze stopping at it.
 
+  ### The spider, and the rest of the house
+
+  The theme shipped without a single spider in it — `grep -c spider` over the
+  engine returned one comment — which for the City of Spiders is the whole game.
+  It is now the motif everywhere, on the same terms the duergar iconography got.
+
+  **The eight wall variants** are keyed on the variant itself, not `variant%4`
+  (four treatments twice each, none of them drow): plain, an engaged pilaster, an
+  **obsidian spider**, an older worn hand, **Lolth's own mark**, **web in the
+  spandrels**, a **house sigil**, and **a sigil chiselled out**. Lolth's mark and
+  the spandrel web are painted onto the emissive sheet too, so they burn like the
+  inscription — hers is the only device in the house that carries the script's
+  light.
+
+  Three shape lessons, all found by looking:
+  - **A spider is read from the KINK in its legs** — out and up to a knee, then
+    out and down to the tip. Straight rays from a blob is a *sun*, which is what
+    the old house sigil looked like, and in the round it gives radial spikes.
+  - **The house sigil failed twice as an EYE.** A ring with radiating legs is a
+    sunburst; a ring inside a *pointed oval* is a pupil inside an eyelid. Straight
+    lozenge edges are what make it read as heraldry.
+  - **A defaced mark needs its ghost legible**, or the gouge over it is a scratch
+    in the brick. It is the same spider variant 6 bears, hacked off — drow houses
+    annihilate each other and erase the name.
+
+  **The roof** (`drowCeilCanvas`) is bare cavern rock hung with web, and it is the
+  second builder after the walls to return `{cv,glow}` — drow silk catches the
+  faerzress and a colour map can only make it pale, so `buildLevel` keys off
+  `.glow` for the ceiling as well. A **tangle, not an orb web**: an orb has a
+  centre, and a centre repeated once a tile prints a lattice overhead. It spans
+  three tiles to break the period further. Bare rock is painted back through it in
+  patches, because webbed edge to edge it reads as something installed rather than
+  accumulated.
+
+  **Furniture on `L.drow`** — the rose window keeps the largest share (it was the
+  only kind before, and at an even six-way draw a floor would have had one), plus
+  a jade **guardian**, a Lolth **shrine**, a silk **fence**, a cold-fire
+  **brazier** and a **wall web** with something in it.
+
+  **Floor dressing**: web in the corners, egg sacs, shed chitin, spent bolts. The
+  corner web spans from one wall to the other **across** the corner — laid out as
+  rays from the corner it came out as metre-long rods lying flat on the floor,
+  neither a web nor in the corner.
+
+  **Hanging cobwebs are the crypt's, reused.** `cobwebGeo(rnd,size)` was hoisted
+  out of the crypt's dressing block to module scope and returns bare line
+  geometry, so the caller picks the material, the tint and where it hangs — which
+  is the whole difference between the two themes. The corner sheets above are
+  silk that was *spun*; these are old tangle up in the dark that nobody has
+  swept, and they are what makes a corridor read as a spider city. About 42 a
+  floor against the crypt's 15.
+
+  Three things worth knowing before adding a third user:
+
+  - **Each web is its own `LineSegments` with its own material clone**, because
+    `shadeSprites` dims each by its own distance — cobwebs are unlit geometry and
+    without that a web ten tiles off is as bright as one overhead. So the count
+    is a draw-call count, and `DROW_WEBS` caps it.
+  - **The cap is spent as a RATE, not as a running total.** Counting up to a
+    limit inside a scan that runs top-left to bottom-right puts every web in the
+    first rooms it meets and leaves the bottom of a large floor bare. The floor's
+    tiles are counted before the loop and the cap turned into a per-tile
+    probability; the hard stop stays only as a backstop.
+  - **`shadeSprites` writes `material.color` every frame**, so a theme's own silk
+    colour cannot live in the material — it goes on `userData.webBase`, which the
+    shading multiplies instead of the shared `WEB_BASE`. The drow's is cooler,
+    because everything in the house is lit by faerzress.
+
+  **The web snare** is the theme's one rules change. It **extends** the trap pool
+  on drow floors rather than replacing anything, so `nTraps` is untouched and a
+  snare displaces some other trap instead of adding to the tally. Reflex or
+  `hold`, no attack roll and no damage; `hold` is already read by both `canAct`
+  and `charAC`, so nothing new had to be taught to the rules.
+
+  **The descent simulator is blind to traps** — it fights monsters and nothing
+  else — so a before/after on its median proves nothing about any trap change, and
+  reads 10 either way. `trapcost_body.js` measures the table directly instead:
+  fire each kind thousands of times at a levelled party, price a held round and
+  ability drain on one scale, and compare. At depth 19 that gives dart 21, gas 25,
+  spike 17, pdart 11, sleepdart 10, **websnare 11** — level with the venom dart
+  and below everything that draws blood, which is where a no-damage snare belongs.
+  It was 4 seconds first and measured 9, under everything; 5 matches the
+  sleepdart.
+
+  **The chapel of Lolth in `L.chapel`** is the ossuary's and forge hall's third
+  sibling and is built on their exact terms: the throne block is `T_PIT` after the
+  connectivity check, it **shoves aside** whatever loot is under it rather than
+  deleting it, and it never lands on the stairs. Its keeper is an elite drow,
+  preferring a caster. `openAltar` is `openBier` rewritten. T57 covers it.
+
+  **The throne is the spider**, not a chair with one carved on it — but the CHAIR
+  has to be legible first. The first build hung eight thick legs off a big body
+  and at a tile's range it was a tangle of scaffolding poles with nothing to sit
+  in. It needs a real seat with a real back, the body rearing *behind* that back,
+  and legs at half the radius and two thirds the spread so they frame the chair
+  instead of filling the view.
+
+  ### Making the pair detailed, and the five things that had to be looked at
+
+  Both were then taken from plain boxes to a real detail pass — the dais laid up
+  in three coursed tiers rather than three slabs, a web cut into the back of the
+  chair, the abdomen banded and marked, the altar given a moulding, blood
+  channels, votive candles and a chalice/bowl/knife/coins. Two materials were
+  added for it and both exist because of a mistake:
+
+  - **`groove` — a cut is not a surface.** The abdomen's three bands were tori in
+    the *same* material as the sphere they ringed, and the body still read as a
+    smooth ball from a tile away. A groove has to be darker than anything the
+    light can make the surface, so it is an unlit near-black. Same for the knee
+    seams.
+  - **`silverD` — the calm silver, for anything with a broad flat face.** The
+    bright one is right on a 10mm fillet and wrong on a 60cm table top: the
+    altar's mensa and rim came out as a single white band across the picture.
+    That is the specular trap again (see *Specular is what blows a surface
+    out*) — a face square-on to a torch that sits at the eye is on the peak of
+    the lobe. The working surface is stone now, with silver only at its edges.
+
+  And four placement lessons, each of which cost a screenshot:
+
+  - **A groove modelled above the surface is a rail.** The blood channels were
+    `voidM` boxes at y 0.417 against a mensa top face at 0.415 — 7mm proud. Seen
+    from standing height their *sides* showed and the whole top of the altar read
+    as a black slab. Sunk flush, only the top face shows and it reads as a line.
+  - **A pale vertical at eye height wins any dark frame.** The dais's four
+    corner finials were tall silver cones and read as four lit candles standing
+    in front of the chair, competing with the throne they were meant to edge.
+    Squat, dark, with the silver as a cap and a collar.
+  - **Where the hips sit is the difference between a spider and a starburst.**
+    All eight legs used to leave the body within 9cm of each other, and from the
+    front the femurs read as a fan of straight rods — a deck chair. Spaced along
+    the side of the cephalothorax at four heights, with the knees near the top of
+    the body rather than towering over it, they read as legs.
+  - **A mark goes where the thing can actually be seen from.** Her abdomen
+    marking was put on the forward face, which her own head hides from anyone
+    standing in front of the throne; exactly one of the three chevrons showed. It
+    belongs on the crown.
+
+  Three shapes are read from one feature each, and all three failed without it:
+  eyes from being in **rows** (scattered at four heights they are a rash, not a
+  face — four small above four with the middle pair much the largest); a chalice
+  from *not* flaring (a cone is a funnel however small, so the bowl is nearly
+  straight-sided over a rounded base, with the wine sitting down inside the rim
+  rather than capping it); and a knife from the contrast between a bright blade
+  and a dark hilt — adamantine on adamantine on a dark table simply was not
+  there.
+
+  The burning mark on the altar front is the **fourth** time a drow spider has
+  had to be re-cut. Straight rays off a blob is a sunburst; bent legs bunched
+  into a tight arc off one hip merge into filled triangles and the mark comes out
+  as a moth with two wings. Wide angular spread, each leg from its own point on
+  the body, and a thin tibia is what finally reads.
+
 Search for `theme.name==='Sewers'`, `th.name==='Crypt'`, `th.name==='Caves'`,
 `th.name==='Duergar'`, `th.name==='Myconid'` and `th.name==='Drow'`
 (plus the `cave`/`duer`/`myco`/`drow` flags in `buildLevel`) to find every hook
@@ -866,7 +1018,7 @@ theme fields its own roster and nothing else — so they assert 100% and 0%
 rather than a band, and cannot drift as rosters are added.
 
 Each theme with machinery writes an array onto the level (`rivers`/`pipes`,
-`crypts`/`ossuary`, `lurkers`, `duergar`/`pillars`/`forge`, `drow`) in `tryGen`
+`crypts`/`ossuary`, `lurkers`, `duergar`/`pillars`/`forge`, `drow`/`chapel`) in `tryGen`
 and reads it back in `buildLevel`; anything you add that way must also be
 carried through `serializeGame` and `loadGame`, or a reloaded floor comes back
 stripped of it.
@@ -1046,8 +1198,9 @@ the dungeon grows:
 ## Crypt interactions
 
 Three tappable things route through the `userData.kind` raycast dispatcher
-in the boot file, alongside doors, traps, items and secrets (a fourth,
-`anvil`, belongs to the duergar forge hall and is written on `bier`'s terms):
+in the boot file, alongside doors, traps, items and secrets. Two more,
+`anvil` (the duergar forge hall) and `altar` (the drow chapel of Lolth), are
+written on `bier`'s terms and live with their own themes:
 
 - **`coffin`** — 55% dust, 25% grave goods, 20% wakes an undead. One shot
   each (`c.opened` is a list of slot indices, so a stacked pair opens
