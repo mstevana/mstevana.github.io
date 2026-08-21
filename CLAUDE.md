@@ -42,9 +42,29 @@ Past sessions split it into chunks in a scratch directory to work on it
 and concatenated them back; that scratch is ephemeral and is **not** in
 the repo, so treat the committed file as authoritative.
 
+## The version number advances on every merge to main
+
+`VERSION` at the top of the rules data is the build's release number, `x.xxx`,
+shown on the main menu and on the death screen. **Bump the last place by one as
+part of every merge to main** — 0.100, 0.101, 0.102 — and on nothing else. Not
+per commit and not per branch push: a version that moves on a branch nobody has
+merged is a version two people can both be holding at once. It started at 0.100.
+
+**It is not the save-format version, and the two must never be wired together.**
+`serializeGame` writes its own `v`, and `loadGame` *deletes* a save whose `v`
+does not match — so bumping that throws away everybody's game, and a number that
+moves every merge must not be able to do it. `v` has been 1 since the beginning
+and every save-shape change so far has been absorbed by making the reader
+tolerant instead (`o.time||0`, `L.forge||null`, `ensureBook` rebuilding a
+wizard's spellbook). Keep doing that; move `v` only when a new field is genuinely
+not optional. T58 asserts the format, the floor, and that the two stay separate.
+
+`stampVersion()` writes it into both panels once at boot, guarded, because the
+node harness stubs `document` and has neither element.
+
 There is no test suite in the repo either. Sessions have built throwaway
 node harnesses that stub `window`/`document`/`THREE`, load the pure-logic
-part of the file, and assert on it (the T1–T57 series referenced in the
+part of the file, and assert on it (the T1–T58 series referenced in the
 git log). If you make a behavioural change, expect to rebuild a harness
 rather than find one — and note that the numbering only ever grows, so the
 git log is the index of what each one covers.
