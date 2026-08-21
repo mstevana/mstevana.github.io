@@ -8044,25 +8044,35 @@ void main(){
      and the cone fills in solid — which is exactly what the first build looked
      like. The gaps have to be genuinely dark. */
   b = pow(max(b,0.0),2.4);
-  float up  = pow(1.0-clamp(vUv.y,0.0,1.0),2.2);      // gone before the ceiling
+  float up  = pow(1.0-clamp(vUv.y,0.0,1.0),1.5);      // gone before the ceiling
   float core= pow(1.0-clamp(vUv.y*3.0,0.0,1.0),2.5);  // a small wash at the mouth
   float f = b*up*0.85 + up*0.10 + core*0.30;
   gl_FragColor=vec4(c*f*amp,1.0);
 }`;
 const GODRAY_VS='varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}';
+/* GODRAY_FLOOR is where the shafts BEGIN, half a room's height below the floor
+   — deep inside the bore rather than at its mouth. The rays then rise out of
+   the well instead of appearing at it, which is the difference between light
+   coming from somewhere and a lamp set in the ground.
+
+   It costs brightness, and the amplitudes below are set for it: the shader's
+   fade runs over the cone's whole `uv.y`, so starting the cone 0.65 lower puts
+   floor level a third of the way up it and the part the party can actually see
+   is already well down the falloff. */
+const GODRAY_FLOOR=-WALLH/2;
 function godRays(cx,cz){
   const g=new THREE.Group();
   // two cones: a tight bright core and a wide soft one, so the rays have a
   // centre rather than being one even flare
-  for(const [r0,r1,h,amp,op] of [[0.30,0.70,WALLH*0.95,0.34,0.30],
-                                 [0.44,1.05,WALLH*0.80,0.20,0.20]]){
+  for(const [r0,r1,h,amp,op] of [[0.22,0.78,WALLH*0.95-GODRAY_FLOOR,0.92,0.30],
+                                 [0.32,1.08,WALLH*0.80-GODRAY_FLOOR,0.54,0.20]]){
     const mat=new THREE.ShaderMaterial({
       uniforms:{t:{value:0},c:{value:new THREE.Color(0xffc06a)},amp:{value:amp}},
       vertexShader:GODRAY_VS,fragmentShader:GODRAY_FS,
       transparent:true,opacity:op,blending:THREE.AdditiveBlending,
       depthWrite:false,side:THREE.DoubleSide});
     const m=new THREE.Mesh(new THREE.CylinderGeometry(r1,r0,h,26,1,true),mat);
-    m.position.set(cx,h/2,cz);
+    m.position.set(cx,GODRAY_FLOOR+h/2,cz);
     m.userData.decor=true;      // a tap goes through the light to the stone
     g.add(m);
     (R3.godRays||(R3.godRays=[])).push(mat);
@@ -8472,17 +8482,28 @@ function buildLevel(L){
        from the GAPS between its treads, so each one has to clear the one
        below it by something you can see. Twelve gives 12cm of rise and 45
        degrees of sweep apiece, and still turns a full 540. */
-    const DEPTH=1.45, N=12, drop=DEPTH/N;
+    const DEPTH=1.25, N=12, drop=0.121;
     const TURN=Math.PI*3/N;                    // 540 degrees over the flight
-    const NEWEL_R=0.092, TREAD_R=0.515;
-    const POST=WALLH/3;                        // how far the newel stands proud
+    /* RISE is the top tread's own surface, and it is the `WALLH/3` of the brief:
+       the STAIRCASE reaches a third of the room's height, with four treads'
+       top faces standing above the floor and the newel carrying on a little
+       past the highest of them. */
+    const RISE=WALLH/3;
+    const BORE_R=0.455;                        // the cylinder cut into the rock
+    /* A tread overlaps the bore by 2cm — see *Surfaces that meet must overlap* —
+       but it can no longer be any wider than that, because the top four now
+       stand above the floor in open air where poking outside the tile would be
+       visible. 0.476 plus `hew`'s 0.045 tops out at 0.487 against a half-tile
+       of 0.5. */
+    const NEWEL_R=0.092, TREAD_R=0.476;
+    const POST=RISE+0.075;                     // the newel's crown, just clear of the top step
     const wv=wallVariant(sxs,sys,wallMats.length);
     const wallMap=wallMats[wv].map;
     // one clone per surface, because `repeat` lives on the texture and each of
     // these wants the courses at a different density
     const mkTex=(rx,ry)=>{const t2=wallMap.clone();t2.needsUpdate=true;
       t2.wrapS=t2.wrapT=THREE.RepeatWrapping;t2.repeat.set(rx,ry);return t2;};
-    const shaftTex=mkTex(1,(DEPTH+0.06)/WALLH);
+    const shaftTex=mkTex(2,DEPTH/WALLH);
     /* The shaft is deliberately much darker than the room's own walls. Faced at
        full strength its far inner wall carried the same brick at the same scale
        as the wall standing behind the stairwell, the eye joined the two, and the
@@ -8490,10 +8511,6 @@ function buildLevel(L){
        with light coming up out of it needs the void. */
     const shaftMat=new THREE.MeshPhongMaterial({map:shaftTex,bumpMap:shaftTex,bumpScale:0.02,
       color:0x5a5a5a,side:THREE.BackSide,specular:0x191309,shininess:5});
-    const shaft=new THREE.Mesh(new THREE.BoxGeometry(0.995,DEPTH+0.06,0.995),shaftMat);
-    shaft.position.set(cx,-(DEPTH+0.06)/2,cz);
-    shaft.userData={kind:'stairs',x:sxs,y:sys};
-    sg.add(shaft);
     /* Everything below is CUT rather than built, and that is a different set of
        shapes from a turned column standing in a hole. Three rules:
 
@@ -8511,6 +8528,37 @@ function buildLevel(L){
          exactly what it must not look like. */
     let shs=((sxs*374761393)^(sys*668265263))>>>0;
     const srr=()=>{shs=(shs*1664525+1013904223)>>>0;return shs/4294967296;};
+    /* The tile is SOLID ROCK with a cylinder cut down through it, which is a
+       different thing from the square hole this used to be.
+
+       Two pieces make that read. The bore is an open-ended cylinder faced on the
+       inside, running from the floor down — nothing of it stands above the
+       floor, because above the floor there is no rock left to cut. And the tile
+       keeps a real floor: `buildLevel` skips T_STAIRS when it lays the floor
+       planes, so this block has to supply its own — a unit square with a
+       circular hole punched in it.
+
+       That plate is in `floorMat`, not the wall's stone, and that is the same
+       lesson the kerb taught: a horizontal face at floor level is lit only by a
+       grazing torch, and the flagstones beside it look lit because the floor
+       texture is far paler than the wall's. In the wall's material it comes out
+       black. */
+    {
+      const sq=new THREE.Shape();
+      sq.moveTo(0,0);sq.lineTo(1,0);sq.lineTo(1,1);sq.lineTo(0,1);sq.lineTo(0,0);
+      const hole=new THREE.Path();
+      hole.absarc(0.5,0.5,BORE_R,0,Math.PI*2,true);   // wound against the shape
+      sq.holes.push(hole);
+      const fg=new THREE.ShapeGeometry(sq,28);
+      // ShapeGeometry lays uv straight off the shape's own coordinates, which
+      // here run 0..1 — exactly the per-tile floor plane's, so the plate carries
+      // on the same flagstones as its neighbours
+      fg.rotateX(-Math.PI/2);                          // shape +Y becomes world -Z
+      const plate=new THREE.Mesh(fg,floorMat);
+      plate.position.set(sxs,0,sys+1);
+      plate.userData={kind:'stairs',x:sxs,y:sys};
+      sg.add(plate);
+    }
     /* CARVED is not SHATTERED, and the first cut of this was the second thing.
        At 0.20 of radial jitter with the y jitter running to the end rings, the
        newel grew black shards off its silhouette and the crown came out as
@@ -8549,6 +8597,23 @@ function buildLevel(L){
        is the loudest cue that a surface was worked smooth. */
     const stoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,0.16)),
       map:stoneTex,bumpMap:stoneTex,bumpScale:0.016,specular:0x1c1610,shininess:4});
+    /* The bore itself: an open-ended cylinder faced on the inside, from the
+       floor down. Open-ended matters — a top cap would be between the eye and
+       the well, and although BackSide culls it from above, the bottom cap is
+       what the light needs to land on, so only that one is built. */
+    {
+      const bore=new THREE.Mesh(
+        hew(new THREE.CylinderGeometry(BORE_R,BORE_R*0.96,DEPTH,26,5,true),0.030),
+        shaftMat);
+      bore.position.set(cx,-DEPTH/2,cz);
+      bore.userData={kind:'stairs',x:sxs,y:sys};
+      sg.add(bore);
+      const btm=new THREE.Mesh(new THREE.CircleGeometry(BORE_R*0.97,24),shaftMat);
+      btm.rotation.x=Math.PI/2;                 // faces down, so BackSide shows it from above
+      btm.position.set(cx,-DEPTH+0.004,cz);
+      btm.userData={kind:'stairs',x:sxs,y:sys};
+      sg.add(btm);
+    }
     const helix=new THREE.Group();helix.position.set(cx,0,cz);
     /* The newel is the core the masons LEFT, not a post they stood up. It had a
        moulded cap and two collars and read as a turned baluster dropped into a
@@ -8589,7 +8654,7 @@ function buildLevel(L){
        belongs to rather than wearing a barber-pole. */
     {
       const pts=[];
-      for(let u=-DEPTH;u<=POST+0.001;u+=drop*0.25){
+      for(let u=-DEPTH*0.62;u<=POST+0.001;u+=drop*0.25){
         const a=-(u/drop)*TURN;
         pts.push(new THREE.Vector3(Math.cos(a)*NEWEL_R*1.14,u,Math.sin(a)*NEWEL_R*1.14));
       }
@@ -8617,7 +8682,8 @@ function buildLevel(L){
         hew(new THREE.CylinderGeometry(TREAD_R,TREAD_R*0.97,drop*0.40,10,2,false,
           -TURN*0.52,TURN*1.06),0.045),
         stoneMat);
-      m2.position.set(0,-drop*(i+0.5)+drop*0.27,0);
+      // the top tread's surface is RISE, so four of them stand above the floor
+      m2.position.set(0,RISE-drop*i-drop*0.20,0);
       m2.rotation.y=-TURN*i;
       m2.userData={kind:'stairs',x:sxs,y:sys};
       helix.add(m2);
@@ -8653,6 +8719,16 @@ function buildLevel(L){
        stone. */
     const mouth=new THREE.PointLight(0xffb455,0.42,1.9,2);
     mouth.position.set(cx-ndx*0.34,0.15,cz-ndy*0.34);sg.add(mouth);
+    /* And one small light ABOVE the well, which is the one cheat here.
+       Everything else in this stairwell shines upward, and the four treads that
+       now stand proud of the floor are horizontal faces — the torch reaches them
+       at about N·L 0.14 from two tiles back, so they rendered as black blades
+       hanging round the newel. A light under them lights their undersides, which
+       is what really happens and is unreadable. This one is dim, warm and pinned
+       to a 1.1 range so it falls off before it touches the room: it exists to
+       put a top on the steps and nothing else. */
+    const lip=new THREE.PointLight(0xffcf90,1.70,2.10,2);
+    lip.position.set(cx,RISE+0.34,cz);sg.add(lip);
     sg.add(godRays(cx,cz));
     grp.add(sg);R3.stairsGroup=sg;
   }
