@@ -709,12 +709,15 @@ three themes carry real machinery:
   hall is for. The count is unchanged at 10–17 a floor, so the variety is free.
 
   **Floor dressing** on the crypt litter's terms — seeded per tile, instanced,
-  `decor:true`. Slag, spilled ore, dropped tools, and **haulage track**. The
-  track is chosen **per row and per column, not per tile**: a tile-by-tile roll
-  gives disconnected two-foot fragments of rail, and hashing the row instead
-  means every horizontal corridor tile on it carries the track and the run comes
-  out continuous. Junctions are neither purely horizontal nor vertical and take
-  no rails, so a line ends where it meets another passage.
+  `decor:true`. Slag, spilled ore and dropped tools.
+
+  **Haulage track ran down the corridors here and was removed.** Keep the
+  technique, which is the part worth having: anything that must run continuously
+  along a passage is chosen **per row and per column, not per tile**. A
+  tile-by-tile roll gives disconnected two-foot fragments of rail — the one thing
+  track cannot be — and hashing the row instead means every horizontal corridor
+  tile on it carries the run. Junctions are neither purely horizontal nor
+  vertical and take nothing, so a line ends where it meets another passage.
 
   **The forge hall in `L.forge`** is the theme's set-piece and the ossuary's
   analogue, with the same hazards and the same answers: the anvil block is
