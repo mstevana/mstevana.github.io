@@ -1334,6 +1334,86 @@ the dungeon grows:
   ride the same schedule. Ordinary floor loot tops out at `+3` at any
   depth, on purpose.
 
+## The stairs down are a monument, and not a tile you stand on
+
+Every floor has exactly one, it is the only thing the party is actually
+looking for, and as a straight flight of seven slabs in a hole it read as a
+recess in the ground — you walked past it. It is now a spiral: twelve treads
+turning a full 540° around a newel that runs the height of the well and stands
+`WALLH/3` proud of the floor, with golden light and shafts rising out of it.
+
+**`T_STAIRS` is deliberately not in `walkableTile`.** A tile the party can
+stand on is a tile the camera ends up inside, and the newel is in the middle of
+it — you would spend the last quarter-second of every floor looking at the
+inside of a column. Neither control changed for the player: `tryMove` descends
+when you walk into the stairwell (where it used to step onto it and descend
+260ms later), and the `stairs` raycast kind descends on a tap from an adjacent
+tile. Both go through `takeStairs`, which guards re-entry with `G._descending`.
+
+Four places had to follow, and all four are the same edit — dropping `T_STAIRS`
+from a `t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS` triple: the party's distance
+field, `combatNoise`, and both monster movement tests. `seesThroughTile` still
+lets it through, because a newel at 0.43 against an eye at 0.62 does not block a
+room. Generation needed nothing: the stairs are the furthest tile the BFS
+reaches, so a standable neighbour exists by construction — measured 0
+unreachable over 40 floors, and 0 of 477 monsters standing on one over 24.
+
+Note this broke **T31**, which asserted the stairs tile itself was reachable by
+a flood fill over `walkableTile`. Under the new rule what has to be reachable is
+*a tile beside it*.
+
+**Everything is faced in `wallMats`** at the variant that tile would have had,
+which is what makes the seven themes differentiate for free — the cave's rock,
+the drow's black brick, the duergar's coursed slab and the grove's stalk all
+arrive by themselves.
+
+Three things had to be looked at rather than reasoned about:
+
+- **You cannot see into the well from anywhere the party can stand.** The eye is
+  at 0.62 and the well is a metre across, so from two tiles back the line of
+  sight reaches about 30cm down — three treads, whose outer edges at one radius
+  make a ring. The stair read as a stone BOWL with a post in it, and everything
+  below was invisible. The fix is the **helical rib wound round the newel** at
+  the stair's own pitch: the spiral is stated on the one part of the staircase
+  that is always in view. Raising the stair head above the floor would show the
+  treads, but treads above floor level read as stairs going *up*.
+- **A kerb round the opening renders solid BLACK.** Tried as a torus (a barrel
+  hoop hanging over the hole) and then laid flat, where it became the darkest
+  thing in the picture. The only light in a room is a torch at the eye, and
+  against a horizontal face at floor level that is grazing — about a third of
+  what the same stone gets standing up as the newel. The flagstones beside it
+  look lit only because the floor texture is far paler than the wall's. Anything
+  that goes there has to use the FLOOR's material.
+- **The shaft has to be darker than the room's own walls** (`color:0x5a5a5a`
+  over the same map). Faced at full strength its far inner wall carried the same
+  brick at the same scale as the wall standing behind the stairwell, the eye
+  joined the two, and there was no hole at all — a newel standing on unbroken
+  floor.
+
+### God rays are geometry, not a post-process
+
+Only `three.min.js` is loaded and there is no build step, so there is no
+`EffectComposer` here; a true screen-space pass would mean hand-rolling an
+occlusion render plus a radial blur through two targets — a second full scene
+render every frame on a phone — and it would only work while the source is on
+screen, which this source is not, being down a hole.
+
+So the rays are two open cones standing on the shaft mouth, drawn additively
+with a shader that cuts them into blades, their `t` uniform driven from the
+render loop and cleared in `disposeLevel` like everything else in `R3`.
+
+- **The blade exponent is the whole difference between rays and a lampshade.**
+  Below about 2 the troughs of the beating sines never reach zero, every blade
+  runs into its neighbour and the cone fills in solid — which is exactly what
+  the first build looked like. It is 2.4.
+- The pattern is a product of sines in `uv.x` at **whole-number frequencies**,
+  so it is periodic round the cone and there is no seam where the uv wraps.
+- `depthWrite:false` so the two cones do not occlude each other, and
+  `depthTest:true` so a wall between the party and the stairwell still cuts the
+  rays off — additive with no depth test shines through stone.
+- Watch the total: the first version summed to over 1.0 at the mouth before the
+  amplitude was even applied, and blew out to a white ring on the floor.
+
 ## Crypt interactions
 
 Three tappable things route through the `userData.kind` raycast dispatcher
