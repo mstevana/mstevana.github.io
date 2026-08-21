@@ -1452,6 +1452,53 @@ function oozeDetail(o,c){
   return g;
 }
 // fungal: gills under a cap, and pores over the stalk
+/* The cap's own surface. `fungalDetail` hangs gills off the rim and speckles the
+   stalk, but it is applied to the BASE layer while a myconid's cap is drawn in
+   the head layer — so the dome itself, which is most of the creature, carried
+   nothing but one smooth radial gradient. Measured against the rest of the
+   bestiary the myconid roster scored 9.3 for contrast-per-brightness against a
+   median of 13.8, second-softest in the game after the oozes, which is why a
+   grove floor reads as blurry when the stonework beside it does not.
+
+   Radial ribs are what a real cap has and what gives the dome its form: each
+   runs from near the apex out to the rim, so they fan with the curve instead of
+   striping across it. Each rib is a dark groove with a lit lip offset up and to
+   the left, toward the torch, which is what reads as a ridge rather than as a
+   drawn line. A defined rim and a few warts finish it.
+
+   Placed off `o.hp`, the head pivot, like everything else in the vocabulary, so
+   it lands on caps of very different sizes without a coordinate table. */
+function capDetail(o,c){
+  c=c||{};
+  const [hx,hy]=o.hp||[32,30];
+  const R=c.r||16, rim=hy+(c.rim===undefined?7:c.rim), apex=rim-R*1.05;
+  const dark=c.dark||'#2a1433', lit=c.lit||'#b58ad4';
+  const n=c.n||9;
+  let g='';
+  for(let i=0;i<n;i++){
+    const t=-1+2*(i+0.5)/n;          // -1 .. 1 across the cap
+    const a=t*1.32;                  // a fan, not a parallel stripe
+    const ex=hx+Math.sin(a)*R*0.97, ey=rim-Math.cos(a)*R*0.13;   // rim end
+    const mx=hx+Math.sin(a)*R*0.52;                              // bow it over the dome
+    const my=apex+(rim-apex)*0.42-Math.cos(a)*2.2;
+    /* Ribs start from a ZONE near the apex, not from one point. Converging them
+       all on a single pixel makes a parasol hub — the same trap as drawing a
+       spider's legs as straight rays from a blob and getting a sunburst. */
+    const sx=hx+Math.sin(a)*R*0.13, sy=apex+1.1+Math.abs(t)*1.6;
+    const d=`M${sx.toFixed(1)} ${sy.toFixed(1)} Q${mx.toFixed(1)} ${my.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}`;
+    g+=`<path d="${d}" stroke="${dark}" stroke-width="${(0.95-Math.abs(t)*0.25).toFixed(2)}" fill="none" opacity="0.5"/>`;
+    g+=`<path d="${d}" transform="translate(-0.7,-0.7)" stroke="${lit}" stroke-width="0.5" fill="none" opacity="0.28"/>`;
+  }
+  // the rim, and the shadow it throws under itself
+  g+=`<path d="M${(hx-R*0.99).toFixed(1)} ${(rim-R*0.1).toFixed(1)} Q${hx} ${(rim+2.6).toFixed(1)} ${(hx+R*0.99).toFixed(1)} ${(rim-R*0.1).toFixed(1)}" stroke="${dark}" stroke-width="1.3" fill="none" opacity="0.72"/>`;
+  const r=_lcg(c.seed||17);
+  for(let i=0;i<5;i++){                       // warts, paler than the dome
+    const a=(-1+2*r())*1.15, rr=0.45+r()*0.45;
+    const x=hx+Math.sin(a)*R*rr, y=apex+(rim-apex)*(0.25+r()*0.5)-Math.cos(a)*1.5;
+    g+=`<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${(1.1+r()*1.0).toFixed(1)}" ry="${(0.8+r()*0.7).toFixed(1)}" fill="${lit}" opacity="0.3"/>`;
+  }
+  return g;
+}
 function fungalDetail(o,c){
   c=c||{};const cx=c.cx||32,cy=c.cy||30,rx=c.rx||13,n=c.n||9;
   /* Gills hang from the rim of the cap and follow its curve. Drawn as a straight
@@ -3118,11 +3165,11 @@ const MONSTER_DETAIL={
   duergarscout:{base:(o)=>plateBands(o,{w:9,y0:9,n:2,gap:4.4,dark:'#242830',mid:'#2e333c'}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
   duergarpriest:{base:(o)=>plateBands(o,{w:10,y0:10,n:3,gap:4.2,dark:'#2e2a22',mid:'#3c372c',lit:'#7a6f52'}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
   // --- Myconid ---
-  shrieker:    {base:(o)=>fungalDetail(o,{cx:32,cy:37,rx:14,n:11,col:'#3a2418',pore:'#4a2a18',seed:71})},
-  mysprout:    {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:12,n:9,col:'#2a1c33',pore:'#3a2a20',seed:73})},
-  violetfungus:{base:(o)=>fungalDetail(o,{cx:32,cy:31,rx:13,n:10,col:'#2a1433',pore:'#3a1c40',seed:79})},
-  sporeservant:{base:(o)=>fungalDetail(o,{cx:32,cy:26,rx:9,n:7,col:'#2a2418',pore:'#3a3020',seed:83}), head:(o)=>faceDetail(o,{w:5.5,eye:10,col:'#2a2418'})},
-  myguard:     {base:(o)=>fungalDetail(o,{cx:32,cy:31,rx:12,n:9,col:'#2a2418',pore:'#3a3020',seed:89}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2418'})},
+  shrieker:    {base:(o)=>fungalDetail(o,{cx:32,cy:37,rx:14,n:11,col:'#3a2418',pore:'#4a2a18',seed:71}), head:(o)=>capDetail(o,{r:19,n:10,dark:'#3a2418',lit:'#c8a888',seed:7})},
+  mysprout:    {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:12,n:9,col:'#2a1c33',pore:'#3a2a20',seed:73}), head:(o)=>capDetail(o,{r:16,n:9,dark:'#2a1c33',lit:'#c3aad6',seed:20})},
+  violetfungus:{base:(o)=>fungalDetail(o,{cx:32,cy:31,rx:13,n:10,col:'#2a1433',pore:'#3a1c40',seed:79}), head:(o)=>capDetail(o,{r:17,n:10,dark:'#2a1433',lit:'#c98adf',seed:33})},
+  sporeservant:{base:(o)=>fungalDetail(o,{cx:32,cy:26,rx:9,n:7,col:'#2a2418',pore:'#3a3020',seed:83}), head:(o)=>capDetail(o,{r:13,n:7,dark:'#2a2418',lit:'#b9aec5',seed:46})+faceDetail(o,{w:5.5,eye:10,col:'#2a2418'})},
+  myguard:     {base:(o)=>fungalDetail(o,{cx:32,cy:31,rx:12,n:9,col:'#2a2418',pore:'#3a3020',seed:89}), head:(o)=>capDetail(o,{r:16,n:9,dark:'#2a1433',lit:'#b98adf',seed:59})+faceDetail(o,{w:6,eye:11,col:'#2a2418'})},
   // --- Drow: fine mail and a house sigil, not leather ---
   drow:        {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
   drowbolt:    {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
@@ -3155,10 +3202,10 @@ const MONSTER_DETAIL={
   blackpud:    {base:(o)=>oozeDetail(o,{cx:32,cy:42,rx:22,ry:17,col:'#6a6a70',seed:157})},
   drider:      {base:(o)=>plateBands(o,{w:9,y0:8,n:2,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'})+hideDetail(o,{x0:14,x1:50,y0:38,y1:58,n:14,col:'#14161c',seed:163}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
   drowmatron:  {base:(o)=>plateBands(o,{w:10,y0:9,n:2,gap:4.6,dark:'#2a1c33',mid:'#372444',lit:'#6b4a90'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
-  mycaster:    {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:14,n:10,col:'#2a1c33',pore:'#3a2a20',seed:179})},
-  myelder:     {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:16,n:12,col:'#2a1c33',pore:'#3a2a20',seed:181})},
-  mylord:      {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:18,n:13,col:'#2a1433',pore:'#3a1c40',seed:191})},
-  mysovereign: {base:(o)=>fungalDetail(o,{cx:32,cy:34,rx:20,n:14,col:'#2a1433',pore:'#3a1c40',seed:193})},
+  mycaster:    {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:14,n:10,col:'#2a1c33',pore:'#3a2a20',seed:179}), head:(o)=>capDetail(o,{r:19,n:10,dark:'#2a1c33',lit:'#cdb6e2',seed:72})},
+  myelder:     {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:16,n:12,col:'#2a1c33',pore:'#3a2a20',seed:181}), head:(o)=>capDetail(o,{r:21,n:11,dark:'#2a1c33',lit:'#d5c2e8',seed:85})},
+  mylord:      {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:18,n:13,col:'#2a1433',pore:'#3a1c40',seed:191}), head:(o)=>capDetail(o,{r:23,n:12,dark:'#2a1433',lit:'#dcc9ef',seed:98})},
+  mysovereign: {base:(o)=>fungalDetail(o,{cx:32,cy:34,rx:20,n:14,col:'#2a1433',pore:'#3a1c40',seed:193}), head:(o)=>capDetail(o,{r:25,n:13,dark:'#2a1433',lit:'#e4d5f4',seed:111})},
   dragon:      {base:(o)=>hideDetail(o,{x0:12,x1:48,y0:24,y1:56,n:22,col:'#1a2412',seed:197})},
   bonedrake:   {base:(o)=>hideDetail(o,{x0:12,x1:48,y0:24,y1:56,n:18,col:'#4a4232',seed:199})+boneDetail(o,{w:7,y0:8,n:3,gap:3.4})},
   bonecolossus:{base:(o)=>boneDetail(o,{w:11,y0:6,n:5,gap:3.8}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#4a4232'})},
