@@ -275,6 +275,9 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   <button class="mbtn" id="m-import">Import save code</button>
   <div id="m-io" class="hidden"><textarea id="m-io-text"></textarea>
     <div class="row"><button class="mbtn small" id="m-io-ok">Load</button><button class="mbtn small" id="m-io-close">Close</button></div></div>
+  <div class="dim-note" style="margin-top:10px">Graphics</div>
+  <div class="chips" id="m-gfx"></div>
+  <div class="dim-note" id="m-gfx-note"></div>
   <div class="dim-note" style="text-align:center;margin-top:6px">D&amp;D 3.5 rules · real-time · landscape</div>
 </div></div>
 
@@ -7778,7 +7781,7 @@ function boltShaderInit(){
 function initRenderer(){
   const cv=document.getElementById('view3d');
   R3.renderer=new THREE.WebGLRenderer({canvas:cv,antialias:false});
-  R3.renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  R3.renderer.setPixelRatio(gfxPixelRatio());
   R3.maxAniso=R3.renderer.capabilities.getMaxAnisotropy(); // sharpen textures at grazing angles, free on GPU
   R3.scene=new THREE.Scene();
   R3.camera=new THREE.PerspectiveCamera(68,1,0.05,30);
@@ -11054,6 +11057,59 @@ function noteSeen(key){
   if(!key||G.seen[key])return;
   G.seen[key]=1;
   try{localStorage.setItem('crawl_seen',JSON.stringify(G.seen));}catch(e){}
+}
+/* ---------- render resolution ----------
+   The 3D view is drawn into a buffer of viewport × pixelRatio and then scaled
+   to fit the screen, so ANY pixel ratio below the display's own DPR is an
+   upscale. The old flat cap of 2 meant a DPR-3 phone drew every frame at two
+   thirds resolution and stretched it by 1.5 — which softened the whole view,
+   and monsters worst, because they carry the finest detail and are what you
+   look at. Measured at 541x400 CSS on DPR 3: a goblin got 427 buffer pixels
+   spread over 640 device pixels. The bestiary looks sharper at the same size
+   for exactly this reason — it is a DOM image rendered at full device
+   resolution, never going through the canvas at all.
+
+   Three modes, because the right answer depends on hardware nobody can detect
+   up front: `high` draws at the display's own resolution, `low` stays cheap,
+   and `adaptive` starts high and steps down only if frames actually run long. */
+const GFX_MODES=['high','adaptive','low'];
+const GFX_RUNGS=[3,2,1.5,1];   // the ladder adaptive walks; index 0 is sharpest
+const GFX_LOW=1.5;
+let gfxMode='adaptive',gfxRung=0,gfxAcc=0,gfxN=0;
+const dprCap=(v)=>Math.max(1,Math.min(window.devicePixelRatio||1,v));
+function gfxPixelRatio(){
+  if(gfxMode==='low')return dprCap(GFX_LOW);
+  if(gfxMode==='high')return dprCap(GFX_RUNGS[0]);
+  return dprCap(GFX_RUNGS[gfxRung]);
+}
+function applyGfx(){
+  if(!R3.renderer)return;
+  const pr=gfxPixelRatio();
+  if(Math.abs(R3.renderer.getPixelRatio()-pr)<0.01)return;
+  R3.renderer.setPixelRatio(pr);
+  onResize();   // the drawing buffer only changes size on a setSize
+}
+function loadGfx(){
+  try{const v=localStorage.getItem('crawl_gfx');if(GFX_MODES.indexOf(v)>=0)gfxMode=v;}catch(e){}
+}
+function setGfx(m){
+  if(GFX_MODES.indexOf(m)<0)return;
+  gfxMode=m;gfxRung=0;gfxAcc=0;gfxN=0;
+  try{localStorage.setItem('crawl_gfx',m);}catch(e){}
+  applyGfx();
+}
+/* Adaptive stepping, fed only by frames that actually did work — the loop
+   throttles to a third of the rate when nothing is moving, and those long idle
+   frames would read as a struggling device. Sampled over roughly a second, with
+   a gap between the step-down and step-up thresholds so it settles instead of
+   oscillating between two rungs. */
+function gfxSample(dt){
+  if(gfxMode!=='adaptive')return;
+  gfxAcc+=dt;gfxN++;
+  if(gfxN<45)return;
+  const avg=gfxAcc/gfxN;gfxAcc=0;gfxN=0;
+  if(avg>0.026&&gfxRung<GFX_RUNGS.length-1){gfxRung++;applyGfx();}        // under ~38fps
+  else if(avg<0.019&&gfxRung>0){gfxRung--;applyGfx();}                    // comfortably at rate
 }
 function tileAt(x,y){if(x<0||y<0||x>=G.L.w||y>=G.L.h)return T_WALL;return G.L.grid[y*G.L.w+x];}
 function setTile(x,y,t){G.L.grid[y*G.L.w+x]=t;}
@@ -14771,6 +14827,7 @@ function loop(now){
     const busy=G.started&&!G.paused&&(R3.camAnim||R3.shake>0||G.fx.length>0||G.moveCd>0||R3.viewDrag||
       G.L.monsters.some(mm=>mm.awake&&mm.hp>0));
     if(!busy){idleSkip=(idleSkip+1)%3;if(idleSkip)return;}
+    else gfxSample(dt);   // only frames doing real work judge the device
     updateCamera(now);
     updateSprites(now);
     R3.renderer.render(R3.scene,R3.camera);
@@ -16149,10 +16206,30 @@ function pickupItem(i){
   saveGame();
 }
 /* ============================== MENU & CREATION ============================== */
+const GFX_LBL={high:'High',adaptive:'Adaptive',low:'Low'};
+const GFX_NOTE={
+  high:'Draws at your screen\'s full resolution. Sharpest, and the most work per frame.',
+  adaptive:'Starts sharp and eases off only if the frame rate cannot keep up.',
+  low:'Draws at reduced resolution. Softest, and the easiest on the battery.',
+};
+function renderGfxChips(){
+  const box=document.getElementById('m-gfx');
+  if(!box)return;
+  box.innerHTML='';
+  for(const m of GFX_MODES){
+    const c=document.createElement('button');
+    c.className='chip'+(gfxMode===m?' sel':'');
+    c.textContent=GFX_LBL[m];
+    c.addEventListener('click',()=>{setGfx(m);renderGfxChips();});
+    box.appendChild(c);
+  }
+  document.getElementById('m-gfx-note').textContent=GFX_NOTE[gfxMode];
+}
 function refreshMenu(){
   const has=!!localStorage.getItem('crawl_save');
   document.getElementById('m-continue').disabled=!has&&!G.started;
   document.getElementById('m-continue').textContent=G.started&&!G.over?'Return to the dungeon':'Continue the descent';
+  renderGfxChips();
 }
 function initMenu(){
   const $=(id)=>document.getElementById(id);
@@ -16350,6 +16427,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     document.body.innerHTML='<div style="padding:40px;font-family:Georgia">Failed to load the three.js library. Check your connection and reload.</div>';
     return;
   }
+  loadGfx();    // the render resolution is chosen before the renderer is built
   initRenderer();
   loadSeen();   // the bestiary outlives any one run, so it is read before the menu opens
   initInput();

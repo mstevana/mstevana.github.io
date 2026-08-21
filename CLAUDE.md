@@ -260,6 +260,50 @@ settled is that the median is not to be chased by fiddling with
 `depthScale`, `threatBudget` or the bestiary — those are not what is
 holding it.
 
+## Render resolution is a setting, and it was the real cause of "blurry monsters"
+
+`initRenderer` used to pin `setPixelRatio(Math.min(devicePixelRatio, 2))`. The
+3D view is drawn into a buffer of viewport × pixelRatio and then scaled to the
+screen, so **any** ratio below the display's own DPR is an upscale: on a DPR-3
+phone every frame was drawn at two thirds resolution and stretched by 1.5.
+Measured at 541×400 CSS on DPR 3, a goblin got **427 buffer pixels spread over
+640 device pixels**.
+
+**The bestiary is the control experiment, and it is why this was findable.** It
+shows the same art at the same size and looks sharper, because it is a DOM
+`<img>` of the vector SVG rendered at full device resolution — it never goes
+through the canvas. Same art + same size + different sharpness means the
+pipeline, not the resolution of the source.
+
+Two things were ruled out with measurements before landing on this, so do not
+re-chase them:
+
+- **Mipmapping is not the cause.** Gradient energy inside the sprite measured
+  6.08 with mipmaps and 6.09 without — no difference. At one tile the sprite sits
+  at LOD ≈ 0.07, essentially mip 0.
+- **The texture is not undersized.** A 640px raster against a ~611px sprite is
+  ~1:1. Raising 384 → 640 earlier fixed a real but *secondary* problem; the
+  framebuffer was the binding constraint the whole time.
+
+`GFX_MODES` is now `high` / `adaptive` / `low`, persisted in its own
+`crawl_gfx` key beside `crawl_best` and `crawl_seen`, chosen from chips on the
+main menu. `high` draws at the display's own resolution (capped at 3), `low` at
+1.5, and `adaptive` walks `GFX_RUNGS` starting at the top. Adaptive is fed
+**only by frames that did real work** — the loop throttles to a third of the
+rate when nothing moves, and those idle frames would read as a struggling
+device — and its step-down (>26ms) and step-up (<19ms) thresholds are
+deliberately apart so it settles instead of oscillating.
+
+**One coupling to know before touching either dial.** Pixel ratio and monster
+texture size are two ends of the same chain: at `high` on DPR 3 a normal
+creature lands on ~640 buffer pixels, which is exactly the 640px raster, so the
+two are currently matched. Raise the pixel ratio further, or field a much larger
+viewport, and the *texture* becomes the next bottleneck; raise the texture
+without the pixel ratio and nothing improves. Note that texture memory is
+already the tighter constraint — frames are 640² RGBA, six poses per kind,
+cached globally for the whole run and never freed — so a blanket bump is not
+free.
+
 ## Sprites are lit now
 
 `THREE.Sprite` uses `SpriteMaterial`, which **ignores every light in the scene**.
