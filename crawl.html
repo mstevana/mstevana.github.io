@@ -3592,7 +3592,15 @@ function randLoot(depth,rich,noPotion,noRation){
 
 /* ============================== DUNGEON GENERATION ============================== */
 const T_WALL=0,T_FLOOR=1,T_DOOR=2,T_DOOR_OPEN=3,T_DOOR_LOCKED=4,T_SECRET=5,T_STAIRS=6,T_SECRET_FOUND=7,T_PIT=8;
-const walkableTile=(t)=>t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS||t===T_DOOR||t===T_DOOR_LOCKED||t===T_SECRET_FOUND;
+/* T_STAIRS is deliberately NOT walkable. The stairwell is a spiral around a
+   newel that stands a third of the room's height above the floor, and a tile
+   the party can stand on is a tile the camera ends up inside — you would spend
+   the last quarter-second of every floor looking at the inside of a column.
+   It is approached instead: walking into it descends (see `tryMove`) and so
+   does tapping it from an adjacent tile, so neither control changed for the
+   player. `seesThroughTile` still lets it through, because a chest-high newel
+   does not block a room. */
+const walkableTile=(t)=>t===T_FLOOR||t===T_DOOR_OPEN||t===T_DOOR||t===T_DOOR_LOCKED||t===T_SECRET_FOUND;
 // pits block movement but not sight: you can see (and shoot) across a sewer lake
 const seesThroughTile=(t)=>t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS||t===T_PIT;
 const DIRS=[[0,-1],[1,0],[0,1],[-1,0]]; // N E S W
@@ -4360,6 +4368,34 @@ function tryGen(depth,targetWalk,theme){
     const bm=monsters.find(m=>m.boss);
     if(bm)bm.atk=Math.max(bm.atk,monsters.reduce((a,m)=>m.boss?a:Math.max(a,m.atk),0));
   }
+  /* Last of all: the floor must still hang together with the STAIRWELL treated
+     as solid. That tile used to be a tile you could walk across, and the level
+     was only ever checked on those terms; now the party stops in front of it,
+     so a stairwell sitting in a corridor is a wall across that corridor.
+
+     It cannot strand anything on its own — the stairs are the furthest tile the
+     generator's own BFS reaches, and nothing can lie beyond a furthest tile —
+     but three things move after that BFS runs: the start room is sealed and its
+     doors re-cut, locked doors appear, and the ossuary bier, the forge anvil
+     and Lolth's throne each block a tile. Any of those can leave the stairwell
+     as the only way round. T31 caught it at about one crypt floor in a few
+     hundred, which is exactly the rate at which it would have stranded the key
+     and sealed a run instead. */
+  {
+    const seen=new Uint8Array(W*H),q=[[start.x,start.y]];seen[idx(start.x,start.y)]=1;
+    for(let qi=0;qi<q.length;qi++){
+      const [cx,cy]=q[qi];
+      for(const [dx,dy] of DIRS){
+        const nx=cx+dx,ny=cy+dy,i=idx(nx,ny),t=g[i];
+        if(!t||t===T_PIT||t===T_STAIRS||seen[i])continue;
+        seen[i]=1;q.push([nx,ny]);
+      }
+    }
+    for(let i=0;i<W*H;i++)
+      if(g[i]&&g[i]!==T_PIT&&g[i]!==T_STAIRS&&!seen[i])return null;   // retry the level
+    // and the way down has to be reachable from beside it
+    if(!DIRS.some(([dx,dy])=>seen[idx(stairs.x+dx,stairs.y+dy)]))return null;
+  }
   return {w:W,h:H,grid:g,start,stairs,traps,items,monsters,secrets,theme,depth,
     explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,forge,chapel,lurkers,duergar,pillars,drow};
 }
@@ -5070,7 +5106,7 @@ const R3={ // renderer state
   scene:null,camera:null,renderer:null,torch:null,ambient:null,
   wallMesh:null,doorMeshes:{},secretMeshes:{},trapDecals:{},itemSprites:{},monsterSprites:{},
   stairsGroup:null,texCache:{},levelGroup:null,
-  camAnim:null,shake:0,liquidFlows:[],liquidShaders:[],candleFlames:[],cryptGroups:[],lurkerMeshes:{},
+  camAnim:null,shake:0,liquidFlows:[],liquidShaders:[],candleFlames:[],cryptGroups:[],lurkerMeshes:{},godRays:[],
 };
 const TILE=1,WALLH=1.3,EYE=0.62;
 // how many pieces of duergar furniture may cast a real light. Everything still
@@ -7978,6 +8014,103 @@ function shadeSprites(){
       .multiply(lightAt(w.position.x,w.position.y,w.position.z));
   }
 }
+/* God rays out of the stairwell.
+
+   Not a post-process. Only three.min.js is loaded — there is no EffectComposer
+   here and no build step to add one — so a true screen-space pass would mean
+   hand-rolling an occlusion render plus a radial blur through two targets, a
+   second full scene render every frame on a phone. It would also only work
+   while the source is on screen, and this source is down a hole.
+
+   So the rays are GEOMETRY: two open cones standing on the shaft mouth and
+   widening toward the ceiling, drawn additively with a shader that cuts them
+   into discrete blades. Three things make it read:
+
+   - The blade pattern is a product of sines in `uv.x` at whole-number
+     frequencies, so it is periodic around the cone and there is no seam where
+     the uv wraps. Beating two frequencies against each other is what stops the
+     blades looking like a comb.
+   - It fades on BOTH axes — out toward the ceiling, and in toward the rim,
+     since a shaft of light has no hard edge anywhere.
+   - `depthWrite:false` so the two cones do not occlude each other, and
+     `depthTest:true` so a wall between the party and the stairwell still cuts
+     the rays off. Additive with no depth test at all would shine through
+     stone. */
+const GODRAY_FS=`
+uniform float t; uniform vec3 c; uniform float amp; uniform float yBot; uniform float yTop;
+varying vec2 vUv; varying float vY;
+void main(){
+  float a=vUv.x*6.28318;
+  // blades: two beating frequencies, slowly counter-rotating
+  float b = 0.5+0.5*sin(a*7.0 + t*0.22);
+  b *= 0.5+0.5*sin(a*11.0 - t*0.13 + 1.7);
+  /* The exponent is the whole difference between rays and a lampshade. Below
+     about 2 the troughs never reach zero, every blade runs into its neighbour
+     and the cone fills in solid — which is exactly what the first build looked
+     like. The gaps have to be genuinely dark. */
+  b = pow(max(b,0.0),2.4);
+  /* The fade is measured in WORLD HEIGHT, not in the mesh's own uv.y. The
+     shafts are lathed profiles now — a parallel column inside the bore that
+     opens into a cone above the floor — so uv.y runs at wildly different rates
+     on the two halves and using it would put a visible kink at the mouth. */
+  float u = clamp((vY-yBot)/(yTop-yBot),0.0,1.0);
+  float up  = pow(1.0-u,1.5);                   // gone before the ceiling
+  float core= pow(1.0-clamp(u*3.0,0.0,1.0),2.5);// a small wash down in the well
+  float f = b*up*0.85 + up*0.10 + core*0.30;
+  gl_FragColor=vec4(c*f*amp,1.0);
+}`;
+const GODRAY_VS=`varying vec2 vUv; varying float vY;
+void main(){vUv=uv;vY=(modelMatrix*vec4(position,1.0)).y;
+gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`;
+/* GODRAY_FLOOR is where the shafts BEGIN, half a room's height below the floor
+   — deep inside the bore rather than at its mouth. The rays then rise out of
+   the well instead of appearing at it, which is the difference between light
+   coming from somewhere and a lamp set in the ground.
+
+   It costs brightness, and the amplitudes below are set for it: the shader's
+   fade runs over the cone's whole `uv.y`, so starting the cone 0.65 lower puts
+   floor level a third of the way up it and the part the party can actually see
+   is already well down the falloff. */
+const GODRAY_FLOOR=-WALLH/2;
+/* The shafts are LATHED PROFILES, not cones, because the bore is an aperture
+   and light does not pass through rock.
+
+   Below the floor a shaft is a parallel-sided column that fits inside the
+   hollowed cylinder; at the floor it reaches the mouth and only then opens out
+   into the room. As plain cones they were narrow at the source and widest at
+   the top, so the wide one measured 0.61 across at floor level against a bore of
+   0.455 — it was passing straight through the rock on its way up, and the only
+   reason it was not obvious is that the floor plate happened to hide it from
+   above. Aim a look along the floor and it would have shone out of solid stone.
+
+   A `LatheGeometry` over the profile [(r,-h), (r,0), (R,top)] gives the whole
+   shape in one mesh: cylinder, then cone, with the break exactly at the
+   aperture. `depthWrite:false` so the two layers do not occlude each other,
+   `depthTest:true` so a wall between the party and the stairwell still cuts
+   them off — additive with no depth test would shine through stone. */
+function godRays(cx,cz){
+  const g=new THREE.Group();
+  // two layers: a tight bright core and a wide soft one, so the light has a
+  // centre rather than being one even flare
+  for(const [rBore,rTop,yTop,amp] of [[0.30,0.74,WALLH*0.95,0.92],
+                                      [0.42,1.06,WALLH*0.80,0.54]]){
+    const mat=new THREE.ShaderMaterial({
+      uniforms:{t:{value:0},c:{value:new THREE.Color(0xffc06a)},amp:{value:amp},
+                yBot:{value:GODRAY_FLOOR},yTop:{value:yTop}},
+      vertexShader:GODRAY_VS,fragmentShader:GODRAY_FS,
+      transparent:true,blending:THREE.AdditiveBlending,
+      depthWrite:false,side:THREE.DoubleSide});
+    const prof=[new THREE.Vector2(rBore,GODRAY_FLOOR),
+                new THREE.Vector2(rBore,-0.02),      // up the bore, parallel-sided
+                new THREE.Vector2(rTop,yTop)];       // and out of the mouth
+    const m=new THREE.Mesh(new THREE.LatheGeometry(prof,30),mat);
+    m.position.set(cx,0,cz);
+    m.userData.decor=true;      // a tap goes through the light to the stone
+    g.add(m);
+    (R3.godRays||(R3.godRays=[])).push(mat);
+  }
+  return g;
+}
 function onResize(){
   const wrap=document.getElementById('view-wrap');
   const w=wrap.clientWidth||1,h=wrap.clientHeight||1;
@@ -7989,7 +8122,7 @@ function disposeLevel(){
   for(const f of R3.liquidFlows)f.tex.dispose();
   R3.liquidFlows=[];R3.liquidShaders=[];
   R3.doorMeshes={};R3.secretMeshes={};R3.trapDecals={};R3.itemSprites={};R3.monsterSprites={};R3.monsterGlows={};R3.monsterShadows={};R3.prewarmQ=[];R3.prewarmT=0;R3.stairsGroup=null;
-  R3.candleFlames=[];R3.cryptGroups=[];R3.lurkerMeshes={};R3.wallMats=null;R3.webMeshes=[];
+  R3.candleFlames=[];R3.cryptGroups=[];R3.lurkerMeshes={};R3.wallMats=null;R3.webMeshes=[];R3.godRays=[];
 }
 /* Scenery welding. A piece of furniture is a dozen little boxes and cylinders,
    and built as a dozen meshes it costs a dozen draw calls apiece — which for
@@ -8320,46 +8453,321 @@ function buildLevel(L){
     if(t===T_DOOR_OPEN)pv.rotation.y=passageX?Math.PI/2:-Math.PI/2;
     grp.add(pv);R3.doorMeshes[y*L.w+x]=pv;
   }
-  // stairs: a real recessed staircase descending below the floor into a dark shaft
+  /* The stairs down: a spiral turning around a central newel that stands a
+     third of the room's height proud of the floor, with golden light and light
+     shafts rising out of the well.
+
+     It is the one landmark every floor has and the only thing the party is
+     actually looking for, and as a straight flight of seven slabs in a hole it
+     read as a recess in the ground — you walked past it. A newel you can see
+     over the furniture, a helix, and a shaft of light are three cues that all
+     say "here" from across a room.
+
+     Everything is faced in the level's own masonry (`wallMats`, at the variant
+     this tile would have had), because a staircase is cut through the same
+     stone as the walls around it. That is also what makes the seven themes come
+     out different for free: the cave's rock, the drow's black brick, the
+     duergar's coursed slab and the grove's stalk all arrive by themselves. */
   {
     const sg=new THREE.Group();
     const sxs=L.stairs.x,sys=L.stairs.y,cx=sxs+0.5,cz=sys+0.5;
-    // the party enters from a walkable neighbor; the steps descend away from it
+    // the party approaches from a walkable neighbour; the helix starts there so
+    // the top tread meets the floor at the edge they arrive over
     let ndx=0,ndy=-1;
     for(const [dx,dy] of DIRS){
       const nt=L.grid[(sys+dy)*L.w+(sxs+dx)];
       if(nt===T_FLOOR||nt===T_DOOR_OPEN||nt===T_DOOR||nt===T_DOOR_LOCKED){ndx=dx;ndy=dy;break;}
     }
-    const DEPTH=1.05,N=7,drop=DEPTH/N;
-    // shaft (inner faces) enclosing the pit, a touch deeper than the steps.
-    // the stairwell is cut through the same masonry as the rest of the level,
-    // so its walls are faced with the wall texture — using the variant this
-    // tile would have had, and scaled so the brick courses stand the same
-    // height as the walls above the floor
-    const shaftTex=wallMats[wallVariant(sxs,sys,wallMats.length)].map.clone();
-    shaftTex.needsUpdate=true;
-    shaftTex.wrapS=shaftTex.wrapT=THREE.RepeatWrapping;
-    shaftTex.repeat.set(1,(DEPTH+0.06)/WALLH);
+    /* Twelve treads, not eighteen. At 18 the rise between one tread and the
+       next was 8cm against a 45cm tread, and from two tiles back the whole
+       flight merged into a smooth bowl around the post — a spiral is read
+       from the GAPS between its treads, so each one has to clear the one
+       below it by something you can see. Twelve gives 12cm of rise and 45
+       degrees of sweep apiece, and still turns a full 540. */
+    const DEPTH=1.25, N=12, drop=0.121;
+    const TURN=Math.PI*3/N;                    // 540 degrees over the flight
+    /* RISE is the top tread's own surface, and it is the `WALLH/3` of the brief:
+       the STAIRCASE reaches a third of the room's height, with four treads'
+       top faces standing above the floor and the newel carrying on a little
+       past the highest of them. */
+    const RISE=WALLH/3;
+    const BORE_R=0.455;                        // the cylinder cut into the rock
+    /* A tread overlaps the bore by 2cm — see *Surfaces that meet must overlap* —
+       but it can no longer be any wider than that, because the top four now
+       stand above the floor in open air where poking outside the tile would be
+       visible. 0.476 plus `hew`'s 0.045 tops out at 0.487 against a half-tile
+       of 0.5. */
+    const NEWEL_R=0.092, TREAD_R=0.476;
+    const POST=RISE+0.075;                     // the newel's crown, just clear of the top step
+    const wv=wallVariant(sxs,sys,wallMats.length);
+    const wallMap=wallMats[wv].map;
+    // one clone per surface, because `repeat` lives on the texture and each of
+    // these wants the courses at a different density
+    const mkTex=(rx,ry)=>{const t2=wallMap.clone();t2.needsUpdate=true;
+      t2.wrapS=t2.wrapT=THREE.RepeatWrapping;t2.repeat.set(rx,ry);return t2;};
+    const shaftTex=mkTex(2,DEPTH/WALLH);
+    /* The shaft is deliberately much darker than the room's own walls. Faced at
+       full strength its far inner wall carried the same brick at the same scale
+       as the wall standing behind the stairwell, the eye joined the two, and the
+       hole simply was not there — a newel standing on an unbroken floor. A void
+       with light coming up out of it needs the void. */
     const shaftMat=new THREE.MeshPhongMaterial({map:shaftTex,bumpMap:shaftTex,bumpScale:0.02,
-      side:THREE.BackSide,specular:0x191309,shininess:5});
-    const shaft=new THREE.Mesh(new THREE.BoxGeometry(0.995,DEPTH+0.06,0.995),shaftMat);
-    shaft.position.set(cx,-(DEPTH+0.06)/2,cz);sg.add(shaft);
-    // single-tread slabs step down toward local +Z (each only one drop tall, so
-    // you see over each tread to the next), then rotated to face the entry edge
-    const stepGrp=new THREE.Group();stepGrp.position.set(cx,0,cz);
-    const dz=1.0/N;
-    for(let i=0;i<N;i++){
-      // alternate tread shade slightly so adjacent steps read as distinct
-      const stepMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,(i%2?-0.08:-0.22))),specular:0x141009,shininess:6});
-      const box=new THREE.Mesh(new THREE.BoxGeometry(0.9,drop+0.03,dz+0.03),stepMat);
-      box.position.set(0,-i*drop-drop/2+0.015,-0.5+(i+0.5)*dz);
-      stepGrp.add(box);
+      color:0x5a5a5a,side:THREE.BackSide,specular:0x191309,shininess:5});
+    /* Everything below is CUT rather than built, and that is a different set of
+       shapes from a turned column standing in a hole. Three rules:
+
+       - Nothing underground is turned on a lathe. Every piece is roughened —
+         its vertices shoved about, then normals recomputed — so no silhouette
+         is a true circle and no face is flat.
+       - The seed is the stairs' own tile, not `Math.random`. `openBier`,
+         `openForge` and `openAltar` all call `buildLevel` again, and a stairwell
+         that re-hewed itself when a coffin was opened would be worse than one
+         that was smooth.
+       - It is all one mass of stone: a single material for newel, treads and
+         bore, and the pieces INTERPENETRATE rather than meet. Alternating the
+         tread shades made a helix legible when the stair was masonry; on carved
+         rock it read as a stack of separate slabs someone had laid, which is
+         exactly what it must not look like. */
+    let shs=((sxs*374761393)^(sys*668265263))>>>0;
+    const srr=()=>{shs=(shs*1664525+1013904223)>>>0;return shs/4294967296;};
+    /* The tile is SOLID ROCK with a cylinder cut down through it, which is a
+       different thing from the square hole this used to be.
+
+       Two pieces make that read. The bore is an open-ended cylinder faced on the
+       inside, running from the floor down — nothing of it stands above the
+       floor, because above the floor there is no rock left to cut. And the tile
+       keeps a real floor: `buildLevel` skips T_STAIRS when it lays the floor
+       planes, so this block has to supply its own — a unit square with a
+       circular hole punched in it.
+
+       That plate is in `floorMat`, not the wall's stone, and that is the same
+       lesson the kerb taught: a horizontal face at floor level is lit only by a
+       grazing torch, and the flagstones beside it look lit because the floor
+       texture is far paler than the wall's. In the wall's material it comes out
+       black. */
+    {
+      const sq=new THREE.Shape();
+      sq.moveTo(0,0);sq.lineTo(1,0);sq.lineTo(1,1);sq.lineTo(0,1);sq.lineTo(0,0);
+      const hole=new THREE.Path();
+      hole.absarc(0.5,0.5,BORE_R,0,Math.PI*2,true);   // wound against the shape
+      sq.holes.push(hole);
+      const fg=new THREE.ShapeGeometry(sq,28);
+      // ShapeGeometry lays uv straight off the shape's own coordinates, which
+      // here run 0..1 — exactly the per-tile floor plane's, so the plate carries
+      // on the same flagstones as its neighbours
+      fg.rotateX(-Math.PI/2);                          // shape +Y becomes world -Z
+      const plate=new THREE.Mesh(fg,floorMat);
+      plate.position.set(sxs,0,sys+1);
+      plate.userData={kind:'stairs',x:sxs,y:sys};
+      sg.add(plate);
     }
-    stepGrp.rotation.y=Math.atan2(-ndx,-ndy); // local +Z descent -> world run direction
-    sg.add(stepGrp);
-    // a faint glow rising from the depths lights the treads and lures the party down
-    const glow=new THREE.PointLight(0xffcf8a,0.9,2.6,2);
-    glow.position.set(cx,-0.5,cz);sg.add(glow);
+    /* CARVED is not SHATTERED, and the first cut of this was the second thing.
+       At 0.20 of radial jitter with the y jitter running to the end rings, the
+       newel grew black shards off its silhouette and the crown came out as
+       broken slag — the stair read as something that had collapsed rather than
+       something a mason had cut. Hand-tooled stone is smooth-ish and slightly
+       wavy, not spiky.
+
+       Two limits keep it that way: the amplitudes are small, and the extreme
+       rows of vertices are left exactly where they were, so an end cap stays a
+       clean edge instead of fraying. Everything ragged in the old build came
+       from moving those. */
+    /* The jitter is a function of the vertex POSITION, not a fresh draw per
+       vertex, and that is a correctness requirement rather than a nicety: a
+       non-indexed geometry (which is what `ExtrudeGeometry` returns) carries
+       duplicated vertices at every shared corner, and drawing independently for
+       each one tears the mesh into confetti. Hashing the position moves every
+       copy of a corner to the same place. */
+    const base=shs;
+    const hew=(geo,amt)=>{
+      const p=geo.attributes.position;
+      let lo=1e9,hi=-1e9;
+      for(let i=0;i<p.count;i++){const y=p.getY(i);if(y<lo)lo=y;if(y>hi)hi=y;}
+      const jit=(x,y,z,salt)=>{
+        let h=((Math.round(x*4096)*374761393)^(Math.round(y*4096)*668265263)
+              ^(Math.round(z*4096)*2246822519)^(base+salt*40503))>>>0;
+        h=(h*1664525+1013904223)>>>0;
+        return h/4294967296-0.5;
+      };
+      for(let i=0;i<p.count;i++){
+        const x=p.getX(i),y=p.getY(i),z=p.getZ(i),r=Math.hypot(x,z);
+        if(r<1e-4)continue;                      // leave the axis alone
+        const end=(y-lo<1e-4)||(hi-y<1e-4);      // and the end rings
+        const k=1+jit(x,y,z,1)*amt;
+        p.setX(i,x*k);p.setZ(i,z*k);
+        if(!end)p.setY(i,y+jit(x,y,z,7)*amt*0.12);
+      }
+      geo.computeVertexNormals();
+      return geo;
+    };
+    const stoneTex=mkTex(2,2);
+    /* Live rock, not dressed masonry: a heavy bump and effectively no specular.
+       A sheen is the single loudest cue that a surface was worked smooth, and
+       the newel's old one was reading as a polished baluster. */
+    /* Bump, not much of it. At 0.055 and then 0.034 the newel went nearly black:
+       a heavy bump map over a brick texture tilts most of the surface away from
+       a light that is already grazing, and the column stopped being lit at all.
+       The irregularity is in the GEOMETRY here — that is what `hew` is for — so
+       the map only has to carry grain. Specular stays near zero because a sheen
+       is the loudest cue that a surface was worked smooth. */
+    const stoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,0.16)),
+      map:stoneTex,bumpMap:stoneTex,bumpScale:0.016,specular:0x1c1610,shininess:4});
+    /* The bore itself: an open-ended cylinder faced on the inside, from the
+       floor down. Open-ended matters — a top cap would be between the eye and
+       the well, and although BackSide culls it from above, the bottom cap is
+       what the light needs to land on, so only that one is built. */
+    {
+      const bore=new THREE.Mesh(
+        hew(new THREE.CylinderGeometry(BORE_R,BORE_R*0.96,DEPTH,26,5,true),0.030),
+        shaftMat);
+      bore.position.set(cx,-DEPTH/2,cz);
+      bore.userData={kind:'stairs',x:sxs,y:sys};
+      sg.add(bore);
+      const btm=new THREE.Mesh(new THREE.CircleGeometry(BORE_R*0.97,24),shaftMat);
+      btm.rotation.x=Math.PI/2;                 // faces down, so BackSide shows it from above
+      btm.position.set(cx,-DEPTH+0.004,cz);
+      btm.userData={kind:'stairs',x:sxs,y:sys};
+      sg.add(btm);
+    }
+    const helix=new THREE.Group();helix.position.set(cx,0,cz);
+    /* The newel is the core the masons LEFT, not a post they stood up. It had a
+       moulded cap and two collars and read as a turned baluster dropped into a
+       hole — architecture rather than excavation. Those are gone. What is here
+       instead is an irregular column, flaring where the treads come off it,
+       finished at the top with a rough hewn crown: a few facets around a low
+       dome, the way the last stone off a cut is left. */
+    {
+      const nw=new THREE.Mesh(
+        hew(new THREE.CylinderGeometry(NEWEL_R*0.94,NEWEL_R*1.30,DEPTH+POST,13,9),0.075),
+        stoneMat);
+      nw.position.set(0,POST-(DEPTH+POST)/2,0);
+      nw.userData={kind:'stairs',x:sxs,y:sys};
+      helix.add(nw);
+      /* The crown is a low DOME, not a flat top and not a cone. A flat top is a
+         cut face, which a core that was never worked has not got; a cone reads
+         as a finial, which is the turned-baluster problem again. Loose spoil
+         was tried clinging round the head and read as black spikes — nothing
+         small and dark belongs on a silhouette at this range. */
+      const cr=new THREE.Mesh(
+        hew(new THREE.SphereGeometry(NEWEL_R*0.99,12,7,0,6.2832,0,1.15),0.075),stoneMat);
+      cr.position.set(0,POST-NEWEL_R*0.42,0);
+      cr.userData={kind:'stairs',x:sxs,y:sys};
+      helix.add(cr);
+    }
+    /* A helical rib wound round the newel, at the stair's own pitch.
+
+       This is what actually makes the thing read as a spiral, and it is a fix
+       for a geometry problem rather than a decoration. The party's eye is at
+       0.62 and the well is a metre wide, so from two tiles back the line of
+       sight only reaches about 30cm down the shaft — three treads. Their outer
+       edges at one radius make a ring, and the stair reads as a stone BOWL with
+       a post in it. Everything below is simply not visible from anywhere the
+       party can stand.
+
+       So the helix is stated on the one part of the staircase that is always in
+       view. Same pitch as the treads, so the post is carved with the stair it
+       belongs to rather than wearing a barber-pole. */
+    {
+      const pts=[];
+      for(let u=-DEPTH*0.62;u<=POST+0.001;u+=drop*0.25){
+        const a=-(u/drop)*TURN;
+        pts.push(new THREE.Vector3(Math.cos(a)*NEWEL_R*1.14,u,Math.sin(a)*NEWEL_R*1.14));
+      }
+      const rib=new THREE.Mesh(
+        hew(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),pts.length*3,0.021,6,false),
+            0.06),
+        stoneMat);
+      rib.userData={kind:'stairs',x:sxs,y:sys};
+      helix.add(rib);
+    }
+    /* A tread is a wedge, not a box: a rectangular step on a helix leaves a gap
+       at the newel on one side and overhangs the well on the other. A ring
+       sector with `thetaLength` slightly over the step angle gives each tread a
+       hair of overlap with the next, which is what a real stone stair has. */
+    /* Treads run INTO the bore wall rather than stopping short of it. At 0.455
+       against a shaft half-width of 0.4975 there was a 4cm gap all the way
+       round, and through it you saw daylight between the stair and the rock —
+       which reads as a structure standing inside a hole. Cut stairs are the
+       same stone as the wall they are cut from, so they overlap it, and the
+       corners of the square bore are what is left of the uncut rock.
+
+       Each tread is hewn on its own seed, so no two are the same wedge. */
+    /* A tread is an EXTRUDED PIE SECTOR, and it has to be, because a
+       theta-sector `CylinderGeometry` is not a solid. Three.js builds one as a
+       torso plus two cap fans and generates NO radial end walls, so the two
+       faces where the step is cut off — the risers, the most important faces on
+       a stair — simply are not there. With front-face culling you look straight
+       through them into nothing, and every tread read as a curved sheet of
+       paper. Audited: a box comes back with 0 open edges and an extruded sector
+       with 0; the theta-sector cylinder does not.
+
+       Extruding a closed 2D shape gives a closed solid. It also returns
+       NON-INDEXED geometry, so `computeVertexNormals` inside `hew` produces one
+       normal per face rather than smoothing across the edges — which is exactly
+       what a cut block wants: a bright top, a dark riser, and a hard line where
+       they meet. A smoothed corner is the other half of why these looked thin.
+
+       The sector is symmetric about angle 0 so that the mirroring `rotateX`
+       does to the shape's own axes cannot move where the step sits. */
+    const TH=drop*0.58;                          // and thicker: 7cm of stone, not 5
+    {
+      const sh=new THREE.Shape();
+      sh.absarc(0,0,TREAD_R,-TURN*0.53,TURN*0.53,false);
+      sh.lineTo(0,0);
+      const tg=new THREE.ExtrudeGeometry(sh,{depth:TH,bevelEnabled:false,curveSegments:9});
+      tg.rotateX(-Math.PI/2);                    // extrusion +Z becomes +Y
+      tg.translate(0,-TH,0);                     // so the top face sits at y=0
+      for(let i=0;i<N;i++){
+        // the top tread's surface is RISE, so four of them stand above the floor
+        const m2=new THREE.Mesh(hew(tg.clone(),0.045),stoneMat);
+        m2.position.set(0,RISE-drop*i,0);
+        m2.rotation.y=-TURN*i;
+        m2.userData={kind:'stairs',x:sxs,y:sys};
+        helix.add(m2);
+      }
+    }
+    /* There is no kerb round the opening, and both attempts at one are worth
+       knowing about. A torus read as a barrel hoop hanging over the hole. Laid
+       flat instead it came out as a solid BLACK ring — the darkest thing in the
+       picture — because the only light in the room is a torch at the eye two
+       tiles away, and against a horizontal face at floor level that is a
+       grazing light: N·L is about a third of what the same stone gets standing
+       up as the newel. The flagstones beside it look lit only because the floor
+       texture is far paler than the wall's. Whatever goes here has to be the
+       FLOOR's material, not the wall's. Nothing does, and the opening reads
+       perfectly well without it. */
+    helix.rotation.y=Math.atan2(-ndx,-ndy);   // the top tread meets the approach
+    sg.add(helix);
+    /* Golden light out of the deep. Two lights: one down in the well doing the
+       real work on the treads and the newel, and one at the mouth so the floor
+       around the opening catches it too — without the second the stairwell is a
+       bright hole in a dark floor, which reads as a texture rather than a
+       light. */
+    const glow=new THREE.PointLight(0xffc46a,1.45,2.7,2);
+    glow.position.set(cx,-0.30,cz);sg.add(glow);      // lights the treads you can see
+    const deep=new THREE.PointLight(0xff9c3c,0.70,1.9,2);
+    deep.position.set(cx,-1.10,cz);sg.add(deep);      // and something further down
+    /* The mouth light is deliberately OFF the shaft axis. On it — at (cx,y,cz)
+       — it is inside the newel, and a point light on the axis of a column
+       cannot light that column at all: every normal on the outer surface points
+       away from it. The newel came out a black silhouette against a brightly
+       lit well, which is dramatic and tells you nothing about what it is made
+       of. Pushed to the rim on the side the party approaches from, the same
+       light still reads as coming out of the well and now rakes across the
+       stone. */
+    const mouth=new THREE.PointLight(0xffb455,0.42,1.9,2);
+    mouth.position.set(cx-ndx*0.34,0.15,cz-ndy*0.34);sg.add(mouth);
+    /* And one small light ABOVE the well, which is the one cheat here.
+       Everything else in this stairwell shines upward, and the four treads that
+       now stand proud of the floor are horizontal faces — the torch reaches them
+       at about N·L 0.14 from two tiles back, so they rendered as black blades
+       hanging round the newel. A light under them lights their undersides, which
+       is what really happens and is unreadable. This one is dim, warm and pinned
+       to a 1.1 range so it falls off before it touches the room: it exists to
+       put a top on the steps and nothing else. */
+    const lip=new THREE.PointLight(0xffcf90,1.70,2.10,2);
+    lip.position.set(cx,RISE+0.34,cz);sg.add(lip);
+    sg.add(godRays(cx,cz));
     grp.add(sg);R3.stairsGroup=sg;
   }
   // sewers: putrid liquid — sunken lake pits, corridor rivers, wall pipes
@@ -9865,15 +10273,20 @@ function buildLevel(L){
     mk(chit,rockU,chitMat); mk(bolts,cylU,boltMat);
     grp.add(litter);
   }
-  /* Duergar floor dressing: haulage track, slag, spilled ore and dropped tools.
-     Built on the crypt's terms — seeded from each tile's own coordinates so a
-     rebuild never reshuffles it, instanced down to a handful of draw calls, flat
-     to the ground so it never blocks a path, and every mesh marked `decor` so a
-     tap goes through it to whatever is lying on the same tile. */
+  /* Duergar floor dressing: slag, spilled ore and dropped tools. Built on the
+     crypt's terms — seeded from each tile's own coordinates so a rebuild never
+     reshuffles it, instanced down to a handful of draw calls, flat to the ground
+     so it never blocks a path, and every mesh marked `decor` so a tap goes
+     through it to whatever is lying on the same tile.
+
+     Haulage track used to run down the corridors here — chosen per row and per
+     column rather than per tile, so a run came out continuous instead of as
+     disconnected two-foot fragments. It was removed. The lesson about hashing
+     the line rather than the tile is kept in CLAUDE.md for whoever wants
+     something that has to run continuously down a passage. */
   if(th.name==='Duergar'){
     const litter=new THREE.Group();
-    const railMat=new THREE.MeshPhongMaterial({color:0x35353c,specular:0x101014,shininess:22});
-    const sleepMat=new THREE.MeshPhongMaterial({color:0x352718,specular:0x120c04,shininess:4});
+    const ironMat=new THREE.MeshPhongMaterial({color:0x35353c,specular:0x101014,shininess:22});
     // Clinker: fired waste, and the one thing down here that is genuinely black.
     // Its sheen is what says "glassy" rather than "sooty", so it keeps a small
     // narrow highlight where the iron deliberately does not.
@@ -9892,42 +10305,18 @@ function buildLevel(L){
        stone at a fraction of the vertices. */
     const rockU=new THREE.IcosahedronGeometry(1,0);
     const cylU=new THREE.CylinderGeometry(1,1,1,6);
-    const QID=new THREE.Quaternion();
     const yawQ=(a)=>new THREE.Quaternion().setFromEuler(new THREE.Euler(0,a,0));
     const tumbleQ=(f)=>new THREE.Quaternion().setFromEuler(
       new THREE.Euler(f()*6.3,f()*6.3,f()*6.3));
     const loc=(px,py,pz,q,sx,sy,sz)=>new THREE.Matrix4().compose(
       new THREE.Vector3(px,py,pz),q,new THREE.Vector3(sx,sy,sz));
-    const rails=[],sleepers=[],slag=[],ore=[],veins=[],hafts=[],heads=[];
-    const walk=(x,y)=>{const t=L.grid[y*L.w+x];
-      return t===T_FLOOR||t===T_DOOR||t===T_DOOR_OPEN||t===T_DOOR_LOCKED;};
+    const slag=[],ore=[],veins=[],hafts=[],heads=[];
     const busy=new Set((L.duergar||[]).map(f=>f.x+','+f.y));
-    /* The track is chosen per ROW and per COLUMN, not per tile. A tile-by-tile
-       roll gives disconnected two-foot fragments of rail lying about, which is
-       the one thing track cannot be; hashing the row means every horizontal
-       corridor tile on that row carries it and the run comes out continuous.
-       Junction tiles are neither purely horizontal nor vertical and take no
-       rails, so a line simply ends where it meets another passage. */
-    const lineHash=(v,salt)=>{let h=((v*2654435761)^(salt*40503))>>>0;
-      h=(h*1664525+1013904223)>>>0;return h/4294967296;};
     for(let y=1;y<L.h-1;y++)for(let x=1;x<L.w-1;x++){
       if(L.grid[y*L.w+x]!==T_FLOOR)continue;
       let hsh=((x*374761393)^(y*668265263))>>>0;
       const rr=()=>{hsh=(hsh*1664525+1013904223)>>>0;return hsh/4294967296;};
       const cx=x+0.5,cz=y+0.5;
-      const horiz=walk(x-1,y)&&walk(x+1,y)&&!walk(x,y-1)&&!walk(x,y+1);
-      const vert =walk(x,y-1)&&walk(x,y+1)&&!walk(x-1,y)&&!walk(x+1,y);
-      const onRail=(horiz&&lineHash(y,17)<0.34)||(vert&&lineHash(x,91)<0.34);
-      if(onRail){
-        const a=horiz?0:Math.PI/2, q=yawQ(a);
-        for(const s of [-1,1])                              // the two rails
-          rails.push(loc(cx+(horiz?0:s*0.16),0.030,cz+(horiz?s*0.16:0),q,1.0,0.026,0.034));
-        for(let k=0;k<4;k++){                               // sleepers under them
-          const t=-0.375+k*0.25;
-          sleepers.push(loc(cx+(horiz?t:0),0.012,cz+(horiz?0:t),q,0.08,0.024,0.44));
-        }
-        continue;                                           // nothing else on a track tile
-      }
       if(busy.has(x+','+y))continue;                        // furniture stands here
       const roll=rr();
       if(roll<0.075){                                       // a heap of clinker
@@ -9965,10 +10354,9 @@ function buildLevel(L){
       mats.forEach((m,i)=>inst.setMatrixAt(i,m));inst.instanceMatrix.needsUpdate=true;
       inst.userData.decor=true;   // never blocks a tap to the item on the same tile
       litter.add(inst); };
-    mk(rails,boxU,railMat); mk(sleepers,boxU,sleepMat);
     mk(slag,rockU,slagMat); mk(ore,rockU,oreMat); mk(veins,rockU,veinMat);
     mk(hafts,cylU,new THREE.MeshPhongMaterial({color:0x3a2a1c,specular:0x140e04,shininess:5}));
-    mk(heads,boxU,railMat);
+    mk(heads,boxU,ironMat);
     grp.add(litter);
   }
   // drow houses: rose windows, and stalactites the builders never bothered to
@@ -10368,7 +10756,7 @@ function buildLevel(L){
       if(L.grid[y*L.w+x]!==T_WALL)continue;
       for(const [dx,dy] of DIRS){
         const t=L.grid[(y+dy)*L.w+(x+dx)];
-        if(t!==T_FLOOR&&t!==T_DOOR_OPEN&&t!==T_STAIRS)continue; // must face somewhere you can stand
+        if(t!==T_FLOOR&&t!==T_DOOR_OPEN)continue; // must face somewhere you can stand
         let h=((x*83492791)^(y*29996224)^((dx+2)*15485863)^((dy+2)*32452843))>>>0;
         h=(h^(h>>>13))*1274126177>>>0;
         if((h>>>8)/16777216>0.015)continue;                     // ~7 sites a floor, no more
@@ -11093,6 +11481,8 @@ function updateCamera(now){
   R3.torch.intensity=R3.torchBase*(1+flicker)*(1+lb*0.12);
   R3.torchFill.intensity=0.9*(1+flicker*0.6);
   shadeSprites();
+  // the stairwell's light shafts drift; one uniform, both cones
+  if(R3.godRays)for(const m of R3.godRays)m.uniforms.t.value=now/1000;
   // crypt candles guttering, each on its own phase so they don't pulse together
   for(let i=0;i<R3.candleFlames.length;i++){
     const c=R3.candleFlames[i],ph=i*1.7;
@@ -11267,7 +11657,7 @@ function computeDistField(){
     if(dd>=22)continue;
     for(const [dx,dy] of DIRS){
       const nx=cx+dx,ny=cy+dy,t=tileAt(nx,ny);
-      if((t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS)&&df[ny*L.w+nx]<0){df[ny*L.w+nx]=dd+1;q.push([nx,ny]);}
+      if((t===T_FLOOR||t===T_DOOR_OPEN)&&df[ny*L.w+nx]<0){df[ny*L.w+nx]=dd+1;q.push([nx,ny]);}
     }
   }
   G.distField=df;
@@ -11293,7 +11683,7 @@ function combatNoise(x,y,r){
     if(d>=r)continue;
     for(const [dx,dy] of DIRS){
       const nx=cx+dx,ny=cy+dy,t=tileAt(nx,ny);
-      if((t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS)&&df[ny*L.w+nx]<0){
+      if((t===T_FLOOR||t===T_DOOR_OPEN)&&df[ny*L.w+nx]<0){
         df[ny*L.w+nx]=d+1;q.push([nx,ny]);
       }
     }
@@ -11455,12 +11845,23 @@ function tryMove(kind){ // 'fwd','back','sleft','sright'
   if(t===T_SECRET_FOUND){openSecretAt(nx,ny);return;}
   if(t===T_DOOR){openDoorAt(nx,ny);return;}
   if(t===T_DOOR_LOCKED){tryUnlock(nx,ny);return;}
+  /* The stairwell is not a tile you stand on — walking into it takes you down
+     it. This is where the party used to step onto the stairs and descend a
+     quarter-second later; the control is identical, the camera simply never
+     enters the tile the newel stands in. */
+  if(t===T_STAIRS){G.moveCd=0.22;takeStairs();return;}
   const m=monsterAt(nx,ny);
   if(m){SFX.bump();UI.toast(m.name+' blocks the way!');return;}
   G.px=nx;G.py=ny;G.moveCd=0.22;
   animCamera(190);SFX.step();
   afterPartyMove();
-  if(t===T_STAIRS){setTimeout(()=>{if(!G.over)descend();},260);}
+}
+// the one way down, shared by walking into the stairwell and by tapping it
+function takeStairs(){
+  if(G.over||G._descending)return;
+  G._descending=true;
+  SFX.step();
+  setTimeout(()=>{G._descending=false;if(!G.over)descend();},260);
 }
 function tryRotate(dir){ // +1 right, -1 left
   if(G.paused||G.over||G.moveCd>0)return;
@@ -12607,7 +13008,7 @@ function resolvePartyTileOverlap(){
     if(m.x!==G.px||m.y!==G.py)continue;
     const opts=DIRS.slice().sort(()=>Math.random()-0.5).filter(([dx,dy])=>{
       const t=tileAt(m.x+dx,m.y+dy);
-      return (t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS)&&freeSlotAt(m.x+dx,m.y+dy,m)>=0;
+      return (t===T_FLOOR||t===T_DOOR_OPEN)&&freeSlotAt(m.x+dx,m.y+dy,m)>=0;
     });
     if(opts.length){const [dx,dy]=opts[0];moveMonster(m,m.x+dx,m.y+dy);}
   }
@@ -12673,7 +13074,7 @@ function chaseStep(m){
 }
 function stepOk(m,nx,ny){
   const t=tileAt(nx,ny);
-  if(!(t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS))return false;
+  if(!(t===T_FLOOR||t===T_DOOR_OPEN))return false;
   if(freeSlotAt(nx,ny,m)<0)return false; // the tile is packed four deep
   if(nx===G.px&&ny===G.py)return false;
   return true;
@@ -16242,6 +16643,10 @@ function initInput(){
       if(u.kind==='bier'){openBier();return;}
       if(u.kind==='anvil'){openForge();return;}
       if(u.kind==='altar'){openAltar();return;}
+      if(u.kind==='stairs'){
+        if(Math.abs(u.x-G.px)+Math.abs(u.y-G.py)>1){UI.toast('Too far away.');return;}
+        takeStairs();return;
+      }
       if(u.kind==='plaque'){readEpitaph(u.x,u.y,u.n);return;}
       if(u.kind==='monster')return; // attacks come from hands
     }
