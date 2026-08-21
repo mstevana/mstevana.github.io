@@ -149,7 +149,8 @@ h1{font-size:26px;text-align:center;} h2{font-size:17px;}
 .best-art{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:center;}
 .best-art img{display:block;image-rendering:auto;}
 .best-info{flex:1 1 0;min-width:0;}
-.best-name{color:var(--ink);font-size:16px;margin-bottom:3px;}
+.best-name{color:var(--ink);font-size:16px;margin-bottom:1px;}
+.best-kind{font-size:12px;color:#8a7f66;margin-bottom:3px;}
 .best-stats{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:13px;color:#c9b98a;}
 .best-stats b{color:var(--ink);font-weight:normal;}
 .best-tag{font-size:12px;color:#9c8f6e;margin-top:4px;line-height:1.45;}
@@ -16219,6 +16220,11 @@ const UI=(()=>{
   }
   const dmgStr=(d)=>d?d[0]+'d'+d[1]+(d[2]>0?'+'+d[2]:d[2]<0?d[2]:''):'—';
   const crStr=(cr)=>cr<1?('1/'+Math.round(1/cr)):String(cr);
+  /* `speed` is a movement COOLDOWN in seconds, so lower is faster — printing the
+     raw number would read backwards to a player. Thresholds sit either side of
+     the bestiary's own spread (quartiles 1.3 / 1.4 / 1.5), so the labels
+     actually divide the roster instead of lumping it all into one word. */
+  const speedLabel=(s)=>s<=1.15?'Fast':s<=1.45?'Steady':s<=1.9?'Slow':'Very slow';
   /* What the creature can do to you, in the same words the game uses when it
      does it. Read off the definition's own flags, so a creature gains its line
      here the moment it gains the ability rather than needing a second table. */
@@ -16260,7 +16266,14 @@ const UI=(()=>{
       const stats=['<span><b>CR</b> '+crStr(d.cr)+'</span>',
         '<span><b>HP</b> '+d.hp+'</span>',
         '<span><b>AC</b> '+d.ac+'</span>',
-        '<span><b>Atk</b> +'+d.atk+' ('+dmgStr(d.dmg)+')</span>'].join('');
+        '<span><b>Atk</b> +'+d.atk+' ('+dmgStr(d.dmg)+')</span>',
+        '<span><b>Speed</b> '+speedLabel(d.speed)+'</span>',
+        '<span><b>XP</b> '+d.xp+'</span>'].join('');
+      // the creature's kind, and the one thing the player can act on because
+      // of it: only the undead can be turned
+      const ty=d.type||'creature';
+      const kind=ty.charAt(0).toUpperCase()+ty.slice(1)+
+        (ty==='undead'?' · can be turned':'');
       const sp=d.caster
         ? '<div class="best-tag"><em>Spells:</em> '+dmgStr(d.caster.dmg)+' at '+d.caster.ranged+
           ' tiles, every '+d.caster.cd+'s'+(d.caster.elem?' ('+d.caster.elem+')':'')+'</div>'
@@ -16273,6 +16286,7 @@ const UI=(()=>{
         '</div>'+
         '<div class="best-info">'+
           '<div class="best-name">'+d.name+'</div>'+
+          '<div class="best-kind">'+kind+'</div>'+
           '<div class="best-stats">'+stats+'</div>'+
           sp+abl+
         '</div></div>';
