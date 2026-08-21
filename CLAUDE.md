@@ -260,6 +260,27 @@ settled is that the median is not to be chased by fiddling with
 `depthScale`, `threatBudget` or the bestiary — those are not what is
 holding it.
 
+## A sprite's raster is sized for the biggest that creature will ever be drawn
+
+`monsterTexPx(key)` gives every creature `MON_TEX` (640) except the three that
+carry `enlarge` — the duergar warrior, thane and hammerlord — which get 832,
+`MON_TEX × ENLARGE_SCALE` rounded up to a multiple of 64.
+
+A duergar's racial enlarge grows the **billboard and nothing else**, so the same
+raster was stretched over a bigger quad: measured on a DPR-3 phone at `high`,
+magnification went from 1.10× to **1.41×** the instant a warrior swelled, and it
+softened visibly at exactly the moment the player was looking hardest at it.
+Sized up front it is 0.85× before and **1.08×** after.
+
+`ENLARGE_SCALE` is shared between `duergarTricks` and `monsterTexPx` precisely so
+the two cannot drift; the raster size is also part of the texture cache key, so
+one sprite shared by two creatures at different rasters cannot hand back the
+smaller one. Only 3 of 80 creatures pay the larger texture, which is why this is
+affordable — a blanket bump would not be (see the memory note above).
+
+**The general rule: anything that scales a sprite quad at runtime has to be paid
+for in the raster.** Check `_sc` writers before adding another.
+
 ## An elite's recolour must be a filter, never a CSS blend mode
 
 `monsterSVG` tinted an elite by laying a 62%-opacity rect of the template colour

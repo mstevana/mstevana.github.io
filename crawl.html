@@ -10786,14 +10786,30 @@ function refreshItemSprite(L,i){
 }
 function itemTexKey(it){return 'it_'+it.base+'_'+it.bonus+'_'+(it.tint||'')+'_'+(ITEM_DEFS[it.base].tint||'');}
 // single source of truth for monster frame textures (cache key + raster options)
-function monsterFrameTex(sprKey,boss,pose,elite){
+/* 640px, not 384: a large creature one tile away fills ~750 physical pixels on
+   a DPR-3 phone, so a 384px raster was magnified ~2x and read as blurry up
+   close. 640 brings that down to ~1.1x — near its native resolution — at the
+   cost of ~2.8x the raster time and texture memory per frame. */
+const MON_TEX=640;
+/* A duergar's racial enlarge grows the BILLBOARD and nothing else, so the same
+   raster gets stretched over a bigger quad: measured, magnification went from
+   1.10x to 1.41x the moment a warrior swelled, and it visibly softened exactly
+   when the player was looking hardest at it. The texture has to be sized for
+   the largest the creature will ever be drawn, and `enlarge` is a static flag
+   on the definition, so that is known before anything is rasterised. Rounded to
+   a multiple of 64 to keep the mip chain tidy. */
+const ENLARGE_SCALE=1.28;
+function monsterTexPx(key){
+  return MONSTERS[key]&&MONSTERS[key].enlarge
+    ? Math.ceil(MON_TEX*ENLARGE_SCALE/64)*64 : MON_TEX;
+}
+function monsterFrameTex(sprKey,boss,pose,elite,px){
   const tint=elite&&ELITES[elite]?ELITES[elite].tint:null;
-  // 640px, not 384: a large creature one tile away fills ~750 physical pixels on
-  // a DPR-3 phone, so a 384px raster was magnified ~2x and read as blurry up
-  // close. 640 brings that down to ~1.2x — near its native resolution — at the
-  // cost of ~2.8x the raster time and texture memory per frame.
+  const S=px||MON_TEX;
+  // the size is part of the key: one sprite shared by two creatures at
+  // different rasters must not hand back the smaller one
   return svgToTexture(monsterSVG(sprKey,boss,pose,tint),
-    'mon_'+sprKey+(boss?'_b':'')+(elite?'_'+elite:'')+'_'+pose,{size:640,mipmap:true});
+    'mon_'+sprKey+(boss?'_b':'')+(elite?'_'+elite:'')+'_'+pose+'_'+S,{size:S,mipmap:true});
 }
 /* Every pose is rasterised the first time it is used, and a frame costs about
    25ms of main thread to decode at 384px once it carries the rim and contact-
@@ -10811,9 +10827,10 @@ function prewarmMonsterFrames(L){
     if(seen[k])continue;seen[k]=1;
     // the resting frames are wanted the instant the floor appears; the rest can
     // trickle in behind it
-    monsterFrameTex(MONSTERS[m.key].spr,m.boss,'idle0',m.elite);
+    const px=monsterTexPx(m.key);
+    monsterFrameTex(MONSTERS[m.key].spr,m.boss,'idle0',m.elite,px);
     for(const pose of ['idle1','walk0','walk1','windup','strike'])
-      queue.push([MONSTERS[m.key].spr,m.boss,pose,m.elite]);
+      queue.push([MONSTERS[m.key].spr,m.boss,pose,m.elite,px]);
   }
   /* Drained a couple at a time rather than in one block. A frame costs about
      30ms of main thread to rasterise at 384px once it carries the rim, the
@@ -10830,7 +10847,7 @@ function prewarmMonsterFrames(L){
   const drain=(dl)=>{
     R3.prewarmT=0;
     while(R3.prewarmQ.length&&(dl.timeRemaining?dl.timeRemaining():8)>4){
-      const a=R3.prewarmQ.shift();monsterFrameTex(a[0],a[1],a[2],a[3]);
+      const a=R3.prewarmQ.shift();monsterFrameTex(a[0],a[1],a[2],a[3],a[4]);
     }
     if(R3.prewarmQ.length)R3.prewarmT=idle(drain);
   };
@@ -10847,7 +10864,8 @@ function addMonsterSprite(m){
   const sprKey=MONSTERS[m.key].spr;
   // only the resting frame up front; walk/windup/strike rasterize lazily on first
   // use (the global texture cache still shares frames across same-type monsters)
-  const frames={idle0:monsterFrameTex(sprKey,m.boss,'idle0',m.elite)};
+  const texPx=monsterTexPx(m.key);
+  const frames={idle0:monsterFrameTex(sprKey,m.boss,'idle0',m.elite,texPx)};
   /* alphaTest matters beyond looks: without it the sprite's transparent margins
      write depth across the whole quad, and every effect behind a monster — a
      lightning stroke, frost on the floor, another monster's impact splash —
@@ -10858,7 +10876,7 @@ function addMonsterSprite(m){
   const sc=monsterSpriteScale(m.key,m.boss);
   spr.scale.set(sc,sc,1);
   spr.position.set(m.x+0.5,sc/2+0.02,m.y+0.5);
-  spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss,elite:m.elite};
+  spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss,elite:m.elite,texPx};
   R3.levelGroup.add(spr);R3.monsterSprites[m.id]=spr;
   addMonsterGlow(m,sprKey,sc);
   addMonsterShadow(m,sc);
@@ -12726,7 +12744,9 @@ function duergarTricks(m){
     m.dmg=[m.dmg[0],m.dmg[1],m.dmg[2]+3];
     m.atk+=1;m.ac-=1;                     // bigger and slower to cover
     const s=R3.monsterSprites&&R3.monsterSprites[m.id];
-    if(s&&m._sc){m._sc*=1.28;s.scale.set(m._sc,m._sc,1);s.position.y=m._sc/2+0.02;}
+    // ENLARGE_SCALE is shared with monsterTexPx: the raster is sized for the
+    // grown creature up front, so swelling does not magnify a too-small texture
+    if(s&&m._sc){m._sc*=ENLARGE_SCALE;s.scale.set(m._sc,m._sc,1);s.position.y=m._sc/2+0.02;}
     UI.floatAtMonster(m,'ENLARGED','#e0cf9e');
     UI.toast(m.name+' swells, armour groaning at the seams!');
     SFX.growl(0);
@@ -14899,7 +14919,7 @@ function updateSprites(now){
     if(ud.curFrame!==frame&&ud.frames){
       // frames are generated lazily on first use; keep the old frame until loaded
       let t=ud.frames[frame];
-      if(!t){t=monsterFrameTex(ud.sprKey,ud.boss,frame,ud.elite);ud.frames[frame]=t;}
+      if(!t){t=monsterFrameTex(ud.sprKey,ud.boss,frame,ud.elite,ud.texPx);ud.frames[frame]=t;}
       if(t.__ready!==false){ud.curFrame=frame;s.material.map=t;}
     }
     // idle bob + strike lunge toward the party
@@ -15902,6 +15922,8 @@ const UI=(()=>{
     if(d.regen)out.push('Regenerates '+d.regen+' hp');
     if(d.skeletal)out.push('Skeletal — half damage from piercing, extra from bludgeoning');
     if(d.incorporeal)out.push('Incorporeal — halves damage from unenchanted weapons');
+    if(d.enlarge)out.push('Enlarges when bloodied — +3 damage, +1 attack, −1 AC');
+    if(d.vanish)out.push('Turns invisible when hurt, then strikes unseen');
     if(d.lurk)out.push('Ambusher — lies in wait as rock');
     if(d.shriek)out.push('Shrieks — wakes the grove');
     if(d.distress)out.push('Distress — its pain calls other myconids');
