@@ -1238,6 +1238,48 @@ hundred — which is exactly the rate at which it would have stranded the key an
 sealed a run. Measured after the gate: 0 stranded over 480 floors at depths
 1–40, and generation still runs at 2.9ms a level.
 
+### A cylinder bored into solid rock
+
+The tile is solid ground with a **cylinder** cut down through it, which is a
+different object from the square hole this started as. Two pieces make it read,
+and the second is easy to miss:
+
+- The bore is an open-ended cylinder faced on the inside, running from the floor
+  down. Nothing of it stands above the floor, because above the floor there is
+  no rock left to cut. Open-ended matters: a top cap would sit between the eye
+  and the well.
+- **The tile has to supply its own floor.** `buildLevel` skips `T_STAIRS` when it
+  lays the floor planes, so the stairs block builds a unit square with a circular
+  hole punched in it — and that plate is in **`floorMat`, not the wall's stone**,
+  which is the kerb's lesson again: a horizontal face at floor level is lit only
+  by a grazing torch, and in the wall's material it comes out black.
+
+**Four treads stand proud of the floor.** `RISE` is the top tread's own surface
+and it is the `WALLH/3` of the brief — the *staircase* reaches a third of the
+room's height, with the newel carrying on a little past the highest step. This
+is what finally makes the spiral legible; everything before it was trying to
+show a helix down a hole the party cannot see into.
+
+It costs one constraint and one cheat:
+
+- **A tread can no longer be wider than the tile.** Below the floor it wanted to
+  overlap the bore as much as possible; above it, poking outside the tile is
+  visible. 0.476 plus `hew`'s 0.045 tops out at 0.487 against a half-tile of 0.5.
+- **The proud treads need a light above them.** Everything in this stairwell
+  shines upward, and a tread top is a horizontal face — the torch reaches one at
+  about N·L 0.14 from two tiles back, so they rendered as pure black blades
+  hanging round the newel. Lighting them from below lights their undersides,
+  which is what really happens and is unreadable. There is a dim warm point light
+  above the well pinned to a short range so it falls off before it touches the
+  room. It exists to put a top on the steps and nothing else.
+
+**The rays start half a room's height BELOW the floor** (`GODRAY_FLOOR`), so they
+rise out of the well rather than appearing at it. That costs real brightness and
+the amplitudes are set for it: the shader's fade runs over the cone's whole
+`uv.y`, so starting 0.65 lower puts floor level a third of the way up and the
+visible part is already well down the falloff. The fade exponent came down to 1.5
+and the amplitudes went up by about half.
+
 ### Carved, not built
 
 The first cut of this was dressed masonry — a turned newel with a moulded cap
