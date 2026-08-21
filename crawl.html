@@ -8570,17 +8570,30 @@ function buildLevel(L){
        rows of vertices are left exactly where they were, so an end cap stays a
        clean edge instead of fraying. Everything ragged in the old build came
        from moving those. */
+    /* The jitter is a function of the vertex POSITION, not a fresh draw per
+       vertex, and that is a correctness requirement rather than a nicety: a
+       non-indexed geometry (which is what `ExtrudeGeometry` returns) carries
+       duplicated vertices at every shared corner, and drawing independently for
+       each one tears the mesh into confetti. Hashing the position moves every
+       copy of a corner to the same place. */
+    const base=shs;
     const hew=(geo,amt)=>{
       const p=geo.attributes.position;
       let lo=1e9,hi=-1e9;
       for(let i=0;i<p.count;i++){const y=p.getY(i);if(y<lo)lo=y;if(y>hi)hi=y;}
+      const jit=(x,y,z,salt)=>{
+        let h=((Math.round(x*4096)*374761393)^(Math.round(y*4096)*668265263)
+              ^(Math.round(z*4096)*2246822519)^(base+salt*40503))>>>0;
+        h=(h*1664525+1013904223)>>>0;
+        return h/4294967296-0.5;
+      };
       for(let i=0;i<p.count;i++){
         const x=p.getX(i),y=p.getY(i),z=p.getZ(i),r=Math.hypot(x,z);
         if(r<1e-4)continue;                      // leave the axis alone
         const end=(y-lo<1e-4)||(hi-y<1e-4);      // and the end rings
-        const k=1+(srr()-0.5)*amt;
+        const k=1+jit(x,y,z,1)*amt;
         p.setX(i,x*k);p.setZ(i,z*k);
-        if(!end)p.setY(i,y+(srr()-0.5)*amt*0.12);
+        if(!end)p.setY(i,y+jit(x,y,z,7)*amt*0.12);
       }
       geo.computeVertexNormals();
       return geo;
@@ -8677,16 +8690,39 @@ function buildLevel(L){
        corners of the square bore are what is left of the uncut rock.
 
        Each tread is hewn on its own seed, so no two are the same wedge. */
-    for(let i=0;i<N;i++){
-      const m2=new THREE.Mesh(
-        hew(new THREE.CylinderGeometry(TREAD_R,TREAD_R*0.97,drop*0.40,10,2,false,
-          -TURN*0.52,TURN*1.06),0.045),
-        stoneMat);
-      // the top tread's surface is RISE, so four of them stand above the floor
-      m2.position.set(0,RISE-drop*i-drop*0.20,0);
-      m2.rotation.y=-TURN*i;
-      m2.userData={kind:'stairs',x:sxs,y:sys};
-      helix.add(m2);
+    /* A tread is an EXTRUDED PIE SECTOR, and it has to be, because a
+       theta-sector `CylinderGeometry` is not a solid. Three.js builds one as a
+       torso plus two cap fans and generates NO radial end walls, so the two
+       faces where the step is cut off — the risers, the most important faces on
+       a stair — simply are not there. With front-face culling you look straight
+       through them into nothing, and every tread read as a curved sheet of
+       paper. Audited: a box comes back with 0 open edges and an extruded sector
+       with 0; the theta-sector cylinder does not.
+
+       Extruding a closed 2D shape gives a closed solid. It also returns
+       NON-INDEXED geometry, so `computeVertexNormals` inside `hew` produces one
+       normal per face rather than smoothing across the edges — which is exactly
+       what a cut block wants: a bright top, a dark riser, and a hard line where
+       they meet. A smoothed corner is the other half of why these looked thin.
+
+       The sector is symmetric about angle 0 so that the mirroring `rotateX`
+       does to the shape's own axes cannot move where the step sits. */
+    const TH=drop*0.58;                          // and thicker: 7cm of stone, not 5
+    {
+      const sh=new THREE.Shape();
+      sh.absarc(0,0,TREAD_R,-TURN*0.53,TURN*0.53,false);
+      sh.lineTo(0,0);
+      const tg=new THREE.ExtrudeGeometry(sh,{depth:TH,bevelEnabled:false,curveSegments:9});
+      tg.rotateX(-Math.PI/2);                    // extrusion +Z becomes +Y
+      tg.translate(0,-TH,0);                     // so the top face sits at y=0
+      for(let i=0;i<N;i++){
+        // the top tread's surface is RISE, so four of them stand above the floor
+        const m2=new THREE.Mesh(hew(tg.clone(),0.045),stoneMat);
+        m2.position.set(0,RISE-drop*i,0);
+        m2.rotation.y=-TURN*i;
+        m2.userData={kind:'stairs',x:sxs,y:sys};
+        helix.add(m2);
+      }
     }
     /* There is no kerb round the opening, and both attempts at one are worth
        knowing about. A torus read as a barrel hoop hanging over the hole. Laid

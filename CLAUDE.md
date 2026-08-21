@@ -1416,6 +1416,33 @@ the amplitudes are set for it: the shader's fade runs over the cone's whole
 visible part is already well down the falloff. The fade exponent came down to 1.5
 and the amplitudes went up by about half.
 
+### A theta-sector cylinder is not a solid
+
+This is the bug that made the treads read as sheets of paper, and it is worth
+knowing before reaching for `CylinderGeometry` to cut a wedge out of anything.
+
+**Three.js builds a `CylinderGeometry` with `thetaLength < 2π` as a torso plus
+two cap fans, and generates no radial end walls.** The two faces where the wedge
+is cut off — on a stair, the *risers*, the most important faces there are —
+simply do not exist. With front-face culling you look straight through them into
+nothing. Audited by counting how many edges are shared by exactly two triangles:
+a box comes back with 0 open edges, an open-ended cylinder with 22, an extruded
+sector with 0, and the theta-sector cylinder does not close.
+
+A tread is an **extruded closed 2D shape** now, and that fixes a second half of
+the same problem: `ExtrudeGeometry` returns **non-indexed** geometry, so the
+`computeVertexNormals()` inside `hew` gives one normal per face instead of
+smoothing across the edges. A cut block wants a bright top, a dark riser and a
+hard line between them; a smoothed corner is the other reason these looked thin.
+They are also thicker — `drop*0.58` rather than `drop*0.40`.
+
+**`hew` had to be rewritten for it.** Its jitter is now a hash of the vertex
+POSITION rather than a fresh random draw per vertex, and that is a correctness
+requirement, not a nicety: non-indexed geometry carries duplicated vertices at
+every shared corner, and drawing independently for each copy tears the mesh into
+confetti. Hashing the position moves every copy of a corner to the same place.
+Verified on a live level: all 12 treads come back closed after hewing.
+
 ### Carved, not built
 
 The first cut of this was dressed masonry — a turned newel with a moulded cap
