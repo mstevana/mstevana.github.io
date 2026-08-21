@@ -76,17 +76,18 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 #memo-body{display:flex;gap:8px;align-items:stretch;margin-bottom:8px;font-size:12px;text-align:left;}
 #memo-list{flex:1 1 58%;min-width:0;height:min(48vh,300px);overflow-y:auto;background:#0d0b07;
   border:1px solid var(--btn-line);border-radius:6px;padding:6px 8px;}
-#memo-detail{flex:1 1 42%;min-width:0;height:min(48vh,300px);overflow-y:auto;background:#0d0b07;
-  border:1px solid var(--btn-line);border-radius:6px;padding:8px;color:var(--ink-dim);}
 #memo-body .mrow .mname{cursor:pointer;}
 #memo-body .mrow.sel{background:#241d13;border-radius:4px;}
 #memo-body .mrow.sel .mname{color:#e0cf9e;}
-#memo-detail .dt-name{color:#e0cf9e;font-size:14px;margin-bottom:1px;}
-#memo-detail .dt-sub{color:#8a7f66;margin-bottom:6px;}
-#memo-detail .dt-desc{color:var(--ink);line-height:1.5;margin-bottom:7px;}
-#memo-detail .dt-row{display:flex;gap:6px;padding:3px 0;border-top:1px solid #1d1811;}
-#memo-detail .dt-k{flex:0 0 66px;color:#8a7f66;}
-#memo-detail .dt-v{flex:1 1 auto;min-width:0;color:#c9b98a;}
+/* the read-what-it-does pane, shared by the memorise and cast windows */
+.detail-pane{flex:1 1 42%;min-width:0;height:min(48vh,300px);overflow-y:auto;background:#0d0b07;
+  border:1px solid var(--btn-line);border-radius:6px;padding:8px;color:var(--ink-dim);font-size:12px;}
+.dt-name{color:#e0cf9e;font-size:14px;margin-bottom:1px;}
+.dt-sub{color:#8a7f66;margin-bottom:6px;}
+.dt-desc{color:var(--ink);line-height:1.5;margin-bottom:7px;}
+.dt-row{display:flex;gap:6px;padding:3px 0;border-top:1px solid #1d1811;}
+.dt-k{flex:0 0 66px;color:#8a7f66;}
+.dt-v{flex:1 1 auto;min-width:0;color:#c9b98a;}
 #memo-body .mcirc{color:#e0cf9e;font-weight:bold;margin:6px 0 3px;border-bottom:1px solid #241d13;padding-bottom:2px;}
 #memo-body .mcirc .full{color:#8a7f66;font-weight:normal;float:right;}
 #memo-body .mrow{display:flex;align-items:center;gap:6px;padding:3px 2px;}
@@ -148,7 +149,8 @@ h1{font-size:26px;text-align:center;} h2{font-size:17px;}
 .best-art{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:center;}
 .best-art img{display:block;image-rendering:auto;}
 .best-info{flex:1 1 0;min-width:0;}
-.best-name{color:var(--ink);font-size:16px;margin-bottom:3px;}
+.best-name{color:var(--ink);font-size:16px;margin-bottom:1px;}
+.best-kind{font-size:12px;color:#8a7f66;margin-bottom:3px;}
 .best-stats{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:13px;color:#c9b98a;}
 .best-stats b{color:var(--ink);font-weight:normal;}
 .best-tag{font-size:12px;color:#9c8f6e;margin-top:4px;line-height:1.45;}
@@ -201,16 +203,18 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 #drag-ghost svg{width:100%;height:100%;}
 /* fixed width so a long description wraps inside the panel instead of
    stretching it — the panel must not change width as items are inspected */
-#item-tip,#spell-tip{font-size:12px;color:var(--ink-dim);margin-top:6px;overflow-wrap:break-word;}
-#item-tip{width:256px;min-height:52px;}  /* 256 = the pack grid: 5*48 + 4*4 gaps */
-#spell-tip{width:270px;min-height:46px;} /* 270 = #spell-list min-width */
+#item-tip{font-size:12px;color:var(--ink-dim);margin-top:6px;overflow-wrap:break-word;
+  width:256px;min-height:52px;}  /* 256 = the pack grid: 5*48 + 4*4 gaps */
 /* stats screen */
 .stat-lines{font-size:13px;line-height:1.55;}
 .stat-lines b{color:#e0cf9e;font-weight:normal;}
 .xpbar{height:10px;background:#0d0b08;border:1px solid var(--line);border-radius:3px;overflow:hidden;margin:4px 0;}
 .xpfill{height:100%;background:#6b5a9e;}
 /* spell menu */
-#spell-list{display:flex;flex-direction:column;gap:4px;max-height:70vh;overflow:auto;min-width:270px;}
+#spell-body{display:flex;gap:8px;align-items:stretch;margin-bottom:8px;text-align:left;}
+#spell-list{display:flex;flex-direction:column;gap:4px;flex:1 1 56%;min-width:0;
+  height:min(48vh,300px);overflow:auto;}
+.spell-row.sel{border-color:var(--ink);background:#3a2f1d;}
 .spell-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border:1px solid var(--btn-line);border-radius:5px;background:var(--btn);}
 .spell-row:active{background:#332a1c;}
 .spell-row.nosl{opacity:.35;}
@@ -272,6 +276,9 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   <button class="mbtn" id="m-import">Import save code</button>
   <div id="m-io" class="hidden"><textarea id="m-io-text"></textarea>
     <div class="row"><button class="mbtn small" id="m-io-ok">Load</button><button class="mbtn small" id="m-io-close">Close</button></div></div>
+  <div class="dim-note" style="margin-top:10px">Graphics</div>
+  <div class="chips" id="m-gfx"></div>
+  <div class="dim-note" id="m-gfx-note"></div>
   <div class="dim-note" style="text-align:center;margin-top:6px">D&amp;D 3.5 rules · real-time · landscape</div>
 </div></div>
 
@@ -325,17 +332,19 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   <button class="mbtn small" id="best-close">Close</button>
 </div></div>
 
-<div class="ovl" id="ovl-spells"><div class="panel">
+<div class="ovl" id="ovl-spells"><div class="panel" style="width:min(620px,94vw)">
   <h2 id="sp-title">Spells</h2>
-  <div id="spell-list"></div>
-  <div id="spell-tip"></div>
-  <button class="mbtn small" id="sp-close">Close</button>
+  <div id="spell-body"><div id="spell-list"></div><div id="spell-detail" class="detail-pane"></div></div>
+  <div class="row">
+    <button class="mbtn small" id="sp-cast">Cast</button>
+    <button class="mbtn small" id="sp-close">Cancel</button>
+  </div>
 </div></div>
 
 <div class="ovl" id="ovl-memo"><div class="panel" style="width:min(620px,94vw)">
   <h2 id="memo-title">Memorise</h2>
   <div class="dim-note" id="memo-sub"></div>
-  <div id="memo-body"><div id="memo-list"></div><div id="memo-detail"></div></div>
+  <div id="memo-body"><div id="memo-list"></div><div id="memo-detail" class="detail-pane"></div></div>
   <div class="row">
     <button class="mbtn small" id="memo-clear">Clear all</button>
     <button class="mbtn small" id="memo-auto">Fill</button>
@@ -3224,16 +3233,37 @@ function monsterSVG(key,boss,pose,tint){
     +layer(B.head,S.head,hx)
     +layer(B.arm,S.arm,ax)
     +'</g>';
-  // an elite wears its template as a recolouring of the whole creature plus a
-  // faint aura, so it is recognisable as a harder thing across a dark room.
-  // 'color' blending swaps the hue but keeps the modelling underneath, which
-  // an overlay wash could not do on creatures already this dark.
-  const wash=tint?`<rect x="0" y="0" width="64" height="64" fill="${tint}" opacity="0.62" style="mix-blend-mode:color"/>`:'';
+  /* An elite wears its template as a recolouring of the whole creature plus an
+     aura, so it is recognisable as a harder thing across a dark room.
+
+     This used to be a tint rect laid over the body with `mix-blend-mode:color`,
+     chosen because that blend swaps the hue while keeping the modelling
+     underneath. **It never took effect.** A sprite is rasterised by loading the
+     SVG into an `Image`, and CSS blend modes are not applied on that path —
+     measured, the body's detail energy was identical with the property present
+     and with it stripped out (7.57 both, against 8.56 for the same creature
+     unaugmented). So every elite was being painted with a flat 62% opaque
+     colour that crushed its modelling, which is what read as a blurry monster
+     next to perfectly sharp stonework.
+
+     `feColorMatrix` is a filter primitive rather than a CSS property, so it
+     survives that rasterisation — the sprite already relies on filters for the
+     rim light and roughness. Scaling each channel toward the tint is a multiply,
+     which keeps every light and shadow in the art and only shifts its hue;
+     mixing that against identity at TINT_MIX keeps it from going too dark.
+     The mask the old wash needed is gone with it, which is a filter pass saved. */
+  const TINT_MIX=0.62;
+  const chan=(i)=>{
+    const v=parseInt(tint.replace('#','').substr(i*2,2),16)/255;
+    return ((1-TINT_MIX)+TINT_MIX*v).toFixed(4);
+  };
+  const washF=tint
+    ?`<filter id="elw" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">`+
+     `<feColorMatrix type="matrix" values="${chan(0)} 0 0 0 0  0 ${chan(1)} 0 0 0  0 0 ${chan(2)} 0 0  0 0 0 1 0"/></filter>`
+    :'';
   const body=`<g${xf?` transform="${xf}"`:''}>${flare}${parts}${crown}</g>`;
   const aura=tint?`<ellipse cx="32" cy="33" rx="27" ry="29" fill="url(#elag)"/>`:'';
-  const inner=tint
-    ?`${aura}<g><defs><mask id="em"><rect x="0" y="0" width="64" height="64" fill="#000"/><g fill="#fff">${body}</g></mask></defs>${body}<g mask="url(#em)">${wash}</g></g>`
-    :body;
+  const inner=tint?`${washF}${aura}<g filter="url(#elw)">${body}</g>`:body;
   return `<svg xmlns="${SVGNS}" viewBox="0 0 64 64">${defs}${ground}${inner}</svg>`;
 }
 /* ---------- trap flash drawings (shown for an instant when a trap fires) ---------- */
@@ -7809,7 +7839,7 @@ function boltShaderInit(){
 function initRenderer(){
   const cv=document.getElementById('view3d');
   R3.renderer=new THREE.WebGLRenderer({canvas:cv,antialias:false});
-  R3.renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  R3.renderer.setPixelRatio(gfxPixelRatio());
   R3.maxAniso=R3.renderer.capabilities.getMaxAnisotropy(); // sharpen textures at grazing angles, free on GPU
   R3.scene=new THREE.Scene();
   R3.camera=new THREE.PerspectiveCamera(68,1,0.05,30);
@@ -11145,14 +11175,30 @@ function refreshItemSprite(L,i){
 }
 function itemTexKey(it){return 'it_'+it.base+'_'+it.bonus+'_'+(it.tint||'')+'_'+(ITEM_DEFS[it.base].tint||'');}
 // single source of truth for monster frame textures (cache key + raster options)
-function monsterFrameTex(sprKey,boss,pose,elite){
+/* 640px, not 384: a large creature one tile away fills ~750 physical pixels on
+   a DPR-3 phone, so a 384px raster was magnified ~2x and read as blurry up
+   close. 640 brings that down to ~1.1x — near its native resolution — at the
+   cost of ~2.8x the raster time and texture memory per frame. */
+const MON_TEX=640;
+/* A duergar's racial enlarge grows the BILLBOARD and nothing else, so the same
+   raster gets stretched over a bigger quad: measured, magnification went from
+   1.10x to 1.41x the moment a warrior swelled, and it visibly softened exactly
+   when the player was looking hardest at it. The texture has to be sized for
+   the largest the creature will ever be drawn, and `enlarge` is a static flag
+   on the definition, so that is known before anything is rasterised. Rounded to
+   a multiple of 64 to keep the mip chain tidy. */
+const ENLARGE_SCALE=1.28;
+function monsterTexPx(key){
+  return MONSTERS[key]&&MONSTERS[key].enlarge
+    ? Math.ceil(MON_TEX*ENLARGE_SCALE/64)*64 : MON_TEX;
+}
+function monsterFrameTex(sprKey,boss,pose,elite,px){
   const tint=elite&&ELITES[elite]?ELITES[elite].tint:null;
-  // 640px, not 384: a large creature one tile away fills ~750 physical pixels on
-  // a DPR-3 phone, so a 384px raster was magnified ~2x and read as blurry up
-  // close. 640 brings that down to ~1.2x — near its native resolution — at the
-  // cost of ~2.8x the raster time and texture memory per frame.
+  const S=px||MON_TEX;
+  // the size is part of the key: one sprite shared by two creatures at
+  // different rasters must not hand back the smaller one
   return svgToTexture(monsterSVG(sprKey,boss,pose,tint),
-    'mon_'+sprKey+(boss?'_b':'')+(elite?'_'+elite:'')+'_'+pose,{size:640,mipmap:true});
+    'mon_'+sprKey+(boss?'_b':'')+(elite?'_'+elite:'')+'_'+pose+'_'+S,{size:S,mipmap:true});
 }
 /* Every pose is rasterised the first time it is used, and a frame costs about
    25ms of main thread to decode at 384px once it carries the rim and contact-
@@ -11170,9 +11216,10 @@ function prewarmMonsterFrames(L){
     if(seen[k])continue;seen[k]=1;
     // the resting frames are wanted the instant the floor appears; the rest can
     // trickle in behind it
-    monsterFrameTex(MONSTERS[m.key].spr,m.boss,'idle0',m.elite);
+    const px=monsterTexPx(m.key);
+    monsterFrameTex(MONSTERS[m.key].spr,m.boss,'idle0',m.elite,px);
     for(const pose of ['idle1','walk0','walk1','windup','strike'])
-      queue.push([MONSTERS[m.key].spr,m.boss,pose,m.elite]);
+      queue.push([MONSTERS[m.key].spr,m.boss,pose,m.elite,px]);
   }
   /* Drained a couple at a time rather than in one block. A frame costs about
      30ms of main thread to rasterise at 384px once it carries the rim, the
@@ -11189,7 +11236,7 @@ function prewarmMonsterFrames(L){
   const drain=(dl)=>{
     R3.prewarmT=0;
     while(R3.prewarmQ.length&&(dl.timeRemaining?dl.timeRemaining():8)>4){
-      const a=R3.prewarmQ.shift();monsterFrameTex(a[0],a[1],a[2],a[3]);
+      const a=R3.prewarmQ.shift();monsterFrameTex(a[0],a[1],a[2],a[3],a[4]);
     }
     if(R3.prewarmQ.length)R3.prewarmT=idle(drain);
   };
@@ -11206,7 +11253,8 @@ function addMonsterSprite(m){
   const sprKey=MONSTERS[m.key].spr;
   // only the resting frame up front; walk/windup/strike rasterize lazily on first
   // use (the global texture cache still shares frames across same-type monsters)
-  const frames={idle0:monsterFrameTex(sprKey,m.boss,'idle0',m.elite)};
+  const texPx=monsterTexPx(m.key);
+  const frames={idle0:monsterFrameTex(sprKey,m.boss,'idle0',m.elite,texPx)};
   /* alphaTest matters beyond looks: without it the sprite's transparent margins
      write depth across the whole quad, and every effect behind a monster — a
      lightning stroke, frost on the floor, another monster's impact splash —
@@ -11217,7 +11265,7 @@ function addMonsterSprite(m){
   const sc=monsterSpriteScale(m.key,m.boss);
   spr.scale.set(sc,sc,1);
   spr.position.set(m.x+0.5,sc/2+0.02,m.y+0.5);
-  spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss,elite:m.elite};
+  spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss,elite:m.elite,texPx};
   R3.levelGroup.add(spr);R3.monsterSprites[m.id]=spr;
   addMonsterGlow(m,sprKey,sc);
   addMonsterShadow(m,sc);
@@ -11439,6 +11487,59 @@ function noteSeen(key){
   if(!key||G.seen[key])return;
   G.seen[key]=1;
   try{localStorage.setItem('crawl_seen',JSON.stringify(G.seen));}catch(e){}
+}
+/* ---------- render resolution ----------
+   The 3D view is drawn into a buffer of viewport × pixelRatio and then scaled
+   to fit the screen, so ANY pixel ratio below the display's own DPR is an
+   upscale. The old flat cap of 2 meant a DPR-3 phone drew every frame at two
+   thirds resolution and stretched it by 1.5 — which softened the whole view,
+   and monsters worst, because they carry the finest detail and are what you
+   look at. Measured at 541x400 CSS on DPR 3: a goblin got 427 buffer pixels
+   spread over 640 device pixels. The bestiary looks sharper at the same size
+   for exactly this reason — it is a DOM image rendered at full device
+   resolution, never going through the canvas at all.
+
+   Three modes, because the right answer depends on hardware nobody can detect
+   up front: `high` draws at the display's own resolution, `low` stays cheap,
+   and `adaptive` starts high and steps down only if frames actually run long. */
+const GFX_MODES=['high','adaptive','low'];
+const GFX_RUNGS=[3,2,1.5,1];   // the ladder adaptive walks; index 0 is sharpest
+const GFX_LOW=1.5;
+let gfxMode='adaptive',gfxRung=0,gfxAcc=0,gfxN=0;
+const dprCap=(v)=>Math.max(1,Math.min(window.devicePixelRatio||1,v));
+function gfxPixelRatio(){
+  if(gfxMode==='low')return dprCap(GFX_LOW);
+  if(gfxMode==='high')return dprCap(GFX_RUNGS[0]);
+  return dprCap(GFX_RUNGS[gfxRung]);
+}
+function applyGfx(){
+  if(!R3.renderer)return;
+  const pr=gfxPixelRatio();
+  if(Math.abs(R3.renderer.getPixelRatio()-pr)<0.01)return;
+  R3.renderer.setPixelRatio(pr);
+  onResize();   // the drawing buffer only changes size on a setSize
+}
+function loadGfx(){
+  try{const v=localStorage.getItem('crawl_gfx');if(GFX_MODES.indexOf(v)>=0)gfxMode=v;}catch(e){}
+}
+function setGfx(m){
+  if(GFX_MODES.indexOf(m)<0)return;
+  gfxMode=m;gfxRung=0;gfxAcc=0;gfxN=0;
+  try{localStorage.setItem('crawl_gfx',m);}catch(e){}
+  applyGfx();
+}
+/* Adaptive stepping, fed only by frames that actually did work — the loop
+   throttles to a third of the rate when nothing is moving, and those long idle
+   frames would read as a struggling device. Sampled over roughly a second, with
+   a gap between the step-down and step-up thresholds so it settles instead of
+   oscillating between two rungs. */
+function gfxSample(dt){
+  if(gfxMode!=='adaptive')return;
+  gfxAcc+=dt;gfxN++;
+  if(gfxN<45)return;
+  const avg=gfxAcc/gfxN;gfxAcc=0;gfxN=0;
+  if(avg>0.026&&gfxRung<GFX_RUNGS.length-1){gfxRung++;applyGfx();}        // under ~38fps
+  else if(avg<0.019&&gfxRung>0){gfxRung--;applyGfx();}                    // comfortably at rate
 }
 function tileAt(x,y){if(x<0||y<0||x>=G.L.w||y>=G.L.h)return T_WALL;return G.L.grid[y*G.L.w+x];}
 function setTile(x,y,t){G.L.grid[y*G.L.w+x]=t;}
@@ -13045,7 +13146,9 @@ function duergarTricks(m){
     m.dmg=[m.dmg[0],m.dmg[1],m.dmg[2]+3];
     m.atk+=1;m.ac-=1;                     // bigger and slower to cover
     const s=R3.monsterSprites&&R3.monsterSprites[m.id];
-    if(s&&m._sc){m._sc*=1.28;s.scale.set(m._sc,m._sc,1);s.position.y=m._sc/2+0.02;}
+    // ENLARGE_SCALE is shared with monsterTexPx: the raster is sized for the
+    // grown creature up front, so swelling does not magnify a too-small texture
+    if(s&&m._sc){m._sc*=ENLARGE_SCALE;s.scale.set(m._sc,m._sc,1);s.position.y=m._sc/2+0.02;}
     UI.floatAtMonster(m,'ENLARGED','#e0cf9e');
     UI.toast(m.name+' swells, armour groaning at the seams!');
     SFX.growl(0);
@@ -15167,6 +15270,7 @@ function loop(now){
     const busy=G.started&&!G.paused&&(R3.camAnim||R3.shake>0||G.fx.length>0||G.moveCd>0||R3.viewDrag||
       G.L.monsters.some(mm=>mm.awake&&mm.hp>0));
     if(!busy){idleSkip=(idleSkip+1)%3;if(idleSkip)return;}
+    else gfxSample(dt);   // only frames doing real work judge the device
     updateCamera(now);
     updateSprites(now);
     R3.renderer.render(R3.scene,R3.camera);
@@ -15217,7 +15321,7 @@ function updateSprites(now){
     if(ud.curFrame!==frame&&ud.frames){
       // frames are generated lazily on first use; keep the old frame until loaded
       let t=ud.frames[frame];
-      if(!t){t=monsterFrameTex(ud.sprKey,ud.boss,frame,ud.elite);ud.frames[frame]=t;}
+      if(!t){t=monsterFrameTex(ud.sprKey,ud.boss,frame,ud.elite,ud.texPx);ud.frames[frame]=t;}
       if(t.__ready!==false){ud.curFrame=frame;s.material.map=t;}
     }
     // idle bob + strike lunge toward the party
@@ -15568,21 +15672,27 @@ const UI=(()=>{
       (e.detail?'<div class="ld">'+esc(e.detail)+'</div>':'')+'</div>').join('');
     box.scrollTop=box.scrollHeight;   // newest at the bottom, like a running tally
   }
+  /* ---------- the read-what-it-does pane ---------- */
+  // Shared by the memorise window and the cast window, so a spell reads the
+  // same either side of the camp.
+  function detailRows(rows){
+    return rows.map(r=>'<div class="dt-row"><div class="dt-k">'+r.k+'</div><div class="dt-v">'+r.v+'</div></div>').join('');
+  }
+  function spellDetailHTML(sp,cl){
+    return '<div class="dt-name">'+sp.name+'</div>'+
+      '<div class="dt-sub">'+sp.circle+ordSuffix(sp.circle)+' circle · '+sp.list+'</div>'+
+      '<div class="dt-desc">'+sp.desc+'</div>'+detailRows(spellEffects(sp,cl));
+  }
+  const DETAIL_HINT='<div class="dt-sub">Tap a spell to read what it does.</div>';
   /* ---------- memorising, at camp ---------- */
   // The wizard sets their loadout here and it holds until the next camp. What
   // is shown is the book, one block per circle, with the slots for that circle
   // as the budget. Rebuilt on every change: the whole panel is a dozen rows.
   let memoCh=null,memoThen=null,memoSel=null;
-  /* the right-hand pane: what the spell picked on the left actually does */
   function renderMemoDetail(){
     const box=$('memo-detail');
     const sp=memoSel&&SPELLS[memoSel];
-    if(!sp){box.innerHTML='<div class="dt-sub">Tap a spell to read what it does.</div>';return;}
-    const rows=spellEffects(sp,memoCh&&memoCh.level).map(r=>
-      '<div class="dt-row"><div class="dt-k">'+r.k+'</div><div class="dt-v">'+r.v+'</div></div>').join('');
-    box.innerHTML='<div class="dt-name">'+sp.name+'</div>'+
-      '<div class="dt-sub">'+sp.circle+ordSuffix(sp.circle)+' circle · '+sp.list+'</div>'+
-      '<div class="dt-desc">'+sp.desc+'</div>'+rows;
+    box.innerHTML=sp?spellDetailHTML(sp,memoCh&&memoCh.level):DETAIL_HINT;
   }
   function renderMemo(){
     const ch=memoCh;if(!ch)return;
@@ -15718,7 +15828,39 @@ const UI=(()=>{
     show('ovl-target');
   }
   /* spells */
+  // the cast window works like the memorise window: pick on the left, read on
+  // the right, then commit with the buttons underneath. TURN is the pseudo-key
+  // for a cleric's channelling, which is not a spell but is chosen the same way.
+  let spCh=null,spSel=null,spLeft={};
+  const TURN='__turn__';
+  function turnDetailHTML(ch){
+    const spent=ch.turnUsed;
+    return '<div class="dt-name">Turn Undead</div>'+
+      '<div class="dt-sub">Channelled · divine</div>'+
+      '<div class="dt-desc">Hold up a holy symbol and drive back the unliving. '+
+      'The strongest are unmoved, the weakest crumble outright.</div>'+
+      detailRows([
+        {k:'Target',v:'Every undead within 6 tiles that can be seen'},
+        {k:'Power',v:String(turnUndeadPower(ch))},
+        {k:'Routed',v:'flees, shaken, for 12s'},
+        {k:'Destroyed',v:'weak undead crumble outright'},
+        {k:'Unmoved',v:'anything far above the channeller\'s power'},
+        {k:'Uses',v:spent?'spent — rest to recover':'once, until the next rest'},
+      ]);
+  }
+  function renderSpellDetail(){
+    const box=$('spell-detail');
+    if(spSel===TURN){box.innerHTML=turnDetailHTML(spCh);return;}
+    const sp=spSel&&SPELLS[spSel];
+    box.innerHTML=sp?spellDetailHTML(sp,spCh&&spCh.level):DETAIL_HINT;
+  }
   function openSpells(ch){
+    spCh=ch;spSel=null;
+    renderSpells();
+    show('ovl-spells');
+  }
+  function renderSpells(){
+    const ch=spCh;if(!ch)return;
     $('sp-title').textContent=ch.name+' — spells';
     const list=$('spell-list');
     list.innerHTML='';
@@ -15732,17 +15874,12 @@ const UI=(()=>{
       list.appendChild(sec);
       const spent=ch.turnUsed;
       const tu=document.createElement('div');
-      tu.className='spell-row chan'+(spent?' spent':'');
+      tu.className='spell-row chan'+(spent?' spent':'')+(spSel===TURN?' sel':'');
       tu.innerHTML=`<span class="scircle">☨</span><span class="sname">Turn Undead</span>`+
         `<span class="sslots">${spent?'spent':'power '+turnUndeadPower(ch)}</span>`;
       tu.title=spent?'Already channelled — rest to recover.'
         :'Rout or destroy the undead within six tiles.';
-      tu.addEventListener('click',()=>{
-        if(spent){toast('Already channelled. Rest to recover.');return;}
-        if(!canAct(ch))return;
-        hide('ovl-spells');
-        turnUndead(ch);
-      });
+      tu.addEventListener('click',()=>{spSel=TURN;renderSpells();});
       list.appendChild(tu);
       const sec2=document.createElement('div');
       sec2.className='spell-sec';
@@ -15775,39 +15912,42 @@ const UI=(()=>{
       none.textContent=ch.name+' has nothing memorised. Camp to prepare spells from their book.';
       list.appendChild(none);
     }
-    const tip=$('spell-tip');
-    const HINT='Tap and hold a spell to read what it does.';
-    tip.textContent=HINT;
+    // how many of this spell are left, for the Cast button's gate
+    const leftOf={};
     for(const {key,left} of rows.sort((a,b)=>SPELLS[a.key].circle-SPELLS[b.key].circle)){
       const sp=SPELLS[key];
+      leftOf[key]=left;
       const row=document.createElement('div');
-      row.className='spell-row'+(left<=0?' nosl':'');
+      row.className='spell-row'+(left<=0?' nosl':'')+(spSel===key?' sel':'');
       row.innerHTML=`<span class="scircle">${sp.circle}</span><span class="sname">${sp.name}</span><span class="sslots">${Math.max(0,left)} left</span>`;
       row.title=sp.desc;
-      // hold to read: the description goes in the panel itself, so it can't end
-      // up behind the overlay, and the hold must not also cast the spell
-      let holdT=null,held=false;
-      row.addEventListener('pointerdown',()=>{
-        held=false;clearTimeout(holdT);
-        holdT=setTimeout(()=>{
-          held=true;
-          tip.innerHTML=`<b style="color:#e0cf9e">${sp.name}</b> · ${sp.circle}${ordSuffix(sp.circle)} circle<br>${sp.desc}`;
-        },450);
-      });
-      const endHold=()=>clearTimeout(holdT);
-      row.addEventListener('pointerup',endHold);
-      row.addEventListener('pointerleave',endHold);
-      row.addEventListener('pointercancel',endHold);
-      row.addEventListener('click',()=>{
-        if(held){held=false;return;} // that press was to read, not to cast
-        if(left<=0){toast('No slots of that circle left. Rest.');return;}
-        hide('ovl-spells');
-        castSpell(ch,key,{fromUI:true});
-      });
+      // a tap selects and reads; casting is the button underneath, so a
+      // mis-tap can no longer spend a slot
+      row.addEventListener('click',()=>{spSel=key;renderSpells();});
       list.appendChild(row);
     }
-    show('ovl-spells');
+    spLeft=leftOf;
+    renderSpellDetail();
+    // Cast is live only for something actually castable right now
+    const btn=$('sp-cast');
+    let ok=false,label='Cast';
+    if(spSel===TURN){ok=!ch.turnUsed&&canAct(ch);label='Channel';}
+    else if(spSel)ok=(spLeft[spSel]||0)>0;
+    btn.disabled=!ok;
+    btn.textContent=label;
   }
+  $('sp-cast').addEventListener('click',()=>{
+    const ch=spCh;if(!ch||!spSel)return;
+    if(spSel===TURN){
+      if(ch.turnUsed){toast('Already channelled. Rest to recover.');return;}
+      if(!canAct(ch))return;
+      hide('ovl-spells');turnUndead(ch);return;
+    }
+    if((spLeft[spSel]||0)<=0){toast('No slots of that circle left. Rest.');return;}
+    const key=spSel;
+    hide('ovl-spells');
+    castSpell(ch,key,{fromUI:true});
+  });
   $('sp-close').addEventListener('click',()=>hide('ovl-spells'));
   /* ---------- inventory ---------- */
   const DOLL_LAYOUT=[['helmet','Helm'],['amulet','Amulet'],['ring1','Ring'],['lhand','L hand'],['armor','Armor'],['rhand','R hand'],['ring2','Ring'],['boots','Boots'],[null,'']];
@@ -16165,6 +16305,11 @@ const UI=(()=>{
   }
   const dmgStr=(d)=>d?d[0]+'d'+d[1]+(d[2]>0?'+'+d[2]:d[2]<0?d[2]:''):'—';
   const crStr=(cr)=>cr<1?('1/'+Math.round(1/cr)):String(cr);
+  /* `speed` is a movement COOLDOWN in seconds, so lower is faster — printing the
+     raw number would read backwards to a player. Thresholds sit either side of
+     the bestiary's own spread (quartiles 1.3 / 1.4 / 1.5), so the labels
+     actually divide the roster instead of lumping it all into one word. */
+  const speedLabel=(s)=>s<=1.15?'Fast':s<=1.45?'Steady':s<=1.9?'Slow':'Very slow';
   /* What the creature can do to you, in the same words the game uses when it
      does it. Read off the definition's own flags, so a creature gains its line
      here the moment it gains the ability rather than needing a second table. */
@@ -16184,6 +16329,8 @@ const UI=(()=>{
     if(d.regen)out.push('Regenerates '+d.regen+' hp');
     if(d.skeletal)out.push('Skeletal — half damage from piercing, extra from bludgeoning');
     if(d.incorporeal)out.push('Incorporeal — halves damage from unenchanted weapons');
+    if(d.enlarge)out.push('Enlarges when bloodied — +3 damage, +1 attack, −1 AC');
+    if(d.vanish)out.push('Turns invisible when hurt, then strikes unseen');
     if(d.lurk)out.push('Ambusher — lies in wait as rock');
     if(d.shriek)out.push('Shrieks — wakes the grove');
     if(d.distress)out.push('Distress — its pain calls other myconids');
@@ -16206,7 +16353,14 @@ const UI=(()=>{
       const stats=['<span><b>CR</b> '+crStr(d.cr)+'</span>',
         '<span><b>HP</b> '+d.hp+'</span>',
         '<span><b>AC</b> '+d.ac+'</span>',
-        '<span><b>Atk</b> +'+d.atk+' ('+dmgStr(d.dmg)+')</span>'].join('');
+        '<span><b>Atk</b> +'+d.atk+' ('+dmgStr(d.dmg)+')</span>',
+        '<span><b>Speed</b> '+speedLabel(d.speed)+'</span>',
+        '<span><b>XP</b> '+d.xp+'</span>'].join('');
+      // the creature's kind, and the one thing the player can act on because
+      // of it: only the undead can be turned
+      const ty=d.type||'creature';
+      const kind=ty.charAt(0).toUpperCase()+ty.slice(1)+
+        (ty==='undead'?' · can be turned':'');
       const sp=d.caster
         ? '<div class="best-tag"><em>Spells:</em> '+dmgStr(d.caster.dmg)+' at '+d.caster.ranged+
           ' tiles, every '+d.caster.cd+'s'+(d.caster.elem?' ('+d.caster.elem+')':'')+'</div>'
@@ -16219,6 +16373,7 @@ const UI=(()=>{
         '</div>'+
         '<div class="best-info">'+
           '<div class="best-name">'+d.name+'</div>'+
+          '<div class="best-kind">'+kind+'</div>'+
           '<div class="best-stats">'+stats+'</div>'+
           sp+abl+
         '</div></div>';
@@ -16513,10 +16668,30 @@ function pickupItem(i){
   saveGame();
 }
 /* ============================== MENU & CREATION ============================== */
+const GFX_LBL={high:'High',adaptive:'Adaptive',low:'Low'};
+const GFX_NOTE={
+  high:'Draws at your screen\'s full resolution. Sharpest, and the most work per frame.',
+  adaptive:'Starts sharp and eases off only if the frame rate cannot keep up.',
+  low:'Draws at reduced resolution. Softest, and the easiest on the battery.',
+};
+function renderGfxChips(){
+  const box=document.getElementById('m-gfx');
+  if(!box)return;
+  box.innerHTML='';
+  for(const m of GFX_MODES){
+    const c=document.createElement('button');
+    c.className='chip'+(gfxMode===m?' sel':'');
+    c.textContent=GFX_LBL[m];
+    c.addEventListener('click',()=>{setGfx(m);renderGfxChips();});
+    box.appendChild(c);
+  }
+  document.getElementById('m-gfx-note').textContent=GFX_NOTE[gfxMode];
+}
 function refreshMenu(){
   const has=!!localStorage.getItem('crawl_save');
   document.getElementById('m-continue').disabled=!has&&!G.started;
   document.getElementById('m-continue').textContent=G.started&&!G.over?'Return to the dungeon':'Continue the descent';
+  renderGfxChips();
 }
 function initMenu(){
   const $=(id)=>document.getElementById(id);
@@ -16714,6 +16889,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     document.body.innerHTML='<div style="padding:40px;font-family:Georgia">Failed to load the three.js library. Check your connection and reload.</div>';
     return;
   }
+  loadGfx();    // the render resolution is chosen before the renderer is built
   initRenderer();
   loadSeen();   // the bestiary outlives any one run, so it is read before the menu opens
   initInput();

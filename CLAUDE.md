@@ -260,6 +260,107 @@ settled is that the median is not to be chased by fiddling with
 `depthScale`, `threatBudget` or the bestiary — those are not what is
 holding it.
 
+## A sprite's raster is sized for the biggest that creature will ever be drawn
+
+`monsterTexPx(key)` gives every creature `MON_TEX` (640) except the three that
+carry `enlarge` — the duergar warrior, thane and hammerlord — which get 832,
+`MON_TEX × ENLARGE_SCALE` rounded up to a multiple of 64.
+
+A duergar's racial enlarge grows the **billboard and nothing else**, so the same
+raster was stretched over a bigger quad: measured on a DPR-3 phone at `high`,
+magnification went from 1.10× to **1.41×** the instant a warrior swelled, and it
+softened visibly at exactly the moment the player was looking hardest at it.
+Sized up front it is 0.85× before and **1.08×** after.
+
+`ENLARGE_SCALE` is shared between `duergarTricks` and `monsterTexPx` precisely so
+the two cannot drift; the raster size is also part of the texture cache key, so
+one sprite shared by two creatures at different rasters cannot hand back the
+smaller one. Only 3 of 80 creatures pay the larger texture, which is why this is
+affordable — a blanket bump would not be (see the memory note above).
+
+**The general rule: anything that scales a sprite quad at runtime has to be paid
+for in the raster.** Check `_sc` writers before adding another.
+
+## An elite's recolour must be a filter, never a CSS blend mode
+
+`monsterSVG` tinted an elite by laying a 62%-opacity rect of the template colour
+over the body with `style="mix-blend-mode:color"`, chosen because that blend
+swaps the hue while keeping the modelling underneath. **It never took effect.**
+A sprite is rasterised by loading the SVG into an `Image`, and CSS blend modes
+are not applied on that path — measured, the body's detail energy was identical
+with the property present and with it stripped out (7.57 both). So every elite
+was painted with a flat opaque colour instead.
+
+Measured as contrast per unit brightness — the only fair metric here, because a
+tint changes overall brightness and that alone moves absolute gradients — an
+elite retained **23–29%** of the plain creature's modelling. Three quarters of
+the art was being wiped off, which is what reads as a *blurry monster standing
+in front of perfectly sharp stonework*.
+
+It is an `feColorMatrix` now, a filter primitive rather than a CSS property, so
+it survives rasterisation the way the rim light and roughness passes already do.
+Scaling each channel toward the tint is a multiply: it keeps every light and
+shadow and only shifts the hue, mixed against identity at `TINT_MIX` so it does
+not go too dark. Elites now measure **101–103%** of plain, and all six templates
+still come out as distinct colourings. The mask the old wash needed is gone with
+it, which is a filter pass saved per elite frame.
+
+**The aura was not the culprit and was not changed.** It is drawn *behind* the
+body, so it never touched the creature's own pixels — with the wash removed and
+the aura still in place, detail measured 8.58 against plain's 8.56. If a monster
+ever looks soft again, check what is being painted **over** it before suspecting
+the glow behind it.
+
+## Render resolution is a setting
+
+(This was chased first as the cause of "blurry monsters" and is a real
+sharpness win for the whole view, but the elite wash above was the bigger half
+of that particular complaint — the giveaway being that the stonework was sharp
+in the very same frame. A framebuffer problem cannot soften one object and
+leave the wall behind it crisp.)
+
+`initRenderer` used to pin `setPixelRatio(Math.min(devicePixelRatio, 2))`. The
+3D view is drawn into a buffer of viewport × pixelRatio and then scaled to the
+screen, so **any** ratio below the display's own DPR is an upscale: on a DPR-3
+phone every frame was drawn at two thirds resolution and stretched by 1.5.
+Measured at 541×400 CSS on DPR 3, a goblin got **427 buffer pixels spread over
+640 device pixels**.
+
+**The bestiary is the control experiment, and it is why this was findable.** It
+shows the same art at the same size and looks sharper, because it is a DOM
+`<img>` of the vector SVG rendered at full device resolution — it never goes
+through the canvas. Same art + same size + different sharpness means the
+pipeline, not the resolution of the source.
+
+Two things were ruled out with measurements before landing on this, so do not
+re-chase them:
+
+- **Mipmapping is not the cause.** Gradient energy inside the sprite measured
+  6.08 with mipmaps and 6.09 without — no difference. At one tile the sprite sits
+  at LOD ≈ 0.07, essentially mip 0.
+- **The texture is not undersized.** A 640px raster against a ~611px sprite is
+  ~1:1. Raising 384 → 640 earlier fixed a real but *secondary* problem; the
+  framebuffer was the binding constraint the whole time.
+
+`GFX_MODES` is now `high` / `adaptive` / `low`, persisted in its own
+`crawl_gfx` key beside `crawl_best` and `crawl_seen`, chosen from chips on the
+main menu. `high` draws at the display's own resolution (capped at 3), `low` at
+1.5, and `adaptive` walks `GFX_RUNGS` starting at the top. Adaptive is fed
+**only by frames that did real work** — the loop throttles to a third of the
+rate when nothing moves, and those idle frames would read as a struggling
+device — and its step-down (>26ms) and step-up (<19ms) thresholds are
+deliberately apart so it settles instead of oscillating.
+
+**One coupling to know before touching either dial.** Pixel ratio and monster
+texture size are two ends of the same chain: at `high` on DPR 3 a normal
+creature lands on ~640 buffer pixels, which is exactly the 640px raster, so the
+two are currently matched. Raise the pixel ratio further, or field a much larger
+viewport, and the *texture* becomes the next bottleneck; raise the texture
+without the pixel ratio and nothing improves. Note that texture memory is
+already the tighter constraint — frames are 640² RGBA, six poses per kind,
+cached globally for the whole run and never freed — so a blanket bump is not
+free.
+
 ## Sprites are lit now
 
 `THREE.Sprite` uses `SpriteMaterial`, which **ignores every light in the scene**.
