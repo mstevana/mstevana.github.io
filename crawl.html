@@ -4291,6 +4291,34 @@ function tryGen(depth,targetWalk,theme){
     const bm=monsters.find(m=>m.boss);
     if(bm)bm.atk=Math.max(bm.atk,monsters.reduce((a,m)=>m.boss?a:Math.max(a,m.atk),0));
   }
+  /* Last of all: the floor must still hang together with the STAIRWELL treated
+     as solid. That tile used to be a tile you could walk across, and the level
+     was only ever checked on those terms; now the party stops in front of it,
+     so a stairwell sitting in a corridor is a wall across that corridor.
+
+     It cannot strand anything on its own — the stairs are the furthest tile the
+     generator's own BFS reaches, and nothing can lie beyond a furthest tile —
+     but three things move after that BFS runs: the start room is sealed and its
+     doors re-cut, locked doors appear, and the ossuary bier, the forge anvil
+     and Lolth's throne each block a tile. Any of those can leave the stairwell
+     as the only way round. T31 caught it at about one crypt floor in a few
+     hundred, which is exactly the rate at which it would have stranded the key
+     and sealed a run instead. */
+  {
+    const seen=new Uint8Array(W*H),q=[[start.x,start.y]];seen[idx(start.x,start.y)]=1;
+    for(let qi=0;qi<q.length;qi++){
+      const [cx,cy]=q[qi];
+      for(const [dx,dy] of DIRS){
+        const nx=cx+dx,ny=cy+dy,i=idx(nx,ny),t=g[i];
+        if(!t||t===T_PIT||t===T_STAIRS||seen[i])continue;
+        seen[i]=1;q.push([nx,ny]);
+      }
+    }
+    for(let i=0;i<W*H;i++)
+      if(g[i]&&g[i]!==T_PIT&&g[i]!==T_STAIRS&&!seen[i])return null;   // retry the level
+    // and the way down has to be reachable from beside it
+    if(!DIRS.some(([dx,dy])=>seen[idx(stairs.x+dx,stairs.y+dy)]))return null;
+  }
   return {w:W,h:H,grid:g,start,stairs,traps,items,monsters,secrets,theme,depth,
     explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,forge,chapel,lurkers,duergar,pillars,drow};
 }
@@ -8344,7 +8372,7 @@ function buildLevel(L){
        degrees of sweep apiece, and still turns a full 540. */
     const DEPTH=1.45, N=12, drop=DEPTH/N;
     const TURN=Math.PI*3/N;                    // 540 degrees over the flight
-    const NEWEL_R=0.085, TREAD_R=0.455;
+    const NEWEL_R=0.092, TREAD_R=0.515;
     const POST=WALLH/3;                        // how far the newel stands proud
     const wv=wallVariant(sxs,sys,wallMats.length);
     const wallMap=wallMats[wv].map;
@@ -8364,30 +8392,85 @@ function buildLevel(L){
     shaft.position.set(cx,-(DEPTH+0.06)/2,cz);
     shaft.userData={kind:'stairs',x:sxs,y:sys};
     sg.add(shaft);
+    /* Everything below is CUT rather than built, and that is a different set of
+       shapes from a turned column standing in a hole. Three rules:
+
+       - Nothing underground is turned on a lathe. Every piece is roughened —
+         its vertices shoved about, then normals recomputed — so no silhouette
+         is a true circle and no face is flat.
+       - The seed is the stairs' own tile, not `Math.random`. `openBier`,
+         `openForge` and `openAltar` all call `buildLevel` again, and a stairwell
+         that re-hewed itself when a coffin was opened would be worse than one
+         that was smooth.
+       - It is all one mass of stone: a single material for newel, treads and
+         bore, and the pieces INTERPENETRATE rather than meet. Alternating the
+         tread shades made a helix legible when the stair was masonry; on carved
+         rock it read as a stack of separate slabs someone had laid, which is
+         exactly what it must not look like. */
+    let shs=((sxs*374761393)^(sys*668265263))>>>0;
+    const srr=()=>{shs=(shs*1664525+1013904223)>>>0;return shs/4294967296;};
+    /* CARVED is not SHATTERED, and the first cut of this was the second thing.
+       At 0.20 of radial jitter with the y jitter running to the end rings, the
+       newel grew black shards off its silhouette and the crown came out as
+       broken slag — the stair read as something that had collapsed rather than
+       something a mason had cut. Hand-tooled stone is smooth-ish and slightly
+       wavy, not spiky.
+
+       Two limits keep it that way: the amplitudes are small, and the extreme
+       rows of vertices are left exactly where they were, so an end cap stays a
+       clean edge instead of fraying. Everything ragged in the old build came
+       from moving those. */
+    const hew=(geo,amt)=>{
+      const p=geo.attributes.position;
+      let lo=1e9,hi=-1e9;
+      for(let i=0;i<p.count;i++){const y=p.getY(i);if(y<lo)lo=y;if(y>hi)hi=y;}
+      for(let i=0;i<p.count;i++){
+        const x=p.getX(i),y=p.getY(i),z=p.getZ(i),r=Math.hypot(x,z);
+        if(r<1e-4)continue;                      // leave the axis alone
+        const end=(y-lo<1e-4)||(hi-y<1e-4);      // and the end rings
+        const k=1+(srr()-0.5)*amt;
+        p.setX(i,x*k);p.setZ(i,z*k);
+        if(!end)p.setY(i,y+(srr()-0.5)*amt*0.12);
+      }
+      geo.computeVertexNormals();
+      return geo;
+    };
     const stoneTex=mkTex(2,2);
-    const stoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,-0.05)),
-      map:stoneTex,bumpMap:stoneTex,bumpScale:0.012,specular:0x171208,shininess:6});
-    // treads alternate a shade so a helix seen edge-on does not merge into a ramp
-    const treadTex=mkTex(1,1);
-    const treadMat=[0.16,-0.26].map(k=>new THREE.MeshPhongMaterial({
-      color:new THREE.Color(shade(th.wall,k)),map:treadTex,bumpMap:treadTex,
-      bumpScale:0.010,specular:0x141009,shininess:6}));
+    /* Live rock, not dressed masonry: a heavy bump and effectively no specular.
+       A sheen is the single loudest cue that a surface was worked smooth, and
+       the newel's old one was reading as a polished baluster. */
+    /* Bump, not much of it. At 0.055 and then 0.034 the newel went nearly black:
+       a heavy bump map over a brick texture tilts most of the surface away from
+       a light that is already grazing, and the column stopped being lit at all.
+       The irregularity is in the GEOMETRY here — that is what `hew` is for — so
+       the map only has to carry grain. Specular stays near zero because a sheen
+       is the loudest cue that a surface was worked smooth. */
+    const stoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,0.16)),
+      map:stoneTex,bumpMap:stoneTex,bumpScale:0.016,specular:0x1c1610,shininess:4});
     const helix=new THREE.Group();helix.position.set(cx,0,cz);
-    /* The newel runs the whole height of the well and out the top of it. Its
-       cap and collar are what stop it reading as a pipe: a post with nothing on
-       the end of it is not architecture. */
+    /* The newel is the core the masons LEFT, not a post they stood up. It had a
+       moulded cap and two collars and read as a turned baluster dropped into a
+       hole — architecture rather than excavation. Those are gone. What is here
+       instead is an irregular column, flaring where the treads come off it,
+       finished at the top with a rough hewn crown: a few facets around a low
+       dome, the way the last stone off a cut is left. */
     {
       const nw=new THREE.Mesh(
-        new THREE.CylinderGeometry(NEWEL_R,NEWEL_R*1.18,DEPTH+POST,12),stoneMat);
+        hew(new THREE.CylinderGeometry(NEWEL_R*0.94,NEWEL_R*1.30,DEPTH+POST,13,9),0.075),
+        stoneMat);
       nw.position.set(0,POST-(DEPTH+POST)/2,0);
       nw.userData={kind:'stairs',x:sxs,y:sys};
       helix.add(nw);
-    }
-    for(const [ry,yy,rr2] of [[0.026,POST-0.013,NEWEL_R*1.42],
-                              [0.020,POST-0.052,NEWEL_R*1.26],
-                              [0.018,-0.012,NEWEL_R*1.30]]){
-      const m2=new THREE.Mesh(new THREE.CylinderGeometry(rr2,rr2,ry,12),stoneMat);
-      m2.position.set(0,yy,0);m2.userData={kind:'stairs',x:sxs,y:sys};helix.add(m2);
+      /* The crown is a low DOME, not a flat top and not a cone. A flat top is a
+         cut face, which a core that was never worked has not got; a cone reads
+         as a finial, which is the turned-baluster problem again. Loose spoil
+         was tried clinging round the head and read as black spikes — nothing
+         small and dark belongs on a silhouette at this range. */
+      const cr=new THREE.Mesh(
+        hew(new THREE.SphereGeometry(NEWEL_R*0.99,12,7,0,6.2832,0,1.15),0.075),stoneMat);
+      cr.position.set(0,POST-NEWEL_R*0.42,0);
+      cr.userData={kind:'stairs',x:sxs,y:sys};
+      helix.add(cr);
     }
     /* A helical rib wound round the newel, at the stair's own pitch.
 
@@ -8409,7 +8492,8 @@ function buildLevel(L){
         pts.push(new THREE.Vector3(Math.cos(a)*NEWEL_R*1.14,u,Math.sin(a)*NEWEL_R*1.14));
       }
       const rib=new THREE.Mesh(
-        new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),pts.length*2,0.017,5,false),
+        hew(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),pts.length*3,0.021,6,false),
+            0.06),
         stoneMat);
       rib.userData={kind:'stairs',x:sxs,y:sys};
       helix.add(rib);
@@ -8418,10 +8502,19 @@ function buildLevel(L){
        at the newel on one side and overhangs the well on the other. A ring
        sector with `thetaLength` slightly over the step angle gives each tread a
        hair of overlap with the next, which is what a real stone stair has. */
-    const wedge=new THREE.CylinderGeometry(TREAD_R,TREAD_R,drop*0.34,12,1,false,
-      -TURN*0.52,TURN*1.04);
+    /* Treads run INTO the bore wall rather than stopping short of it. At 0.455
+       against a shaft half-width of 0.4975 there was a 4cm gap all the way
+       round, and through it you saw daylight between the stair and the rock —
+       which reads as a structure standing inside a hole. Cut stairs are the
+       same stone as the wall they are cut from, so they overlap it, and the
+       corners of the square bore are what is left of the uncut rock.
+
+       Each tread is hewn on its own seed, so no two are the same wedge. */
     for(let i=0;i<N;i++){
-      const m2=new THREE.Mesh(wedge,treadMat[i%2]);
+      const m2=new THREE.Mesh(
+        hew(new THREE.CylinderGeometry(TREAD_R,TREAD_R*0.97,drop*0.40,10,2,false,
+          -TURN*0.52,TURN*1.06),0.045),
+        stoneMat);
       m2.position.set(0,-drop*(i+0.5)+drop*0.27,0);
       m2.rotation.y=-TURN*i;
       m2.userData={kind:'stairs',x:sxs,y:sys};
@@ -8448,8 +8541,16 @@ function buildLevel(L){
     glow.position.set(cx,-0.30,cz);sg.add(glow);      // lights the treads you can see
     const deep=new THREE.PointLight(0xff9c3c,0.70,1.9,2);
     deep.position.set(cx,-1.10,cz);sg.add(deep);      // and something further down
-    const mouth=new THREE.PointLight(0xffb455,0.34,1.8,2);
-    mouth.position.set(cx,0.12,cz);sg.add(mouth);
+    /* The mouth light is deliberately OFF the shaft axis. On it — at (cx,y,cz)
+       — it is inside the newel, and a point light on the axis of a column
+       cannot light that column at all: every normal on the outer surface points
+       away from it. The newel came out a black silhouette against a brightly
+       lit well, which is dramatic and tells you nothing about what it is made
+       of. Pushed to the rim on the side the party approaches from, the same
+       light still reads as coming out of the well and now rakes across the
+       stone. */
+    const mouth=new THREE.PointLight(0xffb455,0.42,1.9,2);
+    mouth.position.set(cx-ndx*0.34,0.15,cz-ndy*0.34);sg.add(mouth);
     sg.add(godRays(cx,cz));
     grp.add(sg);R3.stairsGroup=sg;
   }

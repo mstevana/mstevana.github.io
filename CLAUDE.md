@@ -1226,6 +1226,61 @@ Note this broke **T31**, which asserted the stairs tile itself was reachable by
 a flood fill over `walkableTile`. Under the new rule what has to be reachable is
 *a tile beside it*.
 
+**A stairwell is solid, so `tryGen` re-checks connectivity with it treated as a
+wall** — the last thing it does before returning, and it retries the level if
+anything walkable is stranded. The stairs cannot strand anything on their own
+(they are the furthest tile the generator's own BFS reaches, and nothing can lie
+beyond a furthest tile), but three things move after that BFS runs: the start
+room is sealed and its doors re-cut, locked doors appear, and the ossuary bier,
+the forge anvil and Lolth's throne each block a tile. Any of those can leave the
+stairwell as the only way round. T31 caught it at about one crypt floor in a few
+hundred — which is exactly the rate at which it would have stranded the key and
+sealed a run. Measured after the gate: 0 stranded over 480 floors at depths
+1–40, and generation still runs at 2.9ms a level.
+
+### Carved, not built
+
+The first cut of this was dressed masonry — a turned newel with a moulded cap
+and two collars, standing in a square hole. It read as architecture *placed in*
+a basement rather than a stair *cut into* one. What fixed it:
+
+- **Nothing underground is turned on a lathe.** Every piece goes through `hew`,
+  which shoves its vertices about and recomputes normals, seeded from the
+  stairs' own tile — `openBier`, `openForge` and `openAltar` all call
+  `buildLevel` again, and a stairwell that re-hewed itself when a coffin was
+  opened would be worse than one that was smooth.
+- **The cap and collars are gone.** The newel is the core the masons *left*:
+  irregular, flaring where the treads come off it, finished with a low dome. Not
+  a flat top, which is a cut face; not a cone, which is a finial.
+- **Treads run INTO the bore.** At 0.455 against a shaft half-width of 0.4975
+  there was a 4cm gap all the way round, and daylight between the stair and the
+  rock reads as a structure standing inside a hole. They are 0.515 now and
+  overlap, per *Surfaces that meet must overlap, never abut*.
+- **The alternating tread shades had to go.** They made a helix legible when the
+  stair was masonry; on carved rock two tones read as a stack of separate slabs
+  someone had laid, which is the one thing it must not look like. One material
+  for newel, treads and bore — the contrast comes from the light in the well.
+
+Three limits, each of which cost a screenshot:
+
+- **Carved is not shattered.** At 0.20 of radial jitter, with the y jitter
+  running to the end rings, the newel grew black shards off its silhouette and
+  the crown came out as broken slag. Hand-tooled stone is smooth-ish and
+  slightly wavy. The amplitudes are 0.045–0.075, and `hew` leaves the extreme
+  rows of vertices exactly where they were so an end cap stays a clean edge.
+  Everything ragged in that build came from moving those.
+- **Heavy bump is not roughness.** At `bumpScale` 0.055 and then 0.034 the newel
+  went nearly black: a strong bump map over a brick texture tilts most of the
+  surface away from a light that is already grazing. The irregularity belongs in
+  the geometry — that is what `hew` is for — so the map only carries grain. It
+  is 0.016.
+- **A point light on the shaft axis cannot light the newel.** It is *inside* it,
+  and every normal on the outer surface points away. The mouth light sat at
+  `(cx, y, cz)` and the newel came out a black silhouette against a brightly lit
+  well — dramatic, and it tells you nothing about what the thing is made of.
+  Pushed out to the rim on the side the party approaches from, the same light
+  still reads as coming out of the well and now rakes across the stone.
+
 **Everything is faced in `wallMats`** at the variant that tile would have had,
 which is what makes the seven themes differentiate for free — the cave's rock,
 the drow's black brick, the duergar's coursed slab and the grove's stalk all
