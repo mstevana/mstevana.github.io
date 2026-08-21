@@ -9868,15 +9868,20 @@ function buildLevel(L){
     mk(chit,rockU,chitMat); mk(bolts,cylU,boltMat);
     grp.add(litter);
   }
-  /* Duergar floor dressing: haulage track, slag, spilled ore and dropped tools.
-     Built on the crypt's terms — seeded from each tile's own coordinates so a
-     rebuild never reshuffles it, instanced down to a handful of draw calls, flat
-     to the ground so it never blocks a path, and every mesh marked `decor` so a
-     tap goes through it to whatever is lying on the same tile. */
+  /* Duergar floor dressing: slag, spilled ore and dropped tools. Built on the
+     crypt's terms — seeded from each tile's own coordinates so a rebuild never
+     reshuffles it, instanced down to a handful of draw calls, flat to the ground
+     so it never blocks a path, and every mesh marked `decor` so a tap goes
+     through it to whatever is lying on the same tile.
+
+     Haulage track used to run down the corridors here — chosen per row and per
+     column rather than per tile, so a run came out continuous instead of as
+     disconnected two-foot fragments. It was removed. The lesson about hashing
+     the line rather than the tile is kept in CLAUDE.md for whoever wants
+     something that has to run continuously down a passage. */
   if(th.name==='Duergar'){
     const litter=new THREE.Group();
-    const railMat=new THREE.MeshPhongMaterial({color:0x35353c,specular:0x101014,shininess:22});
-    const sleepMat=new THREE.MeshPhongMaterial({color:0x352718,specular:0x120c04,shininess:4});
+    const ironMat=new THREE.MeshPhongMaterial({color:0x35353c,specular:0x101014,shininess:22});
     // Clinker: fired waste, and the one thing down here that is genuinely black.
     // Its sheen is what says "glassy" rather than "sooty", so it keeps a small
     // narrow highlight where the iron deliberately does not.
@@ -9895,42 +9900,18 @@ function buildLevel(L){
        stone at a fraction of the vertices. */
     const rockU=new THREE.IcosahedronGeometry(1,0);
     const cylU=new THREE.CylinderGeometry(1,1,1,6);
-    const QID=new THREE.Quaternion();
     const yawQ=(a)=>new THREE.Quaternion().setFromEuler(new THREE.Euler(0,a,0));
     const tumbleQ=(f)=>new THREE.Quaternion().setFromEuler(
       new THREE.Euler(f()*6.3,f()*6.3,f()*6.3));
     const loc=(px,py,pz,q,sx,sy,sz)=>new THREE.Matrix4().compose(
       new THREE.Vector3(px,py,pz),q,new THREE.Vector3(sx,sy,sz));
-    const rails=[],sleepers=[],slag=[],ore=[],veins=[],hafts=[],heads=[];
-    const walk=(x,y)=>{const t=L.grid[y*L.w+x];
-      return t===T_FLOOR||t===T_DOOR||t===T_DOOR_OPEN||t===T_DOOR_LOCKED;};
+    const slag=[],ore=[],veins=[],hafts=[],heads=[];
     const busy=new Set((L.duergar||[]).map(f=>f.x+','+f.y));
-    /* The track is chosen per ROW and per COLUMN, not per tile. A tile-by-tile
-       roll gives disconnected two-foot fragments of rail lying about, which is
-       the one thing track cannot be; hashing the row means every horizontal
-       corridor tile on that row carries it and the run comes out continuous.
-       Junction tiles are neither purely horizontal nor vertical and take no
-       rails, so a line simply ends where it meets another passage. */
-    const lineHash=(v,salt)=>{let h=((v*2654435761)^(salt*40503))>>>0;
-      h=(h*1664525+1013904223)>>>0;return h/4294967296;};
     for(let y=1;y<L.h-1;y++)for(let x=1;x<L.w-1;x++){
       if(L.grid[y*L.w+x]!==T_FLOOR)continue;
       let hsh=((x*374761393)^(y*668265263))>>>0;
       const rr=()=>{hsh=(hsh*1664525+1013904223)>>>0;return hsh/4294967296;};
       const cx=x+0.5,cz=y+0.5;
-      const horiz=walk(x-1,y)&&walk(x+1,y)&&!walk(x,y-1)&&!walk(x,y+1);
-      const vert =walk(x,y-1)&&walk(x,y+1)&&!walk(x-1,y)&&!walk(x+1,y);
-      const onRail=(horiz&&lineHash(y,17)<0.34)||(vert&&lineHash(x,91)<0.34);
-      if(onRail){
-        const a=horiz?0:Math.PI/2, q=yawQ(a);
-        for(const s of [-1,1])                              // the two rails
-          rails.push(loc(cx+(horiz?0:s*0.16),0.030,cz+(horiz?s*0.16:0),q,1.0,0.026,0.034));
-        for(let k=0;k<4;k++){                               // sleepers under them
-          const t=-0.375+k*0.25;
-          sleepers.push(loc(cx+(horiz?t:0),0.012,cz+(horiz?0:t),q,0.08,0.024,0.44));
-        }
-        continue;                                           // nothing else on a track tile
-      }
       if(busy.has(x+','+y))continue;                        // furniture stands here
       const roll=rr();
       if(roll<0.075){                                       // a heap of clinker
@@ -9968,10 +9949,9 @@ function buildLevel(L){
       mats.forEach((m,i)=>inst.setMatrixAt(i,m));inst.instanceMatrix.needsUpdate=true;
       inst.userData.decor=true;   // never blocks a tap to the item on the same tile
       litter.add(inst); };
-    mk(rails,boxU,railMat); mk(sleepers,boxU,sleepMat);
     mk(slag,rockU,slagMat); mk(ore,rockU,oreMat); mk(veins,rockU,veinMat);
     mk(hafts,cylU,new THREE.MeshPhongMaterial({color:0x3a2a1c,specular:0x140e04,shininess:5}));
-    mk(heads,boxU,railMat);
+    mk(heads,boxU,ironMat);
     grp.add(litter);
   }
   // drow houses: rose windows, and stalactites the builders never bothered to
