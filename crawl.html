@@ -3229,16 +3229,37 @@ function monsterSVG(key,boss,pose,tint){
     +layer(B.head,S.head,hx)
     +layer(B.arm,S.arm,ax)
     +'</g>';
-  // an elite wears its template as a recolouring of the whole creature plus a
-  // faint aura, so it is recognisable as a harder thing across a dark room.
-  // 'color' blending swaps the hue but keeps the modelling underneath, which
-  // an overlay wash could not do on creatures already this dark.
-  const wash=tint?`<rect x="0" y="0" width="64" height="64" fill="${tint}" opacity="0.62" style="mix-blend-mode:color"/>`:'';
+  /* An elite wears its template as a recolouring of the whole creature plus an
+     aura, so it is recognisable as a harder thing across a dark room.
+
+     This used to be a tint rect laid over the body with `mix-blend-mode:color`,
+     chosen because that blend swaps the hue while keeping the modelling
+     underneath. **It never took effect.** A sprite is rasterised by loading the
+     SVG into an `Image`, and CSS blend modes are not applied on that path —
+     measured, the body's detail energy was identical with the property present
+     and with it stripped out (7.57 both, against 8.56 for the same creature
+     unaugmented). So every elite was being painted with a flat 62% opaque
+     colour that crushed its modelling, which is what read as a blurry monster
+     next to perfectly sharp stonework.
+
+     `feColorMatrix` is a filter primitive rather than a CSS property, so it
+     survives that rasterisation — the sprite already relies on filters for the
+     rim light and roughness. Scaling each channel toward the tint is a multiply,
+     which keeps every light and shadow in the art and only shifts its hue;
+     mixing that against identity at TINT_MIX keeps it from going too dark.
+     The mask the old wash needed is gone with it, which is a filter pass saved. */
+  const TINT_MIX=0.62;
+  const chan=(i)=>{
+    const v=parseInt(tint.replace('#','').substr(i*2,2),16)/255;
+    return ((1-TINT_MIX)+TINT_MIX*v).toFixed(4);
+  };
+  const washF=tint
+    ?`<filter id="elw" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">`+
+     `<feColorMatrix type="matrix" values="${chan(0)} 0 0 0 0  0 ${chan(1)} 0 0 0  0 0 ${chan(2)} 0 0  0 0 0 1 0"/></filter>`
+    :'';
   const body=`<g${xf?` transform="${xf}"`:''}>${flare}${parts}${crown}</g>`;
   const aura=tint?`<ellipse cx="32" cy="33" rx="27" ry="29" fill="url(#elag)"/>`:'';
-  const inner=tint
-    ?`${aura}<g><defs><mask id="em"><rect x="0" y="0" width="64" height="64" fill="#000"/><g fill="#fff">${body}</g></mask></defs>${body}<g mask="url(#em)">${wash}</g></g>`
-    :body;
+  const inner=tint?`${washF}${aura}<g filter="url(#elw)">${body}</g>`:body;
   return `<svg xmlns="${SVGNS}" viewBox="0 0 64 64">${defs}${ground}${inner}</svg>`;
 }
 /* ---------- trap flash drawings (shown for an instant when a trap fires) ---------- */

@@ -260,6 +260,36 @@ settled is that the median is not to be chased by fiddling with
 `depthScale`, `threatBudget` or the bestiary — those are not what is
 holding it.
 
+## An elite's recolour must be a filter, never a CSS blend mode
+
+`monsterSVG` tinted an elite by laying a 62%-opacity rect of the template colour
+over the body with `style="mix-blend-mode:color"`, chosen because that blend
+swaps the hue while keeping the modelling underneath. **It never took effect.**
+A sprite is rasterised by loading the SVG into an `Image`, and CSS blend modes
+are not applied on that path — measured, the body's detail energy was identical
+with the property present and with it stripped out (7.57 both). So every elite
+was painted with a flat opaque colour instead.
+
+Measured as contrast per unit brightness — the only fair metric here, because a
+tint changes overall brightness and that alone moves absolute gradients — an
+elite retained **23–29%** of the plain creature's modelling. Three quarters of
+the art was being wiped off, which is what reads as a *blurry monster standing
+in front of perfectly sharp stonework*.
+
+It is an `feColorMatrix` now, a filter primitive rather than a CSS property, so
+it survives rasterisation the way the rim light and roughness passes already do.
+Scaling each channel toward the tint is a multiply: it keeps every light and
+shadow and only shifts the hue, mixed against identity at `TINT_MIX` so it does
+not go too dark. Elites now measure **101–103%** of plain, and all six templates
+still come out as distinct colourings. The mask the old wash needed is gone with
+it, which is a filter pass saved per elite frame.
+
+**The aura was not the culprit and was not changed.** It is drawn *behind* the
+body, so it never touched the creature's own pixels — with the wash removed and
+the aura still in place, detail measured 8.58 against plain's 8.56. If a monster
+ever looks soft again, check what is being painted **over** it before suspecting
+the glow behind it.
+
 ## Sprites are lit now
 
 `THREE.Sprite` uses `SpriteMaterial`, which **ignores every light in the scene**.
