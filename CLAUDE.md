@@ -1274,11 +1274,24 @@ It costs one constraint and one cheat:
   room. It exists to put a top on the steps and nothing else.
 
 **The rays start half a room's height BELOW the floor** (`GODRAY_FLOOR`), so they
-rise out of the well rather than appearing at it. That costs real brightness and
-the amplitudes are set for it: the shader's fade runs over the cone's whole
-`uv.y`, so starting 0.65 lower puts floor level a third of the way up and the
-visible part is already well down the falloff. The fade exponent came down to 1.5
-and the amplitudes went up by about half.
+rise out of the well rather than appearing at it. That costs real brightness: the
+fade exponent came down to 1.5 and the amplitudes went up by about half.
+
+**And they are LATHED PROFILES, not cones, because the bore is an aperture.**
+Below the floor a shaft is a parallel-sided column that fits inside the hollowed
+cylinder; it reaches the mouth and only there opens out into the room. As plain
+cones they were narrowest at the source and widest at the top, so the wide one
+measured 0.61 across at floor level against a bore of 0.455 — passing straight
+through the rock on its way up, and the only reason it was not obvious is that
+the floor plate happened to hide it from above. A `LatheGeometry` over the
+profile `[(r,-h), (r,0), (R,top)]` gives cylinder-then-cone in one mesh with the
+break exactly at the aperture. Measured on all seven themes: rays reach 0.420
+below the floor against a hewn bore minimum of 0.434.
+
+That change forced the fade to be measured in **world height** rather than the
+mesh's own `uv.y` — a lathed profile runs uv.y at wildly different rates on its
+two halves, and using it would put a visible kink at the mouth. The shader takes
+`yBot`/`yTop` uniforms and a varying carrying the vertex's world y.
 
 ### A theta-sector cylinder is not a solid
 

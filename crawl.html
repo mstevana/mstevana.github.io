@@ -7960,8 +7960,8 @@ function shadeSprites(){
      the rays off. Additive with no depth test at all would shine through
      stone. */
 const GODRAY_FS=`
-uniform float t; uniform vec3 c; uniform float amp;
-varying vec2 vUv;
+uniform float t; uniform vec3 c; uniform float amp; uniform float yBot; uniform float yTop;
+varying vec2 vUv; varying float vY;
 void main(){
   float a=vUv.x*6.28318;
   // blades: two beating frequencies, slowly counter-rotating
@@ -7972,12 +7972,19 @@ void main(){
      and the cone fills in solid — which is exactly what the first build looked
      like. The gaps have to be genuinely dark. */
   b = pow(max(b,0.0),2.4);
-  float up  = pow(1.0-clamp(vUv.y,0.0,1.0),1.5);      // gone before the ceiling
-  float core= pow(1.0-clamp(vUv.y*3.0,0.0,1.0),2.5);  // a small wash at the mouth
+  /* The fade is measured in WORLD HEIGHT, not in the mesh's own uv.y. The
+     shafts are lathed profiles now — a parallel column inside the bore that
+     opens into a cone above the floor — so uv.y runs at wildly different rates
+     on the two halves and using it would put a visible kink at the mouth. */
+  float u = clamp((vY-yBot)/(yTop-yBot),0.0,1.0);
+  float up  = pow(1.0-u,1.5);                   // gone before the ceiling
+  float core= pow(1.0-clamp(u*3.0,0.0,1.0),2.5);// a small wash down in the well
   float f = b*up*0.85 + up*0.10 + core*0.30;
   gl_FragColor=vec4(c*f*amp,1.0);
 }`;
-const GODRAY_VS='varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}';
+const GODRAY_VS=`varying vec2 vUv; varying float vY;
+void main(){vUv=uv;vY=(modelMatrix*vec4(position,1.0)).y;
+gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`;
 /* GODRAY_FLOOR is where the shafts BEGIN, half a room's height below the floor
    — deep inside the bore rather than at its mouth. The rays then rise out of
    the well instead of appearing at it, which is the difference between light
@@ -7988,19 +7995,39 @@ const GODRAY_VS='varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatr
    floor level a third of the way up it and the part the party can actually see
    is already well down the falloff. */
 const GODRAY_FLOOR=-WALLH/2;
+/* The shafts are LATHED PROFILES, not cones, because the bore is an aperture
+   and light does not pass through rock.
+
+   Below the floor a shaft is a parallel-sided column that fits inside the
+   hollowed cylinder; at the floor it reaches the mouth and only then opens out
+   into the room. As plain cones they were narrow at the source and widest at
+   the top, so the wide one measured 0.61 across at floor level against a bore of
+   0.455 — it was passing straight through the rock on its way up, and the only
+   reason it was not obvious is that the floor plate happened to hide it from
+   above. Aim a look along the floor and it would have shone out of solid stone.
+
+   A `LatheGeometry` over the profile [(r,-h), (r,0), (R,top)] gives the whole
+   shape in one mesh: cylinder, then cone, with the break exactly at the
+   aperture. `depthWrite:false` so the two layers do not occlude each other,
+   `depthTest:true` so a wall between the party and the stairwell still cuts
+   them off — additive with no depth test would shine through stone. */
 function godRays(cx,cz){
   const g=new THREE.Group();
-  // two cones: a tight bright core and a wide soft one, so the rays have a
+  // two layers: a tight bright core and a wide soft one, so the light has a
   // centre rather than being one even flare
-  for(const [r0,r1,h,amp,op] of [[0.22,0.78,WALLH*0.95-GODRAY_FLOOR,0.92,0.30],
-                                 [0.32,1.08,WALLH*0.80-GODRAY_FLOOR,0.54,0.20]]){
+  for(const [rBore,rTop,yTop,amp] of [[0.30,0.74,WALLH*0.95,0.92],
+                                      [0.42,1.06,WALLH*0.80,0.54]]){
     const mat=new THREE.ShaderMaterial({
-      uniforms:{t:{value:0},c:{value:new THREE.Color(0xffc06a)},amp:{value:amp}},
+      uniforms:{t:{value:0},c:{value:new THREE.Color(0xffc06a)},amp:{value:amp},
+                yBot:{value:GODRAY_FLOOR},yTop:{value:yTop}},
       vertexShader:GODRAY_VS,fragmentShader:GODRAY_FS,
-      transparent:true,opacity:op,blending:THREE.AdditiveBlending,
+      transparent:true,blending:THREE.AdditiveBlending,
       depthWrite:false,side:THREE.DoubleSide});
-    const m=new THREE.Mesh(new THREE.CylinderGeometry(r1,r0,h,26,1,true),mat);
-    m.position.set(cx,GODRAY_FLOOR+h/2,cz);
+    const prof=[new THREE.Vector2(rBore,GODRAY_FLOOR),
+                new THREE.Vector2(rBore,-0.02),      // up the bore, parallel-sided
+                new THREE.Vector2(rTop,yTop)];       // and out of the mouth
+    const m=new THREE.Mesh(new THREE.LatheGeometry(prof,30),mat);
+    m.position.set(cx,0,cz);
     m.userData.decor=true;      // a tap goes through the light to the stone
     g.add(m);
     (R3.godRays||(R3.godRays=[])).push(mat);
