@@ -1153,8 +1153,15 @@ const THEMES=[
   // A myconid grove is grown, not cut: soft edges, low roomBias, and its own
   // light. `light`/`fill` retint the party's torch so the whole grove reads
   // violet without repainting every texture, and `glow` is the spore colour.
-  {name:'Myconid', wall:'#7a6e86', wall2:'#42384f', floor:'#4b4753', ceil:'#5a4670', fog:0x0d0814, moss:'#8a63b8', roomBias:.3,
-   glow:'#c88ae8', light:0xc59ae8, fill:0xdfc4f2},
+  /* The stalks are DARKER than they look here, and that is a correction. At
+     `#7a6e86` under a torch already retinted lilac there was no headroom left:
+     a wall one tile away came out a white smear with every stalk edge gone,
+     because both the light and the surface were pale. The mid-tone comes down
+     and the torch comes back toward white, so the grove keeps its colour at
+     range and its detail up close — the violet now comes mostly from what is
+     glowing rather than from washing everything in it. */
+  {name:'Myconid', wall:'#5d5368', wall2:'#332b3d', floor:'#413d4a', ceil:'#4a3960', fog:0x0d0814, moss:'#8a63b8', roomBias:.3,
+   glow:'#c88ae8', light:0xa596bb, fill:0xbfb3d2},
   // A drow house: small black bricks laid true, a chiselled frieze, and the
   // only thing in the dungeon that gives off its own light. The walls carry an
   // emissive map, so both read as lit rather than merely pale.
@@ -5717,6 +5724,13 @@ function myconidBaseCanvas(th){
   ctx.fillStyle=damp;ctx.fillRect(0,60,128,68);
   return {cv,edges};
 }
+/* Eight variants, keyed on the variant ITSELF rather than on `variant%4` — the
+   duergar and drow lesson, where four treatments shown twice each read as a
+   repeated stamp rather than as a place. What grows on a stalk is the theme's
+   iconography, so these are the colony's crop and its casualties: a ripplebark
+   shelf, a trillimac, a swollen barrelstalk, a nursery of sprouts, something
+   the spores took, and a stalk that is dying. Variant 0 is deliberately bare —
+   with a device on every tile there is nothing for one to be read against. */
 function myconidWallCanvas(th,variant,base){
   const {cv,ctx}=newCanvas(128);
   const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
@@ -5725,20 +5739,14 @@ function myconidWallCanvas(th,variant,base){
   let sd=(variant*2654435761+12345)>>>0;
   const rr=()=>{sd=(sd*1664525+1013904223)>>>0;return sd/4294967296;};
   const mid=(i)=>{const e=base.edges;const k=i%(e.length-1);return (e[k]+e[k+1])/2;};
-  const v=variant%6;
-  if(v===0){                                   // bracket shelves stepping up a stalk
-    for(let k=0;k<4;k++){
-      const cx=mid(Math.floor(rr()*8)),cy=14+rr()*100,w=7+rr()*9,h=3+rr()*3;
-      wrapX(()=>{
-        ctx.fillStyle=shade(th.wall,-0.42);
-        ctx.beginPath();ctx.ellipse(cx,cy+1.2,w,h,0,0,7);ctx.fill();
-        ctx.fillStyle=shade(th.wall,0.18);
-        ctx.beginPath();ctx.ellipse(cx,cy,w,h,0,0,7);ctx.fill();
-        ctx.strokeStyle='rgba(0,0,0,0.28)';ctx.lineWidth=0.7;
-        for(let r=0;r<4;r++){ctx.beginPath();ctx.ellipse(cx,cy,w*(0.3+r*0.22),h*(0.3+r*0.22),0,0,7);ctx.stroke();}
-      });
-    }
-  }else if(v===1){                             // spore freckles, faintly luminous
+  /* Anything standing out of a wall is read by its BODY, not by a highlight —
+     the drow pilaster failed as two silver hairlines with no shaft between
+     them. So every device here gets a cast shadow on the flesh beside it
+     before anything else is drawn. */
+  const cast=(x,y,w,h)=>{ctx.fillStyle='rgba(0,0,0,0.30)';
+    ctx.beginPath();ctx.ellipse(x+1.5,y+2.2,w,h,0,0,7);ctx.fill();};
+  const v=variant%8;
+  if(v===1){                                   // spore freckles, faintly luminous
     for(let k=0;k<70;k++){
       const x=rr()*128,y=rr()*128,r=0.6+rr()*1.6;
       wrapX(()=>{
@@ -5746,55 +5754,201 @@ function myconidWallCanvas(th,variant,base){
         ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.globalAlpha=1;
       });
     }
-  }else if(v===2){                             // a bloom of mould creeping up from the foot
-    for(let k=0;k<30;k++){
-      const x=rr()*128,y=78+rr()*50,r=3+rr()*9;
+  }else if(v===2){
+    /* RIPPLEBARK: a shelf fungus that looks like a mass of rotting flesh. It is
+       read from its UNDERSIDE — a shelf drawn as a flat ellipse on the wall is
+       a painted lozenge, which is what the first cut looked like. What says
+       "this sticks out" is the dark band of the underside below the lit top,
+       and a front edge with real lobes in it rather than a smooth arc. */
+    for(let k=0;k<4;k++){
+      const cx=mid(Math.floor(rr()*8)),cy=22+k*27+rr()*8,w=13+rr()*7,h=6+rr()*3;
       wrapX(()=>{
-        ctx.fillStyle=`rgba(74,110,72,${0.06+rr()*0.10})`;
-        ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+        cast(cx,cy+h*0.6,w*1.05,h*0.7);
+        const lobe=(t)=>1+Math.sin(t*9+k)*0.13;
+        ctx.fillStyle='#1c0f0d';                 // the underside, in shadow
+        ctx.beginPath();
+        for(let t=-1;t<=1.001;t+=0.05){
+          const px=cx+t*w*lobe(t), py=cy+Math.cos(t*Math.PI/2)*h*1.35*lobe(t);
+          t===-1?ctx.moveTo(px,py):ctx.lineTo(px,py);
+        }
+        ctx.lineTo(cx+w,cy);ctx.lineTo(cx-w,cy);ctx.closePath();ctx.fill();
+        const g=ctx.createLinearGradient(cx,cy-h,cx,cy+h*0.3);
+        ctx.fillStyle=g;
+        /* Browner and darker than raw "rotting flesh" wants to be. At #8a545a
+           the shelves came out BUBBLEGUM PINK in the room: the grove's torch is
+           tinted lilac, and a light with no green in it drives any ruddy
+           mid-tone straight to pink. A colour picked on the texture sheet has
+           to be checked under the theme's own light. */
+        g.addColorStop(0,'#63403a');g.addColorStop(0.55,'#472a27');g.addColorStop(1,'#2b1815');
+        ctx.beginPath();                          // and the top, lit
+        for(let t=-1;t<=1.001;t+=0.05){
+          const px=cx+t*w*lobe(t), py=cy-Math.cos(t*Math.PI/2)*h*lobe(t);
+          t===-1?ctx.moveTo(px,py):ctx.lineTo(px,py);
+        }
+        ctx.lineTo(cx+w,cy+1);ctx.lineTo(cx-w,cy+1);ctx.closePath();ctx.fill();
+        ctx.strokeStyle='rgba(236,196,168,0.11)';ctx.lineWidth=0.8;
+        ctx.beginPath();                          // a wet ridge along the lip
+        for(let t=-0.9;t<=0.9;t+=0.05){
+          const px=cx+t*w*lobe(t), py=cy-Math.cos(t*Math.PI/2)*h*lobe(t)*0.55;
+          t<=-0.85?ctx.moveTo(px,py):ctx.lineTo(px,py);
+        }
+        ctx.stroke();
       });
     }
-    for(let k=0;k<40;k++){
-      const x=rr()*128,y=86+rr()*42;
-      wrapX(()=>{ctx.fillStyle='rgba(150,180,130,0.10)';ctx.fillRect(x,y,1,1+rr()*2);});
-    }
-  }else if(v===3){                             // veil remnants, torn skirts left on the stalk
-    for(let k=0;k<3;k++){
-      const cx=mid(Math.floor(rr()*8)),cy=26+rr()*70;
+  }else if(v===3){
+    /* TRILLIMAC: four or five feet of it, so at a wall's scale it is a real
+       object rather than a texture — a light grey stalk under a broad
+       grey-green cap, the one the colony cuts for scroll leather. */
+    const cx=mid(Math.floor(rr()*8)), foot=128, capY=64+rr()*14, R=17+rr()*6;
+    wrapX(()=>{
+      ctx.fillStyle='rgba(0,0,0,0.26)';ctx.fillRect(cx-3.5,capY,9,foot-capY);
+      const sg=ctx.createLinearGradient(cx-4,0,cx+4,0);
+      sg.addColorStop(0,'#4c4a50');sg.addColorStop(0.4,'#8e8b92');sg.addColorStop(1,'#3d3b42');
+      ctx.fillStyle=sg;ctx.fillRect(cx-4,capY,8,foot-capY);
+      cast(cx,capY,R,R*0.44);
+      const cg=ctx.createLinearGradient(cx,capY-R*0.5,cx,capY+R*0.4);
+      cg.addColorStop(0,'#8d977c');cg.addColorStop(0.55,'#69735a');cg.addColorStop(1,'#3d4436');
+      ctx.fillStyle=cg;
+      ctx.beginPath();ctx.ellipse(cx,capY,R,R*0.52,0,Math.PI,0);
+      ctx.ellipse(cx,capY,R,R*0.20,0,0,Math.PI);ctx.fill();
+      // gills hang from the RIM and follow its curve — drawn as a straight row
+      // they land across the middle of the cap and read as a row of teeth
+      ctx.strokeStyle='rgba(0,0,0,0.34)';ctx.lineWidth=0.8;
+      for(let i=-7;i<=7;i++){
+        const t=i/7.5, px=cx+t*R*0.94, dip=Math.sqrt(Math.max(0,1-t*t));
+        ctx.beginPath();ctx.moveTo(px,capY+R*0.18*dip);ctx.lineTo(px,capY+R*0.42*dip);ctx.stroke();
+      }
+    });
+  }else if(v===4){
+    /* BARRELSTALK: the stalk itself swells into a barrel holding gallons of
+       water. Drawn as an ellipse laid over the wall it came out as a striped
+       beach ball stuck to the flesh — the swelling has to START and END at the
+       stalk's own width, so the silhouette is one continuous thing that happens
+       to be fat in the middle. So it is built off the base's stalk edges. */
+    const e=base.edges, k=Math.floor(rr()*(e.length-1));
+    const x0=e[k], x1=e[k+1], cx=(x0+x1)/2, hw=(x1-x0)/2;
+    const y0=40+rr()*22, y1=y0+44+rr()*22, bulge=hw*0.62;
+    const prof=(y)=>{                            // 0 at the ends, 1 in the middle
+      const t=(y-y0)/(y1-y0);
+      return t<=0||t>=1?0:Math.pow(Math.sin(t*Math.PI),0.72);
+    };
+    wrapX(()=>{
+      ctx.fillStyle='rgba(0,0,0,0.28)';
+      ctx.beginPath();ctx.moveTo(cx+hw+2,y0);
+      for(let y=y0;y<=y1;y+=2)ctx.lineTo(cx+hw+2+prof(y)*bulge,y);
+      ctx.lineTo(cx-hw,y1);ctx.lineTo(cx-hw,y0);ctx.closePath();ctx.fill();
+      const g=ctx.createLinearGradient(cx-hw-bulge,0,cx+hw+bulge,0);
+      g.addColorStop(0,shade(th.wall,-0.36));g.addColorStop(0.36,shade(th.wall,0.24));
+      g.addColorStop(1,shade(th.wall,-0.42));
+      ctx.fillStyle=g;
+      ctx.beginPath();ctx.moveTo(cx-hw,y0);
+      for(let y=y0;y<=y1;y+=2)ctx.lineTo(cx-hw-prof(y)*bulge,y);
+      for(let y=y1;y>=y0;y-=2)ctx.lineTo(cx+hw+prof(y)*bulge,y);
+      ctx.closePath();ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,0.20)';ctx.lineWidth=1.2;
+      for(let i=1;i<=4;i++){                     // hoops, each as wide as the swell there
+        const y=y0+(y1-y0)*i/5, w2=hw+prof(y)*bulge;
+        ctx.beginPath();ctx.ellipse(cx,y,w2,2.0,0,0,7);ctx.stroke();
+      }
+      ctx.fillStyle='rgba(210,235,255,0.09)';    // water standing in the bottom
+      const yw=y0+(y1-y0)*0.66;
+      ctx.beginPath();ctx.ellipse(cx,yw,(hw+prof(yw)*bulge)*0.7,7,0,0,7);ctx.fill();
+    });
+  }else if(v===5){
+    /* A NURSERY: sprouts at the foot of the stalk, where a colony raises them.
+       Small, many, and all leaning the same way, because they came up together. */
+    for(let k=0;k<11;k++){
+      const x=rr()*128, y=104+rr()*22, h=6+rr()*11, lean=(rr()-0.5)*2.2;
       wrapX(()=>{
-        ctx.fillStyle='rgba(236,226,240,0.16)';
-        ctx.beginPath();ctx.moveTo(cx-11,cy);
-        for(let t=-11;t<=11;t+=2.6)ctx.lineTo(cx+t,cy+3+Math.sin(t*0.8)*2.4+rr()*3);
-        ctx.lineTo(cx+11,cy-2);ctx.closePath();ctx.fill();
-        ctx.strokeStyle='rgba(0,0,0,0.18)';ctx.lineWidth=0.7;ctx.stroke();
+        ctx.strokeStyle=shade(th.wall,-0.30);ctx.lineWidth=1.6;
+        ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+lean,y-h);ctx.stroke();
+        ctx.fillStyle=shade(th.moss,-0.06);
+        ctx.beginPath();ctx.ellipse(x+lean,y-h,2.4+rr()*1.8,1.9+rr()*1.2,0,Math.PI,0);ctx.fill();
+        ctx.fillStyle='rgba(255,240,255,0.13)';
+        ctx.beginPath();ctx.ellipse(x+lean-0.7,y-h-0.5,1.1,0.7,0,0,7);ctx.fill();
       });
     }
-  }else if(v===4){                             // a split in the flesh, pale inside
+  }else if(v===6){
+    /* Something the spores took: a body half grown into the stalk. Two things
+       had to be got right and both were wrong first time.
+
+       It is read from a BODY PLAN — head, shoulders, a sternum with ribs paired
+       off it, one arm still free. As a stack of concentric arcs it came out as a
+       spiral bun with no anatomy in it.
+
+       And it has to be UNDER the flesh. Drawn at full strength it was a bright
+       skull with round black eyes — a Halloween decal stuck on the wall, the
+       same failure Deep Duerra's mark had. The bones go down faint, and then a
+       translucent wash of the stalk's own colour is laid back over the whole
+       swelling, so what you see is a shape showing THROUGH rather than on. */
+    const cx=mid(Math.floor(rr()*8)), hy=34+rr()*24;
+    wrapX(()=>{
+      ctx.fillStyle='rgba(0,0,0,0.26)';           // the swelling it makes in the stalk
+      ctx.beginPath();ctx.ellipse(cx,hy+30,16,34,0,0,7);ctx.fill();
+      ctx.fillStyle=shade(th.wall,-0.11);
+      ctx.beginPath();ctx.ellipse(cx,hy+28,14,31,0,0,7);ctx.fill();
+      const bone='rgba(224,216,200,0.21)';
+      ctx.fillStyle=bone;                          // the skull, tipped back and narrow
+      ctx.beginPath();ctx.ellipse(cx,hy,5.2,6.6,0.22,0,7);ctx.fill();
+      ctx.fillStyle='rgba(0,0,0,0.22)';            // sockets are SLITS: a round eye is a cartoon
+      for(const sx of [-1,1]){
+        ctx.save();ctx.translate(cx+sx*2.1,hy-0.4);ctx.rotate(sx*0.45);
+        ctx.beginPath();ctx.ellipse(0,0,1.8,0.95,0,0,7);ctx.fill();ctx.restore();
+      }
+      ctx.strokeStyle=bone;ctx.lineWidth=2.1;      // shoulders
+      ctx.beginPath();ctx.moveTo(cx-8.4,hy+11);ctx.quadraticCurveTo(cx,hy+8.4,cx+8.4,hy+11);ctx.stroke();
+      ctx.lineWidth=1.5;                           // sternum
+      ctx.beginPath();ctx.moveTo(cx,hy+10);ctx.lineTo(cx,hy+31);ctx.stroke();
+      ctx.lineWidth=1.2;                           // and ribs paired off it
+      for(let i=0;i<5;i++){
+        const yy=hy+13+i*4.4, w=8-Math.abs(i-1.4)*1.05;
+        for(const sx of [-1,1]){
+          ctx.beginPath();ctx.moveTo(cx,yy);
+          ctx.quadraticCurveTo(cx+sx*w,yy+0.6,cx+sx*w*0.78,yy+5);ctx.stroke();
+        }
+      }
+      ctx.lineWidth=2.1;                           // the arm that never went under
+      ctx.beginPath();ctx.moveTo(cx+8.4,hy+12);
+      ctx.quadraticCurveTo(cx+20,hy+18,cx+17,hy+33);ctx.stroke();
+      // the flesh closing back over it — this is the half of the effect
+      const wash=ctx.createRadialGradient(cx,hy+24,3,cx,hy+26,32);
+      wash.addColorStop(0,shadeA(th.wall,-0.05,0.30));
+      wash.addColorStop(0.72,shadeA(th.wall,-0.05,0.62));
+      wash.addColorStop(1,shadeA(th.wall,-0.05,0.86));
+      ctx.save();
+      ctx.beginPath();ctx.ellipse(cx,hy+22,15.5,36,0,0,7);ctx.clip();
+      ctx.fillStyle=wash;ctx.fillRect(cx-18,hy-16,36,74);
+      ctx.restore();
+      for(let k=0;k<16;k++){                       // and what is fruiting out of it
+        const a=rr()*6.28,d=3+rr()*13;
+        ctx.fillStyle=glow;ctx.globalAlpha=0.12+rr()*0.20;
+        ctx.beginPath();ctx.arc(cx+Math.cos(a)*d,hy+22+Math.sin(a)*d*1.5,0.9+rr()*1.6,0,7);ctx.fill();
+      }
+      ctx.globalAlpha=1;
+    });
+  }else if(v===7){
+    /* A stalk that is DYING: the flesh gone dark and slumped, the glow in it
+       turned sour green rather than violet. A grove has to be able to look
+       unwell somewhere or it reads as decoration. */
     const cx=mid(Math.floor(rr()*8));
     wrapX(()=>{
-      ctx.strokeStyle='rgba(0,0,0,0.45)';ctx.lineWidth=3;
-      ctx.beginPath();ctx.moveTo(cx,10);
-      let py=10,px=cx;
-      while(py<118){py+=14+rr()*14;px+=(rr()-0.5)*7;ctx.lineTo(px,py);}
-      ctx.stroke();
-      ctx.strokeStyle=shade(th.wall,0.34);ctx.lineWidth=1.1;
-      ctx.beginPath();ctx.moveTo(cx-0.8,10);
-      py=10;px=cx-0.8;
-      while(py<118){py+=14+rr()*14;px+=(rr()-0.5)*7;ctx.lineTo(px,py);}
-      ctx.stroke();
+      const g=ctx.createLinearGradient(cx-17,0,cx+17,0);
+      g.addColorStop(0,'rgba(24,20,14,0)');g.addColorStop(0.5,'rgba(24,20,14,0.62)');
+      g.addColorStop(1,'rgba(24,20,14,0)');
+      ctx.fillStyle=g;ctx.fillRect(cx-17,0,34,128);
+      for(let k=0;k<26;k++){                          // weeping, and pooling downward
+        const x=cx+(rr()-0.5)*26,y=rr()*128,r=1.4+rr()*4.2;
+        ctx.fillStyle=`rgba(96,110,52,${0.07+rr()*0.13})`;
+        ctx.beginPath();ctx.ellipse(x,y,r,r*1.6,0,0,7);ctx.fill();
+      }
+      ctx.strokeStyle='rgba(0,0,0,0.34)';ctx.lineWidth=1.2;
+      for(let k=0;k<4;k++){                           // the flesh split and sagging
+        const x=cx+(rr()-0.5)*20;let py=rr()*30;
+        ctx.beginPath();ctx.moveTo(x,py);
+        while(py<128){py+=10+rr()*12;ctx.lineTo(x+(rr()-0.5)*6,py);}
+        ctx.stroke();
+      }
     });
-  }else{                                       // young caps budding off the stalk
-    for(let k=0;k<5;k++){
-      const x=rr()*128,y=20+rr()*96,r=2.5+rr()*4;
-      wrapX(()=>{
-        ctx.fillStyle=shade(th.moss,-0.15);
-        ctx.beginPath();ctx.ellipse(x,y,r,r*0.72,0,Math.PI,0);ctx.fill();
-        ctx.fillStyle=shade(th.wall,-0.2);
-        ctx.fillRect(x-0.8,y,1.6,r*0.9);
-        ctx.fillStyle='rgba(255,240,255,0.14)';
-        ctx.beginPath();ctx.ellipse(x-r*0.3,y-r*0.25,r*0.32,r*0.2,0,0,7);ctx.fill();
-      });
-    }
   }
   // every wall is a little damp and a little luminous down low
   for(let k=0;k<24;k++){
@@ -8260,7 +8414,7 @@ function buildLevel(L){
   const duer=th.name==='Duergar';
   const myco=th.name==='Myconid';
   const drow=th.name==='Drow';
-  const NVAR=cave?12:(duer?8:(myco?6:(drow?8:6)));
+  const NVAR=cave?12:(duer?8:(myco?8:(drow?8:6)));
   const grid=(cave||duer||myco||drow)?null:brickGrid(th); // brick skeleton, masonry themes only
   const baseWall=cave?caveBaseCanvas(th)      // shared earth, so tiles still join invisibly
                 :duer?duergarBaseCanvas(th)   // shared courses, trim and frieze channel
