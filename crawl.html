@@ -380,7 +380,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 'use strict';
 /* ============================== RULES DATA (D&D 3.5 SRD, simplified) ============================== */
 /* Bisect marker. See the note in refreshDepthTag. */
-const BUILD_TAG='testA';
+const BUILD_TAG='testB';
 const rnd = (n)=>Math.floor(Math.random()*n);
 const d = (n)=>1+rnd(n);
 // Spell damage comes out of each spell's own dmgFn, which rolls internally, so
@@ -10775,14 +10775,34 @@ function refreshItemSprite(L,i){
 }
 function itemTexKey(it){return 'it_'+it.base+'_'+it.bonus+'_'+(it.tint||'')+'_'+(ITEM_DEFS[it.base].tint||'');}
 // single source of truth for monster frame textures (cache key + raster options)
+/* 640 was chosen for sharpness — a large creature one tile away fills about 750
+   physical pixels on a DPR-3 phone, so a 384 raster is magnified ~2x and reads
+   as blurry up close — and for a long time nothing paid for it on iOS, because
+   the sprite SVGs stated no width or height and WebKit therefore rasterised them
+   at the CSS default of 150 square and scaled up. The canvas and the GPU texture
+   were 640 the whole time; only the RASTER was small. That is why the blur was
+   iOS-only, and why raising this number in the first place cost nothing there.
+
+   The moment the size was stated on the SVG root so WebKit would honour it, iOS
+   started genuinely rasterising 640 square — eighteen times the area it had been
+   doing, through the rim-light and contact-shadow filters, six poses at a time
+   during the level's prewarm — and the tab died about ten seconds after a floor
+   appeared. Confirmed by bisect: that one commit alone, on an otherwise stable
+   build, reproduces it.
+
+   So the number has to come down to something WebKit can actually rasterise. 384
+   is 6.5x the area iOS was really doing before and 2.8x less than 640, which
+   should read markedly sharper than the 150 it was getting while costing a
+   fraction of what killed it. If this still dies the next step down is 256.
+
+   NOTE this is a raster-cost limit, not a memory one. Texture memory did not
+   change when the crash appeared, so do not reason about this number from
+   texture bytes. */
+const MON_RASTER=384;
 function monsterFrameTex(sprKey,boss,pose,elite){
   const tint=elite&&ELITES[elite]?ELITES[elite].tint:null;
-  // 640px, not 384: a large creature one tile away fills ~750 physical pixels on
-  // a DPR-3 phone, so a 384px raster was magnified ~2x and read as blurry up
-  // close. 640 brings that down to ~1.2x — near its native resolution — at the
-  // cost of ~2.8x the raster time and texture memory per frame.
   return svgToTexture(monsterSVG(sprKey,boss,pose,tint),
-    'mon_'+sprKey+(boss?'_b':'')+(elite?'_'+elite:'')+'_'+pose,{size:640,mipmap:true});
+    'mon_'+sprKey+(boss?'_b':'')+(elite?'_'+elite:'')+'_'+pose,{size:MON_RASTER,mipmap:true});
 }
 /* Every pose is rasterised the first time it is used, and a frame costs about
    25ms of main thread to decode at 384px once it carries the rim and contact-
