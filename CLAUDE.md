@@ -44,7 +44,7 @@ the repo, so treat the committed file as authoritative.
 
 There is no test suite in the repo either. Sessions have built throwaway
 node harnesses that stub `window`/`document`/`THREE`, load the pure-logic
-part of the file, and assert on it (the T1–T57 series referenced in the
+part of the file, and assert on it (the T1–T59 series referenced in the
 git log). If you make a behavioural change, expect to rebuild a harness
 rather than find one — and note that the numbering only ever grows, so the
 git log is the index of what each one covers.
@@ -259,6 +259,36 @@ design decision rather than a tuning pass. Nobody has taken it. What is
 settled is that the median is not to be chased by fiddling with
 `depthScale`, `threatBudget` or the bestiary — those are not what is
 holding it.
+
+## An elite's recolour must be a filter, never a CSS blend mode
+
+`monsterSVG` tinted an elite by laying a 62%-opacity rect of the template colour
+over the body with `style="mix-blend-mode:color"`, chosen because that blend
+swaps the hue while keeping the modelling underneath. **It never took effect.**
+A sprite is rasterised by loading the SVG into an `Image`, and CSS blend modes
+are not applied on that path — measured, the body's detail energy was identical
+with the property present and with it stripped out (7.57 both). So every elite
+was painted with a flat opaque colour instead.
+
+Measured as contrast per unit brightness — the only fair metric here, because a
+tint changes overall brightness and that alone moves absolute gradients — an
+elite retained **23–29%** of the plain creature's modelling. Three quarters of
+the art was being wiped off, which is what reads as a *blurry monster standing
+in front of perfectly sharp stonework*.
+
+It is an `feColorMatrix` now, a filter primitive rather than a CSS property, so
+it survives rasterisation the way the rim light and roughness passes already do.
+Scaling each channel toward the tint is a multiply: it keeps every light and
+shadow and only shifts the hue, mixed against identity at `TINT_MIX` so it does
+not go too dark. Elites now measure **101–103%** of plain, and all six templates
+still come out as distinct colourings. The mask the old wash needed is gone with
+it, which is a filter pass saved per elite frame.
+
+**The aura was not the culprit and was not changed.** It is drawn *behind* the
+body, so it never touched the creature's own pixels — with the wash removed and
+the aura still in place, detail measured 8.58 against plain's 8.56. If a monster
+ever looks soft again, check what is being painted **over** it before suspecting
+the glow behind it.
 
 ## Sprites are lit now
 
@@ -815,12 +845,15 @@ three themes carry real machinery:
   hall is for. The count is unchanged at 10–17 a floor, so the variety is free.
 
   **Floor dressing** on the crypt litter's terms — seeded per tile, instanced,
-  `decor:true`. Slag, spilled ore, dropped tools, and **haulage track**. The
-  track is chosen **per row and per column, not per tile**: a tile-by-tile roll
-  gives disconnected two-foot fragments of rail, and hashing the row instead
-  means every horizontal corridor tile on it carries the track and the run comes
-  out continuous. Junctions are neither purely horizontal nor vertical and take
-  no rails, so a line ends where it meets another passage.
+  `decor:true`. Slag, spilled ore and dropped tools.
+
+  **Haulage track ran down the corridors here and was removed.** Keep the
+  technique, which is the part worth having: anything that must run continuously
+  along a passage is chosen **per row and per column, not per tile**. A
+  tile-by-tile roll gives disconnected two-foot fragments of rail — the one thing
+  track cannot be — and hashing the row instead means every horizontal corridor
+  tile on it carries the run. Junctions are neither purely horizontal nor
+  vertical and take nothing, so a line ends where it meets another passage.
 
   **The forge hall in `L.forge`** is the theme's set-piece and the ossuary's
   analogue, with the same hazards and the same answers: the anvil block is
@@ -887,7 +920,7 @@ three themes carry real machinery:
 - **`Myconid`** — a grove that grew rather than one that was built, and the
   only theme that replaces the **ceiling** as well as the walls and floor:
   `myconidCeilCanvas` draws the gilled underside of the caps overhead,
-  `myconidWallCanvas` gives six stalk variants over one shared base, and the
+  `myconidWallCanvas` gives eight stalk variants over one shared base, and the
   floor is gravel. The light is purple — `THEMES` carries `light` and `fill`
   for it, and `buildLevel` tints `R3.torch` from `th.light`, so a theme can
   now recolour the party's own lantern. Doors are dried stalks, roughly cut
@@ -896,6 +929,90 @@ three themes carry real machinery:
   The stalks are drawn by sampling a wandering edge every 4 pixels with a
   per-stalk phase. At 16 the kinks landed at the same height in every stalk
   and the wall read as a bamboo fence.
+
+  ### The grove is a colony, and everything in it is the colony's work
+
+  **The wall variants are its crop and its casualties**, eight of them, keyed on
+  the variant itself: a **ripplebark** shelf, a **trillimac**, a swollen
+  **barrelstalk**, a **nursery** of sprouts, **something the spores took**, a
+  stalk that is **dying**, the spore **freckles**, and one deliberately bare so
+  the rest have something to be read against. Four shape lessons came out of it:
+
+  - **A shelf is read from its UNDERSIDE.** As a flat ellipse the ripplebark was
+    a painted lozenge; what says "this sticks out" is a dark band below a lit
+    top, and a front edge with real lobes rather than a smooth arc.
+  - **A swelling has to START and END at the stalk's own width**, so it is built
+    off the base's stalk edges. Drawn as an ellipse over the wall the barrelstalk
+    was a striped beach ball stuck to the flesh.
+  - **A body in the flesh is read from a body plan, and has to be UNDER it.** As
+    concentric arcs it was a spiral bun; at full strength it was a bright skull
+    with round eyes, a Halloween decal. The bones go down faint and a translucent
+    wash of the stalk's own colour goes back over them.
+  - **A colour picked on the texture sheet has to be checked under the theme's
+    own light.** At `#8a545a` the ripplebark came out BUBBLEGUM PINK in the room:
+    the grove's torch is lilac, and a light with no green in it drives any ruddy
+    mid-tone to pink.
+
+  **The grove emits light.** `myconidWallCanvas` returns `{cv,glow}`, the second
+  builder after the drow's — a colour map can only make something pale, and the
+  spores are the whole point of the place. The freckles burn with a real halo,
+  young caps burn, whatever fruits out of a buried body burns, and every variant
+  carries a faint dusting, because a grove where one tile in eight glows reads as
+  a grove with a lamp in it. **Rot burns SOUR GREEN**, the only thing here that
+  is not violet, so a sick stalk can be told from a healthy one down a dark
+  corridor by its colour.
+
+  **The theme was also washing out**, and that had to be fixed before anything
+  else could be seen: `#7a6e86` stalks under a torch already retinted lilac left
+  no headroom at all. Both came down. The violet now comes mostly from what is
+  glowing rather than from washing everything in it.
+
+  **Furniture on `L.myconid`**, six weighted kinds, all of them the colony's work
+  rather than ornament: a fruiting **cluster** (the crop, largest share), a
+  **nursery** bed, a **barrelstalk** tapped for water, hanging spore **pods**, a
+  body being **composted**, and a **rapport bloom** — where a circle melds, and
+  the brightest thing in the grove. Three had to be rebuilt:
+
+  - **A `SphereGeometry(R,...,0,1.05)` is a spherical cap that bulges R into the
+    room.** The rapport bloom's cap swallowed its own gills, glowing core and
+    ring of small caps, and rendered as a dark porthole with bolts round it. What
+    reads as a cap seen face-on is a gill FACE with a rim, built flat.
+  - **A fence is read from its gaps.** Nine close-set kerb posts read as a solid
+    drum; five, thicker and well apart, read as a kerb.
+  - **Anything standing on a dome has to start at the dome's surface**, not at a
+    flat y — the nursery's sprouts were inside a bed 0.3 tall at its middle.
+
+  **Floor dressing**: mound litter with things coming up out of it, shed caps and
+  stalk stubs, patches of **bluecap** — the one thing down here that is BLUE
+  rather than violet, because it is the colony's grain and should read as a crop
+  — and drifts of spore dust, which are drawn before the furniture check because
+  dust does not care what is standing there.
+
+  **The puffball** extends the trap pool on the drow snare's exact terms, so a
+  floor's trap count is untouched. **Fortitude, not Reflex** — the burst is not
+  something you dodge, it is something you breathe — which is what makes it a
+  different trap and not a reskin: the two catch different members of the same
+  party. Priced on `trapcost_body.js` at depth 19 it costs 10.8 hp against a 17.0
+  mean for the five it displaces, level with the snare's 11.4. At three seconds
+  it measured 6.5, the cheapest thing in the table, which is the same reading
+  that took the snare from four seconds to five.
+
+  **`stunned` was half a condition and is fixed.** It blocked acting in `canAct`
+  but cost nothing in `charAC`, while this file has claimed since the cave
+  creatures went in that gaze and hold both stop a character acting *and* cost 4
+  AC. 3.5 agrees — a stunned creature loses its Dex bonus. It is a real balance
+  change: three creatures inflict stun plus the puffball, and all four got
+  better. The descent simulator cannot see conditions or traps at all, so this is
+  a rules correction rather than a measured one.
+
+  **The circle mound in `L.mound`** is the ossuary's, the forge hall's and the
+  chapel's fourth sibling, on their exact terms: `T_PIT` after the connectivity
+  check, shoves aside whatever loot is under it, never on the stairs, kept by an
+  elite myconid that carries spores. Its hoard is the one of the four that needs
+  no invention — a circle plants its dead in its mound, and metal does not rot,
+  so what you dig out is the gear off everything it has composted. `openMound` is
+  `openBier` rewritten. T59 covers it, and asserts the stairs stay reachable with
+  the mound *and* the stairwell both treated as solid.
 
 - **`Drow`** — a house, and the only theme whose decoration gives off light.
   Small black bricks (eight courses of six, with a one-pixel draft rather than
@@ -1124,7 +1241,8 @@ theme fields its own roster and nothing else — so they assert 100% and 0%
 rather than a band, and cannot drift as rosters are added.
 
 Each theme with machinery writes an array onto the level (`rivers`/`pipes`,
-`crypts`/`ossuary`, `lurkers`, `duergar`/`pillars`/`forge`, `drow`/`chapel`) in `tryGen`
+`crypts`/`ossuary`, `lurkers`, `duergar`/`pillars`/`forge`, `drow`/`chapel`,
+`myconid`/`mound`) in `tryGen`
 and reads it back in `buildLevel`; anything you add that way must also be
 carried through `serializeGame` and `loadGame`, or a reloaded floor comes back
 stripped of it.
@@ -1300,6 +1418,223 @@ the dungeon grows:
   exist only in hoards and boss piles from depth 20 (and 28), and affixes
   ride the same schedule. Ordinary floor loot tops out at `+3` at any
   depth, on purpose.
+
+## The stairs down are a monument, and not a tile you stand on
+
+Every floor has exactly one, it is the only thing the party is actually
+looking for, and as a straight flight of seven slabs in a hole it read as a
+recess in the ground — you walked past it. It is now a spiral: twelve treads
+turning a full 540° around a newel that runs the height of the well and stands
+`WALLH/3` proud of the floor, with golden light and shafts rising out of it.
+
+**`T_STAIRS` is deliberately not in `walkableTile`.** A tile the party can
+stand on is a tile the camera ends up inside, and the newel is in the middle of
+it — you would spend the last quarter-second of every floor looking at the
+inside of a column. Neither control changed for the player: `tryMove` descends
+when you walk into the stairwell (where it used to step onto it and descend
+260ms later), and the `stairs` raycast kind descends on a tap from an adjacent
+tile. Both go through `takeStairs`, which guards re-entry with `G._descending`.
+
+Four places had to follow, and all four are the same edit — dropping `T_STAIRS`
+from a `t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS` triple: the party's distance
+field, `combatNoise`, and both monster movement tests. `seesThroughTile` still
+lets it through, because a newel at 0.43 against an eye at 0.62 does not block a
+room. Generation needed nothing: the stairs are the furthest tile the BFS
+reaches, so a standable neighbour exists by construction — measured 0
+unreachable over 40 floors, and 0 of 477 monsters standing on one over 24.
+
+Note this broke **T31**, which asserted the stairs tile itself was reachable by
+a flood fill over `walkableTile`. Under the new rule what has to be reachable is
+*a tile beside it*.
+
+**A stairwell is solid, so `tryGen` re-checks connectivity with it treated as a
+wall** — the last thing it does before returning, and it retries the level if
+anything walkable is stranded. The stairs cannot strand anything on their own
+(they are the furthest tile the generator's own BFS reaches, and nothing can lie
+beyond a furthest tile), but three things move after that BFS runs: the start
+room is sealed and its doors re-cut, locked doors appear, and the ossuary bier,
+the forge anvil and Lolth's throne each block a tile. Any of those can leave the
+stairwell as the only way round. T31 caught it at about one crypt floor in a few
+hundred — which is exactly the rate at which it would have stranded the key and
+sealed a run. Measured after the gate: 0 stranded over 480 floors at depths
+1–40, and generation still runs at 2.9ms a level.
+
+### A cylinder bored into solid rock
+
+The tile is solid ground with a **cylinder** cut down through it, which is a
+different object from the square hole this started as. Two pieces make it read,
+and the second is easy to miss:
+
+- The bore is an open-ended cylinder faced on the inside, running from the floor
+  down. Nothing of it stands above the floor, because above the floor there is
+  no rock left to cut. Open-ended matters: a top cap would sit between the eye
+  and the well.
+- **The tile has to supply its own floor.** `buildLevel` skips `T_STAIRS` when it
+  lays the floor planes, so the stairs block builds a unit square with a circular
+  hole punched in it — and that plate is in **`floorMat`, not the wall's stone**,
+  which is the kerb's lesson again: a horizontal face at floor level is lit only
+  by a grazing torch, and in the wall's material it comes out black.
+
+**Four treads stand proud of the floor.** `RISE` is the top tread's own surface
+and it is the `WALLH/3` of the brief — the *staircase* reaches a third of the
+room's height, with the newel carrying on a little past the highest step. This
+is what finally makes the spiral legible; everything before it was trying to
+show a helix down a hole the party cannot see into.
+
+It costs one constraint and one cheat:
+
+- **A tread can no longer be wider than the tile.** Below the floor it wanted to
+  overlap the bore as much as possible; above it, poking outside the tile is
+  visible. 0.476 plus `hew`'s 0.045 tops out at 0.487 against a half-tile of 0.5.
+- **The proud treads need a light above them.** Everything in this stairwell
+  shines upward, and a tread top is a horizontal face — the torch reaches one at
+  about N·L 0.14 from two tiles back, so they rendered as pure black blades
+  hanging round the newel. Lighting them from below lights their undersides,
+  which is what really happens and is unreadable. There is a dim warm point light
+  above the well pinned to a short range so it falls off before it touches the
+  room. It exists to put a top on the steps and nothing else.
+
+**The rays start half a room's height BELOW the floor** (`GODRAY_FLOOR`), so they
+rise out of the well rather than appearing at it. That costs real brightness: the
+fade exponent came down to 1.5 and the amplitudes went up by about half.
+
+**And they are LATHED PROFILES, not cones, because the bore is an aperture.**
+Below the floor a shaft is a parallel-sided column that fits inside the hollowed
+cylinder; it reaches the mouth and only there opens out into the room. As plain
+cones they were narrowest at the source and widest at the top, so the wide one
+measured 0.61 across at floor level against a bore of 0.455 — passing straight
+through the rock on its way up, and the only reason it was not obvious is that
+the floor plate happened to hide it from above. A `LatheGeometry` over the
+profile `[(r,-h), (r,0), (R,top)]` gives cylinder-then-cone in one mesh with the
+break exactly at the aperture. Measured on all seven themes: rays reach 0.420
+below the floor against a hewn bore minimum of 0.434.
+
+That change forced the fade to be measured in **world height** rather than the
+mesh's own `uv.y` — a lathed profile runs uv.y at wildly different rates on its
+two halves, and using it would put a visible kink at the mouth. The shader takes
+`yBot`/`yTop` uniforms and a varying carrying the vertex's world y.
+
+### A theta-sector cylinder is not a solid
+
+This is the bug that made the treads read as sheets of paper, and it is worth
+knowing before reaching for `CylinderGeometry` to cut a wedge out of anything.
+
+**Three.js builds a `CylinderGeometry` with `thetaLength < 2π` as a torso plus
+two cap fans, and generates no radial end walls.** The two faces where the wedge
+is cut off — on a stair, the *risers*, the most important faces there are —
+simply do not exist. With front-face culling you look straight through them into
+nothing. Audited by counting how many edges are shared by exactly two triangles:
+a box comes back with 0 open edges, an open-ended cylinder with 22, an extruded
+sector with 0, and the theta-sector cylinder does not close.
+
+A tread is an **extruded closed 2D shape** now, and that fixes a second half of
+the same problem: `ExtrudeGeometry` returns **non-indexed** geometry, so the
+`computeVertexNormals()` inside `hew` gives one normal per face instead of
+smoothing across the edges. A cut block wants a bright top, a dark riser and a
+hard line between them; a smoothed corner is the other reason these looked thin.
+They are also thicker — `drop*0.58` rather than `drop*0.40`.
+
+**`hew` had to be rewritten for it.** Its jitter is now a hash of the vertex
+POSITION rather than a fresh random draw per vertex, and that is a correctness
+requirement, not a nicety: non-indexed geometry carries duplicated vertices at
+every shared corner, and drawing independently for each copy tears the mesh into
+confetti. Hashing the position moves every copy of a corner to the same place.
+Verified on a live level: all 12 treads come back closed after hewing.
+
+### Carved, not built
+
+The first cut of this was dressed masonry — a turned newel with a moulded cap
+and two collars, standing in a square hole. It read as architecture *placed in*
+a basement rather than a stair *cut into* one. What fixed it:
+
+- **Nothing underground is turned on a lathe.** Every piece goes through `hew`,
+  which shoves its vertices about and recomputes normals, seeded from the
+  stairs' own tile — `openBier`, `openForge` and `openAltar` all call
+  `buildLevel` again, and a stairwell that re-hewed itself when a coffin was
+  opened would be worse than one that was smooth.
+- **The cap and collars are gone.** The newel is the core the masons *left*:
+  irregular, flaring where the treads come off it, finished with a low dome. Not
+  a flat top, which is a cut face; not a cone, which is a finial.
+- **Treads run INTO the bore.** At 0.455 against a shaft half-width of 0.4975
+  there was a 4cm gap all the way round, and daylight between the stair and the
+  rock reads as a structure standing inside a hole. They are 0.515 now and
+  overlap, per *Surfaces that meet must overlap, never abut*.
+- **The alternating tread shades had to go.** They made a helix legible when the
+  stair was masonry; on carved rock two tones read as a stack of separate slabs
+  someone had laid, which is the one thing it must not look like. One material
+  for newel, treads and bore — the contrast comes from the light in the well.
+
+Three limits, each of which cost a screenshot:
+
+- **Carved is not shattered.** At 0.20 of radial jitter, with the y jitter
+  running to the end rings, the newel grew black shards off its silhouette and
+  the crown came out as broken slag. Hand-tooled stone is smooth-ish and
+  slightly wavy. The amplitudes are 0.045–0.075, and `hew` leaves the extreme
+  rows of vertices exactly where they were so an end cap stays a clean edge.
+  Everything ragged in that build came from moving those.
+- **Heavy bump is not roughness.** At `bumpScale` 0.055 and then 0.034 the newel
+  went nearly black: a strong bump map over a brick texture tilts most of the
+  surface away from a light that is already grazing. The irregularity belongs in
+  the geometry — that is what `hew` is for — so the map only carries grain. It
+  is 0.016.
+- **A point light on the shaft axis cannot light the newel.** It is *inside* it,
+  and every normal on the outer surface points away. The mouth light sat at
+  `(cx, y, cz)` and the newel came out a black silhouette against a brightly lit
+  well — dramatic, and it tells you nothing about what the thing is made of.
+  Pushed out to the rim on the side the party approaches from, the same light
+  still reads as coming out of the well and now rakes across the stone.
+
+**Everything is faced in `wallMats`** at the variant that tile would have had,
+which is what makes the seven themes differentiate for free — the cave's rock,
+the drow's black brick, the duergar's coursed slab and the grove's stalk all
+arrive by themselves.
+
+Three things had to be looked at rather than reasoned about:
+
+- **You cannot see into the well from anywhere the party can stand.** The eye is
+  at 0.62 and the well is a metre across, so from two tiles back the line of
+  sight reaches about 30cm down — three treads, whose outer edges at one radius
+  make a ring. The stair read as a stone BOWL with a post in it, and everything
+  below was invisible. The fix is the **helical rib wound round the newel** at
+  the stair's own pitch: the spiral is stated on the one part of the staircase
+  that is always in view. Raising the stair head above the floor would show the
+  treads, but treads above floor level read as stairs going *up*.
+- **A kerb round the opening renders solid BLACK.** Tried as a torus (a barrel
+  hoop hanging over the hole) and then laid flat, where it became the darkest
+  thing in the picture. The only light in a room is a torch at the eye, and
+  against a horizontal face at floor level that is grazing — about a third of
+  what the same stone gets standing up as the newel. The flagstones beside it
+  look lit only because the floor texture is far paler than the wall's. Anything
+  that goes there has to use the FLOOR's material.
+- **The shaft has to be darker than the room's own walls** (`color:0x5a5a5a`
+  over the same map). Faced at full strength its far inner wall carried the same
+  brick at the same scale as the wall standing behind the stairwell, the eye
+  joined the two, and there was no hole at all — a newel standing on unbroken
+  floor.
+
+### God rays are geometry, not a post-process
+
+Only `three.min.js` is loaded and there is no build step, so there is no
+`EffectComposer` here; a true screen-space pass would mean hand-rolling an
+occlusion render plus a radial blur through two targets — a second full scene
+render every frame on a phone — and it would only work while the source is on
+screen, which this source is not, being down a hole.
+
+So the rays are two open cones standing on the shaft mouth, drawn additively
+with a shader that cuts them into blades, their `t` uniform driven from the
+render loop and cleared in `disposeLevel` like everything else in `R3`.
+
+- **The blade exponent is the whole difference between rays and a lampshade.**
+  Below about 2 the troughs of the beating sines never reach zero, every blade
+  runs into its neighbour and the cone fills in solid — which is exactly what
+  the first build looked like. It is 2.4.
+- The pattern is a product of sines in `uv.x` at **whole-number frequencies**,
+  so it is periodic round the cone and there is no seam where the uv wraps.
+- `depthWrite:false` so the two cones do not occlude each other, and
+  `depthTest:true` so a wall between the party and the stairwell still cuts the
+  rays off — additive with no depth test shines through stone.
+- Watch the total: the first version summed to over 1.0 at the mouth before the
+  amplitude was even applied, and blew out to a white ring on the floor.
 
 ## Crypt interactions
 
