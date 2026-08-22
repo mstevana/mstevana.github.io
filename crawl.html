@@ -379,8 +379,6 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 <script>
 'use strict';
 /* ============================== RULES DATA (D&D 3.5 SRD, simplified) ============================== */
-/* Bisect marker. See the note in refreshDepthTag. */
-const BUILD_TAG='testB';
 const rnd = (n)=>Math.floor(Math.random()*n);
 const d = (n)=>1+rnd(n);
 // Spell damage comes out of each spell's own dmgFn, which rolls internally, so
@@ -15302,10 +15300,7 @@ const UI=(()=>{
     const b=$('log-list');b.scrollTop=b.scrollHeight;
   }
   function refreshDepthTag(){
-    /* BUILD_TAG is here only so a bisect cannot be read off a stale cache: if
-       the label does not change, the phone is still running the old file and
-       whatever it does means nothing. Remove it when the bisect is over. */
-    $('depth-tag').textContent='Depth '+G.depth+' · '+G.L.theme.name+(G.depth%3===0&&G.depth>=6?' ⚔':'')+' · '+BUILD_TAG;
+    $('depth-tag').textContent='Depth '+G.depth+' · '+G.L.theme.name+(G.depth%3===0&&G.depth>=6?' ⚔':'');
   }
   /* ---------- overlays ---------- */
   function anyOverlayOpen(){return [...document.querySelectorAll('.ovl')].some(o=>o.classList.contains('show')&&o.id!=='ovl-rotate');}
