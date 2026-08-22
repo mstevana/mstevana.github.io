@@ -351,7 +351,9 @@ below before touching it. That cost lands
 as a stutter the first time a creature winds up, which is the worst possible
 moment — so `prewarmMonsterFrames` rasterises all six poses of every kind on a
 floor while the level is being built, where a hitch is expected. The texture
-cache is global and keyed by kind, so it is paid once per creature type per run.
+cache is keyed by kind and **pruned to the floor being played** — see *Texture
+memory is bounded per floor, not per run* below — so a frame is paid for once per
+creature type per floor it appears on, not once per run.
 Anything new added to the wrapper should be measured the same way, and note that
 timing `drawImage` alone measures nothing: the rasterisation happens during the
 image *decode*, so time from setting `src` to `onload`.
@@ -400,6 +402,67 @@ Three things worth keeping from how long this took to find:
 If sharpness needs to improve further, the lever is the **filters**, not the
 raster: they are the expensive half, and the rim and contact shadow are what make
 a large raster unaffordable on WebKit.
+
+## Texture memory is bounded per floor, not per run
+
+Three things keep it there, and they are separate from the raster-size limit
+above: that one is about how expensive a single frame is to *draw*, this one is
+about how many of them are alive at once.
+
+- **`pruneMonsterTextures(L)`** drops, once per floor change, every cached frame
+  the floor about to be played does not need. Without it the cache is global and
+  never emptied, so it grows for the length of the run: measured over a 24-floor
+  descent it reached 288 monster frames and 377 MB and was still climbing
+  linearly. With it, depth 24 holds 59 frames and 49 MB, and the figure tracks
+  how many creature kinds a floor fields rather than how deep the run is.
+
+  It hangs off **`startLevel`** and deliberately **not** off `disposeLevel`:
+  `buildLevel` calls `disposeLevel`, and `openBier`/`openForge`/`openAltar` call
+  `buildLevel` again mid-floor to show a shifted lid, so evicting there would
+  re-rasterise every creature on the floor the moment a coffin was opened.
+
+  **`monFrameKey` and `MON_POSES` exist so the rasteriser and the prune cannot
+  disagree about what exists.** A prune that missed a pose would quietly drop a
+  frame that is still on screen. Only `mon_` entries are touched — the wall,
+  floor and fx textures in the same cache are small and in use.
+
+- **`disposeLevelMaterials`** frees a level's materials and their textures, not
+  just its geometry. A theme builds a great many fresh every floor — eight to
+  twelve wall variants, floor, ceiling, doors, the emissive sheets, every piece
+  of furniture. Anything in `R3.texCache` is **skipped**: it is shared across
+  floors and already bounded by the prune, and disposing one would leave a cached
+  entry pointing at freed GPU memory, which renders **black rather than
+  throwing** and is far harder to trace than a crash.
+
+- **`svgToTexture` drops its canvas.** A `CanvasTexture` holds its canvas for
+  ever as `tex.image`, and nothing reads it again after the upload, so every
+  cached frame was paying for its raster twice. It is shrunk to 1×1 in
+  `tex.onUpdate`, which three.js fires at the end of its own `uploadTexture`,
+  after the mip chain is built.
+
+  **The upload has to be forced.** `onUpdate` only fires for a texture that has
+  actually been drawn, and a floor pre-warms every pose of every creature on it —
+  the windup and strike frames of something the party never fights are never
+  uploaded. Released on draw alone, only 20 MB of 75 MB came back;
+  `renderer.initTexture(tex)` in the raster's own `onload` takes it to zero and
+  moves the upload off the moment a creature first swings as a bonus.
+
+  **This is why `initRenderer` handles context loss.** With the canvases gone a
+  lost GL context cannot be repaired from what three.js still holds, so it
+  `preventDefault`s `webglcontextlost` — which is what makes a browser promise a
+  restore at all — and on `webglcontextrestored` empties `R3.texCache` and
+  rebuilds the floor, re-rasterising from the SVG each frame came from. Before
+  this a lost context simply ended the session, so it is strictly better than
+  what it replaced.
+
+What still grows is the **non-monster half of `texCache`** — wall, floor and
+ceiling maps keyed by theme and variant. That converges on a fixed set, because
+there are only seven themes, and it is left alone deliberately.
+
+**None of this is covered by the node harness**, and none of it caused the iOS
+crash — that was raster cost, not bytes. Do not conflate the two: a session was
+spent measuring exactly these numbers and shipping real reductions for them while
+the actual cause went untouched.
 
 ## The detail pass and `MONSTER_DETAIL`
 
