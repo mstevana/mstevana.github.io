@@ -5242,7 +5242,7 @@ const R3={ // renderer state
   scene:null,camera:null,renderer:null,torch:null,ambient:null,
   wallMesh:null,doorMeshes:{},secretMeshes:{},trapDecals:{},itemSprites:{},monsterSprites:{},
   stairsGroup:null,texCache:{},levelGroup:null,
-  camAnim:null,shake:0,liquidFlows:[],liquidShaders:[],candleFlames:[],cryptGroups:[],lurkerMeshes:{},godRays:[],
+  camAnim:null,shake:0,liquidFlows:[],liquidShaders:[],candleFlames:[],cryptGroups:[],lurkerMeshes:{},godRays:[],spores:null,
 };
 const TILE=1,WALLH=1.3,EYE=0.62;
 // how many pieces of duergar furniture may cast a real light. Everything still
@@ -8473,6 +8473,107 @@ gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`;
    fade runs over the cone's whole `uv.y`, so starting the cone 0.65 lower puts
    floor level a third of the way up it and the part the party can actually see
    is already well down the falloff. */
+/* Spores hanging in the air of the grove: a drift of lit motes falling from the
+   roof to the floor, replaced from the roof for ever.
+
+   ALL OF IT HAPPENS IN THE VERTEX SHADER, and that is the whole design. The
+   obvious build is a `THREE.Points` whose position attribute is rewritten every
+   frame — but that is N vertices of JavaScript arithmetic plus an N*3 float
+   upload to the GPU on every single frame, on a phone, for something purely
+   decorative. Here each mote's position attribute is a FIXED offset, and the
+   fall, the sway, the fade and the twinkle are all computed from it and from
+   one `t` uniform. The per-frame cost is two uniform writes.
+
+   The cloud FOLLOWS THE PARTY rather than filling the level. A 30x30 floor is
+   900 tiles and the party can see perhaps a dozen, so motes spread over the
+   whole grove would be almost entirely wasted; instead a box of `SPORE_SPAN`
+   tiles is wrapped around the camera in x and z, which keeps every mote where
+   an eye can reach it and lets the count stay small. Motes that wrap into solid
+   rock are simply occluded — the material is depth-TESTED (it is only
+   depth-write that is off), so stone hides them exactly as it hides the god
+   rays.
+
+   Y does NOT wrap around the camera. It wraps in [0, WALLH], which is what
+   makes them fall out of the ceiling and land on the floor rather than swarming
+   round the party's head. */
+const SPORE_VS=`
+uniform float t; uniform vec3 cam; uniform float span; uniform float wallh; uniform float psz;
+attribute float seed;
+varying float vA;
+void main(){
+  vec3 p=position;                                  // a fixed offset in [0,span)
+  float sp=0.018+0.050*fract(seed*7.31);            // its own falling speed
+  float y=mod(p.y-t*sp,wallh);
+  float sx=sin(t*0.33+seed*17.0)*0.11;              // and its own drift
+  float sz=cos(t*0.27+seed*11.0)*0.11;
+  vec3 w;
+  w.x=cam.x+mod(p.x+sx-cam.x+span*0.5,span)-span*0.5;
+  w.z=cam.z+mod(p.z+sz-cam.z+span*0.5,span)-span*0.5;
+  w.y=y;
+  // fade in as it leaves the roof and out as it reaches the ground, so nothing
+  // ever pops into or out of existence in view
+  vA=smoothstep(0.0,0.10,y)*(1.0-smoothstep(wallh*0.80,wallh,y));
+  vA*=0.45+0.55*sin(t*1.6+seed*29.0);               // and a slow twinkle
+  vec4 mv=viewMatrix*vec4(w,1.0);
+  gl_Position=projectionMatrix*mv;
+  // Size in DEVICE pixels. The projection is h/(2*tan(fov/2)) per world unit at
+  // unit distance, so psz is that factor times the mote's world radius, a few
+  // millimetres. Set by eye it put 86-pixel blobs up and the grove went white.
+  gl_PointSize=(0.8+2.6*fract(seed*3.17))*psz/max(0.35,-mv.z);
+}`;
+const SPORE_FS=`
+uniform vec3 c; varying float vA;
+void main(){
+  vec2 d=gl_PointCoord-0.5;
+  float r2=dot(d,d);
+  if(r2>0.25)discard;                               // a round mote, not a square
+  float g=1.0-r2*4.0;
+  // And they are DIM. Additive motes accumulate wherever two overlap, so a
+  // brightness that suits one is a wash for a hundred: this should read as
+  // dust catching the light, not as a light of its own.
+  gl_FragColor=vec4(c*g*g*vA*0.34,1.0);
+}`;
+/* The count follows the graphics setting, and this is insurance rather than a
+   measured need. What the harness CAN measure says the cloud is free: 520 motes
+   against no motes is 251.1ms vs 250.0ms a frame, and the scaling run is not
+   even monotonic (0 motes came out the slowest of five counts), so the particle
+   count is entirely inside the noise. But that harness is SwiftShader — a
+   software rasteriser with no GPU at all — and the one cost this cannot see is
+   FILL: additive motes with size attenuation overdraw badly when a few of them
+   are right against the eye, and that is a real risk on a phone. So `low` gets
+   a third of them and `adaptive` two thirds, which costs nothing to have and is
+   the only lever that would be wanted if it ever did bite. */
+const SPORE_SPAN=9.0;
+function sporeCount(){
+  return gfxMode==='low'?180:gfxMode==='adaptive'?340:520;
+}
+function sporeCloud(th){
+  const SPORE_N=sporeCount();
+  const pos=new Float32Array(SPORE_N*3), sd=new Float32Array(SPORE_N);
+  let h=0x9e3779b9>>>0;
+  const rr=()=>{h=(h*1664525+1013904223)>>>0;return h/4294967296;};
+  for(let i=0;i<SPORE_N;i++){
+    pos[i*3]=rr()*SPORE_SPAN; pos[i*3+1]=rr()*WALLH; pos[i*3+2]=rr()*SPORE_SPAN;
+    sd[i]=rr();
+  }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('seed',new THREE.BufferAttribute(sd,1));
+  // the cloud moves with the party, so its bounding sphere is meaningless and
+  // frustum culling would flicker the whole thing off at the wrong moments
+  geo.boundingSphere=new THREE.Sphere(new THREE.Vector3(),1e6);
+  const mat=new THREE.ShaderMaterial({
+    uniforms:{t:{value:0},cam:{value:new THREE.Vector3()},span:{value:SPORE_SPAN},
+              wallh:{value:WALLH},psz:{value:200},
+              c:{value:new THREE.Color(th.glow||'#c88ae8')}},
+    vertexShader:SPORE_VS,fragmentShader:SPORE_FS,
+    transparent:true,blending:THREE.AdditiveBlending,depthWrite:false});
+  const pts=new THREE.Points(geo,mat);
+  pts.frustumCulled=false;
+  pts.userData.decor=true;      // a tap goes through the air to the stone
+  R3.spores=mat;
+  return pts;
+}
 const GODRAY_FLOOR=-WALLH/2;
 /* The shafts are LATHED PROFILES, not cones, because the bore is an aperture
    and light does not pass through rock.
@@ -8524,7 +8625,7 @@ function disposeLevel(){
   for(const f of R3.liquidFlows)f.tex.dispose();
   R3.liquidFlows=[];R3.liquidShaders=[];
   R3.doorMeshes={};R3.secretMeshes={};R3.trapDecals={};R3.itemSprites={};R3.monsterSprites={};R3.monsterGlows={};R3.monsterShadows={};R3.prewarmQ=[];R3.prewarmT=0;R3.stairsGroup=null;
-  R3.candleFlames=[];R3.cryptGroups=[];R3.lurkerMeshes={};R3.wallMats=null;R3.webMeshes=[];R3.godRays=[];
+  R3.candleFlames=[];R3.cryptGroups=[];R3.lurkerMeshes={};R3.wallMats=null;R3.webMeshes=[];R3.godRays=[];R3.spores=null;
 }
 /* Scenery welding. A piece of furniture is a dozen little boxes and cylinders,
    and built as a dozen meshes it costs a dozen draw calls apiece — which for
@@ -10677,6 +10778,7 @@ function buildLevel(L){
     mk(chit,rockU,chitMat); mk(bolts,cylU,boltMat);
     grp.add(litter);
   }
+  if(th.name==='Myconid')grp.add(sporeCloud(th));
   /* The circle mound: the grove's set-piece. Seeded from its own tile, because
      `openMound` calls `buildLevel` again to show the bed turned over and
      anything drawn with `Math.random()` would visibly reshuffle at that moment
@@ -12233,6 +12335,15 @@ function updateCamera(now){
   shadeSprites();
   // the stairwell's light shafts drift; one uniform, both cones
   if(R3.godRays)for(const m of R3.godRays)m.uniforms.t.value=now/1000;
+  /* The whole spore cloud, for two uniform writes. `psz` is in DEVICE pixels,
+     so it has to track the drawing buffer rather than the CSS size — the
+     graphics setting changes the pixel ratio underneath it. */
+  if(R3.spores){
+    const u=R3.spores.uniforms;
+    u.t.value=now/1000;
+    u.cam.value.copy(R3.camera.position);
+    u.psz.value=R3.renderer.domElement.height*0.0042;
+  }
   // crypt candles guttering, each on its own phase so they don't pulse together
   for(let i=0;i<R3.candleFlames.length;i++){
     const c=R3.candleFlames[i],ph=i*1.7;
