@@ -280,6 +280,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   <div class="chips" id="m-gfx"></div>
   <div class="dim-note" id="m-gfx-note"></div>
   <div class="dim-note" style="text-align:center;margin-top:6px">D&amp;D 3.5 rules · real-time · landscape</div>
+  <div class="dim-note" style="text-align:center;margin-top:2px">version <span id="m-ver"></span></div>
 </div></div>
 
 <div class="ovl" id="ovl-create"><div class="panel" style="width:560px">
@@ -368,6 +369,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   <h1 style="color:#a33">THE PARTY HAS FALLEN</h1>
   <div id="go-summary"></div>
   <button class="mbtn" id="go-new">Raise a new party</button>
+  <div class="dim-note" style="margin-top:8px">version <span id="go-ver"></span></div>
 </div></div>
 
 <div class="ovl" id="ovl-target"><div class="panel" style="min-width:280px">
@@ -389,6 +391,19 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
    gates compatibility and is versioned separately. */
 const VERSION='1.1.0';
 /* ============================== RULES DATA (D&D 3.5 SRD, simplified) ============================== */
+/* The build's version, `x.xxx`, shown on the main menu and on the death screen.
+
+   It advances by one in the last place on **every merge to main** — 0.100,
+   0.101, 0.102 — and on nothing else. Not per commit and not per branch push:
+   a version that moves on a branch nobody has merged is a version two people
+   can both be holding at once.
+
+   It is deliberately NOT the save-format version. `serializeGame` writes its
+   own `v`, and `loadGame` clears a save whose `v` does not match — bumping that
+   throws away everybody's game, so it may only move when the save shape changes
+   in a way the reader's defaults cannot absorb. A release number moving every
+   merge must never be able to do that. */
+const VERSION='0.101';
 const rnd = (n)=>Math.floor(Math.random()*n);
 const d = (n)=>1+rnd(n);
 // Spell damage comes out of each spell's own dmgFn, which rolls internally, so
@@ -16758,6 +16773,16 @@ function refreshMenu(){
   document.getElementById('m-continue').textContent=G.started&&!G.over?'Return to the dungeon':'Continue the descent';
   renderGfxChips();
 }
+/* The version is stamped into the two panels that are always reachable — the
+   menu and the death screen — once at boot rather than on every open, since it
+   cannot change while the page is loaded. Both writes are guarded: the node
+   test harness stubs `document` and has neither element. */
+function stampVersion(){
+  for(const id of ['m-ver','go-ver']){
+    const el=document.getElementById(id);
+    if(el)el.textContent=VERSION;
+  }
+}
 function initMenu(){
   const $=(id)=>document.getElementById(id);
   $('m-continue').addEventListener('click',()=>{
@@ -16960,6 +16985,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   initInput();
   initMenu();
   initCreation();
+  stampVersion();
   checkOrientation();
   refreshMenu();
   UI.show('ovl-menu');
