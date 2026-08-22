@@ -379,6 +379,8 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 <script>
 'use strict';
 /* ============================== RULES DATA (D&D 3.5 SRD, simplified) ============================== */
+/* Bisect/verify marker; remove once this build is confirmed. */
+const BUILD_TAG='testC';
 const rnd = (n)=>Math.floor(Math.random()*n);
 const d = (n)=>1+rnd(n);
 // Spell damage comes out of each spell's own dmgFn, which rolls internally, so
@@ -7184,7 +7186,30 @@ function svgToTexture(svg,cacheKey,opt){
   const tex=texFromCanvas(cv,tex_opts);
   tex.__ready=false; // callers can hold the previous frame until the raster lands
   const img=new Image();
-  img.onload=()=>{const ctx=cv.getContext('2d');ctx.clearRect(0,0,S,S);ctx.drawImage(img,0,0,S,S);tex.needsUpdate=true;tex.__ready=true;};
+  img.onload=()=>{
+    const ctx=cv.getContext('2d');ctx.clearRect(0,0,S,S);ctx.drawImage(img,0,0,S,S);
+    tex.needsUpdate=true;tex.__ready=true;
+    /* Upload here rather than at first draw, because the release below only
+       reaches a texture that has actually been uploaded — and a floor pre-warms
+       every pose of every creature on it, so the windup and strike frames of
+       something the party never fights would otherwise keep their canvas for
+       ever. Measured at 640 before the raster came down, releasing on draw alone
+       recovered 20MB of 75MB. It also moves the upload off the moment a creature
+       first swings, which is what the prewarm exists to avoid. */
+    if(R3.renderer&&R3.renderer.initTexture)try{R3.renderer.initTexture(tex);}catch(e){}
+  };
+  /* A CanvasTexture holds its canvas for ever as `tex.image`, and nothing reads
+     that canvas again once the upload has happened — so every cached frame was
+     paying for its raster twice, once on the GPU and once as a live backing
+     store. Measured over a 24-floor descent that was 162MB of pure dead weight.
+     `onUpdate` fires at the end of three.js's own `uploadTexture`, after the mip
+     chain is built and the version stamped, so by then it is safe to drop.
+
+     three.js only re-reads `image` if `needsUpdate` is set again, which nothing
+     here does. The one thing that would is a lost and restored GL context, which
+     is why `initRenderer` handles that by emptying the cache and rebuilding the
+     floor rather than trusting what three.js still holds. */
+  tex.onUpdate=()=>{if(cv.width>1){cv.width=cv.height=1;}};
   /* The sprite SVGs carry a viewBox and no width/height, so their INTRINSIC
      size is the CSS default of 150x150. Blink re-rasterises a vector at the
      size you draw it, so on desktop Chrome this is invisible and every
@@ -7790,6 +7815,17 @@ function initRenderer(){
   const cv=document.getElementById('view3d');
   R3.renderer=new THREE.WebGLRenderer({canvas:cv,antialias:false});
   R3.renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  /* Every raster is thrown away once it reaches the GPU (see `svgToTexture`), so
+     a lost context cannot be repaired from what three.js still holds — those
+     canvases are 1x1 by then. Preventing the default on the loss is what makes
+     the browser promise a restore at all; on that restore the cache is emptied
+     and the floor rebuilt, re-rasterising each frame from the SVG it came from.
+     Before this a lost context simply ended the session. */
+  cv.addEventListener('webglcontextlost',(e)=>{e.preventDefault();},false);
+  cv.addEventListener('webglcontextrestored',()=>{
+    for(const k in R3.texCache){const t=R3.texCache[k];if(t&&t.dispose)t.dispose();delete R3.texCache[k];}
+    if(G.L)buildLevel(G.L);
+  },false);
   R3.maxAniso=R3.renderer.capabilities.getMaxAnisotropy(); // sharpen textures at grazing angles, free on GPU
   R3.scene=new THREE.Scene();
   R3.camera=new THREE.PerspectiveCamera(68,1,0.05,30);
@@ -7923,8 +7959,38 @@ function onResize(){
   R3.renderer.setSize(w,h,false);
   R3.camera.aspect=w/h;R3.camera.updateProjectionMatrix();
 }
+/* Geometry used to be the only thing freed here. The MATERIALS and their
+   textures were not, and a theme builds a great many fresh every floor — eight
+   to twelve wall variants, floor, ceiling, doors, the emissive glow sheets, and
+   every piece of furniture. Measured with `renderer.info.memory` over a 24-floor
+   descent, 110 of the 398 live textures at depth 24 were wall, floor and ceiling
+   maps belonging to floors the party had already left.
+
+   Textures held in `R3.texCache` are shared across floors on purpose and are
+   bounded by `pruneMonsterTextures`, so they are skipped — disposing one would
+   leave a cached entry pointing at freed GPU memory, which renders black rather
+   than throwing, and would be far harder to trace. */
+function disposeLevelMaterials(root){
+  const shared=new Set();
+  for(const k in R3.texCache)shared.add(R3.texCache[k]);
+  const seen=new Set();
+  root.traverse(o=>{
+    if(o.geometry)o.geometry.dispose();
+    if(!o.material)return;
+    const mats=Array.isArray(o.material)?o.material:[o.material];
+    for(const m of mats){
+      if(!m||seen.has(m))continue;
+      seen.add(m);
+      for(const prop in m){
+        const v=m[prop];
+        if(v&&v.isTexture&&!shared.has(v))v.dispose();
+      }
+      m.dispose();
+    }
+  });
+}
 function disposeLevel(){
-  if(R3.levelGroup){R3.scene.remove(R3.levelGroup);R3.levelGroup.traverse(o=>{if(o.geometry)o.geometry.dispose();});R3.levelGroup=null;}
+  if(R3.levelGroup){R3.scene.remove(R3.levelGroup);disposeLevelMaterials(R3.levelGroup);R3.levelGroup=null;}
   for(const f of R3.liquidFlows)f.tex.dispose();
   R3.liquidFlows=[];R3.liquidShaders=[];
   R3.doorMeshes={};R3.secretMeshes={};R3.trapDecals={};R3.itemSprites={};R3.monsterSprites={};R3.monsterGlows={};R3.monsterShadows={};R3.prewarmQ=[];R3.prewarmT=0;R3.stairsGroup=null;
@@ -10800,7 +10866,7 @@ const MON_RASTER=384;
 function monsterFrameTex(sprKey,boss,pose,elite){
   const tint=elite&&ELITES[elite]?ELITES[elite].tint:null;
   return svgToTexture(monsterSVG(sprKey,boss,pose,tint),
-    'mon_'+sprKey+(boss?'_b':'')+(elite?'_'+elite:'')+'_'+pose,{size:MON_RASTER,mipmap:true});
+    monFrameKey(sprKey,boss,pose,elite),{size:MON_RASTER,mipmap:true});
 }
 /* Every pose is rasterised the first time it is used, and a frame costs about
    25ms of main thread to decode at 384px once it carries the rim and contact-
@@ -10811,6 +10877,42 @@ function monsterFrameTex(sprKey,boss,pose,elite){
    standing on it while the level is being built, where a hitch is expected and
    invisible. The texture cache is global and keyed by kind, so this is paid once
    per creature type per run, not once per monster. */
+/* The frame cache is global and was never emptied, so it grew for the length of
+   the run rather than for the floor being played. Measured over a 24-floor
+   descent it reached 288 monster frames and 377MB and was still climbing
+   linearly — and that was with the prewarm only partly drained on each floor, so
+   a real descent is worse. Keeping only what the floor about to be played needs
+   bounds it at one floor's worth; anything dropped that is wanted again is
+   re-rasterised by prewarmMonsterFrames, which already spreads that over idle
+   callbacks.
+
+   This hangs off the FLOOR CHANGE and deliberately not off disposeLevel:
+   buildLevel calls disposeLevel, and openBier/openForge/openAltar call buildLevel
+   again mid-floor to show a shifted lid, so evicting there would re-rasterise
+   every creature on the floor the moment a coffin was opened.
+
+   Only `mon_` entries are touched. The wall, floor, item and fx textures in the
+   same cache are small, bounded, and in use by the level being built. */
+const MON_POSES=['idle0','idle1','walk0','walk1','windup','strike'];
+// the key monsterFrameTex files a frame under, in one place so the prune below
+// cannot drift from what the rasteriser actually wrote. The raster size is a
+// constant (MON_RASTER) and so is deliberately not part of it.
+function monFrameKey(sprKey,boss,pose,elite){
+  return 'mon_'+sprKey+(boss?'_b':'')+(elite?'_'+elite:'')+'_'+pose;
+}
+function pruneMonsterTextures(L){
+  const keep={};
+  for(const m of L.monsters)
+    for(const pose of MON_POSES)keep[monFrameKey(MONSTERS[m.key].spr,m.boss,pose,m.elite)]=1;
+  let freed=0;
+  for(const k in R3.texCache){
+    if(k.lastIndexOf('mon_',0)!==0||keep[k])continue;
+    const t=R3.texCache[k];
+    if(t&&t.dispose)t.dispose();
+    delete R3.texCache[k];freed++;
+  }
+  return freed;
+}
 function prewarmMonsterFrames(L){
   const seen={},queue=[];
   for(const m of L.monsters){
@@ -10819,18 +10921,16 @@ function prewarmMonsterFrames(L){
     // the resting frames are wanted the instant the floor appears; the rest can
     // trickle in behind it
     monsterFrameTex(MONSTERS[m.key].spr,m.boss,'idle0',m.elite);
-    for(const pose of ['idle1','walk0','walk1','windup','strike'])
+    for(const pose of MON_POSES)if(pose!=='idle0')
       queue.push([MONSTERS[m.key].spr,m.boss,pose,m.elite]);
   }
   /* Drained a couple at a time rather than in one block. A frame costs about
-     30ms of main thread to rasterise at 384px once it carries the rim, the
-     contact shadow and its detail — and roughly 2.8x that at the 640px raster
-     these frames now use — and a floor holds five or six kinds, so done
-     together that is well over a second of dead air on the level transition,
-     several times that on a phone. Spreading it over idle callbacks matters
-     more at 640 than it did, not less. Spread that way it is invisible, and anything
-     the player reaches before its turn comes up still rasterises lazily on
-     first use exactly as it always did. */
+     30ms of main thread to rasterise at MON_RASTER once it carries the rim, the
+     contact shadow and its detail, and a floor holds five or six kinds, so done
+     together that is well over a second of dead air on the level transition and
+     several times that on a phone. Spread over idle callbacks it is invisible,
+     and anything the player reaches before its turn comes up still rasterises
+     lazily on first use exactly as it always did. */
   R3.prewarmQ=queue;
   if(R3.prewarmT)return;
   const idle=window.requestIdleCallback||((fn)=>setTimeout(()=>fn({timeRemaining:()=>8}),16));
@@ -14695,6 +14795,8 @@ function descend(){
 }
 function startLevel(L){
   clearFx();
+  // once per floor, drop every cached monster frame this floor does not need
+  pruneMonsterTextures(L);
   G.L=L;
   G.px=L.start.x;G.py=L.start.y;
   // face an open direction
@@ -15300,7 +15402,10 @@ const UI=(()=>{
     const b=$('log-list');b.scrollTop=b.scrollHeight;
   }
   function refreshDepthTag(){
-    $('depth-tag').textContent='Depth '+G.depth+' · '+G.L.theme.name+(G.depth%3===0&&G.depth>=6?' ⚔':'');
+    /* BUILD_TAG is here only so a result cannot be read off a stale cache: if the
+       label is missing, the device is still serving the old file and whatever it
+       does means nothing. Remove it once this build is confirmed. */
+    $('depth-tag').textContent='Depth '+G.depth+' · '+G.L.theme.name+(G.depth%3===0&&G.depth>=6?' ⚔':'')+' · '+BUILD_TAG;
   }
   /* ---------- overlays ---------- */
   function anyOverlayOpen(){return [...document.querySelectorAll('.ovl')].some(o=>o.classList.contains('show')&&o.id!=='ovl-rotate');}
