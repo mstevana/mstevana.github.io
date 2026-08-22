@@ -379,6 +379,8 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 <script>
 'use strict';
 /* ============================== RULES DATA (D&D 3.5 SRD, simplified) ============================== */
+/* Bisect marker. See the note in refreshDepthTag. */
+const BUILD_TAG='testA';
 const rnd = (n)=>Math.floor(Math.random()*n);
 const d = (n)=>1+rnd(n);
 // Spell damage comes out of each spell's own dmgFn, which rolls internally, so
@@ -7185,7 +7187,18 @@ function svgToTexture(svg,cacheKey,opt){
   tex.__ready=false; // callers can hold the previous frame until the raster lands
   const img=new Image();
   img.onload=()=>{const ctx=cv.getContext('2d');ctx.clearRect(0,0,S,S);ctx.drawImage(img,0,0,S,S);tex.needsUpdate=true;tex.__ready=true;};
-  img.src='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg)));
+  /* The sprite SVGs carry a viewBox and no width/height, so their INTRINSIC
+     size is the CSS default of 150x150. Blink re-rasterises a vector at the
+     size you draw it, so on desktop Chrome this is invisible and every
+     sharpness measurement taken there comes back clean. WebKit does not: it
+     rasterises the image at its intrinsic size and then scales, which turns a
+     150px raster into a 640px texture — a 4.3x upscale, and the reason monsters
+     read as blurry on an iPhone while the procedurally drawn walls beside them
+     stay sharp. The bestiary escapes it by being a DOM <img> with explicit
+     width and height, which is exactly the fix: state the size on the root so
+     every engine rasterises at the resolution we are about to draw. */
+  const sized=/<svg[^>]*\swidth=/.test(svg)?svg:svg.replace(/<svg\b/,`<svg width="${S}" height="${S}"`);
+  img.src='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(sized)));
   if(cacheKey)R3.texCache[cacheKey]=tex;
   return tex;
 }
@@ -15269,7 +15282,10 @@ const UI=(()=>{
     const b=$('log-list');b.scrollTop=b.scrollHeight;
   }
   function refreshDepthTag(){
-    $('depth-tag').textContent='Depth '+G.depth+' · '+G.L.theme.name+(G.depth%3===0&&G.depth>=6?' ⚔':'');
+    /* BUILD_TAG is here only so a bisect cannot be read off a stale cache: if
+       the label does not change, the phone is still running the old file and
+       whatever it does means nothing. Remove it when the bisect is over. */
+    $('depth-tag').textContent='Depth '+G.depth+' · '+G.L.theme.name+(G.depth%3===0&&G.depth>=6?' ⚔':'')+' · '+BUILD_TAG;
   }
   /* ---------- overlays ---------- */
   function anyOverlayOpen(){return [...document.querySelectorAll('.ovl')].some(o=>o.classList.contains('show')&&o.id!=='ovl-rotate');}
