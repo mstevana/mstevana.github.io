@@ -5731,11 +5731,37 @@ function myconidBaseCanvas(th){
    shelf, a trillimac, a swollen barrelstalk, a nursery of sprouts, something
    the spores took, and a stalk that is dying. Variant 0 is deliberately bare —
    with a device on every tile there is nothing for one to be read against. */
+/* The grove is the second theme after the drow to return `{cv,glow}`. A colour
+   map can only make something PALE; light of its own needs an emissive map, and
+   the spores are the whole point of the place — the theme even carries a `glow`
+   colour that until now was only ever painted as a highlight.
+
+   `em` is a separate black sheet carrying only the burning parts, so it has to
+   be painted deliberately: anything drawn over a freckle on the colour map does
+   NOT hide that freckle's light, which is the trap the drow's first pilaster
+   fell into. `both(fn)` draws to whichever sheets a device wants. */
 function myconidWallCanvas(th,variant,base){
   const {cv,ctx}=newCanvas(128);
+  const em=newCanvas(128);
   const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
+  const wrapE=(fn)=>{for(const ox of [-128,0,128]){em.ctx.save();em.ctx.translate(ox,0);fn(em.ctx);em.ctx.restore();}};
   const glow=th.glow||'#c88ae8';
   ctx.drawImage(base.cv,0,0,128,128);
+  em.ctx.fillStyle='#000';em.ctx.fillRect(0,0,128,128);
+  /* Every wall carries a faint dusting of live spores, not just variant 1 — a
+     grove where only one tile in eight glows reads as a grove with a lamp in
+     it. The bright ones are the variant's own. */
+  {
+    let ds=(variant*40503+7919)>>>0;
+    const dr=()=>{ds=(ds*1664525+1013904223)>>>0;return ds/4294967296;};
+    for(let k=0;k<26;k++){
+      const x=dr()*128,y=dr()*128,r=0.5+dr()*1.1,a=0.05+dr()*0.10;
+      wrapX(()=>{ctx.fillStyle=glow;ctx.globalAlpha=a*1.6;
+        ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.globalAlpha=1;});
+      wrapE((c)=>{c.fillStyle=glow;c.globalAlpha=a;
+        c.beginPath();c.arc(x,y,r*1.5,0,7);c.fill();c.globalAlpha=1;});
+    }
+  }
   let sd=(variant*2654435761+12345)>>>0;
   const rr=()=>{sd=(sd*1664525+1013904223)>>>0;return sd/4294967296;};
   const mid=(i)=>{const e=base.edges;const k=i%(e.length-1);return (e[k]+e[k+1])/2;};
@@ -5746,12 +5772,18 @@ function myconidWallCanvas(th,variant,base){
   const cast=(x,y,w,h)=>{ctx.fillStyle='rgba(0,0,0,0.30)';
     ctx.beginPath();ctx.ellipse(x+1.5,y+2.2,w,h,0,0,7);ctx.fill();};
   const v=variant%8;
-  if(v===1){                                   // spore freckles, faintly luminous
+  if(v===1){                                   // spore freckles, and these really burn
     for(let k=0;k<70;k++){
-      const x=rr()*128,y=rr()*128,r=0.6+rr()*1.6;
+      const x=rr()*128,y=rr()*128,r=0.6+rr()*1.6,a=0.10+rr()*0.22;
       wrapX(()=>{
-        ctx.fillStyle=glow;ctx.globalAlpha=0.10+rr()*0.22;
+        ctx.fillStyle=glow;ctx.globalAlpha=a;
         ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.globalAlpha=1;
+      });
+      wrapE((c)=>{                             // a soft halo, so it reads as light
+        const g2=c.createRadialGradient(x,y,0,x,y,r*3.4);
+        g2.addColorStop(0,shadeA(glow,0.25,Math.min(1,a*2.6)));
+        g2.addColorStop(1,shadeA(glow,0,0));
+        c.fillStyle=g2;c.beginPath();c.arc(x,y,r*3.4,0,7);c.fill();
       });
     }
   }else if(v===2){
@@ -5867,6 +5899,11 @@ function myconidWallCanvas(th,variant,base){
         ctx.fillStyle='rgba(255,240,255,0.13)';
         ctx.beginPath();ctx.ellipse(x+lean-0.7,y-h-0.5,1.1,0.7,0,0,7);ctx.fill();
       });
+      wrapE((c)=>{                             // young caps are the brightest thing here
+        const g2=c.createRadialGradient(x+lean,y-h,0,x+lean,y-h,5.5);
+        g2.addColorStop(0,shadeA(glow,0.35,0.55));g2.addColorStop(1,shadeA(glow,0,0));
+        c.fillStyle=g2;c.beginPath();c.arc(x+lean,y-h,5.5,0,7);c.fill();
+      });
     }
   }else if(v===6){
     /* Something the spores took: a body half grown into the stalk. Two things
@@ -5920,9 +5957,15 @@ function myconidWallCanvas(th,variant,base){
       ctx.fillStyle=wash;ctx.fillRect(cx-18,hy-16,36,74);
       ctx.restore();
       for(let k=0;k<16;k++){                       // and what is fruiting out of it
-        const a=rr()*6.28,d=3+rr()*13;
+        const a=rr()*6.28,d=3+rr()*13,r2=0.9+rr()*1.6;
+        const px=cx+Math.cos(a)*d, py=hy+22+Math.sin(a)*d*1.5;
         ctx.fillStyle=glow;ctx.globalAlpha=0.12+rr()*0.20;
-        ctx.beginPath();ctx.arc(cx+Math.cos(a)*d,hy+22+Math.sin(a)*d*1.5,0.9+rr()*1.6,0,7);ctx.fill();
+        ctx.beginPath();ctx.arc(px,py,r2,0,7);ctx.fill();
+        wrapE((c)=>{
+          const g2=c.createRadialGradient(px,py,0,px,py,r2*3.2);
+          g2.addColorStop(0,shadeA(glow,0.3,0.5));g2.addColorStop(1,shadeA(glow,0,0));
+          c.fillStyle=g2;c.beginPath();c.arc(px,py,r2*3.2,0,7);c.fill();
+        });
       }
       ctx.globalAlpha=1;
     });
@@ -5941,6 +5984,17 @@ function myconidWallCanvas(th,variant,base){
         ctx.fillStyle=`rgba(96,110,52,${0.07+rr()*0.13})`;
         ctx.beginPath();ctx.ellipse(x,y,r,r*1.6,0,0,7);ctx.fill();
       }
+      /* Rot burns SOUR GREEN, and it is the only thing in the grove that is not
+         violet. The point of an emissive map here is that a sick stalk can be
+         told from a healthy one down a corridor, in the dark, by its colour. */
+      for(let k=0;k<12;k++){
+        const x=cx+(rr()-0.5)*22,y=rr()*128,r=2+rr()*5;
+        wrapE((c)=>{
+          const g2=c.createRadialGradient(x,y,0,x,y,r*2.2);
+          g2.addColorStop(0,'rgba(126,150,58,0.34)');g2.addColorStop(1,'rgba(126,150,58,0)');
+          c.fillStyle=g2;c.beginPath();c.arc(x,y,r*2.2,0,7);c.fill();
+        });
+      }
       ctx.strokeStyle='rgba(0,0,0,0.34)';ctx.lineWidth=1.2;
       for(let k=0;k<4;k++){                           // the flesh split and sagging
         const x=cx+(rr()-0.5)*20;let py=rr()*30;
@@ -5955,7 +6009,7 @@ function myconidWallCanvas(th,variant,base){
     const x=rr()*128,y=rr()*128;
     wrapX(()=>{ctx.fillStyle='rgba(255,255,255,0.05)';ctx.fillRect(x,y,1,1);});
   }
-  return cv;
+  return {cv,glow:em.cv};
 }
 // Gravel: the grove's floor is loose grit and shed spore-dust, not stone.
 function myconidFloorCanvas(th){
@@ -8422,9 +8476,11 @@ function buildLevel(L){
                 :drow?drowBaseCanvas(th)      // shared courses and the frieze channel
                      :baseWallCanvas(th,grid);
   for(let v=0;v<NVAR;v++){
-    // The drow wall alone comes back as a pair. A colour map can only make the
-    // inscriptions pale in torchlight; light of their own needs an emissive map,
-    // and that is the whole point of faerzress.
+    // Two wall builders come back as a PAIR — the drow's and the grove's. A
+    // colour map can only make something pale in torchlight; light of its own
+    // needs an emissive map, and that is the whole point of faerzress and of
+    // live spores alike. Everything else here treats the return as a canvas,
+    // so the branch keys off `built.glow`.
     const built=cave?caveWallCanvas(th,v,baseWall)
                :duer?duergarWallCanvas(th,v,baseWall)
                :myco?myconidWallCanvas(th,v,baseWall)
