@@ -1007,6 +1007,18 @@ three themes carry real machinery:
   - **They have to be dim.** Additive motes accumulate wherever two overlap, so
     a brightness that suits one is a wash for a hundred. This should read as dust
     catching the light, not as a light of its own.
+  - **A mote must fade out as it comes at the lens**, and this one is not
+    cosmetic. Size attenuation balloons whatever is nearest, additive blending
+    stacks a handful of them, and the result is a blown-out smear across the near
+    field bright enough to **swallow an item lying on the floor behind it** — which
+    is exactly how it was reported. `vA *= smoothstep(0.30, 1.05, -mv.z)` plus a
+    hard cap on `gl_PointSize` fixes it, and it is also the cheapest cure for the
+    overdraw, since it kills the fragments that cost the most.
+
+    **It is invisible below about DPR 2.** `psz` scales with the drawing buffer,
+    so at desktop resolution the near motes are small enough to look fine and the
+    bug does not appear at all — it has to be reproduced at a phone's pixel ratio.
+    That is the third bug this file records with exactly that shape.
   - **The count was tied to the graphics setting and must not be again.** That
     constant no longer exists, and reading it threw a `ReferenceError` on the
     first grove built rather than costing a frame.

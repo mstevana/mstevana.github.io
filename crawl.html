@@ -8496,6 +8496,14 @@ void main(){
   vA*=0.45+0.55*sin(t*1.6+seed*29.0);               // and a slow twinkle
   vec4 mv=viewMatrix*vec4(w,1.0);
   gl_Position=projectionMatrix*mv;
+  /* Fade a mote out as it comes at the lens. Without this the size attenuation
+     balloons whatever is nearest into a big disc and, because the blending is
+     additive, a handful of them stack into a blown-out smear across the near
+     field — which on a high-DPR phone is bright enough to swallow an item lying
+     on the floor behind it. Nothing should be in focus a hand's breadth from the
+     eye anyway. This is also the cheapest cure for the overdraw, since it kills
+     the fragments that cost the most. */
+  vA*=smoothstep(0.30,1.05,-mv.z);
   /* Size in DEVICE pixels, psz being a per-buffer-height scale set on the CPU.
      Note this is deliberately NOT physically sized. Derived honestly — the
      projection is h/(2*tan(fov/2)) per world unit, times a spore's real radius
@@ -8504,7 +8512,9 @@ void main(){
      scale is chosen to land a mote at four to fourteen device pixels at a couple
      of metres, and the spread is narrowed because the wide one made the biggest
      motes read as blobs while the smallest still vanished. */
-  gl_PointSize=(0.9+1.8*fract(seed*3.17))*psz/max(0.35,-mv.z);
+  // and hard-cap the size, so no single mote can become a disc whatever the
+  // near-plane arithmetic says
+  gl_PointSize=min((0.9+1.8*fract(seed*3.17))*psz/max(0.35,-mv.z), psz*2.2);
 }`;
 const SPORE_FS=`
 uniform vec3 c; varying float vA;
