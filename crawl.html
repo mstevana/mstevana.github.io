@@ -149,8 +149,7 @@ h1{font-size:26px;text-align:center;} h2{font-size:17px;}
 .best-art{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:center;}
 .best-art img{display:block;image-rendering:auto;}
 .best-info{flex:1 1 0;min-width:0;}
-.best-name{color:var(--ink);font-size:16px;margin-bottom:1px;}
-.best-kind{font-size:12px;color:#8a7f66;margin-bottom:3px;}
+.best-name{color:var(--ink);font-size:16px;margin-bottom:3px;}
 .best-stats{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:13px;color:#c9b98a;}
 .best-stats b{color:var(--ink);font-weight:normal;}
 .best-tag{font-size:12px;color:#9c8f6e;margin-top:4px;line-height:1.45;}
@@ -276,11 +275,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   <button class="mbtn" id="m-import">Import save code</button>
   <div id="m-io" class="hidden"><textarea id="m-io-text"></textarea>
     <div class="row"><button class="mbtn small" id="m-io-ok">Load</button><button class="mbtn small" id="m-io-close">Close</button></div></div>
-  <div class="dim-note" style="margin-top:10px">Graphics</div>
-  <div class="chips" id="m-gfx"></div>
-  <div class="dim-note" id="m-gfx-note"></div>
   <div class="dim-note" style="text-align:center;margin-top:6px">D&amp;D 3.5 rules · real-time · landscape</div>
-  <div class="dim-note" style="text-align:center;margin-top:2px">version <span id="m-ver"></span></div>
 </div></div>
 
 <div class="ovl" id="ovl-create"><div class="panel" style="width:560px">
@@ -369,7 +364,6 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   <h1 style="color:#a33">THE PARTY HAS FALLEN</h1>
   <div id="go-summary"></div>
   <button class="mbtn" id="go-new">Raise a new party</button>
-  <div class="dim-note" style="margin-top:8px">version <span id="go-ver"></span></div>
 </div></div>
 
 <div class="ovl" id="ovl-target"><div class="panel" style="min-width:280px">
@@ -385,19 +379,6 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 <script>
 'use strict';
 /* ============================== RULES DATA (D&D 3.5 SRD, simplified) ============================== */
-/* The build's version, `x.xxx`, shown on the main menu and on the death screen.
-
-   It advances by one in the last place on **every merge to main** — 0.100,
-   0.101, 0.102 — and on nothing else. Not per commit and not per branch push:
-   a version that moves on a branch nobody has merged is a version two people
-   can both be holding at once.
-
-   It is deliberately NOT the save-format version. `serializeGame` writes its
-   own `v`, and `loadGame` clears a save whose `v` does not match — bumping that
-   throws away everybody's game, so it may only move when the save shape changes
-   in a way the reader's defaults cannot absorb. A release number moving every
-   merge must never be able to do that. */
-const VERSION='0.107';
 const rnd = (n)=>Math.floor(Math.random()*n);
 const d = (n)=>1+rnd(n);
 // Spell damage comes out of each spell's own dmgFn, which rolls internally, so
@@ -1153,15 +1134,8 @@ const THEMES=[
   // A myconid grove is grown, not cut: soft edges, low roomBias, and its own
   // light. `light`/`fill` retint the party's torch so the whole grove reads
   // violet without repainting every texture, and `glow` is the spore colour.
-  /* The stalks are DARKER than they look here, and that is a correction. At
-     `#7a6e86` under a torch already retinted lilac there was no headroom left:
-     a wall one tile away came out a white smear with every stalk edge gone,
-     because both the light and the surface were pale. The mid-tone comes down
-     and the torch comes back toward white, so the grove keeps its colour at
-     range and its detail up close — the violet now comes mostly from what is
-     glowing rather than from washing everything in it. */
-  {name:'Myconid', wall:'#5d5368', wall2:'#332b3d', floor:'#413d4a', ceil:'#4a3960', fog:0x0d0814, moss:'#8a63b8', roomBias:.3,
-   glow:'#c88ae8', light:0xa596bb, fill:0xbfb3d2},
+  {name:'Myconid', wall:'#7a6e86', wall2:'#42384f', floor:'#4b4753', ceil:'#5a4670', fog:0x0d0814, moss:'#8a63b8', roomBias:.3,
+   glow:'#c88ae8', light:0xc59ae8, fill:0xdfc4f2},
   // A drow house: small black bricks laid true, a chiselled frieze, and the
   // only thing in the dungeon that gives off its own light. The walls carry an
   // emissive map, so both read as lit rather than merely pale.
@@ -1474,53 +1448,6 @@ function oozeDetail(o,c){
   return g;
 }
 // fungal: gills under a cap, and pores over the stalk
-/* The cap's own surface. `fungalDetail` hangs gills off the rim and speckles the
-   stalk, but it is applied to the BASE layer while a myconid's cap is drawn in
-   the head layer — so the dome itself, which is most of the creature, carried
-   nothing but one smooth radial gradient. Measured against the rest of the
-   bestiary the myconid roster scored 9.3 for contrast-per-brightness against a
-   median of 13.8, second-softest in the game after the oozes, which is why a
-   grove floor reads as blurry when the stonework beside it does not.
-
-   Radial ribs are what a real cap has and what gives the dome its form: each
-   runs from near the apex out to the rim, so they fan with the curve instead of
-   striping across it. Each rib is a dark groove with a lit lip offset up and to
-   the left, toward the torch, which is what reads as a ridge rather than as a
-   drawn line. A defined rim and a few warts finish it.
-
-   Placed off `o.hp`, the head pivot, like everything else in the vocabulary, so
-   it lands on caps of very different sizes without a coordinate table. */
-function capDetail(o,c){
-  c=c||{};
-  const [hx,hy]=o.hp||[32,30];
-  const R=c.r||16, rim=hy+(c.rim===undefined?7:c.rim), apex=rim-R*1.05;
-  const dark=c.dark||'#2a1433', lit=c.lit||'#b58ad4';
-  const n=c.n||9;
-  let g='';
-  for(let i=0;i<n;i++){
-    const t=-1+2*(i+0.5)/n;          // -1 .. 1 across the cap
-    const a=t*1.32;                  // a fan, not a parallel stripe
-    const ex=hx+Math.sin(a)*R*0.97, ey=rim-Math.cos(a)*R*0.13;   // rim end
-    const mx=hx+Math.sin(a)*R*0.52;                              // bow it over the dome
-    const my=apex+(rim-apex)*0.42-Math.cos(a)*2.2;
-    /* Ribs start from a ZONE near the apex, not from one point. Converging them
-       all on a single pixel makes a parasol hub — the same trap as drawing a
-       spider's legs as straight rays from a blob and getting a sunburst. */
-    const sx=hx+Math.sin(a)*R*0.13, sy=apex+1.1+Math.abs(t)*1.6;
-    const d=`M${sx.toFixed(1)} ${sy.toFixed(1)} Q${mx.toFixed(1)} ${my.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}`;
-    g+=`<path d="${d}" stroke="${dark}" stroke-width="${(0.95-Math.abs(t)*0.25).toFixed(2)}" fill="none" opacity="0.5"/>`;
-    g+=`<path d="${d}" transform="translate(-0.7,-0.7)" stroke="${lit}" stroke-width="0.5" fill="none" opacity="0.28"/>`;
-  }
-  // the rim, and the shadow it throws under itself
-  g+=`<path d="M${(hx-R*0.99).toFixed(1)} ${(rim-R*0.1).toFixed(1)} Q${hx} ${(rim+2.6).toFixed(1)} ${(hx+R*0.99).toFixed(1)} ${(rim-R*0.1).toFixed(1)}" stroke="${dark}" stroke-width="1.3" fill="none" opacity="0.72"/>`;
-  const r=_lcg(c.seed||17);
-  for(let i=0;i<5;i++){                       // warts, paler than the dome
-    const a=(-1+2*r())*1.15, rr=0.45+r()*0.45;
-    const x=hx+Math.sin(a)*R*rr, y=apex+(rim-apex)*(0.25+r()*0.5)-Math.cos(a)*1.5;
-    g+=`<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${(1.1+r()*1.0).toFixed(1)}" ry="${(0.8+r()*0.7).toFixed(1)}" fill="${lit}" opacity="0.3"/>`;
-  }
-  return g;
-}
 function fungalDetail(o,c){
   c=c||{};const cx=c.cx||32,cy=c.cy||30,rx=c.rx||13,n=c.n||9;
   /* Gills hang from the rim of the cap and follow its curve. Drawn as a straight
@@ -3187,11 +3114,11 @@ const MONSTER_DETAIL={
   duergarscout:{base:(o)=>plateBands(o,{w:9,y0:9,n:2,gap:4.4,dark:'#242830',mid:'#2e333c'}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
   duergarpriest:{base:(o)=>plateBands(o,{w:10,y0:10,n:3,gap:4.2,dark:'#2e2a22',mid:'#3c372c',lit:'#7a6f52'}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
   // --- Myconid ---
-  shrieker:    {base:(o)=>fungalDetail(o,{cx:32,cy:37,rx:14,n:11,col:'#3a2418',pore:'#4a2a18',seed:71}), head:(o)=>capDetail(o,{r:19,n:10,dark:'#3a2418',lit:'#c8a888',seed:7})},
-  mysprout:    {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:12,n:9,col:'#2a1c33',pore:'#3a2a20',seed:73}), head:(o)=>capDetail(o,{r:16,n:9,dark:'#2a1c33',lit:'#c3aad6',seed:20})},
-  violetfungus:{base:(o)=>fungalDetail(o,{cx:32,cy:31,rx:13,n:10,col:'#2a1433',pore:'#3a1c40',seed:79}), head:(o)=>capDetail(o,{r:17,n:10,dark:'#2a1433',lit:'#c98adf',seed:33})},
-  sporeservant:{base:(o)=>fungalDetail(o,{cx:32,cy:26,rx:9,n:7,col:'#2a2418',pore:'#3a3020',seed:83}), head:(o)=>capDetail(o,{r:13,n:7,dark:'#2a2418',lit:'#b9aec5',seed:46})+faceDetail(o,{w:5.5,eye:10,col:'#2a2418'})},
-  myguard:     {base:(o)=>fungalDetail(o,{cx:32,cy:31,rx:12,n:9,col:'#2a2418',pore:'#3a3020',seed:89}), head:(o)=>capDetail(o,{r:16,n:9,dark:'#2a1433',lit:'#b98adf',seed:59})+faceDetail(o,{w:6,eye:11,col:'#2a2418'})},
+  shrieker:    {base:(o)=>fungalDetail(o,{cx:32,cy:37,rx:14,n:11,col:'#3a2418',pore:'#4a2a18',seed:71})},
+  mysprout:    {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:12,n:9,col:'#2a1c33',pore:'#3a2a20',seed:73})},
+  violetfungus:{base:(o)=>fungalDetail(o,{cx:32,cy:31,rx:13,n:10,col:'#2a1433',pore:'#3a1c40',seed:79})},
+  sporeservant:{base:(o)=>fungalDetail(o,{cx:32,cy:26,rx:9,n:7,col:'#2a2418',pore:'#3a3020',seed:83}), head:(o)=>faceDetail(o,{w:5.5,eye:10,col:'#2a2418'})},
+  myguard:     {base:(o)=>fungalDetail(o,{cx:32,cy:31,rx:12,n:9,col:'#2a2418',pore:'#3a3020',seed:89}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2418'})},
   // --- Drow: fine mail and a house sigil, not leather ---
   drow:        {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
   drowbolt:    {base:(o)=>plateBands(o,{w:9,y0:9,n:3,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
@@ -3224,10 +3151,10 @@ const MONSTER_DETAIL={
   blackpud:    {base:(o)=>oozeDetail(o,{cx:32,cy:42,rx:22,ry:17,col:'#6a6a70',seed:157})},
   drider:      {base:(o)=>plateBands(o,{w:9,y0:8,n:2,gap:4,dark:'#1e2029',mid:'#2a2d38',lit:'#7a7f96'})+hideDetail(o,{x0:14,x1:50,y0:38,y1:58,n:14,col:'#14161c',seed:163}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
   drowmatron:  {base:(o)=>plateBands(o,{w:10,y0:9,n:2,gap:4.6,dark:'#2a1c33',mid:'#372444',lit:'#6b4a90'}), head:(o)=>faceDetail(o,{w:6,eye:11,col:'#2a2230'})},
-  mycaster:    {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:14,n:10,col:'#2a1c33',pore:'#3a2a20',seed:179}), head:(o)=>capDetail(o,{r:19,n:10,dark:'#2a1c33',lit:'#cdb6e2',seed:72})},
-  myelder:     {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:16,n:12,col:'#2a1c33',pore:'#3a2a20',seed:181}), head:(o)=>capDetail(o,{r:21,n:11,dark:'#2a1c33',lit:'#d5c2e8',seed:85})},
-  mylord:      {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:18,n:13,col:'#2a1433',pore:'#3a1c40',seed:191}), head:(o)=>capDetail(o,{r:23,n:12,dark:'#2a1433',lit:'#dcc9ef',seed:98})},
-  mysovereign: {base:(o)=>fungalDetail(o,{cx:32,cy:34,rx:20,n:14,col:'#2a1433',pore:'#3a1c40',seed:193}), head:(o)=>capDetail(o,{r:25,n:13,dark:'#2a1433',lit:'#e4d5f4',seed:111})},
+  mycaster:    {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:14,n:10,col:'#2a1c33',pore:'#3a2a20',seed:179})},
+  myelder:     {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:16,n:12,col:'#2a1c33',pore:'#3a2a20',seed:181})},
+  mylord:      {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:18,n:13,col:'#2a1433',pore:'#3a1c40',seed:191})},
+  mysovereign: {base:(o)=>fungalDetail(o,{cx:32,cy:34,rx:20,n:14,col:'#2a1433',pore:'#3a1c40',seed:193})},
   dragon:      {base:(o)=>hideDetail(o,{x0:12,x1:48,y0:24,y1:56,n:22,col:'#1a2412',seed:197})},
   bonedrake:   {base:(o)=>hideDetail(o,{x0:12,x1:48,y0:24,y1:56,n:18,col:'#4a4232',seed:199})+boneDetail(o,{w:7,y0:8,n:3,gap:3.4})},
   bonecolossus:{base:(o)=>boneDetail(o,{w:11,y0:6,n:5,gap:3.8}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#4a4232'})},
@@ -3302,37 +3229,16 @@ function monsterSVG(key,boss,pose,tint){
     +layer(B.head,S.head,hx)
     +layer(B.arm,S.arm,ax)
     +'</g>';
-  /* An elite wears its template as a recolouring of the whole creature plus an
-     aura, so it is recognisable as a harder thing across a dark room.
-
-     This used to be a tint rect laid over the body with `mix-blend-mode:color`,
-     chosen because that blend swaps the hue while keeping the modelling
-     underneath. **It never took effect.** A sprite is rasterised by loading the
-     SVG into an `Image`, and CSS blend modes are not applied on that path —
-     measured, the body's detail energy was identical with the property present
-     and with it stripped out (7.57 both, against 8.56 for the same creature
-     unaugmented). So every elite was being painted with a flat 62% opaque
-     colour that crushed its modelling, which is what read as a blurry monster
-     next to perfectly sharp stonework.
-
-     `feColorMatrix` is a filter primitive rather than a CSS property, so it
-     survives that rasterisation — the sprite already relies on filters for the
-     rim light and roughness. Scaling each channel toward the tint is a multiply,
-     which keeps every light and shadow in the art and only shifts its hue;
-     mixing that against identity at TINT_MIX keeps it from going too dark.
-     The mask the old wash needed is gone with it, which is a filter pass saved. */
-  const TINT_MIX=0.62;
-  const chan=(i)=>{
-    const v=parseInt(tint.replace('#','').substr(i*2,2),16)/255;
-    return ((1-TINT_MIX)+TINT_MIX*v).toFixed(4);
-  };
-  const washF=tint
-    ?`<filter id="elw" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">`+
-     `<feColorMatrix type="matrix" values="${chan(0)} 0 0 0 0  0 ${chan(1)} 0 0 0  0 0 ${chan(2)} 0 0  0 0 0 1 0"/></filter>`
-    :'';
+  // an elite wears its template as a recolouring of the whole creature plus a
+  // faint aura, so it is recognisable as a harder thing across a dark room.
+  // 'color' blending swaps the hue but keeps the modelling underneath, which
+  // an overlay wash could not do on creatures already this dark.
+  const wash=tint?`<rect x="0" y="0" width="64" height="64" fill="${tint}" opacity="0.62" style="mix-blend-mode:color"/>`:'';
   const body=`<g${xf?` transform="${xf}"`:''}>${flare}${parts}${crown}</g>`;
   const aura=tint?`<ellipse cx="32" cy="33" rx="27" ry="29" fill="url(#elag)"/>`:'';
-  const inner=tint?`${washF}${aura}<g filter="url(#elw)">${body}</g>`:body;
+  const inner=tint
+    ?`${aura}<g><defs><mask id="em"><rect x="0" y="0" width="64" height="64" fill="#000"/><g fill="#fff">${body}</g></mask></defs>${body}<g mask="url(#em)">${wash}</g></g>`
+    :body;
   return `<svg xmlns="${SVGNS}" viewBox="0 0 64 64">${defs}${ground}${inner}</svg>`;
 }
 /* ---------- trap flash drawings (shown for an instant when a trap fires) ---------- */
@@ -3404,25 +3310,6 @@ const TRAP_ART={
   // A snare: a corner web with the strand across the passage snapped taut, and
   // the thing that set it waiting at the hub. Every other card in this table
   // shows the mechanism, so this one shows the web rather than the victim.
-  /* A ripe puffball trodden open. Read from the BURST — a mushroom on its own
-     is scenery, and what makes this a trap is the cloud coming out of it and
-     the boot print in the middle of it. */
-  puffball:()=>`<svg xmlns="${SVGNS}" viewBox="0 0 100 100"><g stroke="#0d0b08" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">`+
-    `<ellipse cx="50" cy="80" rx="34" ry="9" fill="#2b2434" stroke="none"/>`+
-    `<path d="M28 80 Q26 58 40 52 Q50 48 60 52 Q74 58 72 80 Z" fill="#6b5f7d"/>`+
-    `<path d="M34 76 Q33 60 44 55" stroke="#9c8fb4" stroke-width="2.6" fill="none"/>`+
-    `<path d="M36 60 Q50 48 64 60" stroke="#1b1622" stroke-width="3" fill="none"/>`+  // split across the crown
-    `<path d="M40 58 L46 50 L52 58 L58 49 L63 58" stroke="#1b1622" stroke-width="2.4" fill="none"/>`+
-    `<g fill="#c88ae8" stroke="none">`+
-      `<circle cx="50" cy="30" r="13" opacity="0.30"/><circle cx="34" cy="38" r="9" opacity="0.26"/>`+
-      `<circle cx="67" cy="37" r="10" opacity="0.26"/><circle cx="50" cy="16" r="8" opacity="0.20"/>`+
-      `<circle cx="24" cy="24" r="6" opacity="0.16"/><circle cx="76" cy="22" r="7" opacity="0.16"/>`+
-    `</g>`+
-    `<g fill="#efe4ff" stroke="none" opacity="0.85">`+
-      `<circle cx="44" cy="34" r="2.4"/><circle cx="58" cy="28" r="2"/><circle cx="36" cy="22" r="1.7"/>`+
-      `<circle cx="64" cy="44" r="1.9"/><circle cx="50" cy="44" r="2.2"/>`+
-    `</g>`+
-    `</g></svg>`,
   websnare:()=>`<svg xmlns="${SVGNS}" viewBox="0 0 100 100"><g stroke="#0d0b08" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">`+
     `<path d="M6 6 L94 40 M6 6 L82 62 M6 6 L60 84 M6 6 L34 94 M6 6 L96 16" stroke="#d8d2ea" stroke-width="2.2" fill="none" opacity="0.85"/>`+
     `<path d="M40 12 Q34 26 22 34 M62 20 Q52 42 32 54 M84 30 Q70 58 44 76" stroke="#c6bede" stroke-width="2.6" fill="none" opacity="0.8"/>`+
@@ -3633,15 +3520,7 @@ function randLoot(depth,rich,noPotion,noRation){
 
 /* ============================== DUNGEON GENERATION ============================== */
 const T_WALL=0,T_FLOOR=1,T_DOOR=2,T_DOOR_OPEN=3,T_DOOR_LOCKED=4,T_SECRET=5,T_STAIRS=6,T_SECRET_FOUND=7,T_PIT=8;
-/* T_STAIRS is deliberately NOT walkable. The stairwell is a spiral around a
-   newel that stands a third of the room's height above the floor, and a tile
-   the party can stand on is a tile the camera ends up inside — you would spend
-   the last quarter-second of every floor looking at the inside of a column.
-   It is approached instead: walking into it descends (see `tryMove`) and so
-   does tapping it from an adjacent tile, so neither control changed for the
-   player. `seesThroughTile` still lets it through, because a chest-high newel
-   does not block a room. */
-const walkableTile=(t)=>t===T_FLOOR||t===T_DOOR_OPEN||t===T_DOOR||t===T_DOOR_LOCKED||t===T_SECRET_FOUND;
+const walkableTile=(t)=>t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS||t===T_DOOR||t===T_DOOR_LOCKED||t===T_SECRET_FOUND;
 // pits block movement but not sight: you can see (and shoot) across a sewer lake
 const seesThroughTile=(t)=>t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS||t===T_PIT;
 const DIRS=[[0,-1],[1,0],[0,1],[-1,0]]; // N E S W
@@ -3874,19 +3753,12 @@ function tryGen(depth,targetWalk,theme){
        venoms. */
     const pool=depth>=4?['dart','spike','gas','pdart','sleepdart']:['dart','spike','gas'];
     if(theme.name==='Drow')pool.push('websnare');
-    /* The grove's is a PUFFBALL, on the snare's exact terms — it extends the
-       pool rather than replacing anything, so `nTraps` is untouched and it
-       displaces some other trap instead of adding to the tally. Also no damage:
-       the spores are the threat, and stunning a character in a place where
-       every creature broadcasts distress is quite enough. */
-    if(theme.name==='Myconid')pool.push('puffball');
     const kind=pick(pool);
     const venom=kind==='pdart'||kind==='sleepdart';
-    const bloodless=kind==='gas'||kind==='websnare'||kind==='puffball';
     traps[i]={kind,found:false,armed:true,dc:trapDC(depth),
       // a venom dart wounds lightly — the toxin is the threat, not the puncture
-      dmg:bloodless?null:venom?[1,4]:[trapDice(depth),6],
-      dur:kind==='pdart'?4:kind==='sleepdart'?5:kind==='websnare'?5:kind==='puffball'?5:0,
+      dmg:(kind==='gas'||kind==='websnare')?null:venom?[1,4]:[trapDice(depth),6],
+      dur:kind==='pdart'?4:kind==='sleepdart'?5:kind==='websnare'?5:0,
       x,y};
     placedTraps++;
   }
@@ -4241,54 +4113,6 @@ function tryGen(depth,targetWalk,theme){
       }
     }
   }
-  /* The CIRCLE MOUND: the grove's set-piece, and the ossuary's, the forge
-     hall's and the chapel's fourth sibling. Built on their exact terms — the
-     mound is `T_PIT` placed after the connectivity check, it shoves aside
-     whatever loot is under it rather than deleting it (the level's only key is
-     one of the things it can land on), and it never lands on the stairs.
-
-     A circle keeps a mound of rock and soil to cultivate on, to meld around and
-     to sleep beside, and it is where the colony plants its dead. That is what
-     makes the hoard here honest where the other three had to invent one:
-     myconids do not collect treasure, but metal does not rot, so what you dig
-     out of a mound is the gear off everything it has ever composted. */
-  let mound=null;
-  if(theme.name==='Myconid'){
-    const cand=rooms.slice(1).filter(r=>r.w>=3&&r.h>=3&&!(lockedRoom&&r.x===lockedRoom.x&&r.y===lockedRoom.y));
-    if(cand.length){
-      const r=pick(cand);
-      const tx=r.x+(r.w>>1), ty=r.y+(r.h>>1);
-      if(!(tx===sx&&ty===sy)){
-        mound={x:r.x,y:r.y,w:r.w,h:r.h,tx,ty,opened:false};
-        g[idx(tx,ty)]=T_PIT;
-        const under=items[idx(tx,ty)];
-        if(under&&under.length){
-          let to=DIRS.map(([dx,dy])=>[tx+dx,ty+dy]).find(([x,y])=>g[idx(x,y)]===T_FLOOR);
-          if(!to)for(let yy=r.y;yy<r.y+r.h&&!to;yy++)
-            for(let xx=r.x;xx<r.x+r.w&&!to;xx++)
-              if(g[idx(xx,yy)]===T_FLOOR)to=[xx,yy];
-          if(to){const j=idx(to[0],to[1]);(items[j]=items[j]||[]).push(...under);}
-        }
-        delete items[idx(tx,ty)];
-        delete traps[idx(tx,ty)];
-        for(let i=monsters.length-1;i>=0;i--)if(monsters[i].x===tx&&monsters[i].y===ty)monsters.splice(i,1);
-        // the circle's elder, beside the mound and already awake
-        const spots=DIRS.map(([dx,dy])=>[tx+dx,ty+dy]).filter(([x,y])=>g[idx(x,y)]===T_FLOOR);
-        if(spots.length){
-          const [gx,gy]=pick(spots);
-          const pool=spawnPool(depth).filter(([k])=>MONSTERS[k].myconid);
-          // a mound is kept by whatever the depth allows that can broadcast —
-          // a circle is held together by rapport, so its keeper carries spores
-          const elders=pool.filter(([k])=>MONSTERS[k].spores);
-          const key=elders.length?pickWeighted(elders):(pool.length?pickWeighted(pool):'myguard');
-          const keeper=mkMonster(key,gx,gy,depth);
-          makeElite(keeper,pick(ELITE_KEYS));
-          keeper.slot=0;keeper.mound=true;
-          monsters.push(keeper);
-        }
-      }
-    }
-  }
   // lurkers: a cave's ambushers wait as scenery rather than standing about.
   // Each one placed removes an ordinary monster from the floor, so a cave
   // carries the same total threat as any floor at its depth — the ambush
@@ -4451,36 +4275,6 @@ function tryGen(depth,targetWalk,theme){
       drow.push({x,y,dx,dy,kind,hue:rnd(3)});
     }
   }
-  /* Grove furniture, on the duergar hall's and the drow house's exact terms.
-     A colony CULTIVATES, so these are its crop and its work rather than
-     ornament: what it eats, what it drinks, what it is raising, and what it
-     has done with the dead. The fruiting cluster keeps the largest share
-     because a grove is mostly food. */
-  let myconid=[];
-  if(theme.name==='Myconid'){
-    const KINDS=[['cluster',0.24],['nursery',0.19],['barrel',0.17],
-                 ['pods',0.15],['compost',0.13],['rapport',0.12]];
-    const pickKind=()=>{
-      let r=Math.random();
-      for(const [k,w] of KINDS){if((r-=w)<=0)return k;}
-      return 'cluster';
-    };
-    const nW=11+rnd(6);
-    let wTries=400;
-    while(myconid.length<nW&&wTries-->0){
-      const x=1+rnd(W-2),y=1+rnd(H-2);
-      if(g[idx(x,y)]!==T_FLOOR)continue;
-      const wd=DIRS.filter(([dx,dy])=>g[idx(x+dx,y+dy)]===T_WALL);
-      if(!wd.length)continue;
-      const kind=pickKind();
-      // a rapport bloom is where a circle melds and wants room around it;
-      // everything else only needs somewhere to stand
-      const near=kind==='rapport'?4:2;
-      if(myconid.some(c=>Math.abs(c.x-x)+Math.abs(c.y-y)<(c.kind==='rapport'?4:near)))continue;
-      const [dx,dy]=pick(wd);
-      myconid.push({x,y,dx,dy,kind,hue:rnd(3)});
-    }
-  }
   /* A boss swings at least as well as the best warrior standing on its own
      floor. This has to run LAST, after every other monster is placed: a boss
      inherits its creature's attack plus a flat bonus, and `threatOf` multiplies
@@ -4494,36 +4288,8 @@ function tryGen(depth,targetWalk,theme){
     const bm=monsters.find(m=>m.boss);
     if(bm)bm.atk=Math.max(bm.atk,monsters.reduce((a,m)=>m.boss?a:Math.max(a,m.atk),0));
   }
-  /* Last of all: the floor must still hang together with the STAIRWELL treated
-     as solid. That tile used to be a tile you could walk across, and the level
-     was only ever checked on those terms; now the party stops in front of it,
-     so a stairwell sitting in a corridor is a wall across that corridor.
-
-     It cannot strand anything on its own — the stairs are the furthest tile the
-     generator's own BFS reaches, and nothing can lie beyond a furthest tile —
-     but three things move after that BFS runs: the start room is sealed and its
-     doors re-cut, locked doors appear, and the ossuary bier, the forge anvil
-     and Lolth's throne each block a tile. Any of those can leave the stairwell
-     as the only way round. T31 caught it at about one crypt floor in a few
-     hundred, which is exactly the rate at which it would have stranded the key
-     and sealed a run instead. */
-  {
-    const seen=new Uint8Array(W*H),q=[[start.x,start.y]];seen[idx(start.x,start.y)]=1;
-    for(let qi=0;qi<q.length;qi++){
-      const [cx,cy]=q[qi];
-      for(const [dx,dy] of DIRS){
-        const nx=cx+dx,ny=cy+dy,i=idx(nx,ny),t=g[i];
-        if(!t||t===T_PIT||t===T_STAIRS||seen[i])continue;
-        seen[i]=1;q.push([nx,ny]);
-      }
-    }
-    for(let i=0;i<W*H;i++)
-      if(g[i]&&g[i]!==T_PIT&&g[i]!==T_STAIRS&&!seen[i])return null;   // retry the level
-    // and the way down has to be reachable from beside it
-    if(!DIRS.some(([dx,dy])=>seen[idx(stairs.x+dx,stairs.y+dy)]))return null;
-  }
   return {w:W,h:H,grid:g,start,stairs,traps,items,monsters,secrets,theme,depth,
-    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,forge,chapel,mound,lurkers,duergar,pillars,drow,myconid};
+    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,forge,chapel,lurkers,duergar,pillars,drow};
 }
 /* ---------- difficulty curve ----------
    Depth, not party level, drives everything. One documented scalar grows every
@@ -4921,17 +4687,7 @@ function charAC(ch){
   if(RACES[ch.race].small)ac+=1;
   if(isRaging(ch))ac-=2;
   for(const b of ch.buffs)if(b.ac)ac+=b.ac;
-  /* `stunned` belongs on this line and was missing from it. CLAUDE.md has said
-     since the cave creatures went in that gaze and hold "both stop a character
-     acting in canAct and cost 4 AC in charAC" — the code only did the first,
-     so stunned was half a condition, and the project's own rule is that one
-     read by a single function is a badge that blocks nothing. 3.5 agrees: a
-     stunned creature loses its Dex bonus to AC, which is what this -4 models.
-
-     It is a real balance change and not only a tidy-up: three creatures inflict
-     it (one gaze, two spore casters) plus the grove's puffball, and all four
-     get better for it. */
-  if(hasCond(ch,'paralysis')||hasCond(ch,'sleep')||hasCond(ch,'hold')||hasCond(ch,'stunned'))ac-=4;
+  if(hasCond(ch,'paralysis')||hasCond(ch,'sleep')||hasCond(ch,'hold'))ac-=4;
   // Faerie fire is the one condition only this function reads. It does not stop
   // a character acting -- being outlined in cold light costs you your cover and
   // nothing else -- so `canAct` deliberately ignores it, and the penalty is two
@@ -5242,7 +4998,7 @@ const R3={ // renderer state
   scene:null,camera:null,renderer:null,torch:null,ambient:null,
   wallMesh:null,doorMeshes:{},secretMeshes:{},trapDecals:{},itemSprites:{},monsterSprites:{},
   stairsGroup:null,texCache:{},levelGroup:null,
-  camAnim:null,shake:0,liquidFlows:[],liquidShaders:[],candleFlames:[],cryptGroups:[],lurkerMeshes:{},godRays:[],
+  camAnim:null,shake:0,liquidFlows:[],liquidShaders:[],candleFlames:[],cryptGroups:[],lurkerMeshes:{},
 };
 const TILE=1,WALLH=1.3,EYE=0.62;
 // how many pieces of duergar furniture may cast a real light. Everything still
@@ -5838,292 +5594,91 @@ function myconidBaseCanvas(th){
   ctx.fillStyle=damp;ctx.fillRect(0,60,128,68);
   return {cv,edges};
 }
-/* Eight variants, keyed on the variant ITSELF rather than on `variant%4` — the
-   duergar and drow lesson, where four treatments shown twice each read as a
-   repeated stamp rather than as a place. What grows on a stalk is the theme's
-   iconography, so these are the colony's crop and its casualties: a ripplebark
-   shelf, a trillimac, a swollen barrelstalk, a nursery of sprouts, something
-   the spores took, and a stalk that is dying. Variant 0 is deliberately bare —
-   with a device on every tile there is nothing for one to be read against. */
-/* The grove is the second theme after the drow to return `{cv,glow}`. A colour
-   map can only make something PALE; light of its own needs an emissive map, and
-   the spores are the whole point of the place — the theme even carries a `glow`
-   colour that until now was only ever painted as a highlight.
-
-   `em` is a separate black sheet carrying only the burning parts, so it has to
-   be painted deliberately: anything drawn over a freckle on the colour map does
-   NOT hide that freckle's light, which is the trap the drow's first pilaster
-   fell into. `both(fn)` draws to whichever sheets a device wants. */
 function myconidWallCanvas(th,variant,base){
   const {cv,ctx}=newCanvas(128);
-  const em=newCanvas(128);
   const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
-  const wrapE=(fn)=>{for(const ox of [-128,0,128]){em.ctx.save();em.ctx.translate(ox,0);fn(em.ctx);em.ctx.restore();}};
   const glow=th.glow||'#c88ae8';
   ctx.drawImage(base.cv,0,0,128,128);
-  em.ctx.fillStyle='#000';em.ctx.fillRect(0,0,128,128);
-  /* Every wall carries a faint dusting of live spores, not just variant 1 — a
-     grove where only one tile in eight glows reads as a grove with a lamp in
-     it. The bright ones are the variant's own. */
-  {
-    let ds=(variant*40503+7919)>>>0;
-    const dr=()=>{ds=(ds*1664525+1013904223)>>>0;return ds/4294967296;};
-    for(let k=0;k<26;k++){
-      const x=dr()*128,y=dr()*128,r=0.5+dr()*1.1,a=0.05+dr()*0.10;
-      wrapX(()=>{ctx.fillStyle=glow;ctx.globalAlpha=a*1.6;
-        ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.globalAlpha=1;});
-      wrapE((c)=>{c.fillStyle=glow;c.globalAlpha=a;
-        c.beginPath();c.arc(x,y,r*1.5,0,7);c.fill();c.globalAlpha=1;});
-    }
-  }
   let sd=(variant*2654435761+12345)>>>0;
   const rr=()=>{sd=(sd*1664525+1013904223)>>>0;return sd/4294967296;};
   const mid=(i)=>{const e=base.edges;const k=i%(e.length-1);return (e[k]+e[k+1])/2;};
-  /* Anything standing out of a wall is read by its BODY, not by a highlight —
-     the drow pilaster failed as two silver hairlines with no shaft between
-     them. So every device here gets a cast shadow on the flesh beside it
-     before anything else is drawn. */
-  const cast=(x,y,w,h)=>{ctx.fillStyle='rgba(0,0,0,0.30)';
-    ctx.beginPath();ctx.ellipse(x+1.5,y+2.2,w,h,0,0,7);ctx.fill();};
-  const v=variant%8;
-  if(v===1){                                   // spore freckles, and these really burn
-    for(let k=0;k<70;k++){
-      const x=rr()*128,y=rr()*128,r=0.6+rr()*1.6,a=0.10+rr()*0.22;
+  const v=variant%6;
+  if(v===0){                                   // bracket shelves stepping up a stalk
+    for(let k=0;k<4;k++){
+      const cx=mid(Math.floor(rr()*8)),cy=14+rr()*100,w=7+rr()*9,h=3+rr()*3;
       wrapX(()=>{
-        ctx.fillStyle=glow;ctx.globalAlpha=a;
+        ctx.fillStyle=shade(th.wall,-0.42);
+        ctx.beginPath();ctx.ellipse(cx,cy+1.2,w,h,0,0,7);ctx.fill();
+        ctx.fillStyle=shade(th.wall,0.18);
+        ctx.beginPath();ctx.ellipse(cx,cy,w,h,0,0,7);ctx.fill();
+        ctx.strokeStyle='rgba(0,0,0,0.28)';ctx.lineWidth=0.7;
+        for(let r=0;r<4;r++){ctx.beginPath();ctx.ellipse(cx,cy,w*(0.3+r*0.22),h*(0.3+r*0.22),0,0,7);ctx.stroke();}
+      });
+    }
+  }else if(v===1){                             // spore freckles, faintly luminous
+    for(let k=0;k<70;k++){
+      const x=rr()*128,y=rr()*128,r=0.6+rr()*1.6;
+      wrapX(()=>{
+        ctx.fillStyle=glow;ctx.globalAlpha=0.10+rr()*0.22;
         ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.globalAlpha=1;
       });
-      wrapE((c)=>{                             // a soft halo, so it reads as light
-        const g2=c.createRadialGradient(x,y,0,x,y,r*3.4);
-        g2.addColorStop(0,shadeA(glow,0.25,Math.min(1,a*2.6)));
-        g2.addColorStop(1,shadeA(glow,0,0));
-        c.fillStyle=g2;c.beginPath();c.arc(x,y,r*3.4,0,7);c.fill();
-      });
     }
-  }else if(v===2){
-    /* RIPPLEBARK: a shelf fungus that looks like a mass of rotting flesh. It is
-       read from its UNDERSIDE — a shelf drawn as a flat ellipse on the wall is
-       a painted lozenge, which is what the first cut looked like. What says
-       "this sticks out" is the dark band of the underside below the lit top,
-       and a front edge with real lobes in it rather than a smooth arc. */
-    for(let k=0;k<4;k++){
-      const cx=mid(Math.floor(rr()*8)),cy=22+k*27+rr()*8,w=13+rr()*7,h=6+rr()*3;
+  }else if(v===2){                             // a bloom of mould creeping up from the foot
+    for(let k=0;k<30;k++){
+      const x=rr()*128,y=78+rr()*50,r=3+rr()*9;
       wrapX(()=>{
-        cast(cx,cy+h*0.6,w*1.05,h*0.7);
-        const lobe=(t)=>1+Math.sin(t*9+k)*0.13;
-        ctx.fillStyle='#1c0f0d';                 // the underside, in shadow
-        ctx.beginPath();
-        for(let t=-1;t<=1.001;t+=0.05){
-          const px=cx+t*w*lobe(t), py=cy+Math.cos(t*Math.PI/2)*h*1.35*lobe(t);
-          t===-1?ctx.moveTo(px,py):ctx.lineTo(px,py);
-        }
-        ctx.lineTo(cx+w,cy);ctx.lineTo(cx-w,cy);ctx.closePath();ctx.fill();
-        const g=ctx.createLinearGradient(cx,cy-h,cx,cy+h*0.3);
-        ctx.fillStyle=g;
-        /* Browner and darker than raw "rotting flesh" wants to be. At #8a545a
-           the shelves came out BUBBLEGUM PINK in the room: the grove's torch is
-           tinted lilac, and a light with no green in it drives any ruddy
-           mid-tone straight to pink. A colour picked on the texture sheet has
-           to be checked under the theme's own light. */
-        g.addColorStop(0,'#63403a');g.addColorStop(0.55,'#472a27');g.addColorStop(1,'#2b1815');
-        ctx.beginPath();                          // and the top, lit
-        for(let t=-1;t<=1.001;t+=0.05){
-          const px=cx+t*w*lobe(t), py=cy-Math.cos(t*Math.PI/2)*h*lobe(t);
-          t===-1?ctx.moveTo(px,py):ctx.lineTo(px,py);
-        }
-        ctx.lineTo(cx+w,cy+1);ctx.lineTo(cx-w,cy+1);ctx.closePath();ctx.fill();
-        ctx.strokeStyle='rgba(236,196,168,0.11)';ctx.lineWidth=0.8;
-        ctx.beginPath();                          // a wet ridge along the lip
-        for(let t=-0.9;t<=0.9;t+=0.05){
-          const px=cx+t*w*lobe(t), py=cy-Math.cos(t*Math.PI/2)*h*lobe(t)*0.55;
-          t<=-0.85?ctx.moveTo(px,py):ctx.lineTo(px,py);
-        }
-        ctx.stroke();
+        ctx.fillStyle=`rgba(74,110,72,${0.06+rr()*0.10})`;
+        ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
       });
     }
-  }else if(v===3){
-    /* TRILLIMAC: four or five feet of it, so at a wall's scale it is a real
-       object rather than a texture — a light grey stalk under a broad
-       grey-green cap, the one the colony cuts for scroll leather. */
-    const cx=mid(Math.floor(rr()*8)), foot=128, capY=64+rr()*14, R=17+rr()*6;
-    wrapX(()=>{
-      ctx.fillStyle='rgba(0,0,0,0.26)';ctx.fillRect(cx-3.5,capY,9,foot-capY);
-      const sg=ctx.createLinearGradient(cx-4,0,cx+4,0);
-      sg.addColorStop(0,'#4c4a50');sg.addColorStop(0.4,'#8e8b92');sg.addColorStop(1,'#3d3b42');
-      ctx.fillStyle=sg;ctx.fillRect(cx-4,capY,8,foot-capY);
-      cast(cx,capY,R,R*0.44);
-      const cg=ctx.createLinearGradient(cx,capY-R*0.5,cx,capY+R*0.4);
-      cg.addColorStop(0,'#8d977c');cg.addColorStop(0.55,'#69735a');cg.addColorStop(1,'#3d4436');
-      ctx.fillStyle=cg;
-      ctx.beginPath();ctx.ellipse(cx,capY,R,R*0.52,0,Math.PI,0);
-      ctx.ellipse(cx,capY,R,R*0.20,0,0,Math.PI);ctx.fill();
-      // gills hang from the RIM and follow its curve — drawn as a straight row
-      // they land across the middle of the cap and read as a row of teeth
-      ctx.strokeStyle='rgba(0,0,0,0.34)';ctx.lineWidth=0.8;
-      for(let i=-7;i<=7;i++){
-        const t=i/7.5, px=cx+t*R*0.94, dip=Math.sqrt(Math.max(0,1-t*t));
-        ctx.beginPath();ctx.moveTo(px,capY+R*0.18*dip);ctx.lineTo(px,capY+R*0.42*dip);ctx.stroke();
-      }
-    });
-  }else if(v===4){
-    /* BARRELSTALK: the stalk itself swells into a barrel holding gallons of
-       water. Drawn as an ellipse laid over the wall it came out as a striped
-       beach ball stuck to the flesh — the swelling has to START and END at the
-       stalk's own width, so the silhouette is one continuous thing that happens
-       to be fat in the middle. So it is built off the base's stalk edges. */
-    const e=base.edges, k=Math.floor(rr()*(e.length-1));
-    const x0=e[k], x1=e[k+1], cx=(x0+x1)/2, hw=(x1-x0)/2;
-    const y0=40+rr()*22, y1=y0+44+rr()*22, bulge=hw*0.62;
-    const prof=(y)=>{                            // 0 at the ends, 1 in the middle
-      const t=(y-y0)/(y1-y0);
-      return t<=0||t>=1?0:Math.pow(Math.sin(t*Math.PI),0.72);
-    };
-    wrapX(()=>{
-      ctx.fillStyle='rgba(0,0,0,0.28)';
-      ctx.beginPath();ctx.moveTo(cx+hw+2,y0);
-      for(let y=y0;y<=y1;y+=2)ctx.lineTo(cx+hw+2+prof(y)*bulge,y);
-      ctx.lineTo(cx-hw,y1);ctx.lineTo(cx-hw,y0);ctx.closePath();ctx.fill();
-      const g=ctx.createLinearGradient(cx-hw-bulge,0,cx+hw+bulge,0);
-      g.addColorStop(0,shade(th.wall,-0.36));g.addColorStop(0.36,shade(th.wall,0.24));
-      g.addColorStop(1,shade(th.wall,-0.42));
-      ctx.fillStyle=g;
-      ctx.beginPath();ctx.moveTo(cx-hw,y0);
-      for(let y=y0;y<=y1;y+=2)ctx.lineTo(cx-hw-prof(y)*bulge,y);
-      for(let y=y1;y>=y0;y-=2)ctx.lineTo(cx+hw+prof(y)*bulge,y);
-      ctx.closePath();ctx.fill();
-      ctx.strokeStyle='rgba(0,0,0,0.20)';ctx.lineWidth=1.2;
-      for(let i=1;i<=4;i++){                     // hoops, each as wide as the swell there
-        const y=y0+(y1-y0)*i/5, w2=hw+prof(y)*bulge;
-        ctx.beginPath();ctx.ellipse(cx,y,w2,2.0,0,0,7);ctx.stroke();
-      }
-      ctx.fillStyle='rgba(210,235,255,0.09)';    // water standing in the bottom
-      const yw=y0+(y1-y0)*0.66;
-      ctx.beginPath();ctx.ellipse(cx,yw,(hw+prof(yw)*bulge)*0.7,7,0,0,7);ctx.fill();
-    });
-  }else if(v===5){
-    /* A NURSERY: sprouts at the foot of the stalk, where a colony raises them.
-       Small, many, and all leaning the same way, because they came up together. */
-    for(let k=0;k<11;k++){
-      const x=rr()*128, y=104+rr()*22, h=6+rr()*11, lean=(rr()-0.5)*2.2;
+    for(let k=0;k<40;k++){
+      const x=rr()*128,y=86+rr()*42;
+      wrapX(()=>{ctx.fillStyle='rgba(150,180,130,0.10)';ctx.fillRect(x,y,1,1+rr()*2);});
+    }
+  }else if(v===3){                             // veil remnants, torn skirts left on the stalk
+    for(let k=0;k<3;k++){
+      const cx=mid(Math.floor(rr()*8)),cy=26+rr()*70;
       wrapX(()=>{
-        ctx.strokeStyle=shade(th.wall,-0.30);ctx.lineWidth=1.6;
-        ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+lean,y-h);ctx.stroke();
-        ctx.fillStyle=shade(th.moss,-0.06);
-        ctx.beginPath();ctx.ellipse(x+lean,y-h,2.4+rr()*1.8,1.9+rr()*1.2,0,Math.PI,0);ctx.fill();
-        ctx.fillStyle='rgba(255,240,255,0.13)';
-        ctx.beginPath();ctx.ellipse(x+lean-0.7,y-h-0.5,1.1,0.7,0,0,7);ctx.fill();
-      });
-      wrapE((c)=>{                             // young caps are the brightest thing here
-        const g2=c.createRadialGradient(x+lean,y-h,0,x+lean,y-h,5.5);
-        g2.addColorStop(0,shadeA(glow,0.35,0.55));g2.addColorStop(1,shadeA(glow,0,0));
-        c.fillStyle=g2;c.beginPath();c.arc(x+lean,y-h,5.5,0,7);c.fill();
+        ctx.fillStyle='rgba(236,226,240,0.16)';
+        ctx.beginPath();ctx.moveTo(cx-11,cy);
+        for(let t=-11;t<=11;t+=2.6)ctx.lineTo(cx+t,cy+3+Math.sin(t*0.8)*2.4+rr()*3);
+        ctx.lineTo(cx+11,cy-2);ctx.closePath();ctx.fill();
+        ctx.strokeStyle='rgba(0,0,0,0.18)';ctx.lineWidth=0.7;ctx.stroke();
       });
     }
-  }else if(v===6){
-    /* Something the spores took: a body half grown into the stalk. Two things
-       had to be got right and both were wrong first time.
-
-       It is read from a BODY PLAN — head, shoulders, a sternum with ribs paired
-       off it, one arm still free. As a stack of concentric arcs it came out as a
-       spiral bun with no anatomy in it.
-
-       And it has to be UNDER the flesh. Drawn at full strength it was a bright
-       skull with round black eyes — a Halloween decal stuck on the wall, the
-       same failure Deep Duerra's mark had. The bones go down faint, and then a
-       translucent wash of the stalk's own colour is laid back over the whole
-       swelling, so what you see is a shape showing THROUGH rather than on. */
-    const cx=mid(Math.floor(rr()*8)), hy=34+rr()*24;
-    wrapX(()=>{
-      ctx.fillStyle='rgba(0,0,0,0.26)';           // the swelling it makes in the stalk
-      ctx.beginPath();ctx.ellipse(cx,hy+30,16,34,0,0,7);ctx.fill();
-      ctx.fillStyle=shade(th.wall,-0.11);
-      ctx.beginPath();ctx.ellipse(cx,hy+28,14,31,0,0,7);ctx.fill();
-      const bone='rgba(224,216,200,0.21)';
-      ctx.fillStyle=bone;                          // the skull, tipped back and narrow
-      ctx.beginPath();ctx.ellipse(cx,hy,5.2,6.6,0.22,0,7);ctx.fill();
-      ctx.fillStyle='rgba(0,0,0,0.22)';            // sockets are SLITS: a round eye is a cartoon
-      for(const sx of [-1,1]){
-        ctx.save();ctx.translate(cx+sx*2.1,hy-0.4);ctx.rotate(sx*0.45);
-        ctx.beginPath();ctx.ellipse(0,0,1.8,0.95,0,0,7);ctx.fill();ctx.restore();
-      }
-      ctx.strokeStyle=bone;ctx.lineWidth=2.1;      // shoulders
-      ctx.beginPath();ctx.moveTo(cx-8.4,hy+11);ctx.quadraticCurveTo(cx,hy+8.4,cx+8.4,hy+11);ctx.stroke();
-      ctx.lineWidth=1.5;                           // sternum
-      ctx.beginPath();ctx.moveTo(cx,hy+10);ctx.lineTo(cx,hy+31);ctx.stroke();
-      ctx.lineWidth=1.2;                           // and ribs paired off it
-      for(let i=0;i<5;i++){
-        const yy=hy+13+i*4.4, w=8-Math.abs(i-1.4)*1.05;
-        for(const sx of [-1,1]){
-          ctx.beginPath();ctx.moveTo(cx,yy);
-          ctx.quadraticCurveTo(cx+sx*w,yy+0.6,cx+sx*w*0.78,yy+5);ctx.stroke();
-        }
-      }
-      ctx.lineWidth=2.1;                           // the arm that never went under
-      ctx.beginPath();ctx.moveTo(cx+8.4,hy+12);
-      ctx.quadraticCurveTo(cx+20,hy+18,cx+17,hy+33);ctx.stroke();
-      // the flesh closing back over it — this is the half of the effect
-      const wash=ctx.createRadialGradient(cx,hy+24,3,cx,hy+26,32);
-      wash.addColorStop(0,shadeA(th.wall,-0.05,0.30));
-      wash.addColorStop(0.72,shadeA(th.wall,-0.05,0.62));
-      wash.addColorStop(1,shadeA(th.wall,-0.05,0.86));
-      ctx.save();
-      ctx.beginPath();ctx.ellipse(cx,hy+22,15.5,36,0,0,7);ctx.clip();
-      ctx.fillStyle=wash;ctx.fillRect(cx-18,hy-16,36,74);
-      ctx.restore();
-      for(let k=0;k<16;k++){                       // and what is fruiting out of it
-        const a=rr()*6.28,d=3+rr()*13,r2=0.9+rr()*1.6;
-        const px=cx+Math.cos(a)*d, py=hy+22+Math.sin(a)*d*1.5;
-        ctx.fillStyle=glow;ctx.globalAlpha=0.12+rr()*0.20;
-        ctx.beginPath();ctx.arc(px,py,r2,0,7);ctx.fill();
-        wrapE((c)=>{
-          const g2=c.createRadialGradient(px,py,0,px,py,r2*3.2);
-          g2.addColorStop(0,shadeA(glow,0.3,0.5));g2.addColorStop(1,shadeA(glow,0,0));
-          c.fillStyle=g2;c.beginPath();c.arc(px,py,r2*3.2,0,7);c.fill();
-        });
-      }
-      ctx.globalAlpha=1;
-    });
-  }else if(v===7){
-    /* A stalk that is DYING: the flesh gone dark and slumped, the glow in it
-       turned sour green rather than violet. A grove has to be able to look
-       unwell somewhere or it reads as decoration. */
+  }else if(v===4){                             // a split in the flesh, pale inside
     const cx=mid(Math.floor(rr()*8));
     wrapX(()=>{
-      const g=ctx.createLinearGradient(cx-17,0,cx+17,0);
-      g.addColorStop(0,'rgba(24,20,14,0)');g.addColorStop(0.5,'rgba(24,20,14,0.62)');
-      g.addColorStop(1,'rgba(24,20,14,0)');
-      ctx.fillStyle=g;ctx.fillRect(cx-17,0,34,128);
-      for(let k=0;k<26;k++){                          // weeping, and pooling downward
-        const x=cx+(rr()-0.5)*26,y=rr()*128,r=1.4+rr()*4.2;
-        ctx.fillStyle=`rgba(96,110,52,${0.07+rr()*0.13})`;
-        ctx.beginPath();ctx.ellipse(x,y,r,r*1.6,0,0,7);ctx.fill();
-      }
-      /* Rot burns SOUR GREEN, and it is the only thing in the grove that is not
-         violet. The point of an emissive map here is that a sick stalk can be
-         told from a healthy one down a corridor, in the dark, by its colour. */
-      for(let k=0;k<12;k++){
-        const x=cx+(rr()-0.5)*22,y=rr()*128,r=2+rr()*5;
-        wrapE((c)=>{
-          const g2=c.createRadialGradient(x,y,0,x,y,r*2.2);
-          g2.addColorStop(0,'rgba(126,150,58,0.34)');g2.addColorStop(1,'rgba(126,150,58,0)');
-          c.fillStyle=g2;c.beginPath();c.arc(x,y,r*2.2,0,7);c.fill();
-        });
-      }
-      ctx.strokeStyle='rgba(0,0,0,0.34)';ctx.lineWidth=1.2;
-      for(let k=0;k<4;k++){                           // the flesh split and sagging
-        const x=cx+(rr()-0.5)*20;let py=rr()*30;
-        ctx.beginPath();ctx.moveTo(x,py);
-        while(py<128){py+=10+rr()*12;ctx.lineTo(x+(rr()-0.5)*6,py);}
-        ctx.stroke();
-      }
+      ctx.strokeStyle='rgba(0,0,0,0.45)';ctx.lineWidth=3;
+      ctx.beginPath();ctx.moveTo(cx,10);
+      let py=10,px=cx;
+      while(py<118){py+=14+rr()*14;px+=(rr()-0.5)*7;ctx.lineTo(px,py);}
+      ctx.stroke();
+      ctx.strokeStyle=shade(th.wall,0.34);ctx.lineWidth=1.1;
+      ctx.beginPath();ctx.moveTo(cx-0.8,10);
+      py=10;px=cx-0.8;
+      while(py<118){py+=14+rr()*14;px+=(rr()-0.5)*7;ctx.lineTo(px,py);}
+      ctx.stroke();
     });
+  }else{                                       // young caps budding off the stalk
+    for(let k=0;k<5;k++){
+      const x=rr()*128,y=20+rr()*96,r=2.5+rr()*4;
+      wrapX(()=>{
+        ctx.fillStyle=shade(th.moss,-0.15);
+        ctx.beginPath();ctx.ellipse(x,y,r,r*0.72,0,Math.PI,0);ctx.fill();
+        ctx.fillStyle=shade(th.wall,-0.2);
+        ctx.fillRect(x-0.8,y,1.6,r*0.9);
+        ctx.fillStyle='rgba(255,240,255,0.14)';
+        ctx.beginPath();ctx.ellipse(x-r*0.3,y-r*0.25,r*0.32,r*0.2,0,0,7);ctx.fill();
+      });
+    }
   }
   // every wall is a little damp and a little luminous down low
   for(let k=0;k<24;k++){
     const x=rr()*128,y=rr()*128;
     wrapX(()=>{ctx.fillStyle='rgba(255,255,255,0.05)';ctx.fillRect(x,y,1,1);});
   }
-  return {cv,glow:em.cv};
+  return cv;
 }
 // Gravel: the grove's floor is loose grit and shed spore-dust, not stone.
 function myconidFloorCanvas(th){
@@ -7447,71 +7002,6 @@ function addSpiderBody(B,mat,x,y,z,s){
   return B;
 }
 // one copy each per run: these are shared by every piece of duergar furniture
-/* The grove's own surfaces, on `duergarTex`'s terms — modulation maps around
-   white, so one map can be handed to flesh of any tone without changing it, and
-   each doubles as its own bump map.
-
-   `flesh` is fibrous and runs VERTICALLY, because a mushroom stalk is a bundle
-   of hyphae pulling upward; `gill` runs radially for the underside of a cap;
-   `husk` is the dried, cracked stuff a colony builds with. */
-function myconidFleshCanvas(){
-  const {cv,ctx}=newCanvas(128);
-  ctx.fillStyle='#fff';ctx.fillRect(0,0,128,128);
-  let sd=99173>>>0;const rr=()=>{sd=(sd*1664525+1013904223)>>>0;return sd/4294967296;};
-  for(let k=0;k<190;k++){                       // fibres, full height so they tile
-    const x=rr()*128,w=0.6+rr()*2.2,a=0.05+rr()*0.10;
-    ctx.strokeStyle=rr()<0.5?`rgba(0,0,0,${a})`:`rgba(255,255,255,${a})`;
-    ctx.lineWidth=w;ctx.beginPath();
-    let y=0,px=x;ctx.moveTo(px,0);
-    while(y<128){y+=8+rr()*14;px+=(rr()-0.5)*2.4;ctx.lineTo(px,y);}
-    ctx.stroke();
-  }
-  for(let k=0;k<260;k++){                       // pores
-    const x=rr()*128,y=rr()*128,r=0.5+rr()*1.3;
-    ctx.fillStyle=`rgba(0,0,0,${0.04+rr()*0.07})`;
-    ctx.beginPath();ctx.ellipse(x,y,r,r*1.5,0,0,7);ctx.fill();
-  }
-  return cv;
-}
-function myconidGillCanvas(){
-  const {cv,ctx}=newCanvas(128);
-  ctx.fillStyle='#fff';ctx.fillRect(0,0,128,128);
-  for(let i=0;i<128;i++){                       // straight blades: on a cap's
-    const a=i/128*Math.PI*2;                    // underside the uv runs around it
-    ctx.strokeStyle=i%2?'rgba(0,0,0,0.22)':'rgba(255,255,255,0.10)';
-    ctx.lineWidth=i%2?1.4:0.9;
-    ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,128);ctx.stroke();
-  }
-  return cv;
-}
-function myconidHuskCanvas(){
-  const {cv,ctx}=newCanvas(128);
-  ctx.fillStyle='#fff';ctx.fillRect(0,0,128,128);
-  let sd=40507>>>0;const rr=()=>{sd=(sd*1664525+1013904223)>>>0;return sd/4294967296;};
-  for(let k=0;k<70;k++){                        // dried and cracked
-    const x=rr()*128,y=rr()*128;
-    ctx.strokeStyle=`rgba(0,0,0,${0.10+rr()*0.16})`;ctx.lineWidth=0.7+rr();
-    ctx.beginPath();ctx.moveTo(x,y);
-    let px=x,py=y;
-    for(let i=0;i<4;i++){px+=(rr()-0.5)*22;py+=(rr()-0.5)*22;ctx.lineTo(px,py);}
-    ctx.stroke();
-  }
-  for(let k=0;k<400;k++){
-    const x=rr()*128,y=rr()*128;
-    ctx.fillStyle=rr()<0.5?'rgba(0,0,0,0.07)':'rgba(255,255,255,0.07)';
-    ctx.fillRect(x,y,1+rr()*2,1+rr()*2);
-  }
-  return cv;
-}
-function myconidTex(kind){
-  const key='mycoTex_'+kind;
-  if(R3.texCache[key])return R3.texCache[key];
-  const cv=kind==='gill'?myconidGillCanvas():kind==='husk'?myconidHuskCanvas():myconidFleshCanvas();
-  const t=texFromCanvas(cv);
-  t.wrapS=t.wrapT=THREE.RepeatWrapping;
-  R3.texCache[key]=t;
-  return t;
-}
 function duergarTex(kind){
   const key='duerTex_'+kind;
   if(R3.texCache[key])return R3.texCache[key];
@@ -7694,49 +7184,8 @@ function svgToTexture(svg,cacheKey,opt){
   const tex=texFromCanvas(cv,tex_opts);
   tex.__ready=false; // callers can hold the previous frame until the raster lands
   const img=new Image();
-  img.onload=()=>{
-    const ctx=cv.getContext('2d');ctx.clearRect(0,0,S,S);ctx.drawImage(img,0,0,S,S);
-    tex.needsUpdate=true;tex.__ready=true;
-    /* Upload now rather than at first draw. Without this the release below only
-       reaches the frames that have actually been rendered — a floor pre-warms
-       every pose of every creature on it, and the windup and strike frames of
-       something the party never fights are never drawn, so measured at depth 17
-       only 20MB of 75MB of canvas came back. It also moves the upload itself off
-       the moment a creature first swings, which is where the prewarm was already
-       trying to move the raster. */
-    if(R3.renderer&&R3.renderer.initTexture)try{R3.renderer.initTexture(tex);}catch(e){}
-  };
-  /* A CanvasTexture holds its canvas forever as `tex.image`, so every cached
-     frame was paying for its raster TWICE: once as the GPU texture and again as
-     a live canvas backing store that nothing ever reads after the upload. At
-     640x640 that is 1.6MB of dead weight per frame, and a floor caches up to
-     120 of them — measured, a depth-17 grove committed about 100MB of GPU
-     texture and another 79MB of canvas within ten seconds of the floor
-     appearing, which is exactly the window a phone was dying in.
-
-     `onUpdate` fires at the end of three.js's own `uploadTexture`, after the mip
-     chain has been generated and the version stamped, so by then the canvas has
-     served its entire purpose and can be shrunk to nothing. The texture keeps
-     working: three.js only re-reads `image` if `needsUpdate` is set again, and
-     nothing here ever sets it twice.
-
-     The one case that WOULD re-read it is a lost and restored GL context, which
-     is why `initRenderer` now handles that by emptying the cache and rebuilding
-     the floor — re-rasterising from the SVG rather than from a canvas that is no
-     longer there. */
-  tex.onUpdate=()=>{if(cv.width>1){cv.width=cv.height=1;}};
-  /* The sprite SVGs carry a viewBox and no width/height, so their INTRINSIC
-     size is the CSS default of 150x150. Blink re-rasterises a vector at the
-     size you draw it, so on desktop Chrome this is invisible and every
-     sharpness measurement taken there comes back clean. WebKit does not: it
-     rasterises the image at its intrinsic size and then scales, which turns a
-     150px raster into a 640px texture — a 4.3x upscale, and the reason monsters
-     read as blurry on an iPhone while the procedurally drawn walls beside them
-     stay sharp. The bestiary escapes it by being a DOM <img> with explicit
-     width and height, which is exactly the fix: state the size on the root so
-     every engine rasterises at the resolution we are about to draw. */
-  const sized=/<svg[^>]*\swidth=/.test(svg)?svg:svg.replace(/<svg\b/,`<svg width="${S}" height="${S}"`);
-  img.src='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(sized)));
+  img.onload=()=>{const ctx=cv.getContext('2d');ctx.clearRect(0,0,S,S);ctx.drawImage(img,0,0,S,S);tex.needsUpdate=true;tex.__ready=true;};
+  img.src='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg)));
   if(cacheKey)R3.texCache[cacheKey]=tex;
   return tex;
 }
@@ -8329,19 +7778,7 @@ function boltShaderInit(){
 function initRenderer(){
   const cv=document.getElementById('view3d');
   R3.renderer=new THREE.WebGLRenderer({canvas:cv,antialias:false});
-  R3.renderer.setPixelRatio(gfxPixelRatio());
-  /* Every raster in this game is thrown away once it reaches the GPU (see
-     `svgToTexture`), so a lost context cannot be repaired by re-uploading what
-     three.js still holds — the canvases behind those textures are 1x1 by then.
-     Preventing the default on the loss is what makes the browser promise a
-     restore at all; on that restore the cache is emptied and the floor rebuilt,
-     which re-rasterises everything from the SVG it came from. Before this a lost
-     context simply ended the session. */
-  cv.addEventListener('webglcontextlost',(e)=>{e.preventDefault();},false);
-  cv.addEventListener('webglcontextrestored',()=>{
-    for(const k in R3.texCache){const t=R3.texCache[k];if(t&&t.dispose)t.dispose();delete R3.texCache[k];}
-    if(G.L)buildLevel(G.L);
-  },false);
+  R3.renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
   R3.maxAniso=R3.renderer.capabilities.getMaxAnisotropy(); // sharpen textures at grazing angles, free on GPU
   R3.scene=new THREE.Scene();
   R3.camera=new THREE.PerspectiveCamera(68,1,0.05,30);
@@ -8469,146 +7906,18 @@ function shadeSprites(){
       .multiply(lightAt(w.position.x,w.position.y,w.position.z));
   }
 }
-/* God rays out of the stairwell.
-
-   Not a post-process. Only three.min.js is loaded — there is no EffectComposer
-   here and no build step to add one — so a true screen-space pass would mean
-   hand-rolling an occlusion render plus a radial blur through two targets, a
-   second full scene render every frame on a phone. It would also only work
-   while the source is on screen, and this source is down a hole.
-
-   So the rays are GEOMETRY: two open cones standing on the shaft mouth and
-   widening toward the ceiling, drawn additively with a shader that cuts them
-   into discrete blades. Three things make it read:
-
-   - The blade pattern is a product of sines in `uv.x` at whole-number
-     frequencies, so it is periodic around the cone and there is no seam where
-     the uv wraps. Beating two frequencies against each other is what stops the
-     blades looking like a comb.
-   - It fades on BOTH axes — out toward the ceiling, and in toward the rim,
-     since a shaft of light has no hard edge anywhere.
-   - `depthWrite:false` so the two cones do not occlude each other, and
-     `depthTest:true` so a wall between the party and the stairwell still cuts
-     the rays off. Additive with no depth test at all would shine through
-     stone. */
-const GODRAY_FS=`
-uniform float t; uniform vec3 c; uniform float amp; uniform float yBot; uniform float yTop;
-varying vec2 vUv; varying float vY;
-void main(){
-  float a=vUv.x*6.28318;
-  // blades: two beating frequencies, slowly counter-rotating
-  float b = 0.5+0.5*sin(a*7.0 + t*0.22);
-  b *= 0.5+0.5*sin(a*11.0 - t*0.13 + 1.7);
-  /* The exponent is the whole difference between rays and a lampshade. Below
-     about 2 the troughs never reach zero, every blade runs into its neighbour
-     and the cone fills in solid — which is exactly what the first build looked
-     like. The gaps have to be genuinely dark. */
-  b = pow(max(b,0.0),2.4);
-  /* The fade is measured in WORLD HEIGHT, not in the mesh's own uv.y. The
-     shafts are lathed profiles now — a parallel column inside the bore that
-     opens into a cone above the floor — so uv.y runs at wildly different rates
-     on the two halves and using it would put a visible kink at the mouth. */
-  float u = clamp((vY-yBot)/(yTop-yBot),0.0,1.0);
-  float up  = pow(1.0-u,1.5);                   // gone before the ceiling
-  float core= pow(1.0-clamp(u*3.0,0.0,1.0),2.5);// a small wash down in the well
-  float f = b*up*0.85 + up*0.10 + core*0.30;
-  gl_FragColor=vec4(c*f*amp,1.0);
-}`;
-const GODRAY_VS=`varying vec2 vUv; varying float vY;
-void main(){vUv=uv;vY=(modelMatrix*vec4(position,1.0)).y;
-gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`;
-/* GODRAY_FLOOR is where the shafts BEGIN, half a room's height below the floor
-   — deep inside the bore rather than at its mouth. The rays then rise out of
-   the well instead of appearing at it, which is the difference between light
-   coming from somewhere and a lamp set in the ground.
-
-   It costs brightness, and the amplitudes below are set for it: the shader's
-   fade runs over the cone's whole `uv.y`, so starting the cone 0.65 lower puts
-   floor level a third of the way up it and the part the party can actually see
-   is already well down the falloff. */
-const GODRAY_FLOOR=-WALLH/2;
-/* The shafts are LATHED PROFILES, not cones, because the bore is an aperture
-   and light does not pass through rock.
-
-   Below the floor a shaft is a parallel-sided column that fits inside the
-   hollowed cylinder; at the floor it reaches the mouth and only then opens out
-   into the room. As plain cones they were narrow at the source and widest at
-   the top, so the wide one measured 0.61 across at floor level against a bore of
-   0.455 — it was passing straight through the rock on its way up, and the only
-   reason it was not obvious is that the floor plate happened to hide it from
-   above. Aim a look along the floor and it would have shone out of solid stone.
-
-   A `LatheGeometry` over the profile [(r,-h), (r,0), (R,top)] gives the whole
-   shape in one mesh: cylinder, then cone, with the break exactly at the
-   aperture. `depthWrite:false` so the two layers do not occlude each other,
-   `depthTest:true` so a wall between the party and the stairwell still cuts
-   them off — additive with no depth test would shine through stone. */
-function godRays(cx,cz){
-  const g=new THREE.Group();
-  // two layers: a tight bright core and a wide soft one, so the light has a
-  // centre rather than being one even flare
-  for(const [rBore,rTop,yTop,amp] of [[0.30,0.74,WALLH*0.95,0.92],
-                                      [0.42,1.06,WALLH*0.80,0.54]]){
-    const mat=new THREE.ShaderMaterial({
-      uniforms:{t:{value:0},c:{value:new THREE.Color(0xffc06a)},amp:{value:amp},
-                yBot:{value:GODRAY_FLOOR},yTop:{value:yTop}},
-      vertexShader:GODRAY_VS,fragmentShader:GODRAY_FS,
-      transparent:true,blending:THREE.AdditiveBlending,
-      depthWrite:false,side:THREE.DoubleSide});
-    const prof=[new THREE.Vector2(rBore,GODRAY_FLOOR),
-                new THREE.Vector2(rBore,-0.02),      // up the bore, parallel-sided
-                new THREE.Vector2(rTop,yTop)];       // and out of the mouth
-    const m=new THREE.Mesh(new THREE.LatheGeometry(prof,30),mat);
-    m.position.set(cx,0,cz);
-    m.userData.decor=true;      // a tap goes through the light to the stone
-    g.add(m);
-    (R3.godRays||(R3.godRays=[])).push(mat);
-  }
-  return g;
-}
 function onResize(){
   const wrap=document.getElementById('view-wrap');
   const w=wrap.clientWidth||1,h=wrap.clientHeight||1;
   R3.renderer.setSize(w,h,false);
   R3.camera.aspect=w/h;R3.camera.updateProjectionMatrix();
 }
-/* Geometry used to be the only thing freed here. The MATERIALS and their
-   textures were not, and a theme builds a great many fresh every floor — eight
-   to twelve wall variants, floor, ceiling, doors, the emissive glow sheets, and
-   every piece of furniture. Measured with `renderer.info.memory` over a 24-floor
-   descent, GPU textures climbed 19 -> 369 while geometries stayed flat: that is
-   the rest of the iOS crash, and the reported failures at depth 17 and 21 sit
-   exactly where the curve gets steep.
-
-   Textures held in `R3.texCache` are shared across floors on purpose and are
-   already bounded by `pruneMonsterTextures`, so they are skipped — disposing one
-   would leave a cached entry pointing at freed GPU memory, which renders black
-   rather than crashing, and would be far harder to trace. */
-function disposeLevelMaterials(root){
-  const shared=new Set();
-  for(const k in R3.texCache)shared.add(R3.texCache[k]);
-  const seen=new Set();
-  root.traverse(o=>{
-    if(o.geometry)o.geometry.dispose();
-    if(!o.material)return;
-    const mats=Array.isArray(o.material)?o.material:[o.material];
-    for(const m of mats){
-      if(!m||seen.has(m))continue;
-      seen.add(m);
-      for(const prop in m){
-        const v=m[prop];
-        if(v&&v.isTexture&&!shared.has(v))v.dispose();
-      }
-      m.dispose();
-    }
-  });
-}
 function disposeLevel(){
-  if(R3.levelGroup){R3.scene.remove(R3.levelGroup);disposeLevelMaterials(R3.levelGroup);R3.levelGroup=null;}
+  if(R3.levelGroup){R3.scene.remove(R3.levelGroup);R3.levelGroup.traverse(o=>{if(o.geometry)o.geometry.dispose();});R3.levelGroup=null;}
   for(const f of R3.liquidFlows)f.tex.dispose();
   R3.liquidFlows=[];R3.liquidShaders=[];
   R3.doorMeshes={};R3.secretMeshes={};R3.trapDecals={};R3.itemSprites={};R3.monsterSprites={};R3.monsterGlows={};R3.monsterShadows={};R3.prewarmQ=[];R3.prewarmT=0;R3.stairsGroup=null;
-  R3.candleFlames=[];R3.cryptGroups=[];R3.lurkerMeshes={};R3.wallMats=null;R3.webMeshes=[];R3.godRays=[];
+  R3.candleFlames=[];R3.cryptGroups=[];R3.lurkerMeshes={};R3.wallMats=null;R3.webMeshes=[];
 }
 /* Scenery welding. A piece of furniture is a dozen little boxes and cylinders,
    and built as a dozen meshes it costs a dozen draw calls apiece — which for
@@ -8713,7 +8022,6 @@ function addRivets(B,mat,x,y,z,n,dx,dy,dz,r){
 }
 function buildLevel(L){
   disposeLevel();
-  refreshMonTexPx();   // a loaded save reaches here without going through startLevel
   const th=L.theme;
   const grp=new THREE.Group();R3.levelGroup=grp;R3.scene.add(grp);
   R3.scene.fog=new THREE.FogExp2(th.fog,0.26);
@@ -8732,7 +8040,7 @@ function buildLevel(L){
   const duer=th.name==='Duergar';
   const myco=th.name==='Myconid';
   const drow=th.name==='Drow';
-  const NVAR=cave?12:(duer?8:(myco?8:(drow?8:6)));
+  const NVAR=cave?12:(duer?8:(myco?6:(drow?8:6)));
   const grid=(cave||duer||myco||drow)?null:brickGrid(th); // brick skeleton, masonry themes only
   const baseWall=cave?caveBaseCanvas(th)      // shared earth, so tiles still join invisibly
                 :duer?duergarBaseCanvas(th)   // shared courses, trim and frieze channel
@@ -8740,11 +8048,9 @@ function buildLevel(L){
                 :drow?drowBaseCanvas(th)      // shared courses and the frieze channel
                      :baseWallCanvas(th,grid);
   for(let v=0;v<NVAR;v++){
-    // Two wall builders come back as a PAIR — the drow's and the grove's. A
-    // colour map can only make something pale in torchlight; light of its own
-    // needs an emissive map, and that is the whole point of faerzress and of
-    // live spores alike. Everything else here treats the return as a canvas,
-    // so the branch keys off `built.glow`.
+    // The drow wall alone comes back as a pair. A colour map can only make the
+    // inscriptions pale in torchlight; light of their own needs an emissive map,
+    // and that is the whole point of faerzress.
     const built=cave?caveWallCanvas(th,v,baseWall)
                :duer?duergarWallCanvas(th,v,baseWall)
                :myco?myconidWallCanvas(th,v,baseWall)
@@ -8942,321 +8248,46 @@ function buildLevel(L){
     if(t===T_DOOR_OPEN)pv.rotation.y=passageX?Math.PI/2:-Math.PI/2;
     grp.add(pv);R3.doorMeshes[y*L.w+x]=pv;
   }
-  /* The stairs down: a spiral turning around a central newel that stands a
-     third of the room's height proud of the floor, with golden light and light
-     shafts rising out of the well.
-
-     It is the one landmark every floor has and the only thing the party is
-     actually looking for, and as a straight flight of seven slabs in a hole it
-     read as a recess in the ground — you walked past it. A newel you can see
-     over the furniture, a helix, and a shaft of light are three cues that all
-     say "here" from across a room.
-
-     Everything is faced in the level's own masonry (`wallMats`, at the variant
-     this tile would have had), because a staircase is cut through the same
-     stone as the walls around it. That is also what makes the seven themes come
-     out different for free: the cave's rock, the drow's black brick, the
-     duergar's coursed slab and the grove's stalk all arrive by themselves. */
+  // stairs: a real recessed staircase descending below the floor into a dark shaft
   {
     const sg=new THREE.Group();
     const sxs=L.stairs.x,sys=L.stairs.y,cx=sxs+0.5,cz=sys+0.5;
-    // the party approaches from a walkable neighbour; the helix starts there so
-    // the top tread meets the floor at the edge they arrive over
+    // the party enters from a walkable neighbor; the steps descend away from it
     let ndx=0,ndy=-1;
     for(const [dx,dy] of DIRS){
       const nt=L.grid[(sys+dy)*L.w+(sxs+dx)];
       if(nt===T_FLOOR||nt===T_DOOR_OPEN||nt===T_DOOR||nt===T_DOOR_LOCKED){ndx=dx;ndy=dy;break;}
     }
-    /* Twelve treads, not eighteen. At 18 the rise between one tread and the
-       next was 8cm against a 45cm tread, and from two tiles back the whole
-       flight merged into a smooth bowl around the post — a spiral is read
-       from the GAPS between its treads, so each one has to clear the one
-       below it by something you can see. Twelve gives 12cm of rise and 45
-       degrees of sweep apiece, and still turns a full 540. */
-    const DEPTH=1.25, N=12, drop=0.121;
-    const TURN=Math.PI*3/N;                    // 540 degrees over the flight
-    /* RISE is the top tread's own surface, and it is the `WALLH/3` of the brief:
-       the STAIRCASE reaches a third of the room's height, with four treads'
-       top faces standing above the floor and the newel carrying on a little
-       past the highest of them. */
-    const RISE=WALLH/3;
-    const BORE_R=0.455;                        // the cylinder cut into the rock
-    /* A tread overlaps the bore by 2cm — see *Surfaces that meet must overlap* —
-       but it can no longer be any wider than that, because the top four now
-       stand above the floor in open air where poking outside the tile would be
-       visible. 0.476 plus `hew`'s 0.045 tops out at 0.487 against a half-tile
-       of 0.5. */
-    const NEWEL_R=0.092, TREAD_R=0.476;
-    const POST=RISE+0.075;                     // the newel's crown, just clear of the top step
-    const wv=wallVariant(sxs,sys,wallMats.length);
-    const wallMap=wallMats[wv].map;
-    // one clone per surface, because `repeat` lives on the texture and each of
-    // these wants the courses at a different density
-    const mkTex=(rx,ry)=>{const t2=wallMap.clone();t2.needsUpdate=true;
-      t2.wrapS=t2.wrapT=THREE.RepeatWrapping;t2.repeat.set(rx,ry);return t2;};
-    const shaftTex=mkTex(2,DEPTH/WALLH);
-    /* The shaft is deliberately much darker than the room's own walls. Faced at
-       full strength its far inner wall carried the same brick at the same scale
-       as the wall standing behind the stairwell, the eye joined the two, and the
-       hole simply was not there — a newel standing on an unbroken floor. A void
-       with light coming up out of it needs the void. */
+    const DEPTH=1.05,N=7,drop=DEPTH/N;
+    // shaft (inner faces) enclosing the pit, a touch deeper than the steps.
+    // the stairwell is cut through the same masonry as the rest of the level,
+    // so its walls are faced with the wall texture — using the variant this
+    // tile would have had, and scaled so the brick courses stand the same
+    // height as the walls above the floor
+    const shaftTex=wallMats[wallVariant(sxs,sys,wallMats.length)].map.clone();
+    shaftTex.needsUpdate=true;
+    shaftTex.wrapS=shaftTex.wrapT=THREE.RepeatWrapping;
+    shaftTex.repeat.set(1,(DEPTH+0.06)/WALLH);
     const shaftMat=new THREE.MeshPhongMaterial({map:shaftTex,bumpMap:shaftTex,bumpScale:0.02,
-      color:0x5a5a5a,side:THREE.BackSide,specular:0x191309,shininess:5});
-    /* Everything below is CUT rather than built, and that is a different set of
-       shapes from a turned column standing in a hole. Three rules:
-
-       - Nothing underground is turned on a lathe. Every piece is roughened —
-         its vertices shoved about, then normals recomputed — so no silhouette
-         is a true circle and no face is flat.
-       - The seed is the stairs' own tile, not `Math.random`. `openBier`,
-         `openForge` and `openAltar` all call `buildLevel` again, and a stairwell
-         that re-hewed itself when a coffin was opened would be worse than one
-         that was smooth.
-       - It is all one mass of stone: a single material for newel, treads and
-         bore, and the pieces INTERPENETRATE rather than meet. Alternating the
-         tread shades made a helix legible when the stair was masonry; on carved
-         rock it read as a stack of separate slabs someone had laid, which is
-         exactly what it must not look like. */
-    let shs=((sxs*374761393)^(sys*668265263))>>>0;
-    const srr=()=>{shs=(shs*1664525+1013904223)>>>0;return shs/4294967296;};
-    /* The tile is SOLID ROCK with a cylinder cut down through it, which is a
-       different thing from the square hole this used to be.
-
-       Two pieces make that read. The bore is an open-ended cylinder faced on the
-       inside, running from the floor down — nothing of it stands above the
-       floor, because above the floor there is no rock left to cut. And the tile
-       keeps a real floor: `buildLevel` skips T_STAIRS when it lays the floor
-       planes, so this block has to supply its own — a unit square with a
-       circular hole punched in it.
-
-       That plate is in `floorMat`, not the wall's stone, and that is the same
-       lesson the kerb taught: a horizontal face at floor level is lit only by a
-       grazing torch, and the flagstones beside it look lit because the floor
-       texture is far paler than the wall's. In the wall's material it comes out
-       black. */
-    {
-      const sq=new THREE.Shape();
-      sq.moveTo(0,0);sq.lineTo(1,0);sq.lineTo(1,1);sq.lineTo(0,1);sq.lineTo(0,0);
-      const hole=new THREE.Path();
-      hole.absarc(0.5,0.5,BORE_R,0,Math.PI*2,true);   // wound against the shape
-      sq.holes.push(hole);
-      const fg=new THREE.ShapeGeometry(sq,28);
-      // ShapeGeometry lays uv straight off the shape's own coordinates, which
-      // here run 0..1 — exactly the per-tile floor plane's, so the plate carries
-      // on the same flagstones as its neighbours
-      fg.rotateX(-Math.PI/2);                          // shape +Y becomes world -Z
-      const plate=new THREE.Mesh(fg,floorMat);
-      plate.position.set(sxs,0,sys+1);
-      plate.userData={kind:'stairs',x:sxs,y:sys};
-      sg.add(plate);
+      side:THREE.BackSide,specular:0x191309,shininess:5});
+    const shaft=new THREE.Mesh(new THREE.BoxGeometry(0.995,DEPTH+0.06,0.995),shaftMat);
+    shaft.position.set(cx,-(DEPTH+0.06)/2,cz);sg.add(shaft);
+    // single-tread slabs step down toward local +Z (each only one drop tall, so
+    // you see over each tread to the next), then rotated to face the entry edge
+    const stepGrp=new THREE.Group();stepGrp.position.set(cx,0,cz);
+    const dz=1.0/N;
+    for(let i=0;i<N;i++){
+      // alternate tread shade slightly so adjacent steps read as distinct
+      const stepMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,(i%2?-0.08:-0.22))),specular:0x141009,shininess:6});
+      const box=new THREE.Mesh(new THREE.BoxGeometry(0.9,drop+0.03,dz+0.03),stepMat);
+      box.position.set(0,-i*drop-drop/2+0.015,-0.5+(i+0.5)*dz);
+      stepGrp.add(box);
     }
-    /* CARVED is not SHATTERED, and the first cut of this was the second thing.
-       At 0.20 of radial jitter with the y jitter running to the end rings, the
-       newel grew black shards off its silhouette and the crown came out as
-       broken slag — the stair read as something that had collapsed rather than
-       something a mason had cut. Hand-tooled stone is smooth-ish and slightly
-       wavy, not spiky.
-
-       Two limits keep it that way: the amplitudes are small, and the extreme
-       rows of vertices are left exactly where they were, so an end cap stays a
-       clean edge instead of fraying. Everything ragged in the old build came
-       from moving those. */
-    /* The jitter is a function of the vertex POSITION, not a fresh draw per
-       vertex, and that is a correctness requirement rather than a nicety: a
-       non-indexed geometry (which is what `ExtrudeGeometry` returns) carries
-       duplicated vertices at every shared corner, and drawing independently for
-       each one tears the mesh into confetti. Hashing the position moves every
-       copy of a corner to the same place. */
-    const base=shs;
-    const hew=(geo,amt)=>{
-      const p=geo.attributes.position;
-      let lo=1e9,hi=-1e9;
-      for(let i=0;i<p.count;i++){const y=p.getY(i);if(y<lo)lo=y;if(y>hi)hi=y;}
-      const jit=(x,y,z,salt)=>{
-        let h=((Math.round(x*4096)*374761393)^(Math.round(y*4096)*668265263)
-              ^(Math.round(z*4096)*2246822519)^(base+salt*40503))>>>0;
-        h=(h*1664525+1013904223)>>>0;
-        return h/4294967296-0.5;
-      };
-      for(let i=0;i<p.count;i++){
-        const x=p.getX(i),y=p.getY(i),z=p.getZ(i),r=Math.hypot(x,z);
-        if(r<1e-4)continue;                      // leave the axis alone
-        const end=(y-lo<1e-4)||(hi-y<1e-4);      // and the end rings
-        const k=1+jit(x,y,z,1)*amt;
-        p.setX(i,x*k);p.setZ(i,z*k);
-        if(!end)p.setY(i,y+jit(x,y,z,7)*amt*0.12);
-      }
-      geo.computeVertexNormals();
-      return geo;
-    };
-    const stoneTex=mkTex(2,2);
-    /* Live rock, not dressed masonry: a heavy bump and effectively no specular.
-       A sheen is the single loudest cue that a surface was worked smooth, and
-       the newel's old one was reading as a polished baluster. */
-    /* Bump, not much of it. At 0.055 and then 0.034 the newel went nearly black:
-       a heavy bump map over a brick texture tilts most of the surface away from
-       a light that is already grazing, and the column stopped being lit at all.
-       The irregularity is in the GEOMETRY here — that is what `hew` is for — so
-       the map only has to carry grain. Specular stays near zero because a sheen
-       is the loudest cue that a surface was worked smooth. */
-    const stoneMat=new THREE.MeshPhongMaterial({color:new THREE.Color(shade(th.wall,0.16)),
-      map:stoneTex,bumpMap:stoneTex,bumpScale:0.016,specular:0x1c1610,shininess:4});
-    /* The bore itself: an open-ended cylinder faced on the inside, from the
-       floor down. Open-ended matters — a top cap would be between the eye and
-       the well, and although BackSide culls it from above, the bottom cap is
-       what the light needs to land on, so only that one is built. */
-    {
-      const bore=new THREE.Mesh(
-        hew(new THREE.CylinderGeometry(BORE_R,BORE_R*0.96,DEPTH,26,5,true),0.030),
-        shaftMat);
-      bore.position.set(cx,-DEPTH/2,cz);
-      bore.userData={kind:'stairs',x:sxs,y:sys};
-      sg.add(bore);
-      const btm=new THREE.Mesh(new THREE.CircleGeometry(BORE_R*0.97,24),shaftMat);
-      btm.rotation.x=Math.PI/2;                 // faces down, so BackSide shows it from above
-      btm.position.set(cx,-DEPTH+0.004,cz);
-      btm.userData={kind:'stairs',x:sxs,y:sys};
-      sg.add(btm);
-    }
-    const helix=new THREE.Group();helix.position.set(cx,0,cz);
-    /* The newel is the core the masons LEFT, not a post they stood up. It had a
-       moulded cap and two collars and read as a turned baluster dropped into a
-       hole — architecture rather than excavation. Those are gone. What is here
-       instead is an irregular column, flaring where the treads come off it,
-       finished at the top with a rough hewn crown: a few facets around a low
-       dome, the way the last stone off a cut is left. */
-    {
-      const nw=new THREE.Mesh(
-        hew(new THREE.CylinderGeometry(NEWEL_R*0.94,NEWEL_R*1.30,DEPTH+POST,13,9),0.075),
-        stoneMat);
-      nw.position.set(0,POST-(DEPTH+POST)/2,0);
-      nw.userData={kind:'stairs',x:sxs,y:sys};
-      helix.add(nw);
-      /* The crown is a low DOME, not a flat top and not a cone. A flat top is a
-         cut face, which a core that was never worked has not got; a cone reads
-         as a finial, which is the turned-baluster problem again. Loose spoil
-         was tried clinging round the head and read as black spikes — nothing
-         small and dark belongs on a silhouette at this range. */
-      const cr=new THREE.Mesh(
-        hew(new THREE.SphereGeometry(NEWEL_R*0.99,12,7,0,6.2832,0,1.15),0.075),stoneMat);
-      cr.position.set(0,POST-NEWEL_R*0.42,0);
-      cr.userData={kind:'stairs',x:sxs,y:sys};
-      helix.add(cr);
-    }
-    /* A helical rib wound round the newel, at the stair's own pitch.
-
-       This is what actually makes the thing read as a spiral, and it is a fix
-       for a geometry problem rather than a decoration. The party's eye is at
-       0.62 and the well is a metre wide, so from two tiles back the line of
-       sight only reaches about 30cm down the shaft — three treads. Their outer
-       edges at one radius make a ring, and the stair reads as a stone BOWL with
-       a post in it. Everything below is simply not visible from anywhere the
-       party can stand.
-
-       So the helix is stated on the one part of the staircase that is always in
-       view. Same pitch as the treads, so the post is carved with the stair it
-       belongs to rather than wearing a barber-pole. */
-    {
-      const pts=[];
-      for(let u=-DEPTH*0.62;u<=POST+0.001;u+=drop*0.25){
-        const a=-(u/drop)*TURN;
-        pts.push(new THREE.Vector3(Math.cos(a)*NEWEL_R*1.14,u,Math.sin(a)*NEWEL_R*1.14));
-      }
-      const rib=new THREE.Mesh(
-        hew(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),pts.length*3,0.021,6,false),
-            0.06),
-        stoneMat);
-      rib.userData={kind:'stairs',x:sxs,y:sys};
-      helix.add(rib);
-    }
-    /* A tread is a wedge, not a box: a rectangular step on a helix leaves a gap
-       at the newel on one side and overhangs the well on the other. A ring
-       sector with `thetaLength` slightly over the step angle gives each tread a
-       hair of overlap with the next, which is what a real stone stair has. */
-    /* Treads run INTO the bore wall rather than stopping short of it. At 0.455
-       against a shaft half-width of 0.4975 there was a 4cm gap all the way
-       round, and through it you saw daylight between the stair and the rock —
-       which reads as a structure standing inside a hole. Cut stairs are the
-       same stone as the wall they are cut from, so they overlap it, and the
-       corners of the square bore are what is left of the uncut rock.
-
-       Each tread is hewn on its own seed, so no two are the same wedge. */
-    /* A tread is an EXTRUDED PIE SECTOR, and it has to be, because a
-       theta-sector `CylinderGeometry` is not a solid. Three.js builds one as a
-       torso plus two cap fans and generates NO radial end walls, so the two
-       faces where the step is cut off — the risers, the most important faces on
-       a stair — simply are not there. With front-face culling you look straight
-       through them into nothing, and every tread read as a curved sheet of
-       paper. Audited: a box comes back with 0 open edges and an extruded sector
-       with 0; the theta-sector cylinder does not.
-
-       Extruding a closed 2D shape gives a closed solid. It also returns
-       NON-INDEXED geometry, so `computeVertexNormals` inside `hew` produces one
-       normal per face rather than smoothing across the edges — which is exactly
-       what a cut block wants: a bright top, a dark riser, and a hard line where
-       they meet. A smoothed corner is the other half of why these looked thin.
-
-       The sector is symmetric about angle 0 so that the mirroring `rotateX`
-       does to the shape's own axes cannot move where the step sits. */
-    const TH=drop*0.58;                          // and thicker: 7cm of stone, not 5
-    {
-      const sh=new THREE.Shape();
-      sh.absarc(0,0,TREAD_R,-TURN*0.53,TURN*0.53,false);
-      sh.lineTo(0,0);
-      const tg=new THREE.ExtrudeGeometry(sh,{depth:TH,bevelEnabled:false,curveSegments:9});
-      tg.rotateX(-Math.PI/2);                    // extrusion +Z becomes +Y
-      tg.translate(0,-TH,0);                     // so the top face sits at y=0
-      for(let i=0;i<N;i++){
-        // the top tread's surface is RISE, so four of them stand above the floor
-        const m2=new THREE.Mesh(hew(tg.clone(),0.045),stoneMat);
-        m2.position.set(0,RISE-drop*i,0);
-        m2.rotation.y=-TURN*i;
-        m2.userData={kind:'stairs',x:sxs,y:sys};
-        helix.add(m2);
-      }
-    }
-    /* There is no kerb round the opening, and both attempts at one are worth
-       knowing about. A torus read as a barrel hoop hanging over the hole. Laid
-       flat instead it came out as a solid BLACK ring — the darkest thing in the
-       picture — because the only light in the room is a torch at the eye two
-       tiles away, and against a horizontal face at floor level that is a
-       grazing light: N·L is about a third of what the same stone gets standing
-       up as the newel. The flagstones beside it look lit only because the floor
-       texture is far paler than the wall's. Whatever goes here has to be the
-       FLOOR's material, not the wall's. Nothing does, and the opening reads
-       perfectly well without it. */
-    helix.rotation.y=Math.atan2(-ndx,-ndy);   // the top tread meets the approach
-    sg.add(helix);
-    /* Golden light out of the deep. Two lights: one down in the well doing the
-       real work on the treads and the newel, and one at the mouth so the floor
-       around the opening catches it too — without the second the stairwell is a
-       bright hole in a dark floor, which reads as a texture rather than a
-       light. */
-    const glow=new THREE.PointLight(0xffc46a,1.45,2.7,2);
-    glow.position.set(cx,-0.30,cz);sg.add(glow);      // lights the treads you can see
-    const deep=new THREE.PointLight(0xff9c3c,0.70,1.9,2);
-    deep.position.set(cx,-1.10,cz);sg.add(deep);      // and something further down
-    /* The mouth light is deliberately OFF the shaft axis. On it — at (cx,y,cz)
-       — it is inside the newel, and a point light on the axis of a column
-       cannot light that column at all: every normal on the outer surface points
-       away from it. The newel came out a black silhouette against a brightly
-       lit well, which is dramatic and tells you nothing about what it is made
-       of. Pushed to the rim on the side the party approaches from, the same
-       light still reads as coming out of the well and now rakes across the
-       stone. */
-    const mouth=new THREE.PointLight(0xffb455,0.42,1.9,2);
-    mouth.position.set(cx-ndx*0.34,0.15,cz-ndy*0.34);sg.add(mouth);
-    /* And one small light ABOVE the well, which is the one cheat here.
-       Everything else in this stairwell shines upward, and the four treads that
-       now stand proud of the floor are horizontal faces — the torch reaches them
-       at about N·L 0.14 from two tiles back, so they rendered as black blades
-       hanging round the newel. A light under them lights their undersides, which
-       is what really happens and is unreadable. This one is dim, warm and pinned
-       to a 1.1 range so it falls off before it touches the room: it exists to
-       put a top on the steps and nothing else. */
-    const lip=new THREE.PointLight(0xffcf90,1.70,2.10,2);
-    lip.position.set(cx,RISE+0.34,cz);sg.add(lip);
-    sg.add(godRays(cx,cz));
+    stepGrp.rotation.y=Math.atan2(-ndx,-ndy); // local +Z descent -> world run direction
+    sg.add(stepGrp);
+    // a faint glow rising from the depths lights the treads and lures the party down
+    const glow=new THREE.PointLight(0xffcf8a,0.9,2.6,2);
+    glow.position.set(cx,-0.5,cz);sg.add(glow);
     grp.add(sg);R3.stairsGroup=sg;
   }
   // sewers: putrid liquid — sunken lake pits, corridor rivers, wall pipes
@@ -10762,193 +9793,15 @@ function buildLevel(L){
     mk(chit,rockU,chitMat); mk(bolts,cylU,boltMat);
     grp.add(litter);
   }
-  /* The circle mound: the grove's set-piece. Seeded from its own tile, because
-     `openMound` calls `buildLevel` again to show the bed turned over and
-     anything drawn with `Math.random()` would visibly reshuffle at that moment
-     — the same reason the crypt's bone stacking and the duergar's floor litter
-     are seeded. */
-  if(th.name==='Myconid'&&L.mound){
-    const c=L.mound, cx=c.tx+0.5, cz=c.ty+0.5;
-    const g0=new THREE.Group(),B=Bins(3.4);
-    let ms=((c.tx*2246822519)^(c.ty*3266489917))>>>0;
-    const mr=()=>{ms=(ms*1664525+1013904223)>>>0;return ms/4294967296;};
-    const fleshT=myconidTex('flesh'),huskT=myconidTex('husk');
-    const soil=new THREE.MeshPhongMaterial({color:0x3a3040,map:huskT,bumpMap:huskT,
-      bumpScale:0.022,specular:0x0c0a10,shininess:3});
-    const stone=new THREE.MeshPhongMaterial({color:new THREE.Color(th.floor).multiplyScalar(1.1),
-      map:huskT,bumpMap:huskT,bumpScale:0.016,specular:0x141118,shininess:6});
-    const fMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.30),
-      map:fleshT,bumpMap:fleshT,bumpScale:0.010,specular:0x24202c,shininess:6});
-    const capMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.moss).multiplyScalar(0.92),
-      map:fleshT,bumpMap:fleshT,bumpScale:0.008,specular:0x2a2233,shininess:8});
-    const boneMat=new THREE.MeshPhongMaterial({color:0x8a8272,specular:0x14120c,shininess:5});
-    const liveMat=new THREE.MeshBasicMaterial({color:new THREE.Color(th.glow||'#c88ae8')});
-    const R=0.44, Hh=c.opened?0.16:0.30;
-    /* The tile has to supply its own floor. `buildLevel` skips `T_PIT` when it
-       lays the floor planes, so a round mound on a square tile left the four
-       corners showing as black holes — the same thing the spiral stairs had to
-       fix with a plate. Here the fix is free and truer: a mound is a heap, and
-       a heap spills out to meet the ground. */
-    B.at(soil,new THREE.BoxGeometry(0.995,0.03,0.995),0,0.012,0);
-    // the bed itself, ringed with the stones a circle piles up round it
-    B.at(soil,new THREE.SphereGeometry(R,20,10,0,6.2832,0,c.opened?1.15:1.35),0,0.01,0);
-    for(let k=0;k<14;k++){
-      const a=k/14*Math.PI*2+mr()*0.2, rr2=0.048+mr()*0.030;
-      B.at(stone,new THREE.IcosahedronGeometry(rr2,0),Math.cos(a)*R*0.92,rr2*0.6,Math.sin(a)*R*0.92,
-           mr()*6.3,mr()*6.3,mr()*6.3);
-    }
-    if(c.opened){
-      // turned over: the crown is gone, the soil is spread and the bones show
-      for(let k=0;k<9;k++){
-        const a=mr()*6.3,d=mr()*R*0.7;
-        B.at(soil,new THREE.SphereGeometry(0.05+mr()*0.05,8,5,0,6.2832,0,1.4),
-             Math.cos(a)*d,0.03,Math.sin(a)*d);
-      }
-      for(let k=0;k<7;k++){
-        const a=mr()*6.3,d=mr()*R*0.55;
-        B.at(boneMat,new THREE.CylinderGeometry(0.012,0.014,0.10+mr()*0.09,5),
-             Math.cos(a)*d,0.055,Math.sin(a)*d,mr()*0.6,mr()*6.3,1.35+mr()*0.4);
-      }
-    }else{
-      /* Unopened, it is a NURSE LOG: the mound is what the circle grows on, so
-         the whole of it is cropped. A ring of caps facing inward is what says
-         "a circle gathers here" rather than "here is a heap of earth". */
-      for(let k=0;k<16;k++){
-        const a=k/16*Math.PI*2, d=R*(0.28+((k*5)%4)*0.16);
-        const px=Math.cos(a)*d, pz=Math.sin(a)*d;
-        const foot=Math.sqrt(Math.max(0,R*R-d*d))*(Hh/R);
-        const h=0.07+((k*7)%4)*0.045, cr=0.038+((k*3)%3)*0.020;
-        addSeg(B,fMat,px,foot,pz,px*1.04,foot+h,pz*1.04,0.017,0.012);
-        B.at(capMat,new THREE.SphereGeometry(cr,9,6,0,6.2832,0,1.28),px*1.04,foot+h,pz*1.04);
-        B.at(liveMat,new THREE.SphereGeometry(cr*0.26,6,5),px*1.04,foot+h+cr*0.4,pz*1.04);
-      }
-      // and one big one at the crown, which is what a circle melds around
-      addSeg(B,fMat,0,Hh-0.02,0,0.01,Hh+0.20,0,0.040,0.028);
-      B.at(capMat,new THREE.SphereGeometry(0.135,14,8,0,6.2832,0,1.22),0.01,Hh+0.20,0);
-      B.at(liveMat,new THREE.SphereGeometry(0.045,10,8),0.01,Hh+0.20,0);
-      // a hand still showing out of the side of the bed
-      B.at(boneMat,new THREE.SphereGeometry(0.034,8,6),R*0.42,Hh*0.55,R*0.52);
-      for(let k=0;k<3;k++)
-        B.at(boneMat,new THREE.CylinderGeometry(0.007,0.009,0.055,5),
-             R*0.42+(k-1)*0.020,Hh*0.55+0.035,R*0.52,0.4,0,0.2);
-    }
-    B.addTo(g0);
-    for(const ch2 of g0.children)ch2.userData={kind:'mound',x:c.tx,y:c.ty};
-    g0.position.set(cx,0,cz);
-    grp.add(g0);
-    if(!c.opened){
-      const l=new THREE.PointLight(new THREE.Color(th.glow||'#c88ae8').getHex(),0.75,3.0,2);
-      l.position.set(cx,Hh+0.24,cz);grp.add(l);
-    }
-  }
-  /* Grove floor dressing: mound litter, shed caps and stalk stubs, bluecap
-     patches and drifts of spore dust. Same terms as the crypt's, the duergar's
-     and the drow's — seeded from each tile's own coordinates so a rebuild never
-     reshuffles it, instanced down to a handful of draw calls, flat to the
-     ground so it never blocks a path, and `decor` so a tap goes through it to
-     whatever is lying on the same tile. */
-  if(th.name==='Myconid'){
-    const litter=new THREE.Group();
-    const fleshT=myconidTex('flesh'),huskT=myconidTex('husk');
-    const capMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.moss).multiplyScalar(0.80),
-      map:fleshT,bumpMap:fleshT,bumpScale:0.008,specular:0x241e2c,shininess:6});
-    const stubMat=new THREE.MeshPhongMaterial({color:0x6b5f4c,map:huskT,bumpMap:huskT,
-      bumpScale:0.010,specular:0x16120c,shininess:5});
-    const soilMat=new THREE.MeshPhongMaterial({color:0x342c39,map:huskT,bumpMap:huskT,
-      bumpScale:0.018,specular:0x0c0a0e,shininess:3});
-    /* Bluecap is the grain of this place — ground for flour — so it is the one
-       thing on the floor that is BLUE rather than violet, and the one the eye
-       can pick out as a crop rather than as debris. */
-    const blueMat=new THREE.MeshPhongMaterial({color:0x46628c,map:fleshT,bumpMap:fleshT,
-      bumpScale:0.006,specular:0x1a2130,shininess:9});
-    // spore dust: unlit, because it is the light lying on the ground
-    const dustMat=new THREE.MeshBasicMaterial({color:new THREE.Color(th.glow||'#c88ae8')
-      .multiplyScalar(0.34),transparent:true,opacity:0.5,depthWrite:false});
-    const boxU=new THREE.BoxGeometry(1,1,1);
-    const sphU=new THREE.SphereGeometry(1,8,6);
-    const domeU=new THREE.SphereGeometry(1,9,5,0,6.2832,0,1.35);
-    const cylU=new THREE.CylinderGeometry(1,1,1,6);
-    const discU=new THREE.CircleGeometry(1,10);discU.rotateX(-Math.PI/2);
-    const yawQ=(a)=>new THREE.Quaternion().setFromEuler(new THREE.Euler(0,a,0));
-    const tumbleQ=(f)=>new THREE.Quaternion().setFromEuler(new THREE.Euler(f()*6.3,f()*6.3,f()*6.3));
-    const loc=(px,py,pz,q,sx,sy,sz)=>new THREE.Matrix4().compose(
-      new THREE.Vector3(px,py,pz),q,new THREE.Vector3(sx,sy,sz));
-    const mounds=[],caps=[],stalks=[],stubs=[],blues=[],dust=[];
-    const busy=new Set((L.myconid||[]).map(f=>f.x+','+f.y));
-    for(let y=1;y<L.h-1;y++)for(let x=1;x<L.w-1;x++){
-      if(L.grid[y*L.w+x]!==T_FLOOR)continue;
-      let hsh=((x*2654435761)^(y*1597334677))>>>0;
-      const rr=()=>{hsh=(hsh*1664525+1013904223)>>>0;return hsh/4294967296;};
-      const cx=x+0.5,cz=y+0.5;
-      /* Spore dust settles everywhere, and it is drawn BEFORE the furniture
-         check: dust does not care that something is standing there. */
-      if(rr()<0.30){
-        const n=1+Math.floor(rr()*3);
-        for(let k=0;k<n;k++){
-          const s=0.10+rr()*0.22;
-          dust.push(loc(cx+(rr()-0.5)*0.7,0.004,cz+(rr()-0.5)*0.7,yawQ(rr()*6.3),s,1,s*(0.6+rr()*0.6)));
-        }
-      }
-      if(busy.has(x+','+y))continue;              // a piece of furniture stands here
-      const roll=rr();
-      if(roll<0.075){
-        /* Mound litter: a circle keeps a pile of rock and soil to cultivate on
-           and to sleep around, and what is left where one used to be is a low
-           heap with things coming up out of it. */
-        const ox=cx+(rr()-0.5)*0.34, oz=cz+(rr()-0.5)*0.34, R=0.16+rr()*0.12;
-        mounds.push(loc(ox,0.005,oz,yawQ(rr()*6.3),R,R*0.42,R*(0.8+rr()*0.4)));
-        const n=2+Math.floor(rr()*3);
-        for(let k=0;k<n;k++){
-          const a=rr()*6.3,d=rr()*R*0.7, s=0.022+rr()*0.020;
-          const px=ox+Math.cos(a)*d, pz=oz+Math.sin(a)*d;
-          const foot=0.005+Math.sqrt(Math.max(0,R*R-d*d))*0.42;
-          stalks.push(loc(px,foot+0.028,pz,yawQ(rr()*6.3),0.011,0.056,0.011));
-          caps.push(loc(px,foot+0.056,pz,yawQ(rr()*6.3),s,s*0.66,s));
-        }
-      }else if(roll<0.135){                       // shed caps and stalk stubs
-        const n=2+Math.floor(rr()*4);
-        for(let k=0;k<n;k++){
-          const s=0.045+rr()*0.055;
-          if(rr()<0.55)                            // a cap fallen on its face
-            caps.push(loc(cx+(rr()-0.5)*0.6,s*0.24,cz+(rr()-0.5)*0.6,tumbleQ(rr),s,s*0.42,s));
-          else                                     // a stalk cut off at the root
-            stubs.push(loc(cx+(rr()-0.5)*0.6,0.030+rr()*0.02,cz+(rr()-0.5)*0.6,
-                           yawQ(rr()*6.3),0.030+rr()*0.02,0.060+rr()*0.05,0.030+rr()*0.02));
-        }
-      }else if(roll<0.185){                       // a patch of bluecap, the grove's grain
-        const ox=cx+(rr()-0.5)*0.4, oz=cz+(rr()-0.5)*0.4;
-        const n=4+Math.floor(rr()*5);
-        for(let k=0;k<n;k++){
-          const s=0.028+rr()*0.024;
-          const px=ox+(rr()-0.5)*0.42, pz=oz+(rr()-0.5)*0.42;
-          stalks.push(loc(px,0.026,pz,yawQ(rr()*6.3),0.008,0.052,0.008));
-          blues.push(loc(px,0.052,pz,yawQ(rr()*6.3),s,s*0.60,s));
-        }
-      }
-    }
-    const mk=(mats,geo,mat)=>{ if(!mats.length)return;
-      const inst=new THREE.InstancedMesh(geo,mat,mats.length);
-      mats.forEach((m,i)=>inst.setMatrixAt(i,m));inst.instanceMatrix.needsUpdate=true;
-      inst.userData.decor=true;   // never blocks a tap to the item on the same tile
-      litter.add(inst); };
-    mk(mounds,domeU,soilMat); mk(caps,domeU,capMat); mk(blues,domeU,blueMat);
-    mk(stalks,cylU,stubMat);   mk(stubs,cylU,stubMat); mk(dust,discU,dustMat);
-    grp.add(litter);
-  }
-  /* Duergar floor dressing: slag, spilled ore and dropped tools. Built on the
-     crypt's terms — seeded from each tile's own coordinates so a rebuild never
-     reshuffles it, instanced down to a handful of draw calls, flat to the ground
-     so it never blocks a path, and every mesh marked `decor` so a tap goes
-     through it to whatever is lying on the same tile.
-
-     Haulage track used to run down the corridors here — chosen per row and per
-     column rather than per tile, so a run came out continuous instead of as
-     disconnected two-foot fragments. It was removed. The lesson about hashing
-     the line rather than the tile is kept in CLAUDE.md for whoever wants
-     something that has to run continuously down a passage. */
+  /* Duergar floor dressing: haulage track, slag, spilled ore and dropped tools.
+     Built on the crypt's terms — seeded from each tile's own coordinates so a
+     rebuild never reshuffles it, instanced down to a handful of draw calls, flat
+     to the ground so it never blocks a path, and every mesh marked `decor` so a
+     tap goes through it to whatever is lying on the same tile. */
   if(th.name==='Duergar'){
     const litter=new THREE.Group();
-    const ironMat=new THREE.MeshPhongMaterial({color:0x35353c,specular:0x101014,shininess:22});
+    const railMat=new THREE.MeshPhongMaterial({color:0x35353c,specular:0x101014,shininess:22});
+    const sleepMat=new THREE.MeshPhongMaterial({color:0x352718,specular:0x120c04,shininess:4});
     // Clinker: fired waste, and the one thing down here that is genuinely black.
     // Its sheen is what says "glassy" rather than "sooty", so it keeps a small
     // narrow highlight where the iron deliberately does not.
@@ -10967,18 +9820,42 @@ function buildLevel(L){
        stone at a fraction of the vertices. */
     const rockU=new THREE.IcosahedronGeometry(1,0);
     const cylU=new THREE.CylinderGeometry(1,1,1,6);
+    const QID=new THREE.Quaternion();
     const yawQ=(a)=>new THREE.Quaternion().setFromEuler(new THREE.Euler(0,a,0));
     const tumbleQ=(f)=>new THREE.Quaternion().setFromEuler(
       new THREE.Euler(f()*6.3,f()*6.3,f()*6.3));
     const loc=(px,py,pz,q,sx,sy,sz)=>new THREE.Matrix4().compose(
       new THREE.Vector3(px,py,pz),q,new THREE.Vector3(sx,sy,sz));
-    const slag=[],ore=[],veins=[],hafts=[],heads=[];
+    const rails=[],sleepers=[],slag=[],ore=[],veins=[],hafts=[],heads=[];
+    const walk=(x,y)=>{const t=L.grid[y*L.w+x];
+      return t===T_FLOOR||t===T_DOOR||t===T_DOOR_OPEN||t===T_DOOR_LOCKED;};
     const busy=new Set((L.duergar||[]).map(f=>f.x+','+f.y));
+    /* The track is chosen per ROW and per COLUMN, not per tile. A tile-by-tile
+       roll gives disconnected two-foot fragments of rail lying about, which is
+       the one thing track cannot be; hashing the row means every horizontal
+       corridor tile on that row carries it and the run comes out continuous.
+       Junction tiles are neither purely horizontal nor vertical and take no
+       rails, so a line simply ends where it meets another passage. */
+    const lineHash=(v,salt)=>{let h=((v*2654435761)^(salt*40503))>>>0;
+      h=(h*1664525+1013904223)>>>0;return h/4294967296;};
     for(let y=1;y<L.h-1;y++)for(let x=1;x<L.w-1;x++){
       if(L.grid[y*L.w+x]!==T_FLOOR)continue;
       let hsh=((x*374761393)^(y*668265263))>>>0;
       const rr=()=>{hsh=(hsh*1664525+1013904223)>>>0;return hsh/4294967296;};
       const cx=x+0.5,cz=y+0.5;
+      const horiz=walk(x-1,y)&&walk(x+1,y)&&!walk(x,y-1)&&!walk(x,y+1);
+      const vert =walk(x,y-1)&&walk(x,y+1)&&!walk(x-1,y)&&!walk(x+1,y);
+      const onRail=(horiz&&lineHash(y,17)<0.34)||(vert&&lineHash(x,91)<0.34);
+      if(onRail){
+        const a=horiz?0:Math.PI/2, q=yawQ(a);
+        for(const s of [-1,1])                              // the two rails
+          rails.push(loc(cx+(horiz?0:s*0.16),0.030,cz+(horiz?s*0.16:0),q,1.0,0.026,0.034));
+        for(let k=0;k<4;k++){                               // sleepers under them
+          const t=-0.375+k*0.25;
+          sleepers.push(loc(cx+(horiz?t:0),0.012,cz+(horiz?0:t),q,0.08,0.024,0.44));
+        }
+        continue;                                           // nothing else on a track tile
+      }
       if(busy.has(x+','+y))continue;                        // furniture stands here
       const roll=rr();
       if(roll<0.075){                                       // a heap of clinker
@@ -11016,183 +9893,11 @@ function buildLevel(L){
       mats.forEach((m,i)=>inst.setMatrixAt(i,m));inst.instanceMatrix.needsUpdate=true;
       inst.userData.decor=true;   // never blocks a tap to the item on the same tile
       litter.add(inst); };
+    mk(rails,boxU,railMat); mk(sleepers,boxU,sleepMat);
     mk(slag,rockU,slagMat); mk(ore,rockU,oreMat); mk(veins,rockU,veinMat);
     mk(hafts,cylU,new THREE.MeshPhongMaterial({color:0x3a2a1c,specular:0x140e04,shininess:5}));
-    mk(heads,boxU,ironMat);
+    mk(heads,boxU,railMat);
     grp.add(litter);
-  }
-  /* Grove furniture, on the duergar hall's and the drow house's exact terms —
-     welded down to one mesh per material by `Bins`, built in a local frame
-     (+X along the wall, +Y up, +Z out into the room) and then turned to face
-     the tile it was placed against.
-
-     A colony CULTIVATES, so all six are its work rather than its ornament:
-     what it eats, what it drinks, what it is raising, what it melds around,
-     and what it has done with the dead. */
-  if(th.name==='Myconid'&&L.myconid){
-    const fleshT=myconidTex('flesh'),gillT=myconidTex('gill'),huskT=myconidTex('husk');
-    const glowC=new THREE.Color(th.glow||'#c88ae8');
-    /* Fungal flesh is soft and slightly waxy: a broad, weak highlight. The one
-       thing it must not have is a tight one — a hard specular on a curved cap
-       is the canonical WET PLASTIC cue, and every material down here that got
-       one had to have it taken away again (see the duergar ironwork). */
-    const fMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.30),
-      map:fleshT,bumpMap:fleshT,bumpScale:0.010,specular:0x24202c,shininess:6});
-    const fDark=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall2).multiplyScalar(1.35),
-      map:fleshT,bumpMap:fleshT,bumpScale:0.012,specular:0x1a1722,shininess:5});
-    const capMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.moss).multiplyScalar(0.92),
-      map:fleshT,bumpMap:fleshT,bumpScale:0.008,specular:0x2a2233,shininess:8});
-    const gillMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.6),
-      map:gillT,bumpMap:gillT,bumpScale:0.006,specular:0x201c28,shininess:5});
-    const huskMat=new THREE.MeshPhongMaterial({color:0x6b5f4c,map:huskT,bumpMap:huskT,
-      bumpScale:0.010,specular:0x1a160e,shininess:6});
-    const soilMat=new THREE.MeshPhongMaterial({color:0x352d3a,map:huskT,bumpMap:huskT,
-      bumpScale:0.016,specular:0x0e0c10,shininess:3});
-    // anything actually alight is unlit basic, like the drow's cold fire — a
-    // shaded spore body reads as a painted bead rather than as something burning
-    const liveMat=new THREE.MeshBasicMaterial({color:glowC});
-    const boneMat=new THREE.MeshPhongMaterial({color:0x8a8272,specular:0x14120c,shininess:5});
-    const pend=[],flames=R3.candleFlames||[];
-    for(const f of L.myconid){
-      const g0=new THREE.Group(),B=Bins(4.0);
-      const Z=0.20;                              // how far out of the wall it stands
-      if(f.kind==='cluster'){
-        /* A fruiting cluster: the crop. Read from the RANGE of sizes — caps all
-           one size read as a manufactured row, and a real flush has one big one
-           with the rest coming up around it. */
-        const N=6;
-        for(let k=0;k<N;k++){
-          const a=(k/N)*Math.PI*2, big=k===0;
-          const px=Math.cos(a)*(big?0.02:0.11+0.06*(k%3)), pz=Z-0.02+Math.sin(a)*0.06;
-          const h=big?0.42:0.16+0.13*((k*7)%3)/2, R=big?0.16:0.065+0.03*((k*5)%3)/2;
-          addSeg(B,fMat,px,0,pz,px+(big?0:0.02),h,pz,0.030+R*0.10,0.020+R*0.08);
-          B.at(capMat,new THREE.SphereGeometry(R,10,6,0,6.2832,0,1.25),px,h,pz);
-          B.at(gillMat,new THREE.CylinderGeometry(R*0.94,R*0.30,R*0.30,12),px,h-R*0.16,pz);
-        }
-        pend.push({pri:2,base:0.28,col:glowC.getHex(),dist:1.9,
-          pos:new THREE.Vector3(f.x+0.5+f.dx*0.5-f.dx*0.30,0.42,f.y+0.5+f.dy*0.5-f.dy*0.30)});
-      }else if(f.kind==='nursery'){
-        /* A bed of raised soil kerbed with cut stalk, and the young coming up.
-           Nine close-set posts read as a solid DRUM — a fence is read from the
-           gaps in it, so there are five, thicker, and well apart. And the bed
-           has to stand PROUD of the floor: sunk to y=-0.03 the dome was under
-           the flagstones and all you saw was the kerb. */
-        for(let k=0;k<5;k++){
-          const a=-1.15+k*0.575;
-          B.at(huskMat,new THREE.CylinderGeometry(0.030,0.036,0.115,7),
-               Math.cos(a)*0.31,0.057,Z+0.03+Math.sin(a)*0.17);
-        }
-        B.at(soilMat,new THREE.SphereGeometry(0.32,14,8,0,6.2832,0,1.15),0,0.015,Z+0.03);
-        /* The sprouts stand ON the bed. Started at a flat y=0.09 they were
-           inside the dome — a 0.32 hemisphere is 0.3 tall at its middle — so
-           each one's foot is put on the dome's own surface at its radius. */
-        const SR=0.32, sy=0.015;
-        for(let k=0;k<10;k++){
-          const a=-1.0+k*0.222, r2=0.07+((k*11)%5)*0.036;
-          const px=Math.cos(a)*r2, pz=Z+0.03+Math.sin(a)*r2*0.6;
-          const foot=sy+Math.sqrt(Math.max(0,SR*SR-r2*r2))-0.015;
-          const h=0.09+((k*7)%4)*0.038, R=0.032+((k*3)%3)*0.013;
-          const tx=px+((k%2)?0.016:-0.016);
-          addSeg(B,fMat,px,foot,pz,tx,foot+h,pz,0.016,0.011);
-          B.at(capMat,new THREE.SphereGeometry(R,8,6,0,6.2832,0,1.3),tx,foot+h,pz);
-          B.at(liveMat,new THREE.SphereGeometry(R*0.30,6,5),tx,foot+h+R*0.4,pz);
-        }
-      }else if(f.kind==='barrel'){
-        /* A barrelstalk tapped for water. It is read from the TAP and the basin
-           under it — a swelling on its own is just a fat stalk, and what makes
-           this read as a colony's cistern is that something has been done to it. */
-        B.at(fMat,new THREE.CylinderGeometry(0.13,0.15,0.14,12),0,0.07,Z);
-        B.at(fMat,new THREE.SphereGeometry(0.21,14,10),0,0.34,Z);
-        B.at(fMat,new THREE.CylinderGeometry(0.10,0.15,0.20,12),0,0.60,Z);
-        for(const yy of [0.22,0.34,0.46])        // the hoops the flesh grows in
-          B.at(fDark,new THREE.TorusGeometry(0.205*Math.sqrt(Math.max(0.05,1-Math.pow((yy-0.34)/0.21,2)))
-               ,0.014,5,14),0,yy,Z,Math.PI/2);
-        B.at(huskMat,new THREE.CylinderGeometry(0.020,0.026,0.13,7),0,0.20,Z+0.19,Math.PI/2);
-        B.at(soilMat,new THREE.CylinderGeometry(0.13,0.10,0.06,12),0,0.03,Z+0.20);
-        B.at(new THREE.MeshBasicMaterial({color:0x2b4a58}),
-             new THREE.CylinderGeometry(0.108,0.108,0.008,12),0,0.058,Z+0.20);
-      }else if(f.kind==='pods'){
-        // spore pods hung on cords from the wall, fat and lit from inside
-        for(let k=0;k<5;k++){
-          const px=-0.26+k*0.13, drop=0.30+((k*13)%5)*0.06, R=0.045+((k*7)%4)*0.014;
-          addSeg(B,fDark,px,WALLH-0.04,Z-0.06,px,WALLH-0.06-drop,Z,0.007,0.010);
-          B.at(fMat,new THREE.SphereGeometry(R,10,8),px,WALLH-0.08-drop-R,Z);
-          B.at(liveMat,new THREE.SphereGeometry(R*0.62,8,6),px,WALLH-0.08-drop-R,Z);
-        }
-        pend.push({pri:1,base:0.40,col:glowC.getHex(),dist:2.3,
-          pos:new THREE.Vector3(f.x+0.5+f.dx*0.5-f.dx*0.28,WALLH-0.52,f.y+0.5+f.dy*0.5-f.dy*0.28)});
-      }else if(f.kind==='compost'){
-        /* What the colony does with the dead: pinned to the stalk and planted.
-           Grim, and it is where the spore servants on this floor came from.
-
-           It must be MOSTLY CONSUMED. Built as a clean skeleton against the
-           wall it read as a little stick figure standing on a mound — a doll,
-           not a body being eaten. So the fungus has most of it: a sheath of
-           flesh over the torso and legs, the soil up past the hips, and only a
-           shoulder, a jaw and one arm still showing. */
-        B.at(fDark,new THREE.BoxGeometry(0.36,0.66,0.09),0,0.40,Z-0.07);
-        B.at(fMat,new THREE.SphereGeometry(0.15,12,9,0,6.2832,0,1.7),0,0.40,Z-0.02);
-        B.at(soilMat,new THREE.SphereGeometry(0.24,13,8,0,6.2832,0,1.35),0,0.06,Z);
-        B.at(boneMat,new THREE.SphereGeometry(0.046,9,7),0.01,0.63,Z+0.01);   // what is left of the head
-        B.at(fMat,new THREE.SphereGeometry(0.044,9,7),-0.015,0.645,Z+0.015);  // most of it already taken
-        B.at(boneMat,new THREE.CylinderGeometry(0.013,0.016,0.10,6),0.10,0.55,Z+0.02,0,0,0.5);
-        addSeg(B,boneMat,0.11,0.52,Z+0.02, 0.19,0.40,Z+0.04,0.017,0.012);     // one arm, still pinned
-        B.at(huskMat,new THREE.CylinderGeometry(0.010,0.010,0.10,5),0.19,0.40,Z+0.02,Math.PI/2);
-        for(let k=0;k<7;k++){                                                 // and the crop off it
-          const a=k*0.9, px=Math.cos(a)*0.11, py=0.26+Math.abs(Math.sin(a))*0.30;
-          addSeg(B,fMat,px,py,Z,px+0.02,py+0.075,Z+0.035,0.011,0.008);
-          B.at(capMat,new THREE.SphereGeometry(0.030,7,5,0,6.2832,0,1.3),px+0.02,py+0.075,Z+0.035);
-          B.at(liveMat,new THREE.SphereGeometry(0.011,6,5),px+0.02,py+0.082,Z+0.055);
-        }
-      }else{
-        /* A RAPPORT BLOOM. Myconids spend a third of the day melding — sharing
-           memory through spores — and a circle does it around one body. This is
-           that body: a broad pale cap on the wall with its gills facing the
-           room, and it is the brightest thing in the grove.
-
-           The light has to sit PROUD of the gills. The first build put the
-           glowing core at Z+0.04 inside a gill cone whose face reaches Z+0.045,
-           so it was buried in its own geometry and the whole thing rendered as
-           a dark porthole with a ring of bolts round it. */
-        /* Built FLAT, not as a dome. `SphereGeometry(0.29,...,0,1.05)` is a
-           spherical cap of radius 0.29, so it bulged 29cm into the room and
-           every other part of the bloom — the gills, the glowing core, the ring
-           of caps — was inside it. All you saw was the back of a ball. What
-           reads as a cap seen face-on is a gill FACE with a rim round it. */
-        B.at(fDark,new THREE.CylinderGeometry(0.31,0.34,0.05,20),0,0.62,Z-0.06,Math.PI/2);
-        B.at(gillMat,new THREE.CylinderGeometry(0.28,0.24,0.05,22),0,0.62,Z,Math.PI/2);
-        B.at(fMat,new THREE.TorusGeometry(0.285,0.035,6,22),0,0.62,Z+0.01,0,0,0);
-        B.at(liveMat,new THREE.SphereGeometry(0.085,12,9),0,0.62,Z+0.06);
-        for(let k=0;k<12;k++){                   // light showing between the gills
-          const a=k/12*Math.PI*2;
-          B.at(liveMat,new THREE.SphereGeometry(0.024,7,6),
-               Math.cos(a)*0.18,0.62+Math.sin(a)*0.18,Z+0.045);
-        }
-        for(let k=0;k<9;k++){                    // the circle that gathers at it
-          const a=k/9*Math.PI*2, px=Math.cos(a)*0.36, py=0.62+Math.sin(a)*0.36;
-          addSeg(B,fMat,px,py,Z-0.06,px*0.90,py*0.96+0.02,Z+0.03,0.015,0.011);
-          B.at(capMat,new THREE.SphereGeometry(0.042,8,6,0,6.2832,0,1.25),px*0.90,py*0.96+0.02,Z+0.03);
-          B.at(liveMat,new THREE.SphereGeometry(0.016,6,5),px*0.90,py*0.96+0.02,Z+0.065);
-        }
-        pend.push({pri:0,base:0.62,col:glowC.getHex(),dist:2.9,
-          pos:new THREE.Vector3(f.x+0.5+f.dx*0.5-f.dx*0.34,0.62,f.y+0.5+f.dy*0.5-f.dy*0.34)});
-      }
-      B.addTo(g0);
-      g0.rotation.y=Math.atan2(-f.dx,-f.dy);
-      g0.position.set(f.x+0.5+f.dx*0.5,0,f.y+0.5+f.dy*0.5);
-      grp.add(g0);
-    }
-    /* Same ration the halls and the house run under: three.js Phong pays for
-       every light on every fragment of every material. A rapport bloom is where
-       the circle gathers and comes first, then the hanging pods, then a
-       fruiting cluster — which is food, and food does not have to be seen from
-       across a room. */
-    pend.sort((a,b)=>a.pri-b.pri);
-    for(const q of pend.slice(0,FURNITURE_LIGHTS)){
-      const l=new THREE.PointLight(q.col,q.base,q.dist,2);
-      l.position.copy(q.pos);grp.add(l);
-    }
-    R3.candleFlames=flames;
   }
   // drow houses: rose windows, and stalactites the builders never bothered to
   // cut down. A wall tile is a solid box, so the window is the same trick the
@@ -11591,7 +10296,7 @@ function buildLevel(L){
       if(L.grid[y*L.w+x]!==T_WALL)continue;
       for(const [dx,dy] of DIRS){
         const t=L.grid[(y+dy)*L.w+(x+dx)];
-        if(t!==T_FLOOR&&t!==T_DOOR_OPEN)continue; // must face somewhere you can stand
+        if(t!==T_FLOOR&&t!==T_DOOR_OPEN&&t!==T_STAIRS)continue; // must face somewhere you can stand
         let h=((x*83492791)^(y*29996224)^((dx+2)*15485863)^((dy+2)*32452843))>>>0;
         h=(h^(h>>>13))*1274126177>>>0;
         if((h>>>8)/16777216>0.015)continue;                     // ~7 sites a floor, no more
@@ -12057,63 +10762,14 @@ function refreshItemSprite(L,i){
 }
 function itemTexKey(it){return 'it_'+it.base+'_'+it.bonus+'_'+(it.tint||'')+'_'+(ITEM_DEFS[it.base].tint||'');}
 // single source of truth for monster frame textures (cache key + raster options)
-/* 640px, not 384: a large creature one tile away fills ~750 physical pixels on
-   a DPR-3 phone, so a 384px raster was magnified ~2x and read as blurry up
-   close. 640 brings that down to ~1.1x — near its native resolution — at the
-   cost of ~2.8x the raster time and texture memory per frame. */
-const MON_TEX=640;
-// the six frames every creature carries, shared by the prewarm and the prune so
-// one cannot rasterise a pose the other does not know to keep
-const MON_POSES=['idle0','idle1','walk0','walk1','windup','strike'];
-/* A duergar's racial enlarge grows the BILLBOARD and nothing else, so the same
-   raster gets stretched over a bigger quad: measured, magnification went from
-   1.10x to 1.41x the moment a warrior swelled, and it visibly softened exactly
-   when the player was looking hardest at it. The texture has to be sized for
-   the largest the creature will ever be drawn, and `enlarge` is a static flag
-   on the definition, so that is known before anything is rasterised. Rounded to
-   a multiple of 64 to keep the mip chain tidy. */
-const ENLARGE_SCALE=1.28;
-/* MON_TEX is the raster a creature needs at the TOP of the ladder, and it was
-   being handed out at every rung. It is matched to a DPR-3 phone drawing at
-   `high`, where a normal creature lands on about 640 buffer pixels — but at
-   `low` the renderer draws at pixel ratio 1.5, where the same creature can never
-   cover more than about half that, and on a desktop at DPR 1 less again. Every
-   one of those was still rasterising and caching 640x640 frames, so the one
-   setting a player reaches for when a device is struggling bought them no memory
-   relief at all.
-
-   The size therefore comes off the drawing buffer the renderer is actually
-   using. The 0.55 is that same matched pair read backwards: 640 pixels of
-   sprite over a 1200-pixel buffer (400 CSS at DPR 3). Basing it on the buffer
-   rather than on the pixel ratio matters, because a large window at DPR 1 shows
-   a creature more pixels than a small one does, and it makes adaptive's stepping
-   carry the texture with it for free.
-
-   Quantised to 64 so the mip chain stays tidy and so small resizes do not churn
-   the cache, and capped at MON_TEX so `high` on a phone is exactly what it was. */
-function monTexBase(){
-  const h=R3.renderer?R3.renderer.domElement.height:0;
-  if(!h)return MON_TEX;
-  return Math.max(256,Math.min(MON_TEX,Math.ceil(h*0.55/64)*64));
-}
-/* Frozen for the length of a floor. The raster size is part of the cache key, so
-   letting it move mid-floor would leave the frames rasterised at the old size
-   stranded in the cache beside the new ones — the prune only runs on a floor
-   change. Refreshed where that prune runs and again at the top of `buildLevel`,
-   which is the one path a loaded save takes. */
-function refreshMonTexPx(){R3.monTexPx=monTexBase();return R3.monTexPx;}
-function monsterTexPx(key){
-  const base=R3.monTexPx||refreshMonTexPx();
-  return MONSTERS[key]&&MONSTERS[key].enlarge
-    ? Math.ceil(base*ENLARGE_SCALE/64)*64 : base;
-}
-function monsterFrameTex(sprKey,boss,pose,elite,px){
+function monsterFrameTex(sprKey,boss,pose,elite){
   const tint=elite&&ELITES[elite]?ELITES[elite].tint:null;
-  const S=px||MON_TEX;
-  // the size is part of the key: one sprite shared by two creatures at
-  // different rasters must not hand back the smaller one
+  // 640px, not 384: a large creature one tile away fills ~750 physical pixels on
+  // a DPR-3 phone, so a 384px raster was magnified ~2x and read as blurry up
+  // close. 640 brings that down to ~1.2x — near its native resolution — at the
+  // cost of ~2.8x the raster time and texture memory per frame.
   return svgToTexture(monsterSVG(sprKey,boss,pose,tint),
-    monFrameKey(sprKey,boss,pose,elite,S),{size:S,mipmap:true});
+    'mon_'+sprKey+(boss?'_b':'')+(elite?'_'+elite:'')+'_'+pose,{size:640,mipmap:true});
 }
 /* Every pose is rasterised the first time it is used, and a frame costs about
    25ms of main thread to decode at 384px once it carries the rim and contact-
@@ -12124,43 +10780,6 @@ function monsterFrameTex(sprKey,boss,pose,elite,px){
    standing on it while the level is being built, where a hitch is expected and
    invisible. The texture cache is global and keyed by kind, so this is paid once
    per creature type per run, not once per monster. */
-// the cache key monsterFrameTex files a frame under, in one place so the prune
-// below cannot drift from what the rasteriser actually wrote
-function monFrameKey(sprKey,boss,pose,elite,px){
-  return 'mon_'+sprKey+(boss?'_b':'')+(elite?'_'+elite:'')+'_'+pose+'_'+(px||MON_TEX);
-}
-/* The frame cache is global and was never emptied, so it grew for the whole run
-   rather than for the floor being played: measured over a 24-floor descent it
-   reached 683 textures and about 1.3 GB. iOS Safari kills a tab well before
-   that, which is what "the game crashes" was — a descent walked off the memory
-   ceiling somewhere past the middle floors. Keeping only what the floor about to
-   be played needs bounds it at one floor's worth; anything dropped that is
-   wanted again is re-rasterised by prewarmMonsterFrames, which already spreads
-   that work over idle callbacks.
-
-   This hangs off the FLOOR CHANGE and deliberately not off disposeLevel:
-   buildLevel calls disposeLevel, and openBier/openForge/openAltar call
-   buildLevel again mid-floor to show a shifted lid, so evicting there would
-   re-rasterise every creature on the floor the moment a coffin is opened.
-
-   Only `mon_` entries are touched. The wall, floor, item and fx textures in the
-   same cache are small, bounded, and in use by the level being built. */
-function pruneMonsterTextures(L){
-  refreshMonTexPx();
-  const keep={};
-  for(const m of L.monsters){
-    const px=monsterTexPx(m.key),spr=MONSTERS[m.key].spr;
-    for(const pose of MON_POSES)keep[monFrameKey(spr,m.boss,pose,m.elite,px)]=1;
-  }
-  let freed=0;
-  for(const k in R3.texCache){
-    if(k.lastIndexOf('mon_',0)!==0||keep[k])continue;
-    const t=R3.texCache[k];
-    if(t&&t.dispose)t.dispose();
-    delete R3.texCache[k];freed++;
-  }
-  return freed;
-}
 function prewarmMonsterFrames(L){
   const seen={},queue=[];
   for(const m of L.monsters){
@@ -12168,10 +10787,9 @@ function prewarmMonsterFrames(L){
     if(seen[k])continue;seen[k]=1;
     // the resting frames are wanted the instant the floor appears; the rest can
     // trickle in behind it
-    const px=monsterTexPx(m.key);
-    monsterFrameTex(MONSTERS[m.key].spr,m.boss,'idle0',m.elite,px);
-    for(const pose of MON_POSES)if(pose!=='idle0')
-      queue.push([MONSTERS[m.key].spr,m.boss,pose,m.elite,px]);
+    monsterFrameTex(MONSTERS[m.key].spr,m.boss,'idle0',m.elite);
+    for(const pose of ['idle1','walk0','walk1','windup','strike'])
+      queue.push([MONSTERS[m.key].spr,m.boss,pose,m.elite]);
   }
   /* Drained a couple at a time rather than in one block. A frame costs about
      30ms of main thread to rasterise at 384px once it carries the rim, the
@@ -12188,7 +10806,7 @@ function prewarmMonsterFrames(L){
   const drain=(dl)=>{
     R3.prewarmT=0;
     while(R3.prewarmQ.length&&(dl.timeRemaining?dl.timeRemaining():8)>4){
-      const a=R3.prewarmQ.shift();monsterFrameTex(a[0],a[1],a[2],a[3],a[4]);
+      const a=R3.prewarmQ.shift();monsterFrameTex(a[0],a[1],a[2],a[3]);
     }
     if(R3.prewarmQ.length)R3.prewarmT=idle(drain);
   };
@@ -12205,8 +10823,7 @@ function addMonsterSprite(m){
   const sprKey=MONSTERS[m.key].spr;
   // only the resting frame up front; walk/windup/strike rasterize lazily on first
   // use (the global texture cache still shares frames across same-type monsters)
-  const texPx=monsterTexPx(m.key);
-  const frames={idle0:monsterFrameTex(sprKey,m.boss,'idle0',m.elite,texPx)};
+  const frames={idle0:monsterFrameTex(sprKey,m.boss,'idle0',m.elite)};
   /* alphaTest matters beyond looks: without it the sprite's transparent margins
      write depth across the whole quad, and every effect behind a monster — a
      lightning stroke, frost on the floor, another monster's impact splash —
@@ -12217,7 +10834,7 @@ function addMonsterSprite(m){
   const sc=monsterSpriteScale(m.key,m.boss);
   spr.scale.set(sc,sc,1);
   spr.position.set(m.x+0.5,sc/2+0.02,m.y+0.5);
-  spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss,elite:m.elite,texPx};
+  spr.userData={kind:'monster',id:m.id,frames,curFrame:'idle0',sprKey,boss:m.boss,elite:m.elite};
   R3.levelGroup.add(spr);R3.monsterSprites[m.id]=spr;
   addMonsterGlow(m,sprKey,sc);
   addMonsterShadow(m,sc);
@@ -12386,8 +11003,6 @@ function updateCamera(now){
   R3.torch.intensity=R3.torchBase*(1+flicker)*(1+lb*0.12);
   R3.torchFill.intensity=0.9*(1+flicker*0.6);
   shadeSprites();
-  // the stairwell's light shafts drift; one uniform, both cones
-  if(R3.godRays)for(const m of R3.godRays)m.uniforms.t.value=now/1000;
   // crypt candles guttering, each on its own phase so they don't pulse together
   for(let i=0;i<R3.candleFlames.length;i++){
     const c=R3.candleFlames[i],ph=i*1.7;
@@ -12439,59 +11054,6 @@ function noteSeen(key){
   if(!key||G.seen[key])return;
   G.seen[key]=1;
   try{localStorage.setItem('crawl_seen',JSON.stringify(G.seen));}catch(e){}
-}
-/* ---------- render resolution ----------
-   The 3D view is drawn into a buffer of viewport × pixelRatio and then scaled
-   to fit the screen, so ANY pixel ratio below the display's own DPR is an
-   upscale. The old flat cap of 2 meant a DPR-3 phone drew every frame at two
-   thirds resolution and stretched it by 1.5 — which softened the whole view,
-   and monsters worst, because they carry the finest detail and are what you
-   look at. Measured at 541x400 CSS on DPR 3: a goblin got 427 buffer pixels
-   spread over 640 device pixels. The bestiary looks sharper at the same size
-   for exactly this reason — it is a DOM image rendered at full device
-   resolution, never going through the canvas at all.
-
-   Three modes, because the right answer depends on hardware nobody can detect
-   up front: `high` draws at the display's own resolution, `low` stays cheap,
-   and `adaptive` starts high and steps down only if frames actually run long. */
-const GFX_MODES=['high','adaptive','low'];
-const GFX_RUNGS=[3,2,1.5,1];   // the ladder adaptive walks; index 0 is sharpest
-const GFX_LOW=1.5;
-let gfxMode='adaptive',gfxRung=0,gfxAcc=0,gfxN=0;
-const dprCap=(v)=>Math.max(1,Math.min(window.devicePixelRatio||1,v));
-function gfxPixelRatio(){
-  if(gfxMode==='low')return dprCap(GFX_LOW);
-  if(gfxMode==='high')return dprCap(GFX_RUNGS[0]);
-  return dprCap(GFX_RUNGS[gfxRung]);
-}
-function applyGfx(){
-  if(!R3.renderer)return;
-  const pr=gfxPixelRatio();
-  if(Math.abs(R3.renderer.getPixelRatio()-pr)<0.01)return;
-  R3.renderer.setPixelRatio(pr);
-  onResize();   // the drawing buffer only changes size on a setSize
-}
-function loadGfx(){
-  try{const v=localStorage.getItem('crawl_gfx');if(GFX_MODES.indexOf(v)>=0)gfxMode=v;}catch(e){}
-}
-function setGfx(m){
-  if(GFX_MODES.indexOf(m)<0)return;
-  gfxMode=m;gfxRung=0;gfxAcc=0;gfxN=0;
-  try{localStorage.setItem('crawl_gfx',m);}catch(e){}
-  applyGfx();
-}
-/* Adaptive stepping, fed only by frames that actually did work — the loop
-   throttles to a third of the rate when nothing is moving, and those long idle
-   frames would read as a struggling device. Sampled over roughly a second, with
-   a gap between the step-down and step-up thresholds so it settles instead of
-   oscillating between two rungs. */
-function gfxSample(dt){
-  if(gfxMode!=='adaptive')return;
-  gfxAcc+=dt;gfxN++;
-  if(gfxN<45)return;
-  const avg=gfxAcc/gfxN;gfxAcc=0;gfxN=0;
-  if(avg>0.026&&gfxRung<GFX_RUNGS.length-1){gfxRung++;applyGfx();}        // under ~38fps
-  else if(avg<0.019&&gfxRung>0){gfxRung--;applyGfx();}                    // comfortably at rate
 }
 function tileAt(x,y){if(x<0||y<0||x>=G.L.w||y>=G.L.h)return T_WALL;return G.L.grid[y*G.L.w+x];}
 function setTile(x,y,t){G.L.grid[y*G.L.w+x]=t;}
@@ -12562,7 +11124,7 @@ function computeDistField(){
     if(dd>=22)continue;
     for(const [dx,dy] of DIRS){
       const nx=cx+dx,ny=cy+dy,t=tileAt(nx,ny);
-      if((t===T_FLOOR||t===T_DOOR_OPEN)&&df[ny*L.w+nx]<0){df[ny*L.w+nx]=dd+1;q.push([nx,ny]);}
+      if((t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS)&&df[ny*L.w+nx]<0){df[ny*L.w+nx]=dd+1;q.push([nx,ny]);}
     }
   }
   G.distField=df;
@@ -12588,7 +11150,7 @@ function combatNoise(x,y,r){
     if(d>=r)continue;
     for(const [dx,dy] of DIRS){
       const nx=cx+dx,ny=cy+dy,t=tileAt(nx,ny);
-      if((t===T_FLOOR||t===T_DOOR_OPEN)&&df[ny*L.w+nx]<0){
+      if((t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS)&&df[ny*L.w+nx]<0){
         df[ny*L.w+nx]=d+1;q.push([nx,ny]);
       }
     }
@@ -12745,30 +11307,17 @@ function tryMove(kind){ // 'fwd','back','sleft','sright'
     // not report a sewer lake
     const os=G.L.ossuary;
     if(os&&nx===os.bx&&ny===os.by){openBier();return;}
-    const mo=G.L.mound;
-    if(mo&&nx===mo.tx&&ny===mo.ty){openMound();return;}
     SFX.bump();UI.toast('A pit of putrid sewage blocks the way.');return;
   }
   if(t===T_SECRET_FOUND){openSecretAt(nx,ny);return;}
   if(t===T_DOOR){openDoorAt(nx,ny);return;}
   if(t===T_DOOR_LOCKED){tryUnlock(nx,ny);return;}
-  /* The stairwell is not a tile you stand on — walking into it takes you down
-     it. This is where the party used to step onto the stairs and descend a
-     quarter-second later; the control is identical, the camera simply never
-     enters the tile the newel stands in. */
-  if(t===T_STAIRS){G.moveCd=0.22;takeStairs();return;}
   const m=monsterAt(nx,ny);
   if(m){SFX.bump();UI.toast(m.name+' blocks the way!');return;}
   G.px=nx;G.py=ny;G.moveCd=0.22;
   animCamera(190);SFX.step();
   afterPartyMove();
-}
-// the one way down, shared by walking into the stairwell and by tapping it
-function takeStairs(){
-  if(G.over||G._descending)return;
-  G._descending=true;
-  SFX.step();
-  setTimeout(()=>{G._descending=false;if(!G.over)descend();},260);
+  if(t===T_STAIRS){setTimeout(()=>{if(!G.over)descend();},260);}
 }
 function tryRotate(dir){ // +1 right, -1 left
   if(G.paused||G.over||G.moveCd>0)return;
@@ -12964,31 +11513,6 @@ function triggerTrap(tr){
       UI.float(ch,'held!','#c9a8e8');
       UI.toast('Silk snaps taut round '+ch.name+' — they are held fast!');
     }else UI.toast('A snare closes on '+ch.name+' and finds no purchase.'); // freedom
-  }else if(tr.kind==='puffball'){
-    /* A ripe puffball underfoot. FORTITUDE, not Reflex — the burst is not
-       something you dodge, it is something you breathe, which is the same test
-       the grove's own creatures make you roll against their spores. It stuns
-       It stuns rather than holds, and it lasts as long as the drow snare does,
-       which is what `trapcost_body.js` says it has to: at three seconds it
-       measured 6.5 hp against a 16.9 mean for the five it displaces, the
-       cheapest thing in the table by a wide margin — the same reading that made
-       the snare go from four seconds to five.
-
-       What makes it a different trap rather than a reskin is the SAVE. The
-       snare is Reflex and this is Fortitude, so the two catch different members
-       of the same party.
-
-       No damage. `stunned` is already read by both canAct and charAC — a
-       condition read by only one is a badge that blocks nothing — so the rules
-       needed nothing new to make this bite. */
-    const ch=pick(alive);
-    const sv=charSaves(ch).fort+foundBonus;
-    if(d20()+sv>=tr.dc){
-      UI.toast(ch.name+' turns their head from the burst.');
-    }else if(addCond(ch,{kind:'stunned',dur:tr.dur})){
-      UI.float(ch,'stunned!','#c88ae8');
-      UI.toast('A puffball bursts underfoot and '+ch.name+' reels in the spore cloud!');
-    }else UI.toast('Spores wash over '+ch.name+' and do nothing.');
   }else if(tr.kind==='pdart'||tr.kind==='sleepdart'){
     // the dart must hit (dodge it by AC), and then the venom must take (resist
     // it by Fortitude) — two layers, because paralysis and sleep are that bad
@@ -13940,7 +12464,7 @@ function resolvePartyTileOverlap(){
     if(m.x!==G.px||m.y!==G.py)continue;
     const opts=DIRS.slice().sort(()=>Math.random()-0.5).filter(([dx,dy])=>{
       const t=tileAt(m.x+dx,m.y+dy);
-      return (t===T_FLOOR||t===T_DOOR_OPEN)&&freeSlotAt(m.x+dx,m.y+dy,m)>=0;
+      return (t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS)&&freeSlotAt(m.x+dx,m.y+dy,m)>=0;
     });
     if(opts.length){const [dx,dy]=opts[0];moveMonster(m,m.x+dx,m.y+dy);}
   }
@@ -14006,7 +12530,7 @@ function chaseStep(m){
 }
 function stepOk(m,nx,ny){
   const t=tileAt(nx,ny);
-  if(!(t===T_FLOOR||t===T_DOOR_OPEN))return false;
+  if(!(t===T_FLOOR||t===T_DOOR_OPEN||t===T_STAIRS))return false;
   if(freeSlotAt(nx,ny,m)<0)return false; // the tile is packed four deep
   if(nx===G.px&&ny===G.py)return false;
   return true;
@@ -14125,9 +12649,7 @@ function duergarTricks(m){
     m.dmg=[m.dmg[0],m.dmg[1],m.dmg[2]+3];
     m.atk+=1;m.ac-=1;                     // bigger and slower to cover
     const s=R3.monsterSprites&&R3.monsterSprites[m.id];
-    // ENLARGE_SCALE is shared with monsterTexPx: the raster is sized for the
-    // grown creature up front, so swelling does not magnify a too-small texture
-    if(s&&m._sc){m._sc*=ENLARGE_SCALE;s.scale.set(m._sc,m._sc,1);s.position.y=m._sc/2+0.02;}
+    if(s&&m._sc){m._sc*=1.28;s.scale.set(m._sc,m._sc,1);s.position.y=m._sc/2+0.02;}
     UI.floatAtMonster(m,'ENLARGED','#e0cf9e');
     UI.toast(m.name+' swells, armour groaning at the seams!');
     SFX.growl(0);
@@ -16106,31 +14628,6 @@ function openAltar(){
   if(coffinNoise(c.ax,c.ay,8))setTimeout(()=>UI.toast('The whole chapel has heard it…'),900);
   saveGame();
 }
-/* Digging a circle mound out, written on `openBier`'s terms like the forge
-   anvil and Lolth's altar before it. Robbed once, and loud: a mound is where
-   the circle sleeps, so turning one over is heard right across the grove —
-   which on this theme means every myconid within earshot, not just the ones
-   who can see you. */
-function openMound(){
-  const L=G.L,c=L.mound;
-  if(!c)return;
-  if(Math.abs(c.tx-G.px)+Math.abs(c.ty-G.py)>1){UI.toast('Too far to reach the mound.');return;}
-  if(c.opened){UI.toast('The mound is turned over. Only soil and spent caps now.');return;}
-  c.opened=true;
-  SFX.secret();
-  buildLevel(L);
-  const spill=[];
-  for(let k=0;k<2+rnd(2);k++)spill.push(randLoot(G.depth+2,true,true,true));
-  const near=DIRS.map(([dx,dy])=>({x:c.tx+dx,y:c.ty+dy}))
-    .filter(p=>walkableTile(tileAt(p.x,p.y)));
-  const drop=near.length?near[0]:{x:G.px,y:G.py};
-  const di=drop.y*L.w+drop.x;
-  (L.items[di]=L.items[di]||[]).push(...spill);
-  refreshItemSprite(L,di);
-  UI.toast('You dig through the bed. Metal does not rot: '+spill.map(itemName).join(', ')+'.');
-  if(coffinNoise(c.tx,c.ty,8))setTimeout(()=>UI.toast('The whole grove has felt it…'),900);
-  saveGame();
-}
 // camp on a floor a third time and something comes looking for you
 function summonHuntingPack(){
   const L=G.L;
@@ -16171,9 +14668,6 @@ function startLevel(L){
   G.px=L.start.x;G.py=L.start.y;
   // face an open direction
   for(let f=0;f<4;f++){const [dx,dy]=DIRS[f];if(walkableTile(tileAt(L.start.x+dx,L.start.y+dy))){G.facing=f;break;}}
-  // once per floor, before the new one's frames are rasterised: drop the
-  // previous floor's creatures so the cache holds a floor rather than a run
-  pruneMonsterTextures(L);
   buildLevel(L);
   packAllRanks(); // generated or loaded monsters may share a tile: seat them
   snapCamera();
@@ -16185,43 +14679,7 @@ function startLevel(L){
 }
 /* ---------- save / load ---------- */
 function u8ToB64(u8){let s='';for(let i=0;i<u8.length;i+=4096)s+=String.fromCharCode.apply(null,u8.subarray(i,i+4096));return btoa(s);}
-/* The decoder is deliberately forgiving, and that is the whole difference
-   between a save that loads and a save that is gone.
-
-   `atob` is strict: a string whose length is not a multiple of four, or that
-   carries padding anywhere but at the end, throws outright. A save arrived
-   whose `explored` field was 1130 characters — two more than any `btoa` output
-   can be — and every attempt to continue that descent died inside `b64ToU8`,
-   which `loadGame`'s catch then swallowed. The player got a Continue button
-   that did nothing, which is indistinguishable from a crash, on a save that was
-   otherwise entirely intact: the map, the party, the monsters and the floor's
-   furniture all read back perfectly once the field was repaired.
-
-   These two arrays are the *only* binary fields in a save, they are pure
-   scenery bookkeeping (the tile map and which tiles have been seen), and their
-   length is already known from `w`·`h`. So there is no reason to let a few
-   damaged characters in them cost a run. Anything outside the base64 alphabet
-   is dropped, stray padding is dropped, the remainder is re-padded to a
-   multiple of four, and the result is fitted to the length the level says it
-   should be. A byte or two of the map may come back wrong; a run does not.
-
-   `want` is optional so the function still behaves for any other caller. */
-function b64ToU8(b,want){
-  let s='';
-  try{s=atob(b);}
-  catch(e){
-    const clean=String(b).replace(/[^A-Za-z0-9+/]/g,'');
-    // re-pad: base64 decodes four characters to three bytes, and a trailing
-    // group of one character carries no whole byte at all, so drop it
-    const keep=clean.length-(clean.length%4===1?1:0);
-    const trimmed=clean.slice(0,keep);
-    try{s=atob(trimmed+'='.repeat((4-trimmed.length%4)%4));}catch(e2){s='';}
-  }
-  const n=want>0?want:s.length;
-  const u=new Uint8Array(n);
-  for(let i=0,m=Math.min(n,s.length);i<m;i++)u[i]=s.charCodeAt(i);
-  return u;
-}
+function b64ToU8(b){const s=atob(b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u;}
 function serializeGame(){
   const L=G.L;
   return {
@@ -16237,7 +14695,7 @@ function serializeGame(){
       traps:Object.values(L.traps),items:Object.keys(L.items).map(i=>[+i,L.items[i]]),
       monsters:L.monsters.map(m=>{const c=Object.assign({},m);delete c._sc;delete c._regenT;delete c.dot;return c;}),
       secrets:L.secrets,lockedRoom:L.lockedRoom,restCount:L.restCount||{},restsHere:L.restsHere||0,
-      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,forge:L.forge||null,chapel:L.chapel||null,mound:L.mound||null,lurkers:L.lurkers||[],duergar:L.duergar||[],pillars:L.pillars||[],drow:L.drow||[],myconid:L.myconid||[],
+      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,forge:L.forge||null,chapel:L.chapel||null,lurkers:L.lurkers||[],duergar:L.duergar||[],pillars:L.pillars||[],drow:L.drow||[],
     },
   };
 }
@@ -16254,10 +14712,10 @@ function deserializeGame(o){
   const traps={};for(const t of lv.traps)traps[t.y*lv.w+t.x]=t;
   const items={};for(const [i,arr] of lv.items)items[i]=arr;
   const L={
-    w:lv.w,h:lv.h,grid:b64ToU8(lv.grid,lv.w*lv.h),explored:b64ToU8(lv.explored,lv.w*lv.h),
+    w:lv.w,h:lv.h,grid:b64ToU8(lv.grid),explored:b64ToU8(lv.explored),
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
     traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
-    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,forge:lv.forge||null,chapel:lv.chapel||null,mound:lv.mound||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],pillars:lv.pillars||[],drow:lv.drow||[],myconid:lv.myconid||[],
+    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,forge:lv.forge||null,chapel:lv.chapel||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],pillars:lv.pillars||[],drow:lv.drow||[],
   };
   clearFx();
   G.L=L;G.over=false;
@@ -16291,15 +14749,7 @@ function loadGame(){
     }
     deserializeGame(o);
     return true;
-  }catch(e){
-    console.warn('load failed',e);
-    /* Say something. The save is deliberately left alone — it may still be
-       readable by a later build, and throwing away someone's descent to tidy
-       the menu is the worst thing this function could do — but a Continue
-       button that does nothing at all reads as the game having crashed. */
-    UI.toast('The saved game could not be read.');
-    return false;
-  }
+  }catch(e){console.warn('load failed',e);return false;}
 }
 /* ---------- main loop ---------- */
 let lastT=0,idleSkip=0;
@@ -16321,7 +14771,6 @@ function loop(now){
     const busy=G.started&&!G.paused&&(R3.camAnim||R3.shake>0||G.fx.length>0||G.moveCd>0||R3.viewDrag||
       G.L.monsters.some(mm=>mm.awake&&mm.hp>0));
     if(!busy){idleSkip=(idleSkip+1)%3;if(idleSkip)return;}
-    else gfxSample(dt);   // only frames doing real work judge the device
     updateCamera(now);
     updateSprites(now);
     R3.renderer.render(R3.scene,R3.camera);
@@ -16372,7 +14821,7 @@ function updateSprites(now){
     if(ud.curFrame!==frame&&ud.frames){
       // frames are generated lazily on first use; keep the old frame until loaded
       let t=ud.frames[frame];
-      if(!t){t=monsterFrameTex(ud.sprKey,ud.boss,frame,ud.elite,ud.texPx);ud.frames[frame]=t;}
+      if(!t){t=monsterFrameTex(ud.sprKey,ud.boss,frame,ud.elite);ud.frames[frame]=t;}
       if(t.__ready!==false){ud.curFrame=frame;s.material.map=t;}
     }
     // idle bob + strike lunge toward the party
@@ -16690,7 +15139,6 @@ const UI=(()=>{
       :kind==='pdart'?'rgba(80,220,200,0.22)'
       :kind==='sleepdart'?'rgba(165,125,220,0.22)'
       :kind==='websnare'?'rgba(200,168,232,0.20)'   // faerzress violet: it draws no blood
-      :kind==='puffball'?'rgba(200,138,232,0.22)'   // spore violet: nor does this
       :'rgba(200,45,30,0.20)';
     el.style.background='radial-gradient(circle at center, '+tint+', transparent 60%),'
       +'radial-gradient(circle at center, rgba(0,0,0,0.30), rgba(0,0,0,0.52) 78%)';
@@ -16821,8 +15269,7 @@ const UI=(()=>{
     const b=$('log-list');b.scrollTop=b.scrollHeight;
   }
   function refreshDepthTag(){
-    $('depth-tag').textContent='Depth '+G.depth+' · '+G.L.theme.name+
-      (G.depth%3===0&&G.depth>=6?' ⚔':'')+'  ·  v'+VERSION;
+    $('depth-tag').textContent='Depth '+G.depth+' · '+G.L.theme.name+(G.depth%3===0&&G.depth>=6?' ⚔':'');
   }
   /* ---------- overlays ---------- */
   function anyOverlayOpen(){return [...document.querySelectorAll('.ovl')].some(o=>o.classList.contains('show')&&o.id!=='ovl-rotate');}
@@ -17358,11 +15805,6 @@ const UI=(()=>{
   }
   const dmgStr=(d)=>d?d[0]+'d'+d[1]+(d[2]>0?'+'+d[2]:d[2]<0?d[2]:''):'—';
   const crStr=(cr)=>cr<1?('1/'+Math.round(1/cr)):String(cr);
-  /* `speed` is a movement COOLDOWN in seconds, so lower is faster — printing the
-     raw number would read backwards to a player. Thresholds sit either side of
-     the bestiary's own spread (quartiles 1.3 / 1.4 / 1.5), so the labels
-     actually divide the roster instead of lumping it all into one word. */
-  const speedLabel=(s)=>s<=1.15?'Fast':s<=1.45?'Steady':s<=1.9?'Slow':'Very slow';
   /* What the creature can do to you, in the same words the game uses when it
      does it. Read off the definition's own flags, so a creature gains its line
      here the moment it gains the ability rather than needing a second table. */
@@ -17382,8 +15824,6 @@ const UI=(()=>{
     if(d.regen)out.push('Regenerates '+d.regen+' hp');
     if(d.skeletal)out.push('Skeletal — half damage from piercing, extra from bludgeoning');
     if(d.incorporeal)out.push('Incorporeal — halves damage from unenchanted weapons');
-    if(d.enlarge)out.push('Enlarges when bloodied — +3 damage, +1 attack, −1 AC');
-    if(d.vanish)out.push('Turns invisible when hurt, then strikes unseen');
     if(d.lurk)out.push('Ambusher — lies in wait as rock');
     if(d.shriek)out.push('Shrieks — wakes the grove');
     if(d.distress)out.push('Distress — its pain calls other myconids');
@@ -17406,14 +15846,7 @@ const UI=(()=>{
       const stats=['<span><b>CR</b> '+crStr(d.cr)+'</span>',
         '<span><b>HP</b> '+d.hp+'</span>',
         '<span><b>AC</b> '+d.ac+'</span>',
-        '<span><b>Atk</b> +'+d.atk+' ('+dmgStr(d.dmg)+')</span>',
-        '<span><b>Speed</b> '+speedLabel(d.speed)+'</span>',
-        '<span><b>XP</b> '+d.xp+'</span>'].join('');
-      // the creature's kind, and the one thing the player can act on because
-      // of it: only the undead can be turned
-      const ty=d.type||'creature';
-      const kind=ty.charAt(0).toUpperCase()+ty.slice(1)+
-        (ty==='undead'?' · can be turned':'');
+        '<span><b>Atk</b> +'+d.atk+' ('+dmgStr(d.dmg)+')</span>'].join('');
       const sp=d.caster
         ? '<div class="best-tag"><em>Spells:</em> '+dmgStr(d.caster.dmg)+' at '+d.caster.ranged+
           ' tiles, every '+d.caster.cd+'s'+(d.caster.elem?' ('+d.caster.elem+')':'')+'</div>'
@@ -17426,7 +15859,6 @@ const UI=(()=>{
         '</div>'+
         '<div class="best-info">'+
           '<div class="best-name">'+d.name+'</div>'+
-          '<div class="best-kind">'+kind+'</div>'+
           '<div class="best-stats">'+stats+'</div>'+
           sp+abl+
         '</div></div>';
@@ -17649,11 +16081,6 @@ function initInput(){
       if(u.kind==='bier'){openBier();return;}
       if(u.kind==='anvil'){openForge();return;}
       if(u.kind==='altar'){openAltar();return;}
-      if(u.kind==='mound'){openMound();return;}
-      if(u.kind==='stairs'){
-        if(Math.abs(u.x-G.px)+Math.abs(u.y-G.py)>1){UI.toast('Too far away.');return;}
-        takeStairs();return;
-      }
       if(u.kind==='plaque'){readEpitaph(u.x,u.y,u.n);return;}
       if(u.kind==='monster')return; // attacks come from hands
     }
@@ -17722,40 +16149,10 @@ function pickupItem(i){
   saveGame();
 }
 /* ============================== MENU & CREATION ============================== */
-const GFX_LBL={high:'High',adaptive:'Adaptive',low:'Low'};
-const GFX_NOTE={
-  high:'Draws at your screen\'s full resolution. Sharpest, and the most work per frame.',
-  adaptive:'Starts sharp and eases off only if the frame rate cannot keep up.',
-  low:'Draws at reduced resolution. Softest, and the easiest on the battery.',
-};
-function renderGfxChips(){
-  const box=document.getElementById('m-gfx');
-  if(!box)return;
-  box.innerHTML='';
-  for(const m of GFX_MODES){
-    const c=document.createElement('button');
-    c.className='chip'+(gfxMode===m?' sel':'');
-    c.textContent=GFX_LBL[m];
-    c.addEventListener('click',()=>{setGfx(m);renderGfxChips();});
-    box.appendChild(c);
-  }
-  document.getElementById('m-gfx-note').textContent=GFX_NOTE[gfxMode];
-}
 function refreshMenu(){
   const has=!!localStorage.getItem('crawl_save');
   document.getElementById('m-continue').disabled=!has&&!G.started;
   document.getElementById('m-continue').textContent=G.started&&!G.over?'Return to the dungeon':'Continue the descent';
-  renderGfxChips();
-}
-/* The version is stamped into the two panels that are always reachable — the
-   menu and the death screen — once at boot rather than on every open, since it
-   cannot change while the page is loaded. Both writes are guarded: the node
-   test harness stubs `document` and has neither element. */
-function stampVersion(){
-  for(const id of ['m-ver','go-ver']){
-    const el=document.getElementById(id);
-    if(el)el.textContent=VERSION;
-  }
 }
 function initMenu(){
   const $=(id)=>document.getElementById(id);
@@ -17953,13 +16350,11 @@ window.addEventListener('DOMContentLoaded',()=>{
     document.body.innerHTML='<div style="padding:40px;font-family:Georgia">Failed to load the three.js library. Check your connection and reload.</div>';
     return;
   }
-  loadGfx();    // the render resolution is chosen before the renderer is built
   initRenderer();
   loadSeen();   // the bestiary outlives any one run, so it is read before the menu opens
   initInput();
   initMenu();
   initCreation();
-  stampVersion();
   checkOrientation();
   refreshMenu();
   UI.show('ovl-menu');
