@@ -10546,15 +10546,12 @@ function buildLevel(L){
   if(th.name==='Drow'){
     const litter=new THREE.Group();
     const silkT=drowTex('silk');
-    const dSilkMat=new THREE.MeshPhongMaterial({color:0x555c6e,map:silkT,bumpMap:silkT,
-      bumpScale:0.003,specular:0x181c26,shininess:10});
     const sacMat=new THREE.MeshPhongMaterial({color:0x51503f,map:silkT,bumpMap:silkT,
       bumpScale:0.004,specular:0x201e18,shininess:14});
     // chitin: dark and lacquered, the one thing down here with a real sheen —
     // kept modest all the same, since a small hard curve is a specular trap
     const chitMat=new THREE.MeshPhongMaterial({color:0x1c1720,specular:0x252030,shininess:22});
     const boltMat=new THREE.MeshPhongMaterial({color:0x2b2c34,specular:0x101218,shininess:24});
-    const boxU=new THREE.BoxGeometry(1,1,1);
     const rockU=new THREE.IcosahedronGeometry(1,0);
     const sphU=new THREE.SphereGeometry(1,7,5);
     const cylU=new THREE.CylinderGeometry(1,1,1,5);
@@ -10563,14 +10560,7 @@ function buildLevel(L){
     const tumbleQ=(f)=>new THREE.Quaternion().setFromEuler(new THREE.Euler(f()*6.3,f()*6.3,f()*6.3));
     const loc=(px,py,pz,q,sx,sy,sz)=>new THREE.Matrix4().compose(
       new THREE.Vector3(px,py,pz),q,new THREE.Vector3(sx,sy,sz));
-    // a unit box stretched between two points — the instanced equivalent of addSeg
-    const segM=(ax,ay,az,bx,by,bz,t)=>{
-      const d=new THREE.Vector3(bx-ax,by-ay,bz-az), len=d.length();
-      const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());
-      return new THREE.Matrix4().compose(
-        new THREE.Vector3((ax+bx)/2,(ay+by)/2,(az+bz)/2),q,new THREE.Vector3(t,len,t));
-    };
-    const strands=[],sacs=[],chit=[],bolts=[];
+    const sacs=[],chit=[],bolts=[];
     const wall=(x,y)=>{const t=L.grid[y*L.w+x];return t===T_WALL||t===T_SECRET;};
     const busy=new Set((L.drow||[]).map(f=>f.x+','+f.y));
     /* Hanging cobwebs, the crypt's own geometry hung on the drow's terms. The
@@ -10601,6 +10591,24 @@ function buildLevel(L){
     for(let i=0;i<L.grid.length;i++)if(L.grid[i]===T_FLOOR)nFloor++;
     const webP=Math.min(0.13,DROW_WEBS/Math.max(1,nFloor));
     let nWebs=0;
+    /* Corner webs are each their own LineSegments, for the same reason the
+       hanging ones are — `shadeSprites` dims each by its own distance — so they
+       are each a draw call and need their own budget. Spent as a RATE against
+       the number of ELIGIBLE corners rather than as a running total, because a
+       scan running top-left to bottom-right would otherwise web every corner of
+       the first rooms and leave the rest of the floor bare. 0.55 was the old
+       unconditional rate and stays the ceiling. */
+    const CORNER_WEBS=24;
+    let nEligible=0;
+    for(let yy=1;yy<L.h-1;yy++)for(let xx=1;xx<L.w-1;xx++){
+      if(L.grid[yy*L.w+xx]!==T_FLOOR)continue;
+      for(const [ex,ez] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
+        const t1=L.grid[yy*L.w+(xx+ex)],t2=L.grid[(yy+ez)*L.w+xx];
+        if((t1===T_WALL||t1===T_SECRET)&&(t2===T_WALL||t2===T_SECRET))nEligible++;
+      }
+    }
+    const cornP=Math.min(0.55,CORNER_WEBS/Math.max(1,nEligible));
+    let nCorner=0;
     for(let y=1;y<L.h-1;y++)for(let x=1;x<L.w-1;x++){
       if(L.grid[y*L.w+x]!==T_FLOOR)continue;
       let hsh=((x*2246822519)^(y*3266489917))>>>0;
@@ -10609,24 +10617,36 @@ function buildLevel(L){
       /* Web gathers in a CORNER, where two walls meet, because that is the only
          place a strand has two anchors close enough together. Laying it on open
          floor instead would read as a net somebody dropped. */
+      /* A corner web is `cobwebGeo` too — the same threads the crypt hangs from
+         its ceiling and the house hangs in its corridors.
+
+         It was nine stretched BOXES before: five spanning strands and four guys,
+         5.5mm thick, in a lit Phong material. At a tile's range that is exactly
+         what it looked like — a handful of pale rods lying in the corner.
+         Nothing about the LAYOUT was wrong; solid geometry was. A thread has no
+         thickness to read, so a web has to be drawn as unlit lines and carried
+         by having many of them, which is the whole reason `cobwebGeo` exists and
+         why the ceiling webs read correctly in the same room.
+
+         The sheet BRIDGES the corner. `cobwebGeo` builds in the XY plane facing
+         +Z, so yawing it to `atan2(-dx,-dz)` turns that face along the diagonal
+         into the room and lands the spokes on both walls at once. The apex sits
+         up the corner and the fan hangs down toward the floor, which is where
+         dust actually gathers. */
       for(const [dx,dz] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
         if(!wall(x+dx,y)||!wall(x,y+dz))continue;
-        if(rr()>0.55)continue;
+        if(nCorner>=CORNER_WEBS||rr()>cornP)continue;
         const ax=cx+dx*0.5, az=cz+dz*0.5;           // the corner post itself
-        /* Strands span from one wall to the other ACROSS the corner, which is a
-           triangular sheet a hand's breadth wide. Laid out as rays from the
-           corner instead they came out over a metre long and lying flat across
-           the floor — straight rods radiating into the room, which is neither a
-           web nor in the corner. */
-        for(let k=0;k<5;k++){
-          const t=0.10+k*0.062, h=0.025+k*0.042;
-          strands.push(segM(ax-dx*t,h,az, ax,h,az-dz*t, 0.0055));
-        }
-        for(let k=0;k<4;k++){                       // the guys holding it up
-          const a=(k+0.5)/4*(Math.PI/2), t=0.33;
-          strands.push(segM(ax,0.018,az,
-                            ax-dx*Math.cos(a)*t,0.235,az-dz*Math.sin(a)*t, 0.0045));
-        }
+        // half-width is about 0.95*size, and it has to reach onto both walls
+        // without poking past the half-tile: 0.36 spans ~48cm along each
+        const sz=0.26+rr()*0.10;
+        const cw=new THREE.LineSegments(cobwebGeo(rr,sz),dWebMat.clone());
+        cw.position.set(ax,(0.40+rr()*0.16)-sz*0.52,az);
+        cw.rotation.set(0,Math.atan2(-dx,-dz),(rr()-0.5)*0.30);
+        cw.userData.decor=true;cw.userData.webBase=dWebBase;
+        litter.add(cw);
+        (R3.webMeshes||(R3.webMeshes=[])).push(cw);
+        nCorner++;
       }
       /* Hung BEFORE the furniture check, and it is the one piece of dressing
          that may share a tile with a wall feature: these ride up near the roof
@@ -10683,7 +10703,7 @@ function buildLevel(L){
       mats.forEach((m,i)=>inst.setMatrixAt(i,m));inst.instanceMatrix.needsUpdate=true;
       inst.userData.decor=true;
       litter.add(inst); };
-    mk(strands,boxU,dSilkMat); mk(sacs,sphU,sacMat);
+    mk(sacs,sphU,sacMat);
     mk(chit,rockU,chitMat); mk(bolts,cylU,boltMat);
     grp.add(litter);
   }
