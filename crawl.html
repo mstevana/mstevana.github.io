@@ -397,7 +397,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
    throws away everybody's game, so it may only move when the save shape changes
    in a way the reader's defaults cannot absorb. A release number moving every
    merge must never be able to do that. */
-const VERSION='0.106';
+const VERSION='0.107';
 const rnd = (n)=>Math.floor(Math.random()*n);
 const d = (n)=>1+rnd(n);
 // Spell damage comes out of each spell's own dmgFn, which rolls internally, so
@@ -7694,7 +7694,37 @@ function svgToTexture(svg,cacheKey,opt){
   const tex=texFromCanvas(cv,tex_opts);
   tex.__ready=false; // callers can hold the previous frame until the raster lands
   const img=new Image();
-  img.onload=()=>{const ctx=cv.getContext('2d');ctx.clearRect(0,0,S,S);ctx.drawImage(img,0,0,S,S);tex.needsUpdate=true;tex.__ready=true;};
+  img.onload=()=>{
+    const ctx=cv.getContext('2d');ctx.clearRect(0,0,S,S);ctx.drawImage(img,0,0,S,S);
+    tex.needsUpdate=true;tex.__ready=true;
+    /* Upload now rather than at first draw. Without this the release below only
+       reaches the frames that have actually been rendered — a floor pre-warms
+       every pose of every creature on it, and the windup and strike frames of
+       something the party never fights are never drawn, so measured at depth 17
+       only 20MB of 75MB of canvas came back. It also moves the upload itself off
+       the moment a creature first swings, which is where the prewarm was already
+       trying to move the raster. */
+    if(R3.renderer&&R3.renderer.initTexture)try{R3.renderer.initTexture(tex);}catch(e){}
+  };
+  /* A CanvasTexture holds its canvas forever as `tex.image`, so every cached
+     frame was paying for its raster TWICE: once as the GPU texture and again as
+     a live canvas backing store that nothing ever reads after the upload. At
+     640x640 that is 1.6MB of dead weight per frame, and a floor caches up to
+     120 of them — measured, a depth-17 grove committed about 100MB of GPU
+     texture and another 79MB of canvas within ten seconds of the floor
+     appearing, which is exactly the window a phone was dying in.
+
+     `onUpdate` fires at the end of three.js's own `uploadTexture`, after the mip
+     chain has been generated and the version stamped, so by then the canvas has
+     served its entire purpose and can be shrunk to nothing. The texture keeps
+     working: three.js only re-reads `image` if `needsUpdate` is set again, and
+     nothing here ever sets it twice.
+
+     The one case that WOULD re-read it is a lost and restored GL context, which
+     is why `initRenderer` now handles that by emptying the cache and rebuilding
+     the floor — re-rasterising from the SVG rather than from a canvas that is no
+     longer there. */
+  tex.onUpdate=()=>{if(cv.width>1){cv.width=cv.height=1;}};
   /* The sprite SVGs carry a viewBox and no width/height, so their INTRINSIC
      size is the CSS default of 150x150. Blink re-rasterises a vector at the
      size you draw it, so on desktop Chrome this is invisible and every
@@ -8300,6 +8330,18 @@ function initRenderer(){
   const cv=document.getElementById('view3d');
   R3.renderer=new THREE.WebGLRenderer({canvas:cv,antialias:false});
   R3.renderer.setPixelRatio(gfxPixelRatio());
+  /* Every raster in this game is thrown away once it reaches the GPU (see
+     `svgToTexture`), so a lost context cannot be repaired by re-uploading what
+     three.js still holds — the canvases behind those textures are 1x1 by then.
+     Preventing the default on the loss is what makes the browser promise a
+     restore at all; on that restore the cache is emptied and the floor rebuilt,
+     which re-rasterises everything from the SVG it came from. Before this a lost
+     context simply ended the session. */
+  cv.addEventListener('webglcontextlost',(e)=>{e.preventDefault();},false);
+  cv.addEventListener('webglcontextrestored',()=>{
+    for(const k in R3.texCache){const t=R3.texCache[k];if(t&&t.dispose)t.dispose();delete R3.texCache[k];}
+    if(G.L)buildLevel(G.L);
+  },false);
   R3.maxAniso=R3.renderer.capabilities.getMaxAnisotropy(); // sharpen textures at grazing angles, free on GPU
   R3.scene=new THREE.Scene();
   R3.camera=new THREE.PerspectiveCamera(68,1,0.05,30);
@@ -8671,6 +8713,7 @@ function addRivets(B,mat,x,y,z,n,dx,dy,dz,r){
 }
 function buildLevel(L){
   disposeLevel();
+  refreshMonTexPx();   // a loaded save reaches here without going through startLevel
   const th=L.theme;
   const grp=new THREE.Group();R3.levelGroup=grp;R3.scene.add(grp);
   R3.scene.fog=new THREE.FogExp2(th.fog,0.26);
@@ -12030,9 +12073,39 @@ const MON_POSES=['idle0','idle1','walk0','walk1','windup','strike'];
    on the definition, so that is known before anything is rasterised. Rounded to
    a multiple of 64 to keep the mip chain tidy. */
 const ENLARGE_SCALE=1.28;
+/* MON_TEX is the raster a creature needs at the TOP of the ladder, and it was
+   being handed out at every rung. It is matched to a DPR-3 phone drawing at
+   `high`, where a normal creature lands on about 640 buffer pixels — but at
+   `low` the renderer draws at pixel ratio 1.5, where the same creature can never
+   cover more than about half that, and on a desktop at DPR 1 less again. Every
+   one of those was still rasterising and caching 640x640 frames, so the one
+   setting a player reaches for when a device is struggling bought them no memory
+   relief at all.
+
+   The size therefore comes off the drawing buffer the renderer is actually
+   using. The 0.55 is that same matched pair read backwards: 640 pixels of
+   sprite over a 1200-pixel buffer (400 CSS at DPR 3). Basing it on the buffer
+   rather than on the pixel ratio matters, because a large window at DPR 1 shows
+   a creature more pixels than a small one does, and it makes adaptive's stepping
+   carry the texture with it for free.
+
+   Quantised to 64 so the mip chain stays tidy and so small resizes do not churn
+   the cache, and capped at MON_TEX so `high` on a phone is exactly what it was. */
+function monTexBase(){
+  const h=R3.renderer?R3.renderer.domElement.height:0;
+  if(!h)return MON_TEX;
+  return Math.max(256,Math.min(MON_TEX,Math.ceil(h*0.55/64)*64));
+}
+/* Frozen for the length of a floor. The raster size is part of the cache key, so
+   letting it move mid-floor would leave the frames rasterised at the old size
+   stranded in the cache beside the new ones — the prune only runs on a floor
+   change. Refreshed where that prune runs and again at the top of `buildLevel`,
+   which is the one path a loaded save takes. */
+function refreshMonTexPx(){R3.monTexPx=monTexBase();return R3.monTexPx;}
 function monsterTexPx(key){
+  const base=R3.monTexPx||refreshMonTexPx();
   return MONSTERS[key]&&MONSTERS[key].enlarge
-    ? Math.ceil(MON_TEX*ENLARGE_SCALE/64)*64 : MON_TEX;
+    ? Math.ceil(base*ENLARGE_SCALE/64)*64 : base;
 }
 function monsterFrameTex(sprKey,boss,pose,elite,px){
   const tint=elite&&ELITES[elite]?ELITES[elite].tint:null;
@@ -12073,6 +12146,7 @@ function monFrameKey(sprKey,boss,pose,elite,px){
    Only `mon_` entries are touched. The wall, floor, item and fx textures in the
    same cache are small, bounded, and in use by the level being built. */
 function pruneMonsterTextures(L){
+  refreshMonTexPx();
   const keep={};
   for(const m of L.monsters){
     const px=monsterTexPx(m.key),spr=MONSTERS[m.key].spr;
