@@ -64,7 +64,7 @@ node harness stubs `document` and has neither element.
 
 There is no test suite in the repo either. Sessions have built throwaway
 node harnesses that stub `window`/`document`/`THREE`, load the pure-logic
-part of the file, and assert on it (the T1–T58 series referenced in the
+part of the file, and assert on it (the T1–T59 series referenced in the
 git log). If you make a behavioural change, expect to rebuild a harness
 rather than find one — and note that the numbering only ever grows, so the
 git log is the index of what each one covers.
@@ -905,7 +905,7 @@ three themes carry real machinery:
 - **`Myconid`** — a grove that grew rather than one that was built, and the
   only theme that replaces the **ceiling** as well as the walls and floor:
   `myconidCeilCanvas` draws the gilled underside of the caps overhead,
-  `myconidWallCanvas` gives six stalk variants over one shared base, and the
+  `myconidWallCanvas` gives eight stalk variants over one shared base, and the
   floor is gravel. The light is purple — `THEMES` carries `light` and `fill`
   for it, and `buildLevel` tints `R3.torch` from `th.light`, so a theme can
   now recolour the party's own lantern. Doors are dried stalks, roughly cut
@@ -914,6 +914,90 @@ three themes carry real machinery:
   The stalks are drawn by sampling a wandering edge every 4 pixels with a
   per-stalk phase. At 16 the kinks landed at the same height in every stalk
   and the wall read as a bamboo fence.
+
+  ### The grove is a colony, and everything in it is the colony's work
+
+  **The wall variants are its crop and its casualties**, eight of them, keyed on
+  the variant itself: a **ripplebark** shelf, a **trillimac**, a swollen
+  **barrelstalk**, a **nursery** of sprouts, **something the spores took**, a
+  stalk that is **dying**, the spore **freckles**, and one deliberately bare so
+  the rest have something to be read against. Four shape lessons came out of it:
+
+  - **A shelf is read from its UNDERSIDE.** As a flat ellipse the ripplebark was
+    a painted lozenge; what says "this sticks out" is a dark band below a lit
+    top, and a front edge with real lobes rather than a smooth arc.
+  - **A swelling has to START and END at the stalk's own width**, so it is built
+    off the base's stalk edges. Drawn as an ellipse over the wall the barrelstalk
+    was a striped beach ball stuck to the flesh.
+  - **A body in the flesh is read from a body plan, and has to be UNDER it.** As
+    concentric arcs it was a spiral bun; at full strength it was a bright skull
+    with round eyes, a Halloween decal. The bones go down faint and a translucent
+    wash of the stalk's own colour goes back over them.
+  - **A colour picked on the texture sheet has to be checked under the theme's
+    own light.** At `#8a545a` the ripplebark came out BUBBLEGUM PINK in the room:
+    the grove's torch is lilac, and a light with no green in it drives any ruddy
+    mid-tone to pink.
+
+  **The grove emits light.** `myconidWallCanvas` returns `{cv,glow}`, the second
+  builder after the drow's — a colour map can only make something pale, and the
+  spores are the whole point of the place. The freckles burn with a real halo,
+  young caps burn, whatever fruits out of a buried body burns, and every variant
+  carries a faint dusting, because a grove where one tile in eight glows reads as
+  a grove with a lamp in it. **Rot burns SOUR GREEN**, the only thing here that
+  is not violet, so a sick stalk can be told from a healthy one down a dark
+  corridor by its colour.
+
+  **The theme was also washing out**, and that had to be fixed before anything
+  else could be seen: `#7a6e86` stalks under a torch already retinted lilac left
+  no headroom at all. Both came down. The violet now comes mostly from what is
+  glowing rather than from washing everything in it.
+
+  **Furniture on `L.myconid`**, six weighted kinds, all of them the colony's work
+  rather than ornament: a fruiting **cluster** (the crop, largest share), a
+  **nursery** bed, a **barrelstalk** tapped for water, hanging spore **pods**, a
+  body being **composted**, and a **rapport bloom** — where a circle melds, and
+  the brightest thing in the grove. Three had to be rebuilt:
+
+  - **A `SphereGeometry(R,...,0,1.05)` is a spherical cap that bulges R into the
+    room.** The rapport bloom's cap swallowed its own gills, glowing core and
+    ring of small caps, and rendered as a dark porthole with bolts round it. What
+    reads as a cap seen face-on is a gill FACE with a rim, built flat.
+  - **A fence is read from its gaps.** Nine close-set kerb posts read as a solid
+    drum; five, thicker and well apart, read as a kerb.
+  - **Anything standing on a dome has to start at the dome's surface**, not at a
+    flat y — the nursery's sprouts were inside a bed 0.3 tall at its middle.
+
+  **Floor dressing**: mound litter with things coming up out of it, shed caps and
+  stalk stubs, patches of **bluecap** — the one thing down here that is BLUE
+  rather than violet, because it is the colony's grain and should read as a crop
+  — and drifts of spore dust, which are drawn before the furniture check because
+  dust does not care what is standing there.
+
+  **The puffball** extends the trap pool on the drow snare's exact terms, so a
+  floor's trap count is untouched. **Fortitude, not Reflex** — the burst is not
+  something you dodge, it is something you breathe — which is what makes it a
+  different trap and not a reskin: the two catch different members of the same
+  party. Priced on `trapcost_body.js` at depth 19 it costs 10.8 hp against a 17.0
+  mean for the five it displaces, level with the snare's 11.4. At three seconds
+  it measured 6.5, the cheapest thing in the table, which is the same reading
+  that took the snare from four seconds to five.
+
+  **`stunned` was half a condition and is fixed.** It blocked acting in `canAct`
+  but cost nothing in `charAC`, while this file has claimed since the cave
+  creatures went in that gaze and hold both stop a character acting *and* cost 4
+  AC. 3.5 agrees — a stunned creature loses its Dex bonus. It is a real balance
+  change: three creatures inflict stun plus the puffball, and all four got
+  better. The descent simulator cannot see conditions or traps at all, so this is
+  a rules correction rather than a measured one.
+
+  **The circle mound in `L.mound`** is the ossuary's, the forge hall's and the
+  chapel's fourth sibling, on their exact terms: `T_PIT` after the connectivity
+  check, shoves aside whatever loot is under it, never on the stairs, kept by an
+  elite myconid that carries spores. Its hoard is the one of the four that needs
+  no invention — a circle plants its dead in its mound, and metal does not rot,
+  so what you dig out is the gear off everything it has composted. `openMound` is
+  `openBier` rewritten. T59 covers it, and asserts the stairs stay reachable with
+  the mound *and* the stairwell both treated as solid.
 
 - **`Drow`** — a house, and the only theme whose decoration gives off light.
   Small black bricks (eight courses of six, with a one-pixel draft rather than
@@ -1142,7 +1226,8 @@ theme fields its own roster and nothing else — so they assert 100% and 0%
 rather than a band, and cannot drift as rosters are added.
 
 Each theme with machinery writes an array onto the level (`rivers`/`pipes`,
-`crypts`/`ossuary`, `lurkers`, `duergar`/`pillars`/`forge`, `drow`/`chapel`) in `tryGen`
+`crypts`/`ossuary`, `lurkers`, `duergar`/`pillars`/`forge`, `drow`/`chapel`,
+`myconid`/`mound`) in `tryGen`
 and reads it back in `buildLevel`; anything you add that way must also be
 carried through `serializeGame` and `loadGame`, or a reloaded floor comes back
 stripped of it.
