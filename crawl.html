@@ -380,8 +380,6 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 <script>
 'use strict';
 /* ============================== RULES DATA (D&D 3.5 SRD, simplified) ============================== */
-/* Verify marker; remove once this build is confirmed. */
-const BUILD_TAG='testD';
 const rnd = (n)=>Math.floor(Math.random()*n);
 const d = (n)=>1+rnd(n);
 // Spell damage comes out of each spell's own dmgFn, which rolls internally, so
@@ -16612,11 +16610,40 @@ const UI=(()=>{
     // and again once the panel is on screen: a hidden element has no scrollHeight
     const b=$('log-list');b.scrollTop=b.scrollHeight;
   }
+  /* The build id is DERIVED from the code rather than declared, because a
+     declared one can be forgotten or collide and both happened. Two sessions
+     merging on the same day each bumped the old `VERSION` constant — there is a
+     commit called "reconcile the duplicate VERSION constant" — and because it
+     only changed when somebody remembered, it could never answer the question
+     that actually mattered on a phone: is this device running the file I just
+     pushed, or a cached one? A bisect had to carry its own hand-written tag for
+     exactly that reason.
+
+     A hash of the source cannot be forgotten, cannot collide between two
+     branches, and changes if and only if the code changes. It cannot tell you
+     which of two builds is newer — that is the one thing a declared version is
+     better at, and it was traded away deliberately.
+
+     What is hashed is every INLINE script and style, not `documentElement`: the
+     DOM mutates constantly as the game runs, so hashing that would give a
+     different answer depending on when it was asked. three.js is loaded with a
+     `src` and is skipped, so a CDN hiccup cannot change the id.
+
+     Measured at 1.9ms over the file's ~1.01M characters on desktop, so a phone
+     is a few ms; it is computed once, on the first floor built, where a hitch is
+     already expected, and memoised. FNV-1a, printed as a fixed 8 hex digits. */
+  let _buildId=null;
+  function buildId(){
+    if(_buildId)return _buildId;
+    let src='';
+    for(const el of document.querySelectorAll('script:not([src]),style'))src+=el.textContent;
+    let h=0x811c9dc5>>>0;
+    for(let i=0;i<src.length;i++){h^=src.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0;}
+    _buildId=('0000000'+h.toString(16)).slice(-8);
+    return _buildId;
+  }
   function refreshDepthTag(){
-    /* BUILD_TAG is here only so a device check cannot be read off a stale cache:
-       if the label is missing, the phone is still serving the old file. Remove it
-       once this build is confirmed. */
-    $('depth-tag').textContent='Depth '+G.depth+' · '+G.L.theme.name+(G.depth%3===0&&G.depth>=6?' ⚔':'')+' · '+BUILD_TAG;
+    $('depth-tag').textContent='Depth '+G.depth+' · '+G.L.theme.name+(G.depth%3===0&&G.depth>=6?' ⚔':'')+' · '+buildId();
   }
   /* ---------- overlays ---------- */
   function anyOverlayOpen(){return [...document.querySelectorAll('.ovl')].some(o=>o.classList.contains('show')&&o.id!=='ovl-rotate');}
