@@ -3339,6 +3339,25 @@ const TRAP_ART={
   // A snare: a corner web with the strand across the passage snapped taut, and
   // the thing that set it waiting at the hub. Every other card in this table
   // shows the mechanism, so this one shows the web rather than the victim.
+  /* A ripe puffball trodden open. Read from the BURST — a mushroom on its own
+     is scenery, and what makes this a trap is the cloud coming out of it and
+     the boot print in the middle of it. */
+  puffball:()=>`<svg xmlns="${SVGNS}" viewBox="0 0 100 100"><g stroke="#0d0b08" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">`+
+    `<ellipse cx="50" cy="80" rx="34" ry="9" fill="#2b2434" stroke="none"/>`+
+    `<path d="M28 80 Q26 58 40 52 Q50 48 60 52 Q74 58 72 80 Z" fill="#6b5f7d"/>`+
+    `<path d="M34 76 Q33 60 44 55" stroke="#9c8fb4" stroke-width="2.6" fill="none"/>`+
+    `<path d="M36 60 Q50 48 64 60" stroke="#1b1622" stroke-width="3" fill="none"/>`+  // split across the crown
+    `<path d="M40 58 L46 50 L52 58 L58 49 L63 58" stroke="#1b1622" stroke-width="2.4" fill="none"/>`+
+    `<g fill="#c88ae8" stroke="none">`+
+      `<circle cx="50" cy="30" r="13" opacity="0.30"/><circle cx="34" cy="38" r="9" opacity="0.26"/>`+
+      `<circle cx="67" cy="37" r="10" opacity="0.26"/><circle cx="50" cy="16" r="8" opacity="0.20"/>`+
+      `<circle cx="24" cy="24" r="6" opacity="0.16"/><circle cx="76" cy="22" r="7" opacity="0.16"/>`+
+    `</g>`+
+    `<g fill="#efe4ff" stroke="none" opacity="0.85">`+
+      `<circle cx="44" cy="34" r="2.4"/><circle cx="58" cy="28" r="2"/><circle cx="36" cy="22" r="1.7"/>`+
+      `<circle cx="64" cy="44" r="1.9"/><circle cx="50" cy="44" r="2.2"/>`+
+    `</g>`+
+    `</g></svg>`,
   websnare:()=>`<svg xmlns="${SVGNS}" viewBox="0 0 100 100"><g stroke="#0d0b08" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">`+
     `<path d="M6 6 L94 40 M6 6 L82 62 M6 6 L60 84 M6 6 L34 94 M6 6 L96 16" stroke="#d8d2ea" stroke-width="2.2" fill="none" opacity="0.85"/>`+
     `<path d="M40 12 Q34 26 22 34 M62 20 Q52 42 32 54 M84 30 Q70 58 44 76" stroke="#c6bede" stroke-width="2.6" fill="none" opacity="0.8"/>`+
@@ -3790,12 +3809,19 @@ function tryGen(depth,targetWalk,theme){
        venoms. */
     const pool=depth>=4?['dart','spike','gas','pdart','sleepdart']:['dart','spike','gas'];
     if(theme.name==='Drow')pool.push('websnare');
+    /* The grove's is a PUFFBALL, on the snare's exact terms — it extends the
+       pool rather than replacing anything, so `nTraps` is untouched and it
+       displaces some other trap instead of adding to the tally. Also no damage:
+       the spores are the threat, and stunning a character in a place where
+       every creature broadcasts distress is quite enough. */
+    if(theme.name==='Myconid')pool.push('puffball');
     const kind=pick(pool);
     const venom=kind==='pdart'||kind==='sleepdart';
+    const bloodless=kind==='gas'||kind==='websnare'||kind==='puffball';
     traps[i]={kind,found:false,armed:true,dc:trapDC(depth),
       // a venom dart wounds lightly — the toxin is the threat, not the puncture
-      dmg:(kind==='gas'||kind==='websnare')?null:venom?[1,4]:[trapDice(depth),6],
-      dur:kind==='pdart'?4:kind==='sleepdart'?5:kind==='websnare'?5:0,
+      dmg:bloodless?null:venom?[1,4]:[trapDice(depth),6],
+      dur:kind==='pdart'?4:kind==='sleepdart'?5:kind==='websnare'?5:kind==='puffball'?5:0,
       x,y};
     placedTraps++;
   }
@@ -4782,7 +4808,17 @@ function charAC(ch){
   if(RACES[ch.race].small)ac+=1;
   if(isRaging(ch))ac-=2;
   for(const b of ch.buffs)if(b.ac)ac+=b.ac;
-  if(hasCond(ch,'paralysis')||hasCond(ch,'sleep')||hasCond(ch,'hold'))ac-=4;
+  /* `stunned` belongs on this line and was missing from it. CLAUDE.md has said
+     since the cave creatures went in that gaze and hold "both stop a character
+     acting in canAct and cost 4 AC in charAC" — the code only did the first,
+     so stunned was half a condition, and the project's own rule is that one
+     read by a single function is a badge that blocks nothing. 3.5 agrees: a
+     stunned creature loses its Dex bonus to AC, which is what this -4 models.
+
+     It is a real balance change and not only a tidy-up: three creatures inflict
+     it (one gaze, two spore casters) plus the grove's puffball, and all four
+     get better for it. */
+  if(hasCond(ch,'paralysis')||hasCond(ch,'sleep')||hasCond(ch,'hold')||hasCond(ch,'stunned'))ac-=4;
   // Faerie fire is the one condition only this function reads. It does not stop
   // a character acting -- being outlined in cold light costs you your cover and
   // nothing else -- so `canAct` deliberately ignores it, and the penalty is two
@@ -10603,6 +10639,100 @@ function buildLevel(L){
     mk(chit,rockU,chitMat); mk(bolts,cylU,boltMat);
     grp.add(litter);
   }
+  /* Grove floor dressing: mound litter, shed caps and stalk stubs, bluecap
+     patches and drifts of spore dust. Same terms as the crypt's, the duergar's
+     and the drow's — seeded from each tile's own coordinates so a rebuild never
+     reshuffles it, instanced down to a handful of draw calls, flat to the
+     ground so it never blocks a path, and `decor` so a tap goes through it to
+     whatever is lying on the same tile. */
+  if(th.name==='Myconid'){
+    const litter=new THREE.Group();
+    const fleshT=myconidTex('flesh'),huskT=myconidTex('husk');
+    const capMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.moss).multiplyScalar(0.80),
+      map:fleshT,bumpMap:fleshT,bumpScale:0.008,specular:0x241e2c,shininess:6});
+    const stubMat=new THREE.MeshPhongMaterial({color:0x6b5f4c,map:huskT,bumpMap:huskT,
+      bumpScale:0.010,specular:0x16120c,shininess:5});
+    const soilMat=new THREE.MeshPhongMaterial({color:0x342c39,map:huskT,bumpMap:huskT,
+      bumpScale:0.018,specular:0x0c0a0e,shininess:3});
+    /* Bluecap is the grain of this place — ground for flour — so it is the one
+       thing on the floor that is BLUE rather than violet, and the one the eye
+       can pick out as a crop rather than as debris. */
+    const blueMat=new THREE.MeshPhongMaterial({color:0x46628c,map:fleshT,bumpMap:fleshT,
+      bumpScale:0.006,specular:0x1a2130,shininess:9});
+    // spore dust: unlit, because it is the light lying on the ground
+    const dustMat=new THREE.MeshBasicMaterial({color:new THREE.Color(th.glow||'#c88ae8')
+      .multiplyScalar(0.34),transparent:true,opacity:0.5,depthWrite:false});
+    const boxU=new THREE.BoxGeometry(1,1,1);
+    const sphU=new THREE.SphereGeometry(1,8,6);
+    const domeU=new THREE.SphereGeometry(1,9,5,0,6.2832,0,1.35);
+    const cylU=new THREE.CylinderGeometry(1,1,1,6);
+    const discU=new THREE.CircleGeometry(1,10);discU.rotateX(-Math.PI/2);
+    const yawQ=(a)=>new THREE.Quaternion().setFromEuler(new THREE.Euler(0,a,0));
+    const tumbleQ=(f)=>new THREE.Quaternion().setFromEuler(new THREE.Euler(f()*6.3,f()*6.3,f()*6.3));
+    const loc=(px,py,pz,q,sx,sy,sz)=>new THREE.Matrix4().compose(
+      new THREE.Vector3(px,py,pz),q,new THREE.Vector3(sx,sy,sz));
+    const mounds=[],caps=[],stalks=[],stubs=[],blues=[],dust=[];
+    const busy=new Set((L.myconid||[]).map(f=>f.x+','+f.y));
+    for(let y=1;y<L.h-1;y++)for(let x=1;x<L.w-1;x++){
+      if(L.grid[y*L.w+x]!==T_FLOOR)continue;
+      let hsh=((x*2654435761)^(y*1597334677))>>>0;
+      const rr=()=>{hsh=(hsh*1664525+1013904223)>>>0;return hsh/4294967296;};
+      const cx=x+0.5,cz=y+0.5;
+      /* Spore dust settles everywhere, and it is drawn BEFORE the furniture
+         check: dust does not care that something is standing there. */
+      if(rr()<0.30){
+        const n=1+Math.floor(rr()*3);
+        for(let k=0;k<n;k++){
+          const s=0.10+rr()*0.22;
+          dust.push(loc(cx+(rr()-0.5)*0.7,0.004,cz+(rr()-0.5)*0.7,yawQ(rr()*6.3),s,1,s*(0.6+rr()*0.6)));
+        }
+      }
+      if(busy.has(x+','+y))continue;              // a piece of furniture stands here
+      const roll=rr();
+      if(roll<0.075){
+        /* Mound litter: a circle keeps a pile of rock and soil to cultivate on
+           and to sleep around, and what is left where one used to be is a low
+           heap with things coming up out of it. */
+        const ox=cx+(rr()-0.5)*0.34, oz=cz+(rr()-0.5)*0.34, R=0.16+rr()*0.12;
+        mounds.push(loc(ox,0.005,oz,yawQ(rr()*6.3),R,R*0.42,R*(0.8+rr()*0.4)));
+        const n=2+Math.floor(rr()*3);
+        for(let k=0;k<n;k++){
+          const a=rr()*6.3,d=rr()*R*0.7, s=0.022+rr()*0.020;
+          const px=ox+Math.cos(a)*d, pz=oz+Math.sin(a)*d;
+          const foot=0.005+Math.sqrt(Math.max(0,R*R-d*d))*0.42;
+          stalks.push(loc(px,foot+0.028,pz,yawQ(rr()*6.3),0.011,0.056,0.011));
+          caps.push(loc(px,foot+0.056,pz,yawQ(rr()*6.3),s,s*0.66,s));
+        }
+      }else if(roll<0.135){                       // shed caps and stalk stubs
+        const n=2+Math.floor(rr()*4);
+        for(let k=0;k<n;k++){
+          const s=0.045+rr()*0.055;
+          if(rr()<0.55)                            // a cap fallen on its face
+            caps.push(loc(cx+(rr()-0.5)*0.6,s*0.24,cz+(rr()-0.5)*0.6,tumbleQ(rr),s,s*0.42,s));
+          else                                     // a stalk cut off at the root
+            stubs.push(loc(cx+(rr()-0.5)*0.6,0.030+rr()*0.02,cz+(rr()-0.5)*0.6,
+                           yawQ(rr()*6.3),0.030+rr()*0.02,0.060+rr()*0.05,0.030+rr()*0.02));
+        }
+      }else if(roll<0.185){                       // a patch of bluecap, the grove's grain
+        const ox=cx+(rr()-0.5)*0.4, oz=cz+(rr()-0.5)*0.4;
+        const n=4+Math.floor(rr()*5);
+        for(let k=0;k<n;k++){
+          const s=0.028+rr()*0.024;
+          const px=ox+(rr()-0.5)*0.42, pz=oz+(rr()-0.5)*0.42;
+          stalks.push(loc(px,0.026,pz,yawQ(rr()*6.3),0.008,0.052,0.008));
+          blues.push(loc(px,0.052,pz,yawQ(rr()*6.3),s,s*0.60,s));
+        }
+      }
+    }
+    const mk=(mats,geo,mat)=>{ if(!mats.length)return;
+      const inst=new THREE.InstancedMesh(geo,mat,mats.length);
+      mats.forEach((m,i)=>inst.setMatrixAt(i,m));inst.instanceMatrix.needsUpdate=true;
+      inst.userData.decor=true;   // never blocks a tap to the item on the same tile
+      litter.add(inst); };
+    mk(mounds,domeU,soilMat); mk(caps,domeU,capMat); mk(blues,domeU,blueMat);
+    mk(stalks,cylU,stubMat);   mk(stubs,cylU,stubMat); mk(dust,discU,dustMat);
+    grp.add(litter);
+  }
   /* Duergar floor dressing: slag, spilled ore and dropped tools. Built on the
      crypt's terms — seeded from each tile's own coordinates so a rebuild never
      reshuffles it, instanced down to a handful of draw calls, flat to the ground
@@ -12543,6 +12673,31 @@ function triggerTrap(tr){
       UI.float(ch,'held!','#c9a8e8');
       UI.toast('Silk snaps taut round '+ch.name+' — they are held fast!');
     }else UI.toast('A snare closes on '+ch.name+' and finds no purchase.'); // freedom
+  }else if(tr.kind==='puffball'){
+    /* A ripe puffball underfoot. FORTITUDE, not Reflex — the burst is not
+       something you dodge, it is something you breathe, which is the same test
+       the grove's own creatures make you roll against their spores. It stuns
+       It stuns rather than holds, and it lasts as long as the drow snare does,
+       which is what `trapcost_body.js` says it has to: at three seconds it
+       measured 6.5 hp against a 16.9 mean for the five it displaces, the
+       cheapest thing in the table by a wide margin — the same reading that made
+       the snare go from four seconds to five.
+
+       What makes it a different trap rather than a reskin is the SAVE. The
+       snare is Reflex and this is Fortitude, so the two catch different members
+       of the same party.
+
+       No damage. `stunned` is already read by both canAct and charAC — a
+       condition read by only one is a badge that blocks nothing — so the rules
+       needed nothing new to make this bite. */
+    const ch=pick(alive);
+    const sv=charSaves(ch).fort+foundBonus;
+    if(d20()+sv>=tr.dc){
+      UI.toast(ch.name+' turns their head from the burst.');
+    }else if(addCond(ch,{kind:'stunned',dur:tr.dur})){
+      UI.float(ch,'stunned!','#c88ae8');
+      UI.toast('A puffball bursts underfoot and '+ch.name+' reels in the spore cloud!');
+    }else UI.toast('Spores wash over '+ch.name+' and do nothing.');
   }else if(tr.kind==='pdart'||tr.kind==='sleepdart'){
     // the dart must hit (dodge it by AC), and then the venom must take (resist
     // it by Fortitude) — two layers, because paralysis and sleep are that bad
@@ -16171,6 +16326,7 @@ const UI=(()=>{
       :kind==='pdart'?'rgba(80,220,200,0.22)'
       :kind==='sleepdart'?'rgba(165,125,220,0.22)'
       :kind==='websnare'?'rgba(200,168,232,0.20)'   // faerzress violet: it draws no blood
+      :kind==='puffball'?'rgba(200,138,232,0.22)'   // spore violet: nor does this
       :'rgba(200,45,30,0.20)';
     el.style.background='radial-gradient(circle at center, '+tint+', transparent 60%),'
       +'radial-gradient(circle at center, rgba(0,0,0,0.30), rgba(0,0,0,0.52) 78%)';
