@@ -260,6 +260,36 @@ settled is that the median is not to be chased by fiddling with
 `depthScale`, `threatBudget` or the bestiary — those are not what is
 holding it.
 
+## An SVG rasterised into a texture MUST state its width and height
+
+This is the one that actually made monsters blurry on a phone, and it hid from
+every measurement taken on desktop.
+
+`monsterSVG` and `itemSVG` emit `<svg viewBox="0 0 64 64">` with no `width` or
+`height`, so the image's **intrinsic size is the CSS default, 150×150**.
+
+- **Blink re-rasterises a vector at the size you draw it**, so on desktop Chrome
+  a 150-intrinsic SVG drawn at 640 comes out at full 640 quality. Detail energy
+  measured *identical* with and without the attributes (10.06 both).
+- **WebKit does not.** It rasterises the image at its intrinsic size and then
+  scales, so the 640px monster texture was really a 150px raster blown up 4.3×.
+  That is why monsters read as soft on an iPhone while the procedurally drawn
+  walls beside them — canvas, not SVG — stayed sharp.
+
+`svgToTexture` now injects `width`/`height` matching the raster target before
+encoding the data URI. It is a no-op on Blink and a 4.3× resolution win on
+WebKit.
+
+**The lesson is about the instrument, not the bug.** Every sharpness experiment
+in this file was run in headless Chrome, and a Blink-only re-rasterisation
+silently masked the fault for several rounds — pixel-ratio, mipmapping, texture
+size and the elite wash were all measured and (correctly) cleared while the real
+cause was invisible to that browser. If a rendering complaint comes from a
+device you are not testing on, check for engine-specific behaviour before
+trusting a clean local measurement. The bestiary was the tell throughout: it is
+a DOM `<img>` with explicit width and height, which is why it looked right on
+the very device where the sprites did not.
+
 ## A sprite's raster is sized for the biggest that creature will ever be drawn
 
 `monsterTexPx(key)` gives every creature `MON_TEX` (640) except the three that

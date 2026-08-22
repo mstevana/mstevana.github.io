@@ -7293,7 +7293,18 @@ function svgToTexture(svg,cacheKey,opt){
   tex.__ready=false; // callers can hold the previous frame until the raster lands
   const img=new Image();
   img.onload=()=>{const ctx=cv.getContext('2d');ctx.clearRect(0,0,S,S);ctx.drawImage(img,0,0,S,S);tex.needsUpdate=true;tex.__ready=true;};
-  img.src='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg)));
+  /* The sprite SVGs carry a viewBox and no width/height, so their INTRINSIC
+     size is the CSS default of 150x150. Blink re-rasterises a vector at the
+     size you draw it, so on desktop Chrome this is invisible and every
+     sharpness measurement taken there comes back clean. WebKit does not: it
+     rasterises the image at its intrinsic size and then scales, which turns a
+     150px raster into a 640px texture — a 4.3x upscale, and the reason monsters
+     read as blurry on an iPhone while the procedurally drawn walls beside them
+     stay sharp. The bestiary escapes it by being a DOM <img> with explicit
+     width and height, which is exactly the fix: state the size on the root so
+     every engine rasterises at the resolution we are about to draw. */
+  const sized=/<svg[^>]*\swidth=/.test(svg)?svg:svg.replace(/<svg\b/,`<svg width="${S}" height="${S}"`);
+  img.src='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(sized)));
   if(cacheKey)R3.texCache[cacheKey]=tex;
   return tex;
 }
