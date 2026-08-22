@@ -397,7 +397,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
    throws away everybody's game, so it may only move when the save shape changes
    in a way the reader's defaults cannot absorb. A release number moving every
    merge must never be able to do that. */
-const VERSION='0.103';
+const VERSION='0.104';
 const rnd = (n)=>Math.floor(Math.random()*n);
 const d = (n)=>1+rnd(n);
 // Spell damage comes out of each spell's own dmgFn, which rolls internally, so
@@ -8631,8 +8631,39 @@ function onResize(){
   R3.renderer.setSize(w,h,false);
   R3.camera.aspect=w/h;R3.camera.updateProjectionMatrix();
 }
+/* Geometry used to be the only thing freed here. The MATERIALS and their
+   textures were not, and a theme builds a great many fresh every floor — eight
+   to twelve wall variants, floor, ceiling, doors, the emissive glow sheets, and
+   every piece of furniture. Measured with `renderer.info.memory` over a 24-floor
+   descent, GPU textures climbed 19 -> 369 while geometries stayed flat: that is
+   the rest of the iOS crash, and the reported failures at depth 17 and 21 sit
+   exactly where the curve gets steep.
+
+   Textures held in `R3.texCache` are shared across floors on purpose and are
+   already bounded by `pruneMonsterTextures`, so they are skipped — disposing one
+   would leave a cached entry pointing at freed GPU memory, which renders black
+   rather than crashing, and would be far harder to trace. */
+function disposeLevelMaterials(root){
+  const shared=new Set();
+  for(const k in R3.texCache)shared.add(R3.texCache[k]);
+  const seen=new Set();
+  root.traverse(o=>{
+    if(o.geometry)o.geometry.dispose();
+    if(!o.material)return;
+    const mats=Array.isArray(o.material)?o.material:[o.material];
+    for(const m of mats){
+      if(!m||seen.has(m))continue;
+      seen.add(m);
+      for(const prop in m){
+        const v=m[prop];
+        if(v&&v.isTexture&&!shared.has(v))v.dispose();
+      }
+      m.dispose();
+    }
+  });
+}
 function disposeLevel(){
-  if(R3.levelGroup){R3.scene.remove(R3.levelGroup);R3.levelGroup.traverse(o=>{if(o.geometry)o.geometry.dispose();});R3.levelGroup=null;}
+  if(R3.levelGroup){R3.scene.remove(R3.levelGroup);disposeLevelMaterials(R3.levelGroup);R3.levelGroup=null;}
   for(const f of R3.liquidFlows)f.tex.dispose();
   R3.liquidFlows=[];R3.liquidShaders=[];
   R3.doorMeshes={};R3.secretMeshes={};R3.trapDecals={};R3.itemSprites={};R3.monsterSprites={};R3.monsterGlows={};R3.monsterShadows={};R3.prewarmQ=[];R3.prewarmT=0;R3.stairsGroup=null;
