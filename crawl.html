@@ -380,6 +380,8 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 <script>
 'use strict';
 /* ============================== RULES DATA (D&D 3.5 SRD, simplified) ============================== */
+/* Verify marker; remove once this build is confirmed. */
+const BUILD_TAG='testD';
 const rnd = (n)=>Math.floor(Math.random()*n);
 const d = (n)=>1+rnd(n);
 // Spell damage comes out of each spell's own dmgFn, which rolls internally, so
@@ -16611,7 +16613,10 @@ const UI=(()=>{
     const b=$('log-list');b.scrollTop=b.scrollHeight;
   }
   function refreshDepthTag(){
-    $('depth-tag').textContent='Depth '+G.depth+' · '+G.L.theme.name+(G.depth%3===0&&G.depth>=6?' ⚔':'');
+    /* BUILD_TAG is here only so a device check cannot be read off a stale cache:
+       if the label is missing, the phone is still serving the old file. Remove it
+       once this build is confirmed. */
+    $('depth-tag').textContent='Depth '+G.depth+' · '+G.L.theme.name+(G.depth%3===0&&G.depth>=6?' ⚔':'')+' · '+BUILD_TAG;
   }
   /* ---------- overlays ---------- */
   function anyOverlayOpen(){return [...document.querySelectorAll('.ovl')].some(o=>o.classList.contains('show')&&o.id!=='ovl-rotate');}
