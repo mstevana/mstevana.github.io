@@ -16149,7 +16149,43 @@ function startLevel(L){
 }
 /* ---------- save / load ---------- */
 function u8ToB64(u8){let s='';for(let i=0;i<u8.length;i+=4096)s+=String.fromCharCode.apply(null,u8.subarray(i,i+4096));return btoa(s);}
-function b64ToU8(b){const s=atob(b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u;}
+/* The decoder is deliberately forgiving, and that is the whole difference
+   between a save that loads and a save that is gone.
+
+   `atob` is strict: a string whose length is not a multiple of four, or that
+   carries padding anywhere but at the end, throws outright. A save arrived
+   whose `explored` field was 1130 characters — two more than any `btoa` output
+   can be — and every attempt to continue that descent died inside `b64ToU8`,
+   which `loadGame`'s catch then swallowed. The player got a Continue button
+   that did nothing, which is indistinguishable from a crash, on a save that was
+   otherwise entirely intact: the map, the party, the monsters and the floor's
+   furniture all read back perfectly once the field was repaired.
+
+   These two arrays are the *only* binary fields in a save, they are pure
+   scenery bookkeeping (the tile map and which tiles have been seen), and their
+   length is already known from `w`·`h`. So there is no reason to let a few
+   damaged characters in them cost a run. Anything outside the base64 alphabet
+   is dropped, stray padding is dropped, the remainder is re-padded to a
+   multiple of four, and the result is fitted to the length the level says it
+   should be. A byte or two of the map may come back wrong; a run does not.
+
+   `want` is optional so the function still behaves for any other caller. */
+function b64ToU8(b,want){
+  let s='';
+  try{s=atob(b);}
+  catch(e){
+    const clean=String(b).replace(/[^A-Za-z0-9+/]/g,'');
+    // re-pad: base64 decodes four characters to three bytes, and a trailing
+    // group of one character carries no whole byte at all, so drop it
+    const keep=clean.length-(clean.length%4===1?1:0);
+    const trimmed=clean.slice(0,keep);
+    try{s=atob(trimmed+'='.repeat((4-trimmed.length%4)%4));}catch(e2){s='';}
+  }
+  const n=want>0?want:s.length;
+  const u=new Uint8Array(n);
+  for(let i=0,m=Math.min(n,s.length);i<m;i++)u[i]=s.charCodeAt(i);
+  return u;
+}
 function serializeGame(){
   const L=G.L;
   return {
@@ -16182,7 +16218,7 @@ function deserializeGame(o){
   const traps={};for(const t of lv.traps)traps[t.y*lv.w+t.x]=t;
   const items={};for(const [i,arr] of lv.items)items[i]=arr;
   const L={
-    w:lv.w,h:lv.h,grid:b64ToU8(lv.grid),explored:b64ToU8(lv.explored),
+    w:lv.w,h:lv.h,grid:b64ToU8(lv.grid,lv.w*lv.h),explored:b64ToU8(lv.explored,lv.w*lv.h),
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
     traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
     restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,forge:lv.forge||null,chapel:lv.chapel||null,mound:lv.mound||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],pillars:lv.pillars||[],drow:lv.drow||[],myconid:lv.myconid||[],
@@ -16219,7 +16255,15 @@ function loadGame(){
     }
     deserializeGame(o);
     return true;
-  }catch(e){console.warn('load failed',e);return false;}
+  }catch(e){
+    console.warn('load failed',e);
+    /* Say something. The save is deliberately left alone — it may still be
+       readable by a later build, and throwing away someone's descent to tidy
+       the menu is the worst thing this function could do — but a Continue
+       button that does nothing at all reads as the game having crashed. */
+    UI.toast('The saved game could not be read.');
+    return false;
+  }
 }
 /* ---------- main loop ---------- */
 let lastT=0,idleSkip=0;
