@@ -1880,6 +1880,47 @@ walks every living preparer through `UI.openMemo` and only then calls
 would let a player re-prepare between fights, which is the decision the
 whole system exists to make.
 
+## The build id is derived, not declared
+
+The depth line ends with eight hex digits — `Depth 17 · Myconid · 809bc1e5` —
+and that is a hash of the game's own source, computed by `buildId()` in
+`08_ui.js`.
+
+It replaced a hand-bumped `VERSION` constant, and it is worth knowing why. A
+declared version can be **forgotten**, and it can **collide**: two sessions
+merging on the same day each bumped it, and there is a commit in the history
+called *"reconcile the duplicate VERSION constant"*. Worse, because it only
+changed when somebody remembered to change it, it could never answer the one
+question that actually mattered when a phone was crashing — *is this device
+running the file I just pushed, or a cached one?* A bisect had to carry its own
+hand-written build tag for exactly that.
+
+A hash cannot be forgotten and cannot collide between branches. The trade is
+real and was made deliberately: **it cannot tell you which of two builds is
+newer.** If that is ever wanted, pair it with a declared date rather than
+replacing it.
+
+Three details it depends on:
+
+- **It hashes every inline `<script>` and `<style>`, not `documentElement`.** The
+  DOM mutates constantly while the game runs, so hashing that would give a
+  different answer depending on when it was asked. Verified stable across seven
+  floors and a full party-panel rebuild.
+- **three.js is skipped**, because it is loaded with a `src` and the selector
+  excludes it. A CDN hiccup therefore cannot change the id.
+- **It is memoised, and first computed on the first floor built**, where a hitch
+  is already expected. Measured at 1.9ms on desktop and 7.2ms under the headless
+  harness over the file's ~1.01M characters; a phone is a few ms, paid once.
+
+FNV-1a over 32 bits, printed at a fixed width of 8. Adjacent builds colliding is
+a 2⁻³² event; the birthday bound is about 65,000 builds, which this repo will not
+reach. Verified end to end by changing `MON_RASTER` from 384 to 383 — one
+character — and watching the id move from `809bc1e5` to `93e09ee2`.
+
+**It is deliberately not in `serializeGame`.** That carries `v:1`, a *save
+format* number, and `loadGame` DELETES a save whose `v` does not match. Folding a
+build id into it would destroy every run on every deploy.
+
 ## The keyboard reads positions, not letters
 
 `KEY_ACTION` in `09_boot.js` is keyed by **`e.code`** — the physical key — and
