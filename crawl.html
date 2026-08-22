@@ -4176,6 +4176,54 @@ function tryGen(depth,targetWalk,theme){
       }
     }
   }
+  /* The CIRCLE MOUND: the grove's set-piece, and the ossuary's, the forge
+     hall's and the chapel's fourth sibling. Built on their exact terms — the
+     mound is `T_PIT` placed after the connectivity check, it shoves aside
+     whatever loot is under it rather than deleting it (the level's only key is
+     one of the things it can land on), and it never lands on the stairs.
+
+     A circle keeps a mound of rock and soil to cultivate on, to meld around and
+     to sleep beside, and it is where the colony plants its dead. That is what
+     makes the hoard here honest where the other three had to invent one:
+     myconids do not collect treasure, but metal does not rot, so what you dig
+     out of a mound is the gear off everything it has ever composted. */
+  let mound=null;
+  if(theme.name==='Myconid'){
+    const cand=rooms.slice(1).filter(r=>r.w>=3&&r.h>=3&&!(lockedRoom&&r.x===lockedRoom.x&&r.y===lockedRoom.y));
+    if(cand.length){
+      const r=pick(cand);
+      const tx=r.x+(r.w>>1), ty=r.y+(r.h>>1);
+      if(!(tx===sx&&ty===sy)){
+        mound={x:r.x,y:r.y,w:r.w,h:r.h,tx,ty,opened:false};
+        g[idx(tx,ty)]=T_PIT;
+        const under=items[idx(tx,ty)];
+        if(under&&under.length){
+          let to=DIRS.map(([dx,dy])=>[tx+dx,ty+dy]).find(([x,y])=>g[idx(x,y)]===T_FLOOR);
+          if(!to)for(let yy=r.y;yy<r.y+r.h&&!to;yy++)
+            for(let xx=r.x;xx<r.x+r.w&&!to;xx++)
+              if(g[idx(xx,yy)]===T_FLOOR)to=[xx,yy];
+          if(to){const j=idx(to[0],to[1]);(items[j]=items[j]||[]).push(...under);}
+        }
+        delete items[idx(tx,ty)];
+        delete traps[idx(tx,ty)];
+        for(let i=monsters.length-1;i>=0;i--)if(monsters[i].x===tx&&monsters[i].y===ty)monsters.splice(i,1);
+        // the circle's elder, beside the mound and already awake
+        const spots=DIRS.map(([dx,dy])=>[tx+dx,ty+dy]).filter(([x,y])=>g[idx(x,y)]===T_FLOOR);
+        if(spots.length){
+          const [gx,gy]=pick(spots);
+          const pool=spawnPool(depth).filter(([k])=>MONSTERS[k].myconid);
+          // a mound is kept by whatever the depth allows that can broadcast —
+          // a circle is held together by rapport, so its keeper carries spores
+          const elders=pool.filter(([k])=>MONSTERS[k].spores);
+          const key=elders.length?pickWeighted(elders):(pool.length?pickWeighted(pool):'myguard');
+          const keeper=mkMonster(key,gx,gy,depth);
+          makeElite(keeper,pick(ELITE_KEYS));
+          keeper.slot=0;keeper.mound=true;
+          monsters.push(keeper);
+        }
+      }
+    }
+  }
   // lurkers: a cave's ambushers wait as scenery rather than standing about.
   // Each one placed removes an ordinary monster from the floor, so a cave
   // carries the same total threat as any floor at its depth — the ambush
@@ -4410,7 +4458,7 @@ function tryGen(depth,targetWalk,theme){
     if(!DIRS.some(([dx,dy])=>seen[idx(stairs.x+dx,stairs.y+dy)]))return null;
   }
   return {w:W,h:H,grid:g,start,stairs,traps,items,monsters,secrets,theme,depth,
-    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,forge,chapel,lurkers,duergar,pillars,drow,myconid};
+    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,forge,chapel,mound,lurkers,duergar,pillars,drow,myconid};
 }
 /* ---------- difficulty curve ----------
    Depth, not party level, drives everything. One documented scalar grows every
@@ -10639,6 +10687,85 @@ function buildLevel(L){
     mk(chit,rockU,chitMat); mk(bolts,cylU,boltMat);
     grp.add(litter);
   }
+  /* The circle mound: the grove's set-piece. Seeded from its own tile, because
+     `openMound` calls `buildLevel` again to show the bed turned over and
+     anything drawn with `Math.random()` would visibly reshuffle at that moment
+     — the same reason the crypt's bone stacking and the duergar's floor litter
+     are seeded. */
+  if(th.name==='Myconid'&&L.mound){
+    const c=L.mound, cx=c.tx+0.5, cz=c.ty+0.5;
+    const g0=new THREE.Group(),B=Bins(3.4);
+    let ms=((c.tx*2246822519)^(c.ty*3266489917))>>>0;
+    const mr=()=>{ms=(ms*1664525+1013904223)>>>0;return ms/4294967296;};
+    const fleshT=myconidTex('flesh'),huskT=myconidTex('husk');
+    const soil=new THREE.MeshPhongMaterial({color:0x3a3040,map:huskT,bumpMap:huskT,
+      bumpScale:0.022,specular:0x0c0a10,shininess:3});
+    const stone=new THREE.MeshPhongMaterial({color:new THREE.Color(th.floor).multiplyScalar(1.1),
+      map:huskT,bumpMap:huskT,bumpScale:0.016,specular:0x141118,shininess:6});
+    const fMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.wall).multiplyScalar(1.30),
+      map:fleshT,bumpMap:fleshT,bumpScale:0.010,specular:0x24202c,shininess:6});
+    const capMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.moss).multiplyScalar(0.92),
+      map:fleshT,bumpMap:fleshT,bumpScale:0.008,specular:0x2a2233,shininess:8});
+    const boneMat=new THREE.MeshPhongMaterial({color:0x8a8272,specular:0x14120c,shininess:5});
+    const liveMat=new THREE.MeshBasicMaterial({color:new THREE.Color(th.glow||'#c88ae8')});
+    const R=0.44, Hh=c.opened?0.16:0.30;
+    /* The tile has to supply its own floor. `buildLevel` skips `T_PIT` when it
+       lays the floor planes, so a round mound on a square tile left the four
+       corners showing as black holes — the same thing the spiral stairs had to
+       fix with a plate. Here the fix is free and truer: a mound is a heap, and
+       a heap spills out to meet the ground. */
+    B.at(soil,new THREE.BoxGeometry(0.995,0.03,0.995),0,0.012,0);
+    // the bed itself, ringed with the stones a circle piles up round it
+    B.at(soil,new THREE.SphereGeometry(R,20,10,0,6.2832,0,c.opened?1.15:1.35),0,0.01,0);
+    for(let k=0;k<14;k++){
+      const a=k/14*Math.PI*2+mr()*0.2, rr2=0.048+mr()*0.030;
+      B.at(stone,new THREE.IcosahedronGeometry(rr2,0),Math.cos(a)*R*0.92,rr2*0.6,Math.sin(a)*R*0.92,
+           mr()*6.3,mr()*6.3,mr()*6.3);
+    }
+    if(c.opened){
+      // turned over: the crown is gone, the soil is spread and the bones show
+      for(let k=0;k<9;k++){
+        const a=mr()*6.3,d=mr()*R*0.7;
+        B.at(soil,new THREE.SphereGeometry(0.05+mr()*0.05,8,5,0,6.2832,0,1.4),
+             Math.cos(a)*d,0.03,Math.sin(a)*d);
+      }
+      for(let k=0;k<7;k++){
+        const a=mr()*6.3,d=mr()*R*0.55;
+        B.at(boneMat,new THREE.CylinderGeometry(0.012,0.014,0.10+mr()*0.09,5),
+             Math.cos(a)*d,0.055,Math.sin(a)*d,mr()*0.6,mr()*6.3,1.35+mr()*0.4);
+      }
+    }else{
+      /* Unopened, it is a NURSE LOG: the mound is what the circle grows on, so
+         the whole of it is cropped. A ring of caps facing inward is what says
+         "a circle gathers here" rather than "here is a heap of earth". */
+      for(let k=0;k<16;k++){
+        const a=k/16*Math.PI*2, d=R*(0.28+((k*5)%4)*0.16);
+        const px=Math.cos(a)*d, pz=Math.sin(a)*d;
+        const foot=Math.sqrt(Math.max(0,R*R-d*d))*(Hh/R);
+        const h=0.07+((k*7)%4)*0.045, cr=0.038+((k*3)%3)*0.020;
+        addSeg(B,fMat,px,foot,pz,px*1.04,foot+h,pz*1.04,0.017,0.012);
+        B.at(capMat,new THREE.SphereGeometry(cr,9,6,0,6.2832,0,1.28),px*1.04,foot+h,pz*1.04);
+        B.at(liveMat,new THREE.SphereGeometry(cr*0.26,6,5),px*1.04,foot+h+cr*0.4,pz*1.04);
+      }
+      // and one big one at the crown, which is what a circle melds around
+      addSeg(B,fMat,0,Hh-0.02,0,0.01,Hh+0.20,0,0.040,0.028);
+      B.at(capMat,new THREE.SphereGeometry(0.135,14,8,0,6.2832,0,1.22),0.01,Hh+0.20,0);
+      B.at(liveMat,new THREE.SphereGeometry(0.045,10,8),0.01,Hh+0.20,0);
+      // a hand still showing out of the side of the bed
+      B.at(boneMat,new THREE.SphereGeometry(0.034,8,6),R*0.42,Hh*0.55,R*0.52);
+      for(let k=0;k<3;k++)
+        B.at(boneMat,new THREE.CylinderGeometry(0.007,0.009,0.055,5),
+             R*0.42+(k-1)*0.020,Hh*0.55+0.035,R*0.52,0.4,0,0.2);
+    }
+    B.addTo(g0);
+    for(const ch2 of g0.children)ch2.userData={kind:'mound',x:c.tx,y:c.ty};
+    g0.position.set(cx,0,cz);
+    grp.add(g0);
+    if(!c.opened){
+      const l=new THREE.PointLight(new THREE.Color(th.glow||'#c88ae8').getHex(),0.75,3.0,2);
+      l.position.set(cx,Hh+0.24,cz);grp.add(l);
+    }
+  }
   /* Grove floor dressing: mound litter, shed caps and stalk stubs, bluecap
      patches and drifts of spore dust. Same terms as the crypt's, the duergar's
      and the drow's — seeded from each tile's own coordinates so a rebuild never
@@ -12456,6 +12583,8 @@ function tryMove(kind){ // 'fwd','back','sleft','sright'
     // not report a sewer lake
     const os=G.L.ossuary;
     if(os&&nx===os.bx&&ny===os.by){openBier();return;}
+    const mo=G.L.mound;
+    if(mo&&nx===mo.tx&&ny===mo.ty){openMound();return;}
     SFX.bump();UI.toast('A pit of putrid sewage blocks the way.');return;
   }
   if(t===T_SECRET_FOUND){openSecretAt(nx,ny);return;}
@@ -15813,6 +15942,31 @@ function openAltar(){
   if(coffinNoise(c.ax,c.ay,8))setTimeout(()=>UI.toast('The whole chapel has heard it…'),900);
   saveGame();
 }
+/* Digging a circle mound out, written on `openBier`'s terms like the forge
+   anvil and Lolth's altar before it. Robbed once, and loud: a mound is where
+   the circle sleeps, so turning one over is heard right across the grove —
+   which on this theme means every myconid within earshot, not just the ones
+   who can see you. */
+function openMound(){
+  const L=G.L,c=L.mound;
+  if(!c)return;
+  if(Math.abs(c.tx-G.px)+Math.abs(c.ty-G.py)>1){UI.toast('Too far to reach the mound.');return;}
+  if(c.opened){UI.toast('The mound is turned over. Only soil and spent caps now.');return;}
+  c.opened=true;
+  SFX.secret();
+  buildLevel(L);
+  const spill=[];
+  for(let k=0;k<2+rnd(2);k++)spill.push(randLoot(G.depth+2,true,true,true));
+  const near=DIRS.map(([dx,dy])=>({x:c.tx+dx,y:c.ty+dy}))
+    .filter(p=>walkableTile(tileAt(p.x,p.y)));
+  const drop=near.length?near[0]:{x:G.px,y:G.py};
+  const di=drop.y*L.w+drop.x;
+  (L.items[di]=L.items[di]||[]).push(...spill);
+  refreshItemSprite(L,di);
+  UI.toast('You dig through the bed. Metal does not rot: '+spill.map(itemName).join(', ')+'.');
+  if(coffinNoise(c.tx,c.ty,8))setTimeout(()=>UI.toast('The whole grove has felt it…'),900);
+  saveGame();
+}
 // camp on a floor a third time and something comes looking for you
 function summonHuntingPack(){
   const L=G.L;
@@ -15882,7 +16036,7 @@ function serializeGame(){
       traps:Object.values(L.traps),items:Object.keys(L.items).map(i=>[+i,L.items[i]]),
       monsters:L.monsters.map(m=>{const c=Object.assign({},m);delete c._sc;delete c._regenT;delete c.dot;return c;}),
       secrets:L.secrets,lockedRoom:L.lockedRoom,restCount:L.restCount||{},restsHere:L.restsHere||0,
-      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,forge:L.forge||null,chapel:L.chapel||null,lurkers:L.lurkers||[],duergar:L.duergar||[],pillars:L.pillars||[],drow:L.drow||[],myconid:L.myconid||[],
+      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,forge:L.forge||null,chapel:L.chapel||null,mound:L.mound||null,lurkers:L.lurkers||[],duergar:L.duergar||[],pillars:L.pillars||[],drow:L.drow||[],myconid:L.myconid||[],
     },
   };
 }
@@ -15902,7 +16056,7 @@ function deserializeGame(o){
     w:lv.w,h:lv.h,grid:b64ToU8(lv.grid),explored:b64ToU8(lv.explored),
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
     traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
-    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,forge:lv.forge||null,chapel:lv.chapel||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],pillars:lv.pillars||[],drow:lv.drow||[],myconid:lv.myconid||[],
+    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,forge:lv.forge||null,chapel:lv.chapel||null,mound:lv.mound||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],pillars:lv.pillars||[],drow:lv.drow||[],myconid:lv.myconid||[],
   };
   clearFx();
   G.L=L;G.over=false;
@@ -17282,6 +17436,7 @@ function initInput(){
       if(u.kind==='bier'){openBier();return;}
       if(u.kind==='anvil'){openForge();return;}
       if(u.kind==='altar'){openAltar();return;}
+      if(u.kind==='mound'){openMound();return;}
       if(u.kind==='stairs'){
         if(Math.abs(u.x-G.px)+Math.abs(u.y-G.py)>1){UI.toast('Too far away.');return;}
         takeStairs();return;
