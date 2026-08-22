@@ -331,6 +331,71 @@ affordable — a blanket bump would not be (see the memory note above).
 **The general rule: anything that scales a sprite quad at runtime has to be paid
 for in the raster.** Check `_sc` writers before adding another.
 
+### …and for the resolution the frame is actually drawn at
+
+`MON_TEX` is the raster a creature needs at the **top** of the ladder, and for a
+long time it was handed out at every rung. It is matched to a DPR-3 phone at
+`high`, where a normal creature lands on about 640 buffer pixels — but at `low`
+the renderer draws at pixel ratio 1.5, where the same creature can never cover
+more than about half that, and a desktop at DPR 1 shows it less again. All of
+them still rasterised and cached 640² frames, so **the one setting a player
+reaches for when a device is struggling bought no memory relief at all.**
+
+The size therefore comes off `R3.renderer.domElement.height`, the buffer actually
+being drawn: `clamp(⌈h·0.55/64⌉·64, 256, MON_TEX)`. The 0.55 is that same matched
+pair read backwards — 640 pixels of sprite over a 1200-pixel buffer. Two details
+worth keeping:
+
+- **It reads the buffer, not the pixel ratio.** A large window at DPR 1 shows a
+  creature more pixels than a small one does, and reading the buffer also makes
+  adaptive's stepping carry the texture down with it for free.
+- **It is frozen for the length of a floor** (`R3.monTexPx`, set by
+  `refreshMonTexPx`). The size is part of the cache key and the prune only runs
+  on a floor change, so a size that moved mid-floor would strand every frame
+  rasterised at the old one beside the new. Refreshed where the prune runs and
+  again at the top of `buildLevel`, which is the path a loaded save takes.
+
+Measured on the reported depth-17 save, a landscape phone at DPR 3: `high` still
+rasterises at 640 and is untouched; `low` drops to 384 and its monster textures
+fall from 99.8 MB to 35.9 MB; a desktop at DPR 1 drops to 256 and 16 MB.
+
+## A CanvasTexture holds its canvas forever, so every raster was paid for twice
+
+`svgToTexture` builds a canvas, draws the decoded SVG into it, and wraps it in a
+`THREE.CanvasTexture` — which keeps that canvas as `tex.image` for the life of
+the texture. Nothing ever reads it again after the upload. At 640² that is 1.6 MB
+of dead weight per frame on top of the 2.2 MB the GPU copy costs with its mip
+chain, and a floor caches up to 120 frames.
+
+Measured on a depth-17 grove: **100 MB of GPU texture and another 75 MB of live
+canvas, all committed within ten seconds of the floor appearing** — which is
+`prewarmMonsterFrames` draining its idle queue, and exactly the window a phone
+was dying in. The per-floor prune that landed earlier bounded this to one floor's
+worth; one floor's worth was still 240 MB at depth 17 and 437 MB at depth 27.
+
+`tex.onUpdate` fires at the end of three.js's own `uploadTexture`, after the mip
+chain is generated and the version stamped, so the canvas is shrunk to 1×1 there.
+
+Two things this depends on, and both were found by measuring:
+
+- **The upload has to be forced.** `onUpdate` only fires for a texture that has
+  actually been drawn, and a floor pre-warms every pose of every creature on it —
+  the windup and strike frames of something the party never fights are never
+  uploaded. Released only on draw, just 20 MB of the 75 MB came back.
+  `renderer.initTexture(tex)` in the raster's own `onload` uploads it there
+  instead, which takes it to zero and also moves the upload off the moment a
+  creature first swings.
+- **A lost GL context can no longer be repaired from what three.js holds**, since
+  those canvases are 1×1 by then. `initRenderer` now calls `preventDefault` on
+  `webglcontextlost` (which is what makes the browser promise a restore at all)
+  and on `webglcontextrestored` empties `R3.texCache` and rebuilds the floor,
+  re-rasterising from the SVG each frame came from. Before this a lost context
+  simply ended the session, so it is strictly better than what it replaced.
+
+**Note the engine has no node harness**, so none of this is covered by T1–T60 —
+`06_engine.js` is replaced by `engine_stub.js`. It was verified in a real
+browser, and any change here has to be.
+
 ## An elite's recolour must be a filter, never a CSS blend mode
 
 `monsterSVG` tinted an elite by laying a 62%-opacity rect of the template colour
