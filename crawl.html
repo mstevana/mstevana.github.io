@@ -397,7 +397,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
    throws away everybody's game, so it may only move when the save shape changes
    in a way the reader's defaults cannot absorb. A release number moving every
    merge must never be able to do that. */
-const VERSION='0.102';
+const VERSION='0.103';
 const rnd = (n)=>Math.floor(Math.random()*n);
 const d = (n)=>1+rnd(n);
 // Spell damage comes out of each spell's own dmgFn, which rolls internally, so
@@ -11253,6 +11253,9 @@ function itemTexKey(it){return 'it_'+it.base+'_'+it.bonus+'_'+(it.tint||'')+'_'+
    close. 640 brings that down to ~1.1x — near its native resolution — at the
    cost of ~2.8x the raster time and texture memory per frame. */
 const MON_TEX=640;
+// the six frames every creature carries, shared by the prewarm and the prune so
+// one cannot rasterise a pose the other does not know to keep
+const MON_POSES=['idle0','idle1','walk0','walk1','windup','strike'];
 /* A duergar's racial enlarge grows the BILLBOARD and nothing else, so the same
    raster gets stretched over a bigger quad: measured, magnification went from
    1.10x to 1.41x the moment a warrior swelled, and it visibly softened exactly
@@ -11271,7 +11274,7 @@ function monsterFrameTex(sprKey,boss,pose,elite,px){
   // the size is part of the key: one sprite shared by two creatures at
   // different rasters must not hand back the smaller one
   return svgToTexture(monsterSVG(sprKey,boss,pose,tint),
-    'mon_'+sprKey+(boss?'_b':'')+(elite?'_'+elite:'')+'_'+pose+'_'+S,{size:S,mipmap:true});
+    monFrameKey(sprKey,boss,pose,elite,S),{size:S,mipmap:true});
 }
 /* Every pose is rasterised the first time it is used, and a frame costs about
    25ms of main thread to decode at 384px once it carries the rim and contact-
@@ -11282,6 +11285,42 @@ function monsterFrameTex(sprKey,boss,pose,elite,px){
    standing on it while the level is being built, where a hitch is expected and
    invisible. The texture cache is global and keyed by kind, so this is paid once
    per creature type per run, not once per monster. */
+// the cache key monsterFrameTex files a frame under, in one place so the prune
+// below cannot drift from what the rasteriser actually wrote
+function monFrameKey(sprKey,boss,pose,elite,px){
+  return 'mon_'+sprKey+(boss?'_b':'')+(elite?'_'+elite:'')+'_'+pose+'_'+(px||MON_TEX);
+}
+/* The frame cache is global and was never emptied, so it grew for the whole run
+   rather than for the floor being played: measured over a 24-floor descent it
+   reached 683 textures and about 1.3 GB. iOS Safari kills a tab well before
+   that, which is what "the game crashes" was — a descent walked off the memory
+   ceiling somewhere past the middle floors. Keeping only what the floor about to
+   be played needs bounds it at one floor's worth; anything dropped that is
+   wanted again is re-rasterised by prewarmMonsterFrames, which already spreads
+   that work over idle callbacks.
+
+   This hangs off the FLOOR CHANGE and deliberately not off disposeLevel:
+   buildLevel calls disposeLevel, and openBier/openForge/openAltar call
+   buildLevel again mid-floor to show a shifted lid, so evicting there would
+   re-rasterise every creature on the floor the moment a coffin is opened.
+
+   Only `mon_` entries are touched. The wall, floor, item and fx textures in the
+   same cache are small, bounded, and in use by the level being built. */
+function pruneMonsterTextures(L){
+  const keep={};
+  for(const m of L.monsters){
+    const px=monsterTexPx(m.key),spr=MONSTERS[m.key].spr;
+    for(const pose of MON_POSES)keep[monFrameKey(spr,m.boss,pose,m.elite,px)]=1;
+  }
+  let freed=0;
+  for(const k in R3.texCache){
+    if(k.lastIndexOf('mon_',0)!==0||keep[k])continue;
+    const t=R3.texCache[k];
+    if(t&&t.dispose)t.dispose();
+    delete R3.texCache[k];freed++;
+  }
+  return freed;
+}
 function prewarmMonsterFrames(L){
   const seen={},queue=[];
   for(const m of L.monsters){
@@ -11291,7 +11330,7 @@ function prewarmMonsterFrames(L){
     // trickle in behind it
     const px=monsterTexPx(m.key);
     monsterFrameTex(MONSTERS[m.key].spr,m.boss,'idle0',m.elite,px);
-    for(const pose of ['idle1','walk0','walk1','windup','strike'])
+    for(const pose of MON_POSES)if(pose!=='idle0')
       queue.push([MONSTERS[m.key].spr,m.boss,pose,m.elite,px]);
   }
   /* Drained a couple at a time rather than in one block. A frame costs about
@@ -15240,6 +15279,9 @@ function startLevel(L){
   G.px=L.start.x;G.py=L.start.y;
   // face an open direction
   for(let f=0;f<4;f++){const [dx,dy]=DIRS[f];if(walkableTile(tileAt(L.start.x+dx,L.start.y+dy))){G.facing=f;break;}}
+  // once per floor, before the new one's frames are rasterised: drop the
+  // previous floor's creatures so the cache holds a floor rather than a run
+  pruneMonsterTextures(L);
   buildLevel(L);
   packAllRanks(); // generated or loaded monsters may share a tile: seat them
   snapCamera();
