@@ -384,12 +384,6 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 'use strict';
-/* Shown in the corner beside the depth and theme, so a screenshot says which
-   build it came from — which is the whole point of it being on screen. There is
-   no build step here, so BUMP THIS BY HAND when landing a change worth telling
-   apart in a bug report. It is unrelated to the save format's own `v`, which
-   gates compatibility and is versioned separately. */
-const VERSION='1.1.0';
 /* ============================== RULES DATA (D&D 3.5 SRD, simplified) ============================== */
 /* The build's version, `x.xxx`, shown on the main menu and on the death screen.
 
@@ -403,7 +397,7 @@ const VERSION='1.1.0';
    throws away everybody's game, so it may only move when the save shape changes
    in a way the reader's defaults cannot absorb. A release number moving every
    merge must never be able to do that. */
-const VERSION='0.101';
+const VERSION='0.102';
 const rnd = (n)=>Math.floor(Math.random()*n);
 const d = (n)=>1+rnd(n);
 // Spell damage comes out of each spell's own dmgFn, which rolls internally, so
