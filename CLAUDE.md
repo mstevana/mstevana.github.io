@@ -1112,10 +1112,24 @@ three themes carry real machinery:
   a jade **guardian**, a Lolth **shrine**, a silk **fence**, a cold-fire
   **brazier** and a **wall web** with something in it.
 
-  **Floor dressing**: web in the corners, egg sacs, shed chitin, spent bolts. The
-  corner web spans from one wall to the other **across** the corner — laid out as
-  rays from the corner it came out as metre-long rods lying flat on the floor,
-  neither a web nor in the corner.
+  **Floor dressing**: web in the corners, egg sacs, shed chitin, spent bolts.
+
+  **The corner web is `cobwebGeo` as well**, the same threads the crypt hangs
+  from its ceiling. It was built from nine stretched BOXES — five spanning
+  strands and four guys, 5.5mm thick, in a lit Phong material — and at a tile's
+  range that is exactly what it looked like: a handful of pale rods lying in the
+  corner, reported as such. Nothing about the layout was wrong; **solid geometry
+  was**. A thread has no thickness to read at any distance, so a web has to be
+  drawn as unlit lines and carried by having many of them — which is the whole
+  reason `cobwebGeo` exists, and the giveaway was that the ceiling webs in the
+  very same room read correctly.
+
+  It bridges the corner: `cobwebGeo` builds in the XY plane facing +Z, so yawing
+  it to `atan2(-dx,-dz)` turns that face along the diagonal into the room and
+  lands the spokes on both walls at once. Being its own `LineSegments` (so
+  `shadeSprites` can dim it by its own distance) it is also its own draw call, so
+  it gets its own `CORNER_WEBS` budget — spent as a **rate against the eligible
+  corners**, counted in a cheap pre-pass, for the same reason `DROW_WEBS` is.
 
   **Hanging cobwebs are the crypt's, reused.** `cobwebGeo(rnd,size)` was hoisted
   out of the crypt's dressing block to module scope and returns bare line
