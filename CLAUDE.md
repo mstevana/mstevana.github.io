@@ -344,12 +344,10 @@ in any individual creature, so all 78 get them at once.
 
 **Filters are the expensive half of rasterising a frame, and it is paid on the
 main thread during play.** Measured over 36 frames at 384px: 11.3ms plain,
-+5.9ms for the contact shadow, +7.4ms for the rim, 24.6ms for both. **Monster
-frames now rasterise at 640px, not 384** (`monsterFrameTex`), because a large
-creature one tile away fills ~750 physical pixels on a DPR-3 phone and a 384px
-raster was magnified ~2x into visible blur up close; 640 costs roughly 2.8x the
-raster time and texture memory per frame, so treat the figures above as a
-per-pixel baseline and scale them. That cost lands
++5.9ms for the contact shadow, +7.4ms for the rim, 24.6ms for both. Monster
+frames rasterise at **`MON_RASTER`, 384px**, and the number has a hard ceiling
+above it that is not about memory — see *The sprite raster is limited by WebKit*
+below before touching it. That cost lands
 as a stutter the first time a creature winds up, which is the worst possible
 moment — so `prewarmMonsterFrames` rasterises all six poses of every kind on a
 floor while the level is being built, where a hitch is expected. The texture
@@ -357,6 +355,51 @@ cache is global and keyed by kind, so it is paid once per creature type per run.
 Anything new added to the wrapper should be measured the same way, and note that
 timing `drawImage` alone measures nothing: the rasterisation happens during the
 image *decode*, so time from setting `src` to `onload`.
+
+## The sprite raster is limited by WebKit, and the limit is not memory
+
+**Do not raise `MON_RASTER` without reading this.** It crashed the game on a
+phone for a day, the cause was invisible on desktop, and the wrong theory
+survived three rounds of confident measurement.
+
+The sprite SVGs are handed to an `Image` as a data URI and drawn into a canvas.
+They carry a `viewBox` and **no width or height**, so their intrinsic size is the
+CSS default of 150×150. Blink re-rasterises a vector at the size you draw it, so
+on desktop Chrome the intrinsic size is irrelevant and every sharpness and
+timing measurement taken there comes back clean. **WebKit does not**: it
+rasterises at the intrinsic size and then scales. So on an iPhone every monster
+frame was really a 150px raster blown up to fill the canvas — which is why
+monsters read as blurry there while the procedurally drawn walls beside them
+stayed sharp, and why nobody could reproduce it.
+
+Stating the size on the SVG root fixes the blur, and that is the right fix. But
+it also means WebKit starts genuinely rasterising at that size, **through the rim
+light and the contact shadow**, six poses at a time while `prewarmMonsterFrames`
+drains its idle queue. At 640 that is eighteen times the area it had been doing,
+and an iPhone died about ten seconds after each floor appeared — exactly the
+window the prewarm occupies. Bisected to that one commit on an otherwise stable
+build, then fixed by dropping the raster to 384 and confirmed stable.
+
+Three things worth keeping from how long this took to find:
+
+- **The canvas and the GPU texture were 640² the whole time**, before and after.
+  Only the raster was small. So texture memory did not change when the crash
+  appeared, and **reasoning about this number from texture bytes is reasoning
+  about the wrong quantity.** A whole session was spent measuring per-floor
+  texture memory (100 MB at depth 17, 437 MB at depth 27), shipping two real
+  reductions for it, and not moving the crash at all.
+- **Raising 384 → 640 originally cost iOS nothing**, because iOS was not
+  honouring it. A change that measures free on desktop may simply not be
+  happening on the platform that matters.
+- **A headless Chromium harness cannot see any of this**, and neither can the
+  node tests — `svgToTexture` lives in `06_engine.js`, which `engine_stub.js`
+  replaces wholesale. It was found by bisecting on the actual device, one commit
+  at a time, with a build tag in the depth line so a stale cache could not be
+  mistaken for a result. That is the instrument for this class of bug.
+
+If sharpness needs to improve further, the lever is the **filters**, not the
+raster: they are the expensive half, and the rim and contact shadow are what make
+a large raster unaffordable on WebKit.
 
 ## The detail pass and `MONSTER_DETAIL`
 
