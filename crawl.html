@@ -8565,6 +8565,24 @@ function sporeCloud(th){
     transparent:true,blending:THREE.AdditiveBlending,depthWrite:false});
   const pts=new THREE.Points(geo,mat);
   pts.frustumCulled=false;
+  /* Draw the cloud BEFORE anything else in the transparent pass, and this is a
+     correctness fix rather than a preference.
+
+     three.js sorts transparent objects by the projected z of each OBJECT's own
+     position, not per fragment. The cloud is one object whose position is the
+     level group's origin — tile (0,0) — so its sort key has nothing to do with
+     where the motes actually are. Walk around and it lands on either side of the
+     sprites: on one side the sprites paint over the motes and everything is
+     fine, on the other the motes are drawn last and, being additive, wash out
+     whatever they cover. A monster or an item that is visible from one tile and
+     swamped from the next is exactly that flip, and it was reported as
+     "sometimes shown, sometimes hidden".
+
+     Forcing the cloud first makes it deterministic. The cost is that a mote
+     genuinely between the eye and a creature is painted over by the creature
+     instead of in front of it — a couple of pixels of dust in the wrong order,
+     against a monster that can no longer be washed out. */
+  pts.renderOrder=-1;
   pts.userData.decor=true;      // a tap goes through the air to the stone
   R3.spores=mat;
   return pts;
@@ -12111,7 +12129,12 @@ function refreshItemSprite(L,i){
   if(!arr||!arr.length)return;
   const x=i%L.w,y=Math.floor(i/L.w);
   const top=arr[arr.length-1];
-  const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:svgToTexture(itemSVG(top),itemTexKey(top)),transparent:true}));
+  /* alphaTest matches the monster sprites', and for the same reason: without it
+     the quad's fully transparent margin still writes depth, so anything drawn
+     behind an item — spore motes, spell effects — gets a rectangular hole
+     punched around it. Monsters were given this when the effects were shaped;
+     items were missed. */
+  const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:svgToTexture(itemSVG(top),itemTexKey(top)),transparent:true,alphaTest:0.08}));
   spr.scale.set(0.38,0.38,1);
   spr.position.set(x+0.5,0.2,y+0.5);
   spr.userData={kind:'item',x,y,i};

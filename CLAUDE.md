@@ -1019,6 +1019,28 @@ three themes carry real machinery:
     so at desktop resolution the near motes are small enough to look fine and the
     bug does not appear at all — it has to be reproduced at a phone's pixel ratio.
     That is the third bug this file records with exactly that shape.
+  - **The cloud draws FIRST in the transparent pass** (`renderOrder = -1`), and
+    that is correctness, not preference. three.js sorts transparent objects by
+    the projected z of each **object's** position, not per fragment. The cloud is
+    one object sitting at the level group's origin — tile (0,0) — so its sort key
+    has nothing to do with where the motes are. Walking around flips it onto
+    either side of the sprites: on one side the sprites paint over the motes and
+    all is well, on the other the additive motes are drawn last and wash out
+    whatever they cover. That is why a monster or an item was *sometimes* visible
+    and sometimes swamped from one tile to the next.
+
+    Measured over 40 items on grove floors, the cloud's effect on the sprite's own
+    pixels: mean 13.2 and worst 410 (a total white-out) with 3 of 40 badly
+    washed, against mean 0.15 and worst 6.1 with none washed after. The cost is
+    that a mote genuinely between the eye and a creature is painted over by the
+    creature — a couple of pixels of dust in the wrong order, against a monster
+    that can no longer disappear.
+
+  **An item sprite needs `alphaTest` too.** It had none, so the fully transparent
+  margin of its quad still wrote depth and punched a rectangular hole in anything
+  drawn behind it. Monster sprites were given `alphaTest:0.08` when the spell
+  effects were shaped; items were simply missed, and the spore cloud is what made
+  it visible.
   - **The count was tied to the graphics setting and must not be again.** That
     constant no longer exists, and reading it threw a `ReferenceError` on the
     first grove built rather than costing a frame.
