@@ -988,6 +988,35 @@ three themes carry real machinery:
   — and drifts of spore dust, which are drawn before the furniture check because
   dust does not care what is standing there.
 
+  **Spores hang in the air and fall**, which is the one piece of the grove that
+  moves. `sporeCloud` is a single `THREE.Points` — one draw call, 520 motes,
+  about 5KB of geometry — animated entirely in the vertex shader from `t` and a
+  per-mote `seed`, so there is no per-frame CPU work at all. Each drifts down at
+  its own speed, wanders a little, twinkles, fades in as it leaves the roof and
+  out as it reaches the ground, and wraps in a `SPORE_SPAN` box that follows the
+  camera, so the grove is never out of them and none ever pops into view.
+
+  Three things about it are easy to get wrong:
+
+  - **It is deliberately not physically sized.** Derived honestly — the
+    projection scale times a spore's real radius of a few millimetres — a mote
+    comes out one to four pixels and is simply *not there*. A real spore is
+    invisible; this has to read as one. The scale lands a mote at four to
+    fourteen device pixels at a couple of metres, and it is multiplied by the
+    drawing buffer's height so it looks the same whatever the device draws at.
+  - **They have to be dim.** Additive motes accumulate wherever two overlap, so
+    a brightness that suits one is a wash for a hundred. This should read as dust
+    catching the light, not as a light of its own.
+  - **The count was tied to the graphics setting and must not be again.** That
+    constant no longer exists, and reading it threw a `ReferenceError` on the
+    first grove built rather than costing a frame.
+
+  Measured, the cloud is free: 520 motes against none is 251.1ms vs 250.0ms a
+  frame, and a sweep of 0/260/520/1040/2080 is not even monotonic. But that
+  harness is SwiftShader with no GPU, and the one cost it cannot see is **fill** —
+  additive motes with size attenuation overdraw when several are against the eye.
+  `SPORE_N` is the lever if that ever bites, and the only one worth reaching for.
+
   **The puffball** extends the trap pool on the drow snare's exact terms, so a
   floor's trap count is untouched. **Fortitude, not Reflex** — the burst is not
   something you dodge, it is something you breathe — which is what makes it a

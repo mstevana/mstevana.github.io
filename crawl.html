@@ -8482,7 +8482,7 @@ attribute float seed;
 varying float vA;
 void main(){
   vec3 p=position;                                  // a fixed offset in [0,span)
-  float sp=0.018+0.050*fract(seed*7.31);            // its own falling speed
+  float sp=0.030+0.070*fract(seed*7.31);            // its own falling speed
   float y=mod(p.y-t*sp,wallh);
   float sx=sin(t*0.33+seed*17.0)*0.11;              // and its own drift
   float sz=cos(t*0.27+seed*11.0)*0.11;
@@ -8496,10 +8496,15 @@ void main(){
   vA*=0.45+0.55*sin(t*1.6+seed*29.0);               // and a slow twinkle
   vec4 mv=viewMatrix*vec4(w,1.0);
   gl_Position=projectionMatrix*mv;
-  // Size in DEVICE pixels. The projection is h/(2*tan(fov/2)) per world unit at
-  // unit distance, so psz is that factor times the mote's world radius, a few
-  // millimetres. Set by eye it put 86-pixel blobs up and the grove went white.
-  gl_PointSize=(0.8+2.6*fract(seed*3.17))*psz/max(0.35,-mv.z);
+  /* Size in DEVICE pixels, psz being a per-buffer-height scale set on the CPU.
+     Note this is deliberately NOT physically sized. Derived honestly — the
+     projection is h/(2*tan(fov/2)) per world unit, times a spore's real radius
+     of a few millimetres — a mote comes out one to four pixels across and is
+     simply not there. A real spore is invisible; this has to read as one. So the
+     scale is chosen to land a mote at four to fourteen device pixels at a couple
+     of metres, and the spread is narrowed because the wide one made the biggest
+     motes read as blobs while the smallest still vanished. */
+  gl_PointSize=(0.9+1.8*fract(seed*3.17))*psz/max(0.35,-mv.z);
 }`;
 const SPORE_FS=`
 uniform vec3 c; varying float vA;
@@ -8511,24 +8516,24 @@ void main(){
   // And they are DIM. Additive motes accumulate wherever two overlap, so a
   // brightness that suits one is a wash for a hundred: this should read as
   // dust catching the light, not as a light of its own.
-  gl_FragColor=vec4(c*g*g*vA*0.34,1.0);
+  gl_FragColor=vec4(c*g*g*vA*0.55,1.0);
 }`;
 /* The count follows the graphics setting, and this is insurance rather than a
    measured need. What the harness CAN measure says the cloud is free: 520 motes
    against no motes is 251.1ms vs 250.0ms a frame, and the scaling run is not
    even monotonic (0 motes came out the slowest of five counts), so the particle
    count is entirely inside the noise. But that harness is SwiftShader — a
-   software rasteriser with no GPU at all — and the one cost this cannot see is
+   software rasteriser with no GPU at all — and the one cost it cannot see is
    FILL: additive motes with size attenuation overdraw badly when a few of them
-   are right against the eye, and that is a real risk on a phone. So `low` gets
-   a third of them and `adaptive` two thirds, which costs nothing to have and is
-   the only lever that would be wanted if it ever did bite. */
-const SPORE_SPAN=9.0;
-function sporeCount(){
-  return gfxMode==='low'?180:gfxMode==='adaptive'?340:520;
-}
+   are right against the eye, which is a real risk on a phone.
+
+   `SPORE_N` used to be chosen from `gfxMode`, and that constant does not exist
+   in this build — the graphics setting was reverted and not brought back, so
+   reading it would have thrown a ReferenceError on the first grove built rather
+   than costing a frame. It is a single number now. If fill ever does bite, this
+   is the lever, and it is the only one worth reaching for. */
+const SPORE_SPAN=9.0, SPORE_N=520;
 function sporeCloud(th){
-  const SPORE_N=sporeCount();
   const pos=new Float32Array(SPORE_N*3), sd=new Float32Array(SPORE_N);
   let h=0x9e3779b9>>>0;
   const rr=()=>{h=(h*1664525+1013904223)>>>0;return h/4294967296;};
@@ -12408,7 +12413,11 @@ function updateCamera(now){
     const u=R3.spores.uniforms;
     u.t.value=now/1000;
     u.cam.value.copy(R3.camera.position);
-    u.psz.value=R3.renderer.domElement.height*0.0042;
+    /* Scaled by the drawing buffer's height so a mote is the same apparent size
+       whatever the device draws at. 0.0042 was a correction to an 86-pixel blob
+       and it overshot the other way: it put motes at one to four pixels, which
+       is what a spore honestly is and is therefore invisible. */
+    u.psz.value=R3.renderer.domElement.height*0.0095;
   }
   // crypt candles guttering, each on its own phase so they don't pulse together
   for(let i=0;i<R3.candleFlames.length;i++){
