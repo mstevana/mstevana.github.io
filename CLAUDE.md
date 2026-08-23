@@ -1979,10 +1979,15 @@ replacing it.
 
 Three details it depends on:
 
-- **It hashes every inline `<script>` and `<style>`, not `documentElement`.** The
-  DOM mutates constantly while the game runs, so hashing that would give a
-  different answer depending on when it was asked. Verified stable across seven
-  floors and a full party-panel rebuild.
+- **It hashes every inline `<script>` and `<style>`, plus the head's `link`,
+  `meta` and `title` tags — not `documentElement`.** The body's DOM mutates
+  constantly while the game runs, so hashing that would give a different answer
+  depending on when it was asked; the head does not, and nothing in the game
+  edits it. The head was left out at first, and a change that touched only it —
+  adding the home-screen icons and the manifest — did not move the id at all,
+  which is exactly the case the id exists to catch. Their attributes matter
+  rather than their text, so that half reads `outerHTML`. Verified stable across
+  seven floors and a full party-panel rebuild.
 - **three.js is skipped**, because it is loaded with a `src` and the selector
   excludes it. A CDN hiccup therefore cannot change the id.
 - **It is memoised, and first computed on the first floor built**, where a hitch
@@ -1997,6 +2002,39 @@ character — and watching the id move from `809bc1e5` to `93e09ee2`.
 **It is deliberately not in `serializeGame`.** That carries `v:1`, a *save
 format* number, and `loadGame` DELETES a save whose `v` does not match. Folding a
 build id into it would destroy every run on every deploy.
+
+## The home-screen icon
+
+`icon.svg` is the source; `icon-180.png`, `icon-192.png` and `icon-512.png` are
+rasterised from it and are the only binary files in the repo. They exist as real
+files rather than inlined like everything else here because **iOS will not accept
+a `data:` URI for `apple-touch-icon`**, and it ignores the manifest's icons
+entirely — Safari reads that one link and nothing else. 180 is what a modern
+iPhone asks for and iOS downscales it for every other slot, so one file covers
+them all. Android and desktop Chrome read `crawl.webmanifest` instead, where 192
+and 512 are what an install prompt wants, plus a `maskable` copy so a launcher
+can crop it to its own shape.
+
+Two meta tags are needed and neither substitutes for the other:
+`apple-mobile-web-app-capable` makes the saved tile open without Safari's chrome,
+and `mobile-web-app-capable` is Chrome's equivalent.
+
+Three things about the art, all of which showed up at the size it is actually
+seen rather than on the sheet:
+
+- **The shield is warm and the sword is cold.** Both in steel, they merged into
+  one grey blob at 60px. The colour split is what separates them, not the
+  outline.
+- **A blade must be long relative to its width or it reads as a dagger.** The
+  first cut was 6:1 and looked like a knife on a shield; it is nearer 9:1 now.
+- **The composition is vertically limited by the pommel, not the tip.** It looks
+  like it could be scaled up to fill the tile, and it cannot: the pommel already
+  sits 35px off the bottom edge of 512, and the sword and shield have to keep
+  their relationship. The dark margin is left and right, which is where a tall
+  composition puts it.
+
+Regenerate with `icon/render.js` in the scratch harness after editing `icon.svg`;
+check the result at 60px, not at 512, because that is the size it is judged at.
 
 ## The keyboard reads positions, not letters
 
