@@ -2027,11 +2027,14 @@ seen rather than on the sheet:
   outline.
 - **A blade must be long relative to its width or it reads as a dagger.** The
   first cut was 6:1 and looked like a knife on a shield; it is nearer 9:1 now.
-- **The composition is vertically limited by the pommel, not the tip.** It looks
-  like it could be scaled up to fill the tile, and it cannot: the pommel already
-  sits 35px off the bottom edge of 512, and the sword and shield have to keep
-  their relationship. The dark margin is left and right, which is where a tall
-  composition puts it.
+- **They stand apart, shield left and sword right, and the gap does not do the
+  separating on its own.** Side by side is a weaker read than overlapped — there
+  is no figure and ground — so the warm/cold split matters *more* here, not less.
+  With both in steel the two silhouettes sit as one grey mass across the tile.
+- **A thin object next to a wide one needs its own horizontal mass.** A bare
+  blade on the right leaves that half of the tile reading empty beside the
+  shield; the crossguard is what balances it, so it is drawn full width rather
+  than dainty.
 
 Regenerate with `icon/render.js` in the scratch harness after editing `icon.svg`;
 check the result at 60px, not at 512, because that is the size it is judged at.

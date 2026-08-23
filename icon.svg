@@ -28,9 +28,11 @@
 
   <rect width="512" height="512" fill="url(#glow)"/>
 
-  <!-- the shield, warm, so the steel in front of it separates by COLOUR and not
-       only by outline: two grey objects merge into one blob at 60px -->
-  <g filter="url(#cast)" transform="translate(256,274) scale(6.55) translate(-32,-32)">
+  <!-- Shield left, sword right, standing apart. They are still warm against
+       cold: side by side the gap does some of the separating, but two grey
+       objects this close still merge into one mass at 60px, so the colour split
+       is doing most of the work and is kept. -->
+  <g filter="url(#cast)" transform="translate(156,262) scale(5.6) translate(-32,-32)">
     <path d="M32 4 Q48 6 50 12 Q50 42 32 60 Q14 42 14 12 Q16 6 32 4 Z"
           fill="#2a1c0f"/>
     <path d="M32 6.2 Q46.4 8.2 48.2 13.4 Q48.2 41 32 57.4 Q15.8 41 15.8 13.4 Q17.6 8.2 32 6.2 Z"
@@ -44,9 +46,11 @@
     <path d="M32 47.5 Q22 38 20 26" stroke="#c9b37e" stroke-width="1.1" fill="none" opacity="0.30"/>
   </g>
 
-  <!-- the sword, vertical and in front. Point up: a blade angled down reads as
-       surrender, and at icon size the vertical is the strongest line available -->
-  <g filter="url(#cast)" transform="translate(256,256) scale(6.9) translate(-32,-32)">
+  <!-- Point up: a blade angled down reads as surrender, and at icon size a
+       vertical is the strongest line available. The crossguard is what gives the
+       sword horizontal mass — without it the right half of the tile reads empty
+       beside the shield. -->
+  <g filter="url(#cast)" transform="translate(368,256) scale(5.9) translate(-32,-32)">
     <path d="M32 1.6 L35.4 8.6 L35.4 42 L32 48.5 L28.6 42 L28.6 8.6 Z" fill="#1d1f22"/>
     <path d="M32 3.0 L34.6 9.2 L34.6 41.4 L32 47 L29.4 41.4 L29.4 9.2 Z" fill="url(#steel)"/>
     <path d="M32 4.6 L32 45.5" stroke="#f2f4f7" stroke-width="0.8" opacity="0.85"/>
