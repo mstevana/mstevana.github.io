@@ -5,6 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Crawl — a dungeon awaits</title>
+<!-- Home-screen install. iOS reads `apple-touch-icon` and nothing else: it
+     ignores the manifest's icons, and it will not accept a data: URI here, which
+     is why these are real files rather than inlined like everything else in this
+     project. 180 is the size a modern iPhone asks for; iOS downscales it for
+     every other slot, so one file covers them all. Android and desktop Chrome
+     read the manifest instead, where 192 and 512 are what an install prompt
+     wants, plus a maskable copy so a launcher can crop it to its own shape.
+
+     `apple-mobile-web-app-capable` is what makes the saved tile open without
+     Safari's chrome; the older `mobile-web-app-capable` above is the same thing
+     for Chrome. Both are needed — neither reads the other's. -->
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="manifest" href="crawl.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Crawl">
+<meta name="theme-color" content="#0d0b09">
 <style>
 :root{
   --ink:#c9b37e; --ink-dim:#7a6c4e; --blood:#8c1f1f; --hp-green:#3f7d3a;
@@ -16810,6 +16829,14 @@ const UI=(()=>{
     if(_buildId)return _buildId;
     let src='';
     for(const el of document.querySelectorAll('script:not([src]),style'))src+=el.textContent;
+    /* The head's link and meta tags count too. They are static — nothing in the
+       game adds, removes or edits one — and leaving them out meant a change that
+       touched only the head did not move the id at all, which is precisely the
+       case the id exists to catch. Adding the home-screen icons and the manifest
+       was that change, and it slipped through unnoticed until the id was checked
+       against it. Their attributes matter, not just their text, so this reads
+       outerHTML rather than textContent. */
+    for(const el of document.querySelectorAll('head link,head meta,title'))src+=el.outerHTML;
     let h=0x811c9dc5>>>0;
     for(let i=0;i<src.length;i++){h^=src.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0;}
     _buildId=('0000000'+h.toString(16)).slice(-8);
