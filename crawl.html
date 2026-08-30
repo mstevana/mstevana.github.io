@@ -255,6 +255,12 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 .gothic{font-size:12px;color:var(--ink-dim);text-align:center;font-style:italic;margin:4px 0 10px;}
 #go-summary{font-size:14px;line-height:1.6;text-align:center;}
 .hidden{display:none !important;}
+#legal-body{max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  font-size:11px;line-height:1.5;color:var(--ink-dim);white-space:pre-wrap;
+  border:1px solid var(--line);background:#0d0b09;padding:10px 12px;border-radius:4px;}
+#legal-body h3{color:var(--ink);font-size:13px;margin:14px 0 6px;}
+#legal-body h3:first-child{margin-top:0;}
+#legal-body .warn{color:#d08a3a;}
 </style>
 </head>
 <body>
@@ -291,6 +297,7 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   <button class="mbtn" id="m-new">New party</button>
   <button class="mbtn" id="m-quick">Quick start (auto party)</button>
   <button class="mbtn" id="m-bestiary">Bestiary</button>
+  <button class="mbtn" id="m-legal">Licence</button>
   <button class="mbtn" id="m-export">Export save code</button>
   <button class="mbtn" id="m-import">Import save code</button>
   <div id="m-io" class="hidden"><textarea id="m-io-text"></textarea>
@@ -368,6 +375,15 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
   </div>
 </div></div>
 
+<!-- The licence screen. Section 10 of the OGL requires a copy of the License to
+     travel with every copy of the Open Game Content, so this is not decoration:
+     without it the game cannot legally be distributed at all. -->
+<div class="ovl" id="ovl-legal"><div class="panel" style="width:min(680px,94vw)">
+  <h2>Licence</h2>
+  <div id="legal-body"></div>
+  <div class="row"><button class="mbtn small" id="legal-close">Close</button></div>
+</div></div>
+
 <div class="ovl" id="ovl-log"><div class="panel" style="width:min(620px,94vw)">
   <h2>Log</h2>
   <div id="log-list"></div>
@@ -398,7 +414,50 @@ select{background:#0b0906;border:1px solid var(--btn-line);color:var(--ink);font
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 'use strict';
-/* ============================== RULES DATA (D&D 3.5 SRD, simplified) ============================== */
+/* ============================== RULES DATA (3.5 SRD, simplified) ============================== */
+/* ---------- licence ----------------------------------------------------------
+   The rules this game implements come from the 3.5 System Reference Document,
+   which is Open Game Content under the Open Game License 1.0a. Section 10 of
+   that licence requires a copy of the License to travel with every copy of the
+   Open Game Content — so the Licence screen is not decoration, it is the thing
+   that makes the game distributable.
+
+   OGL_TEXT IS DELIBERATELY EMPTY. It has to be the licence VERBATIM, and a
+   legal document reproduced from memory is worse than no document at all: a
+   licence you have subtly misquoted is a licence you cannot rely on. Paste it
+   from an authoritative copy — Wizards' own SRD download, or the Open Gaming
+   Foundation — as sections 1 through 15 inclusive, including the two copyright
+   lines Section 15 already carries (the OGL itself, and the System Reference
+   Document). `OGL_OUR_NOTICE` is appended to those automatically, which is what
+   Section 6 requires of anyone distributing their own work.
+
+   Until it is filled in, the Licence screen says so in plain sight rather than
+   pretending to be complete. */
+const OGL_TEXT = '';
+const OGL_OUR_NOTICE = 'Crawl Copyright 2026, mstevana.';
+
+/* Section 1(e) requires a work to say which parts are Open Game Content and
+   which are not. This is that declaration, and it is our own text rather than
+   anything quoted. */
+const LEGAL_DECLARATION = [
+  ['Open Game Content',
+   'The game rules and mechanics in this program are derived from the 3.5 System '+
+   'Reference Document and are Open Game Content: ability scores and their modifiers, '+
+   'races, classes, levels and experience, the spell lists and spell effects, armour '+
+   'class, attack and damage resolution, saving throws, conditions, and the statistics '+
+   'of creatures drawn from the SRD.'],
+  ['Product Identity',
+   'The following are Product Identity and are not Open Game Content: the name "Crawl"; '+
+   'all artwork, sprites, textures and visual presentation; the layout and trade dress '+
+   'of the interface; all descriptive and flavour text; and the proper names invented '+
+   'for this work, including Rubble hulk, Carrion worm, Lure-spinner, Ceiling lurker, '+
+   'squithid, Mycelid, the Weaver, Durn the Grey and Morrath.'],
+  ['No third-party Product Identity',
+   'This work uses no Product Identity belonging to Wizards of the Coast. Creatures and '+
+   'deities that are excluded from the SRD were renamed for that reason. This program is '+
+   'not affiliated with, endorsed by, or sponsored by Wizards of the Coast.'],
+];
+
 const rnd = (n)=>Math.floor(Math.random()*n);
 const d = (n)=>1+rnd(n);
 // Spell damage comes out of each spell's own dmgFn, which rolls internally, so
@@ -17474,7 +17533,36 @@ const UI=(()=>{
     show('ovl-bestiary');
   }
   function openBestiary(){renderBestiary();}
+  /* The licence screen. Rendered on open rather than at boot, like every other
+     panel here, and built with textContent rather than innerHTML — the licence
+     is a long legal text and must appear exactly as written, so it must not go
+     anywhere near HTML parsing. */
+  function openLegal(){
+    const box=$('legal-body');
+    box.textContent='';
+    const sec=(title,body,cls)=>{
+      const h=document.createElement('h3');h.textContent=title;box.appendChild(h);
+      const d=document.createElement('div');if(cls)d.className=cls;
+      d.textContent=body;box.appendChild(d);
+    };
+    for(const [t,b] of LEGAL_DECLARATION)sec(t,b);
+    if(OGL_TEXT&&OGL_TEXT.trim()){
+      sec('Open Game License Version 1.0a',
+          OGL_TEXT.trim()+'\n'+OGL_OUR_NOTICE);
+    }else{
+      /* Said out loud rather than left blank. Distributing the Open Game Content
+         without the License attached is the one thing the licence does not
+         permit, so a build in this state must not reach an app store. */
+      sec('Open Game License Version 1.0a',
+          'NOT YET INCLUDED IN THIS BUILD.\n\n'+
+          'This game implements Open Game Content and may not be distributed '+
+          'until the full text of the Open Game License Version 1.0a is included '+
+          'here, verbatim, together with this notice:\n\n'+OGL_OUR_NOTICE,'warn');
+    }
+    show('ovl-legal');
+  }
   $('best-close').addEventListener('click',()=>hide('ovl-bestiary'));
+  $('legal-close').addEventListener('click',()=>hide('ovl-legal'));
   /* ---------- automap ---------- */
   function openMap(){
     const cv=$('map-cv'),ctx=cv.getContext('2d');
@@ -17551,7 +17639,7 @@ const UI=(()=>{
     refreshMenu();
   });
   return {buildPartyDom,refreshParty,tickCooldowns,charFlash,float,floatAtMonster,vignette,trapFlash,toast,
-    refreshDepthTag,pickAlly,paladinMenu,openSpells,spellFlash,openInventory,openStats,openBestiary,openMap,openLog,openMemo,gameOver,show,hide,anyOverlayOpen,refreshInv};
+    refreshDepthTag,pickAlly,paladinMenu,openSpells,spellFlash,openInventory,openStats,openBestiary,openLegal,openMap,openLog,openMemo,gameOver,show,hide,anyOverlayOpen,refreshInv};
 })();
 /* ============================== INPUT ============================== */
 function bindPad(id,fn){
@@ -17583,7 +17671,7 @@ const KEY_LETTER={w:'fwd',arrowup:'fwd',s:'back',arrowdown:'back',a:'sleft',d:'s
 // the death screen have no entry: they must be answered.
 const OVL_DISMISS={'ovl-inv':'inv-close','ovl-stats':'st-close','ovl-spells':'sp-close',
   'ovl-memo':'memo-done','ovl-log':'log-close','ovl-map':'map-close','ovl-target':'tg-cancel',
-  'ovl-bestiary':'best-close'};
+  'ovl-bestiary':'best-close','ovl-legal':'legal-close'};
 function topOverlay(){
   const open=[...document.querySelectorAll('.ovl.show')].filter(o=>o.id!=='ovl-rotate');
   return open[open.length-1]||null;
@@ -17778,6 +17866,8 @@ function initMenu(){
   // the bestiary layers over the menu rather than replacing it, so Escape (or
   // Close) drops the player back where they were
   $('m-bestiary').addEventListener('click',()=>UI.openBestiary());
+  // layers over the menu the same way the bestiary does, so Close returns here
+  $('m-legal').addEventListener('click',()=>UI.openLegal());
   $('m-quick').addEventListener('click',()=>{
     goFull();
     UI.hide('ovl-menu');
