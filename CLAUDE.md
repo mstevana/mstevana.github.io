@@ -565,6 +565,33 @@ at two tiles, not just a large sheet), and that no stroke leaves the 64-unit
 viewBox. Note when checking the latter that `hideDetail` emits relative
 linetos (`l dx dy`), so a naive coordinate scan reports false positives.
 
+## The licence screen, and the one thing left blank on purpose
+
+The rules are Open Game Content under the OGL 1.0a, and **Section 10 requires a
+copy of the License to travel with every copy of that content** — so `ovl-legal`
+is not decoration, it is what makes the game distributable at all. It hangs off
+the menu beside the bestiary and layers over it, so Close returns to the menu.
+
+`LEGAL_DECLARATION` is the Section 1(e) declaration — which parts are Open Game
+Content and which are Product Identity. That is our own text and it is complete.
+
+**`OGL_TEXT` is deliberately an empty string.** It has to be the licence
+verbatim, and a legal document reproduced from memory is worse than none: a
+licence subtly misquoted is a licence that cannot be relied on. It must be pasted
+from an authoritative copy — Wizards' own SRD download or the Open Gaming
+Foundation — as sections 1 to 15 inclusive, keeping the two copyright lines
+Section 15 already carries. `OGL_OUR_NOTICE` is appended automatically, which is
+what Section 6 asks of anyone distributing their own work.
+
+Until it is filled in the screen **says so, in amber**, rather than rendering
+blank and looking finished. A build in that state must not reach an app store.
+That is the whole reason it is loud.
+
+Two implementation notes: the panel is built with `textContent`, never
+`innerHTML`, because a licence must appear exactly as written and must not go
+near an HTML parser; and it is rendered on open like every other panel here, not
+at boot.
+
 ## Creature and deity names are deliberately not D&D's
 
 The rules are the 3.5 SRD, which is open content. A handful of names in the
