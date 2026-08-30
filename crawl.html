@@ -469,9 +469,32 @@ The following text is the property of Wizards of the Coast, Inc. and is Copyrigh
 14 Reformation: If any provision of this License is held to be unenforceable, such provision shall be reformed only to the extent necessary to make it enforceable.
 
 15 COPYRIGHT NOTICE Open Game License v 1.0 Copyright 2000, Wizards of the Coast, Inc.`;
-/* The SRD's own Section 15 line. Paste it verbatim from the System Reference
-   Document; it names Wizards, the year range and the SRD's authors. */
-const OGL_SRD_NOTICE = '';
+/* The rest of the Section 15 chain, between the OGL's own copyright line — which
+   is already the last line of OGL_TEXT — and this work's, which is appended
+   after. Supplied by the project owner.
+
+   NOTE what is deliberately NOT repeated here. The source this was taken from
+   prints a `COPYRIGHT NOTICE` heading, then the OGL's own line, then these; the
+   heading and that line are already in OGL_TEXT, so re-printing them would give
+   the finished screen two copyright headings and two OGL lines that disagree
+   about the version (`v 1.0` in the licence proper, `v 1.0a` in the reproduction).
+   `END OF LICENSE` is left off for the same reason: this work's notice comes
+   after these, so a terminator in the middle would be wrong. */
+const OGL_SRD_NOTICE = `System Reference Document Copyright 2000-2003, Wizards of the Coast, Inc.; Authors Jonathan Tweet, Monte Cook, Skip Williams, Rich Baker, Andy Collins, David Noonan, Rich Redman, Bruce R. Cordell, John D. Rateliff, Thomas Reid, James Wyatt, based on original material by E. Gary Gygax and Dave Arneson.
+
+Creature Collection Volume 1 Copyright 2000, Clark Peterson.
+
+Modern System Reference Document Copyright 2002, Wizards of the Coast, Inc.; Authors Bill Slavicsek, Jeff Grubb, Rich Redman, Charles Ryan, based on material by Jonathan Tweet, Monte Cook, Skip Williams, Richard Baker,Peter Adkison, Bruce R. Cordell, John Tynes, Andy Collins, and JD Wiker
+
+Monster Manual II Copyright 2002, Wizards of the Coast, Inc.
+
+Swords of Our Fathers Copyright 2003, The Game Mechanics.
+
+Mutants & Masterminds Copyright 2002, Green Ronin Publishing.
+
+Unearthed Arcana Copyright 2004, Wizards of the Coast, Inc.; Andy Collins, Jesse Decker, David Noonan, Rich Redman.
+
+The Hypertext d20 SRD Copyright 2004, Jans W Carton; transferred to BoLS Interactive, 2016.`;
 const OGL_OUR_NOTICE = 'Crawl Copyright 2026, mstevana.';
 
 /* Section 1(e) requires a work to say which parts are Open Game Content and
@@ -17588,9 +17611,10 @@ const UI=(()=>{
       /* Section 15 is a chain: the licence's own notice is already the last line
          of OGL_TEXT, and Section 6 requires the notice of every piece of Open
          Game Content used on top of it — the SRD's, then this work's. */
+      // blank-line separated, because that is how the chain's own entries are laid out
       let tail='';
-      if(OGL_SRD_NOTICE&&OGL_SRD_NOTICE.trim())tail+='\n'+OGL_SRD_NOTICE.trim();
-      tail+='\n'+OGL_OUR_NOTICE;
+      if(OGL_SRD_NOTICE&&OGL_SRD_NOTICE.trim())tail+='\n\n'+OGL_SRD_NOTICE.trim();
+      tail+='\n\n'+OGL_OUR_NOTICE;
       sec('Open Game License Version 1.0a',OGL_TEXT.trim()+tail);
       if(!(OGL_SRD_NOTICE&&OGL_SRD_NOTICE.trim())){
         /* Said out loud rather than quietly omitted. The licence is here, but
