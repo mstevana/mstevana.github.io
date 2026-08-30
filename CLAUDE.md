@@ -132,7 +132,7 @@ heavy undead filling the deep bands, plus the undead damage rules) it
 reads **median 26, middle half 22–29**. After the cave work (nine cave
 creatures, the ambushers, the cave spawn bias) it reads **median 27,
 middle half 24–30**; moving boss floors to every third level took it to
-**median 28, middle half 26–30**. The duergar and myconid rosters left it
+**median 28, middle half 26–30**. The duergar and mycelid rosters left it
 at **median 27, middle half 26–30**, the drow at **median 28, middle half
 25–29**, and the sewers roster at **median 27, middle half 24–29**.
 
@@ -143,7 +143,7 @@ tried. Most of it was recovered there (the first attempt read median 26 with
 the party arriving at depth 15 two levels short); what is left is that
 `threatOf` cannot see what makes a floor of nothing but drow harder than its
 score — AC, sleep poison, a line of casters — which is the same blind spot
-that hid the myconid speed bug.
+that hid the mycelid speed bug.
 
 Then two things landed together and both of them moved it a long way.
 
@@ -201,7 +201,7 @@ coffin and ossuary fights from the simulation leaves the median unchanged,
 and so does skipping every ambush.
 
 **Run the descent after adding a roster, not just the threat ratios.** The
-myconids measured 0.69–1.35 of their per-monster share — a clean roster by
+mycelids measured 0.69–1.35 of their per-monster share — a clean roster by
 every static check — and still walled the descent at depth 16, because
 `speed` had been read as a rate instead of a cooldown (see *Adding a
 monster*). The budget cannot see a creature that simply moves faster than
@@ -241,7 +241,7 @@ Also worth knowing: **`poolCeiling` is a separate trap in the same area.**
 It reads the single heaviest creature a depth allows, so a new roster's top
 creature out-weighing the incumbent top creature lifts the cap the budget
 is allowed to grow into. The black pudding did that at depth 23 (822 against
-the myconid elder's 714) and was sized down for it.
+the mycelid elder's 714) and was sized down for it.
 
 The cause is structural, and worth knowing before you touch any dial.
 **The party is level-capped at 20 by depth 20** — `MAX_LEVEL` is 20 and a
@@ -541,7 +541,7 @@ Two things learned by looking rather than reasoning:
   what makes leather look like leather.
 - **Gills hang from the rim of a cap and follow its curve.** Drawn as a straight
   row of verticals they landed across the middle of the cap and read as a row of
-  teeth on the shrieker and the myconid guard.
+  teeth on the shrieker and the mycelid guard.
 
 **Detail is geometry rather than filters, and geometry is close to free here.**
 Measured back-to-back on one machine: the build before any detail 48.1ms, after
@@ -564,6 +564,45 @@ adding more — that it reads at the size it is actually seen (an in-game captur
 at two tiles, not just a large sheet), and that no stroke leaves the 64-unit
 viewBox. Note when checking the latter that `hideDetail` emits relative
 linetos (`l dx dy`), so a naive coordinate scan reports false positives.
+
+## Creature and deity names are deliberately not D&D's
+
+The rules are the 3.5 SRD, which is open content. A handful of names in the
+original build were **not**: they are Product Identity, excluded from the SRD,
+and they were renamed so the game could be published without depending on
+anyone's goodwill.
+
+| was | is |
+|---|---|
+| Umber hulk | **Rubble hulk** |
+| Carrion crawler | **Carrion worm** |
+| Cave fisher | **Lure-spinner** |
+| Piercer | **Ceiling lurker** |
+| Lolth | **the Weaver** |
+| Laduguer | **Durn the Grey** |
+| Deep Duerra | **Morrath** |
+| illithid / mind flayer | **squithid** |
+| Myconid | **Mycelid** |
+
+**Do not let these drift back.** It is easy to reach for the familiar word when
+adding a creature or writing a comment, and the whole point of the exercise is
+that the familiar word is the one that cannot be used.
+
+Everything else in the bestiary was checked against the SRD and is fine — drow,
+duergar, drider, otyugh, roper, scrag, ochre jelly, black pudding, ettin, purple
+worm, wererat, worg, shrieker and violet fungus are all open content.
+
+Two mechanical notes:
+
+- **`MON_RENAMES` in `07_game.js` must be kept for ever.** A save stores a
+  creature by key, so without that table a run saved before the rename comes back
+  with `MONSTERS[m.key]` undefined and dies rebuilding its first floor. It covers
+  the four creatures whose keys moved. **Lurkers carry a key too** and are stored
+  separately from `monsters` — easy to miss.
+- **The grove's own creature keys did not move.** They were already `mysprout`,
+  `myguard` and so on, which read as well for a mycelid. Only the level's
+  furniture array was renamed, and `deserializeGame` reads `lv.myconid` when
+  `lv.mycelid` is absent.
 
 ## Adding a monster
 
@@ -712,7 +751,7 @@ really the movement cooldown. Anything that changes pacing has to be
 measured on a real `updateMonsters` loop, which is what T52 does.
 
 **`speed` is a movement cooldown, so lower is faster.** It is seconds
-between steps: `m.moveCd = m.speed * slowMult`. The piercer, an ambusher
+between steps: `m.moveCd = m.speed * slowMult`. The ceiling lurker, an ambusher
 that cannot walk at all, is the slowest thing in the game at 2.6, and
 nothing is below 1. Read the other way round it is silently catastrophic
 and `threatOf` will not see it — a shrieker written as `speed:0.01`
@@ -734,9 +773,9 @@ Whether a creature counts as undead for the crypt spawn bias, for
 Turn Undead and for the antitoxin-style loot faucets is `type:'undead'` —
 there is no separate list to update.
 
-Myconids take one flag, `myconid:true`, which is the whole of what the
+Mycelids take one flag, `mycelid:true`, which is the whole of what the
 grove spawn bias reads. Three optional behaviours ride on it, all in
-`07_game.js`: `distress:true` (being hurt wakes myconids within 7 tiles),
+`07_game.js`: `distress:true` (being hurt wakes mycelids within 7 tiles),
 `shriek:true` (screams once on seeing the party within 6 and wakes within
 11), and `spores:{dc,dur,kind}` (a Fortitude save or `stunned`/`hold`,
 read by `monsterSpecials` alongside the cave creatures' `gaze` and `hold`).
@@ -761,7 +800,7 @@ what the cave spawn bias reads — like `type:'undead'`, there is no list
 elsewhere. `lurk:true` additionally makes the creature eligible to be
 placed as an **ambusher** rather than a standing spawn (see below); only
 give it to something whose idiom is waiting still, and give it a matching
-formation in `addLurkerMesh` or it will hide inside a piercer's
+formation in `addLurkerMesh` or it will hide inside a ceiling lurker's
 stalactite.
 
 Two special-attack flags were added with them and are read by
@@ -821,8 +860,8 @@ three themes carry real machinery:
   **The eight variants each carry something different**, keyed on the variant
   itself rather than `variant%4` (which showed three treatments twice each, one
   of them a roundel with a meaningless star in it): plain, gold studs, a chevron
-  course, **Laduguer** (a broken crossbow bolt on a grey shield), **Deep Duerra**
-  (a cracked illithid skull — the duergar were enslaved by mind flayers and she
+  course, **Durn the Grey** (a broken crossbow bolt on a grey shield), **Morrath**
+  (a cracked squithid skull — the duergar were enslaved by squithids and she
   stole psionics from them, so her mark is a trophy taken off the thing that
   owned her people), a **slave quota tally**, an **ore seam** where the dressing
   stops and the raw rock shows, and the mason's roundel. Variant 0 is
@@ -841,7 +880,7 @@ three themes carry real machinery:
   **Wall furniture in `L.duergar`**, six kinds, weighted rather than even:
   engaged fluted half-columns and iron torches are the *fabric* of the hall and
   stay the common sight (0.30/0.26); a working **forge**, a **rack** of picks
-  and hammers, a **shrine** niche to Laduguer and wall **chains** are what the
+  and hammers, a **shrine** niche to Durn the Grey and wall **chains** are what the
   hall is for. The count is unchanged at 10–17 a floor, so the variety is free.
 
   **Floor dressing** on the crypt litter's terms — seeded per tile, instanced,
@@ -917,14 +956,14 @@ three themes carry real machinery:
     is what finally made them undulation. Rivets are real spheres, and those are
     meant to read as spheres.
 
-- **`Myconid`** — a grove that grew rather than one that was built, and the
+- **`Mycelid`** — a grove that grew rather than one that was built, and the
   only theme that replaces the **ceiling** as well as the walls and floor:
-  `myconidCeilCanvas` draws the gilled underside of the caps overhead,
-  `myconidWallCanvas` gives eight stalk variants over one shared base, and the
+  `mycelidCeilCanvas` draws the gilled underside of the caps overhead,
+  `mycelidWallCanvas` gives eight stalk variants over one shared base, and the
   floor is gravel. The light is purple — `THEMES` carries `light` and `fill`
   for it, and `buildLevel` tints `R3.torch` from `th.light`, so a theme can
   now recolour the party's own lantern. Doors are dried stalks, roughly cut
-  and bolted. A floor of `myconid:true` creatures and nothing else.
+  and bolted. A floor of `mycelid:true` creatures and nothing else.
 
   The stalks are drawn by sampling a wandering edge every 4 pixels with a
   per-stalk phase. At 16 the kinks landed at the same height in every stalk
@@ -953,7 +992,7 @@ three themes carry real machinery:
     the grove's torch is lilac, and a light with no green in it drives any ruddy
     mid-tone to pink.
 
-  **The grove emits light.** `myconidWallCanvas` returns `{cv,glow}`, the second
+  **The grove emits light.** `mycelidWallCanvas` returns `{cv,glow}`, the second
   builder after the drow's — a colour map can only make something pale, and the
   spores are the whole point of the place. The freckles burn with a real halo,
   young caps burn, whatever fruits out of a buried body burns, and every variant
@@ -967,7 +1006,7 @@ three themes carry real machinery:
   no headroom at all. Both came down. The violet now comes mostly from what is
   glowing rather than from washing everything in it.
 
-  **Furniture on `L.myconid`**, six weighted kinds, all of them the colony's work
+  **Furniture on `L.mycelid`**, six weighted kinds, all of them the colony's work
   rather than ornament: a fruiting **cluster** (the crop, largest share), a
   **nursery** bed, a **barrelstalk** tapped for water, hanging spore **pods**, a
   body being **composted**, and a **rapport bloom** — where a circle melds, and
@@ -1071,7 +1110,7 @@ three themes carry real machinery:
   **The circle mound in `L.mound`** is the ossuary's, the forge hall's and the
   chapel's fourth sibling, on their exact terms: `T_PIT` after the connectivity
   check, shoves aside whatever loot is under it, never on the stairs, kept by an
-  elite myconid that carries spores. Its hoard is the one of the four that needs
+  elite mycelid that carries spores. Its hoard is the one of the four that needs
   no invention — a circle plants its dead in its mound, and metal does not rot,
   so what you dig out is the gear off everything it has composted. `openMound` is
   `openBier` rewritten. T59 covers it, and asserts the stairs stay reachable with
@@ -1144,8 +1183,8 @@ three themes carry real machinery:
 
   **The eight wall variants** are keyed on the variant itself, not `variant%4`
   (four treatments twice each, none of them drow): plain, an engaged pilaster, an
-  **obsidian spider**, an older worn hand, **Lolth's own mark**, **web in the
-  spandrels**, a **house sigil**, and **a sigil chiselled out**. Lolth's mark and
+  **obsidian spider**, an older worn hand, **the Weaver's own mark**, **web in the
+  spandrels**, a **house sigil**, and **a sigil chiselled out**. the Weaver's mark and
   the spandrel web are painted onto the emissive sheet too, so they burn like the
   inscription — hers is the only device in the house that carries the script's
   light.
@@ -1172,7 +1211,7 @@ three themes carry real machinery:
 
   **Furniture on `L.drow`** — the rose window keeps the largest share (it was the
   only kind before, and at an even six-way draw a floor would have had one), plus
-  a jade **guardian**, a Lolth **shrine**, a silk **fence**, a cold-fire
+  a jade **guardian**, a the Weaver **shrine**, a silk **fence**, a cold-fire
   **brazier** and a **wall web** with something in it.
 
   **Floor dressing**: web in the corners, egg sacs, shed chitin, spent bolts.
@@ -1234,7 +1273,7 @@ three themes carry real machinery:
   It was 4 seconds first and measured 9, under everything; 5 matches the
   sleepdart.
 
-  **The chapel of Lolth in `L.chapel`** is the ossuary's and forge hall's third
+  **The chapel of the Weaver in `L.chapel`** is the ossuary's and forge hall's third
   sibling and is built on their exact terms: the throne block is `T_PIT` after the
   connectivity check, it **shoves aside** whatever loot is under it rather than
   deleting it, and it never lands on the stairs. Its keeper is an elite drow,
@@ -1303,7 +1342,7 @@ three themes carry real machinery:
   the body, and a thin tibia is what finally reads.
 
 Search for `theme.name==='Sewers'`, `th.name==='Crypt'`, `th.name==='Caves'`,
-`th.name==='Duergar'`, `th.name==='Myconid'` and `th.name==='Drow'`
+`th.name==='Duergar'`, `th.name==='Mycelid'` and `th.name==='Drow'`
 (plus the `cave`/`duer`/`myco`/`drow` flags in `buildLevel`) to find every hook
 before adding a seventh such theme.
 
@@ -1319,7 +1358,7 @@ rather than a band, and cannot drift as rosters are added.
 
 Each theme with machinery writes an array onto the level (`rivers`/`pipes`,
 `crypts`/`ossuary`, `lurkers`, `duergar`/`pillars`/`forge`, `drow`/`chapel`,
-`myconid`/`mound`) in `tryGen`
+`mycelid`/`mound`) in `tryGen`
 and reads it back in `buildLevel`; anything you add that way must also be
 carried through `serializeGame` and `loadGame`, or a reloaded floor comes back
 stripped of it.
@@ -1414,7 +1453,7 @@ the dungeon grows:
 - **`BOSS_TABLE`** — bosses, keyed by theme and then by tier. **A boss belongs
   to the floor it caps.** Boss floors are every third level from depth 6, and
   because themes cycle every three floors the theme of a boss floor walks
-  Sewers, Crypt, Caves, Duergar, Myconid, Drow, Dungeon and starts over 21
+  Sewers, Crypt, Caves, Duergar, Mycelid, Drow, Dungeon and starts over 21
   depths later. `bossSlot(depth)` returns that theme and the tier — how many of
   that theme's boss floors have already been passed.
 
@@ -1448,7 +1487,7 @@ the dungeon grows:
   allowed to.
 
   **A boss-only creature with no slot is dead content.** When the table
-  replaced the old flat list the myconid sovereign fell out of it entirely —
+  replaced the old flat list the mycelid sovereign fell out of it entirely —
   she scored 6057 at depth 39 against a window of 3253–4182. Being boss-only
   is exactly what makes the numbers free to move, so she was resized into the
   slot rather than dropped. Check this whenever the table changes.
@@ -1530,7 +1569,7 @@ anything walkable is stranded. The stairs cannot strand anything on their own
 (they are the furthest tile the generator's own BFS reaches, and nothing can lie
 beyond a furthest tile), but three things move after that BFS runs: the start
 room is sealed and its doors re-cut, locked doors appear, and the ossuary bier,
-the forge anvil and Lolth's throne each block a tile. Any of those can leave the
+the forge anvil and the Weaver's throne each block a tile. Any of those can leave the
 stairwell as the only way round. T31 caught it at about one crypt floor in a few
 hundred — which is exactly the rate at which it would have stranded the key and
 sealed a run. Measured after the gate: 0 stranded over 480 floors at depths
@@ -1717,7 +1756,7 @@ render loop and cleared in `disposeLevel` like everything else in `R3`.
 
 Three tappable things route through the `userData.kind` raycast dispatcher
 in the boot file, alongside doors, traps, items and secrets. Two more,
-`anvil` (the duergar forge hall) and `altar` (the drow chapel of Lolth), are
+`anvil` (the duergar forge hall) and `altar` (the drow chapel of the Weaver), are
 written on `bier`'s terms and live with their own themes:
 
 - **`coffin`** — 55% dust, 25% grave goods, 20% wakes an undead. One shot
@@ -1757,7 +1796,7 @@ changes a floor's shape, not its difficulty. The trade explicitly skips
 eats the boss on every third floor. Which creature a lurker is comes from
 the same log-space Gaussian against the floor's per-monster share that a
 standing spawn uses, so a deep floor does not ambush the party with a
-piercer.
+ceiling lurker.
 
 The lifecycle has exactly two ends, both in `revealLurker`, and both
 finish with a real awake monster where the rock was:
@@ -1781,7 +1820,7 @@ kind wears its own formation, seeded from its own tile coordinates for the
 same reason the crypt's dressing is (`openBier` rebuilds the level), and
 pitched at the *shadowed* rock — a formation that catches the eye is not an
 ambush, and the tell is meant to be the rogue's. A new `lurk` creature
-without a branch in there hides inside a piercer's stalactite.
+without a branch in there hides inside a ceiling lurker's stalactite.
 
 The formations are faced with the walls' own textures, read back off
 `R3.wallMats` (stashed by `buildLevel`, nulled by `disposeLevel`). The maps
@@ -1959,7 +1998,7 @@ whole system exists to make.
 
 ## The build id is derived, not declared
 
-The depth line ends with eight hex digits — `Depth 17 · Myconid · 809bc1e5` —
+The depth line ends with eight hex digits — `Depth 17 · Mycelid · 809bc1e5` —
 and that is a hash of the game's own source, computed by `buildId()` in
 `08_ui.js`.
 
@@ -2278,7 +2317,7 @@ the `f.t>6` branch). T37 covers the whole of this.
 theme's membership is defined. A floor draws only from creatures that belong
 to the theme standing on it. Undead are `type:'undead'` — the same test Turn
 Undead and the loot faucets use — and the other six carry a boolean on the
-definition (`cave`, `duergar`, `myconid`, `drow`, `sewers`, `dungeon`).
+definition (`cave`, `duergar`, `mycelid`, `drow`, `sewers`, `dungeon`).
 
 This replaced a weighting: a theme's own creatures were multiplied by 4 and
 everybody else's by an `OFF` of 0.35, so floors ran 48–94% their own theme
