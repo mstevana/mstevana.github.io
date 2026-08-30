@@ -575,17 +575,22 @@ the menu beside the bestiary and layers over it, so Close returns to the menu.
 `LEGAL_DECLARATION` is the Section 1(e) declaration — which parts are Open Game
 Content and which are Product Identity. That is our own text and it is complete.
 
-**`OGL_TEXT` is deliberately an empty string.** It has to be the licence
-verbatim, and a legal document reproduced from memory is worse than none: a
-licence subtly misquoted is a licence that cannot be relied on. It must be pasted
-from an authoritative copy — Wizards' own SRD download or the Open Gaming
-Foundation — as sections 1 to 15 inclusive, keeping the two copyright lines
-Section 15 already carries. `OGL_OUR_NOTICE` is appended automatically, which is
-what Section 6 asks of anyone distributing their own work.
+**`OGL_TEXT` holds the licence verbatim and must stay that way.** It was supplied
+by the project owner rather than reproduced from memory, deliberately: a legal
+document written out approximately is worse than none, because a licence subtly
+misquoted is a licence that cannot be relied on. **Do not "tidy" it.** Its odd
+spacing is in the official text and is meant to be there — `3.Offer`, `10 Copy`,
+and `v 1.0` rather than `v 1.0a` in the Section 15 line. A test asserts all four
+of those quirks survive, precisely so a well-meaning cleanup is caught.
 
-Until it is filled in the screen **says so, in amber**, rather than rendering
-blank and looking finished. A build in that state must not reach an app store.
-That is the whole reason it is loud.
+**Section 15 is a chain, and it is still one entry short.** Section 6 requires
+the copyright notice of every piece of Open Game Content used, so this work needs
+three: the OGL's own line (the last line of `OGL_TEXT`), the System Reference
+Document's (`OGL_SRD_NOTICE`, **still empty** — it has to come from the SRD
+itself, for the same reason as above), and this work's (`OGL_OUR_NOTICE`). The
+screen appends the last two and **says in amber when the SRD line is missing**,
+rather than omitting it quietly. A build in that state must not reach an app
+store; that is the whole reason it is loud.
 
 Two implementation notes: the panel is built with `textContent`, never
 `innerHTML`, because a licence must appear exactly as written and must not go
