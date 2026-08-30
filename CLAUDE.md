@@ -583,14 +583,26 @@ spacing is in the official text and is meant to be there — `3.Offer`, `10 Copy
 and `v 1.0` rather than `v 1.0a` in the Section 15 line. A test asserts all four
 of those quirks survive, precisely so a well-meaning cleanup is caught.
 
-**Section 15 is a chain, and it is still one entry short.** Section 6 requires
-the copyright notice of every piece of Open Game Content used, so this work needs
-three: the OGL's own line (the last line of `OGL_TEXT`), the System Reference
-Document's (`OGL_SRD_NOTICE`, **still empty** — it has to come from the SRD
-itself, for the same reason as above), and this work's (`OGL_OUR_NOTICE`). The
-screen appends the last two and **says in amber when the SRD line is missing**,
-rather than omitting it quietly. A build in that state must not reach an app
-store; that is the whole reason it is loud.
+**Section 15 is a chain, and it must not double back on itself.** Section 6
+requires the copyright notice of every piece of Open Game Content used, so the
+screen renders three parts in order: the OGL's own line (already the last line of
+`OGL_TEXT`), then `OGL_SRD_NOTICE`, then `OGL_OUR_NOTICE`.
+
+`OGL_SRD_NOTICE` therefore starts at the *System Reference Document* line and
+deliberately does **not** repeat the `COPYRIGHT NOTICE` heading, the OGL's own
+line, or `END OF LICENSE` — all three appear in the sources this is usually
+copied from, and pasting them wholesale gives the finished screen two headings
+and two OGL lines that disagree about the version (`v 1.0` in the licence proper,
+`v 1.0a` in most reproductions). T61 fails if any of them creep back in. When
+`OGL_SRD_NOTICE` is empty the screen says so in amber instead of omitting it
+quietly, and a build in that state must not reach an app store.
+
+**The chain currently names works this game does not draw from** — Creature
+Collection, the Modern SRD, Monster Manual II, Swords of Our Fathers, Mutants &
+Masterminds, Unearthed Arcana — because it was taken from the Hypertext d20 SRD,
+whose own chain lists them. That is over-attribution rather than under-, which is
+the safer direction to err, but it is a claim about this work's provenance and
+should be trimmed to what was actually used if that is ever established.
 
 Two implementation notes: the panel is built with `textContent`, never
 `innerHTML`, because a licence must appear exactly as written and must not go
