@@ -597,12 +597,18 @@ and two OGL lines that disagree about the version (`v 1.0` in the licence proper
 `OGL_SRD_NOTICE` is empty the screen says so in amber instead of omitting it
 quietly, and a build in that state must not reach an app store.
 
-**The chain currently names works this game does not draw from** — Creature
+**The chain names works this game does not itself draw from** — Creature
 Collection, the Modern SRD, Monster Manual II, Swords of Our Fathers, Mutants &
-Masterminds, Unearthed Arcana — because it was taken from the Hypertext d20 SRD,
-whose own chain lists them. That is over-attribution rather than under-, which is
-the safer direction to err, but it is a claim about this work's provenance and
-should be trimmed to what was actually used if that is ever established.
+Masterminds, Unearthed Arcana — and that is **correct, so do not trim it.** The
+rules content came from the Hypertext d20 SRD, so this work distributes Open Game
+Content belonging to *that* work, and Section 6 asks for the exact text of its
+copyright notice — which is the whole chain, exactly as it presents it. Cutting
+it back to the SRD line alone would be under-attribution, which is the direction
+that actually breaks the licence.
+
+This was checked with the project owner rather than assumed. If the provenance
+ever changes — if the rules are ever re-derived from Wizards' own SRD instead —
+then the chain changes with it, and only then.
 
 Two implementation notes: the panel is built with `textContent`, never
 `innerHTML`, because a licence must appear exactly as written and must not go
