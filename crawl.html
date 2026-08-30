@@ -736,9 +736,9 @@ const MONSTERS={
   // `cave:true` is what the placement bias keys off, since these span vermin,
   // beast, aberration, humanoid and giant rather than sharing one type.
   // `lurk:true` marks the three that are placed as scenery and spring an ambush.
-  piercer:  {name:'Piercer',       cr:3,  hp:22, ac:15,atk:6, dmg:[3,6,2], xp:900, speed:2.6, type:'vermin', spr:'piercer',
+  ceilinglurker:  {name:'Ceiling lurker',cr:3,  hp:22, ac:15,atk:6, dmg:[3,6,2], xp:900, speed:2.6, type:'vermin', spr:'ceilinglurker',
              cave:true, lurk:true},
-  cavefisher:{name:'Cave fisher',  cr:5,  hp:38, ac:17,atk:8, dmg:[1,10,4],xp:1500,speed:1.8, type:'vermin', spr:'cavefisher',
+  lurespinner:{name:'Lure-spinner',  cr:5,  hp:38, ac:17,atk:8, dmg:[1,10,4],xp:1500,speed:1.8, type:'vermin', spr:'lurespinner',
              cave:true, lurk:true, ranged:5},
   // 82 rather than 80 to keep the boss arc rising: the roper caps depth 33, and
   // once `depthAtkBonus` was capped at 20 the attack term stopped growing past
@@ -759,21 +759,21 @@ const MONSTERS={
              cave:true},
   troglodyte:{name:'Troglodyte',   cr:3,  hp:24, ac:16,atk:5, dmg:[1,8,2], xp:900, speed:1.4, type:'humanoid', spr:'troglodyte',
              cave:true, poison:{dc:13,abil:'str',dice:[1,3]}},
-  crawler:  {reach:true, name:'Carrion crawler',cr:4,hp:28,ac:16,atk:6,dmg:[1,6,2],xp:1200,speed:1.5, type:'aberration', spr:'crawler',
+  carrionworm:  {reach:true, name:'Carrion worm',cr:4,hp:28,ac:16,atk:6,dmg:[1,6,2],xp:1200,speed:1.5, type:'aberration', spr:'carrionworm',
              cave:true, paralysis:{dc:13,dur:3}},
   // The otyugh moves from the caves to the sewers, where it always belonged:
   // it eats refuse, and the guild keeps it for that. The cave roster can spare
   // one -- it still fields nine.
   otyugh:   {reach:true, name:'Otyugh',cr:7, hp:58, ac:17,atk:9, dmg:[1,10,5],xp:2100,speed:1.9, type:'aberration', spr:'otyugh',
              sewers:true, disease:{dc:15,name:'Filth fever'}},
-  umberhulk:{reach:true, name:'Umber hulk',cr:9,hp:74,ac:18,atk:12,dmg:[2,8,6],xp:2700,speed:1.5, type:'aberration', spr:'umberhulk',
+  rubblehulk:{reach:true, name:'Rubble hulk',cr:9,hp:74,ac:18,atk:12,dmg:[2,8,6],xp:2700,speed:1.5, type:'aberration', spr:'rubblehulk',
              cave:true, gaze:{dc:16,dur:2.5}},
   /* ---------- duergar: the grey dwarves of the deep halls ----------
      Sour, disciplined and organised, which is what separates them from the
      cave roster: they field ranks rather than lone predators. Their 3.5 kit
      maps onto flags that already exist -- a warhammer line, crossbow shot, a
      priest who casts, a runecaster whose bolt is elemental -- plus two of
-     their own: `enlarge`, the gift their mind flayer masters left them, and
+     their own: `enlarge`, the gift their squithid masters left them, and
      `duergar` itself, which is the whole of what the halls' spawn bias reads. */
   // and the same gap in the duergar halls, where the warrior was the floor:
   // a drudge is the labourer the warriors drive, in leather rather than plate
@@ -791,43 +791,43 @@ const MONSTERS={
              duergar:true, reach:true, caster:{dmg:[4,6,4],ranged:7,cd:5,fx:'#ffb45a',elem:'fire'}},
   duergarlord:{name:'Duergar hammerlord',cr:11,hp:80,ac:21,atk:14,dmg:[2,8,6],xp:3300,speed:1.4,type:'humanoid',spr:'duergarlord',
              duergar:true, reach:true, enlarge:true},
-  /* ---------- myconids: the grove and what it has grown ----------
+  /* ---------- mycelids: the grove and what it has grown ----------
      Fungus folk. They fight with spores rather than steel, which is one new
      flag -- `spores`, a Fortitude save or a condition that already exists --
-     and `distress`, the alarm a hurt myconid broadcasts to the others. A
+     and `distress`, the alarm a hurt mycelid broadcasts to the others. A
      sovereign's kill does not stay dead: the corpse is overgrown and stood
      back up as a spore servant, which is why the grove fields more bodies
-     than it has minds. `myconid` is the whole of what the grove bias reads. */
-  mysprout: {name:'Myconid sprout', cr:6, hp:50, ac:16,atk:10,dmg:[1,8,5], xp:1800,speed:1.6, type:'plant', spr:'mysprout',
-             myconid:true, distress:true, poison:{dc:13,abil:'con',dice:[1,3]}},
+     than it has minds. `mycelid` is the whole of what the grove bias reads. */
+  mysprout: {name:'Mycelid sprout', cr:6, hp:50, ac:16,atk:10,dmg:[1,8,5], xp:1800,speed:1.6, type:'plant', spr:'mysprout',
+             mycelid:true, distress:true, poison:{dc:13,abil:'con',dice:[1,3]}},
   shrieker: {name:'Shrieker', cr:5, hp:62, ac:13,atk:6, dmg:[1,6,2], xp:1500,speed:6,   type:'plant', spr:'shrieker',
-             myconid:true, distress:true, shriek:true},
+             mycelid:true, distress:true, shriek:true},
   violetfungus:{name:'Violet fungus',cr:6,hp:50,ac:15,atk:9,dmg:[1,8,6],xp:1800,speed:2.8, type:'plant', spr:'violetfungus',
-             myconid:true, reach:true, disease:{dc:14,name:'Rot'}},
+             mycelid:true, reach:true, disease:{dc:14,name:'Rot'}},
   sporeservant:{name:'Spore servant',cr:7,hp:62,ac:16,atk:10,dmg:[1,10,6],xp:2100,speed:2.0, type:'plant', spr:'sporeservant',
-             myconid:true},
-  myguard:  {name:'Myconid guard', cr:7, hp:54, ac:18,atk:11,dmg:[1,10,6],xp:2100,speed:1.5, type:'plant', spr:'myguard',
-             myconid:true, distress:true, spores:{dc:15,dur:3,kind:'hold'}},
-  mycaster: {name:'Myconid sporecaster',cr:9,hp:58,ac:18,atk:9,dmg:[1,8,4],xp:2700,speed:1.6, type:'plant', spr:'mycaster',
-             myconid:true, distress:true, reach:true, caster:{dmg:[4,6,3],ranged:6,cd:5,fx:'#c88ae8',elem:'acid'},
+             mycelid:true},
+  myguard:  {name:'Mycelid guard', cr:7, hp:54, ac:18,atk:11,dmg:[1,10,6],xp:2100,speed:1.5, type:'plant', spr:'myguard',
+             mycelid:true, distress:true, spores:{dc:15,dur:3,kind:'hold'}},
+  mycaster: {name:'Mycelid sporecaster',cr:9,hp:58,ac:18,atk:9,dmg:[1,8,4],xp:2700,speed:1.6, type:'plant', spr:'mycaster',
+             mycelid:true, distress:true, reach:true, caster:{dmg:[4,6,3],ranged:6,cd:5,fx:'#c88ae8',elem:'acid'},
              spores:{dc:16,dur:2.5,kind:'stun'}},
-  myelder:  {name:'Myconid elder', cr:10,hp:68, ac:20,atk:12,dmg:[2,8,5],xp:3000,speed:1.5, type:'plant', spr:'myelder',
-             myconid:true, distress:true, reach:true, spores:{dc:17,dur:3,kind:'stun'},
+  myelder:  {name:'Mycelid elder', cr:10,hp:68, ac:20,atk:12,dmg:[2,8,5],xp:3000,speed:1.5, type:'plant', spr:'myelder',
+             mycelid:true, distress:true, reach:true, spores:{dc:17,dur:3,kind:'stun'},
              caster:{dmg:[4,6,5],ranged:6,cd:5.5,fx:'#c88ae8',elem:'acid'}},
-  // Two myconid rulers, and they are boss-only — neither has a SPAWN_DEPTH entry,
+  // Two mycelid rulers, and they are boss-only — neither has a SPAWN_DEPTH entry,
   // so their numbers are free to be sized to the boss floor they were written for
   // rather than to a spawn band. The lord caps the grove at depth 18; the
   // sovereign is the deeper power, and the last named boss in the game.
-  mylord:   {name:'Myconid lord', cr:8, hp:38, ac:20,atk:12,dmg:[2,6,4],xp:2400,speed:1.4, type:'plant', spr:'mylord',
-             myconid:true, distress:true, reach:true, spores:{dc:17,dur:3,kind:'hold'},
+  mylord:   {name:'Mycelid lord', cr:8, hp:38, ac:20,atk:12,dmg:[2,6,4],xp:2400,speed:1.4, type:'plant', spr:'mylord',
+             mycelid:true, distress:true, reach:true, spores:{dc:17,dur:3,kind:'hold'},
              caster:{dmg:[3,6,4],ranged:6,cd:5,fx:'#c88ae8',elem:'acid'}},
   // Resized when BOSSES became a per-theme table. The sovereign holds the grove's
   // tier-1 slot at depth 39, whose window is 3253 (the hammerlord three floors
   // above) to 4182 (the drider three below); at hp 96 she scored 6057 and fitted
   // nowhere, which for a boss-only creature means dead content. Boss-only is
   // exactly what makes the numbers free to move.
-  mysovereign:{name:'Myconid sovereign',cr:11,hp:60,ac:21,atk:13,dmg:[2,8,5],xp:3300,speed:1.4, type:'plant', spr:'mysovereign',
-             myconid:true, distress:true, reach:true, spores:{dc:18,dur:3.5,kind:'hold'},
+  mysovereign:{name:'Mycelid sovereign',cr:11,hp:60,ac:21,atk:13,dmg:[2,8,5],xp:3300,speed:1.4, type:'plant', spr:'mysovereign',
+             mycelid:true, distress:true, reach:true, spores:{dc:18,dur:3.5,kind:'hold'},
              caster:{dmg:[4,6,4],ranged:7,cd:5,fx:'#c88ae8',elem:'acid'}},
   /* ---------- the drow ----------
      Elves, so the profile is the mirror of the duergar's: less hit points than
@@ -862,7 +862,7 @@ const MONSTERS={
   drider:    {name:'Drider', cr:12,hp:62, ac:21,atk:14,dmg:[2,8,5], xp:3600,speed:1.3, type:'aberration', spr:'drider',
               drow:true, reach:true, poison:{dc:17,abil:'str',dice:[1,6]},
               caster:{dmg:[3,6,3],ranged:6,cd:6,fx:'#a86ce8',elem:'acid'}},
-  // and the house that owns them. Boss-only, like the two myconid rulers: with
+  // and the house that owns them. Boss-only, like the two mycelid rulers: with
   // no SPAWN_DEPTH her numbers answer to the boss floor she was written for.
   drowmatron:{name:'Drow matron',cr:13,hp:33,ac:22,atk:14,dmg:[2,6,5],xp:3900,speed:1.4, type:'humanoid', spr:'drowmatron',
               drow:true, reach:true, faerie:{dc:18,dur:8}, drowpoison:{dc:18,dur:3},
@@ -901,7 +901,7 @@ const MONSTERS={
   scrag:    {name:'Scrag',        cr:8, hp:62, ac:19,atk:13,dmg:[1,10,6],xp:2400,speed:1.3, type:'giant', spr:'scrag',
              sewers:true, reach:true, regen:4},
   // Sized down from hp 94 / atk 15 / 2d8+7 after a descent. Not because its own
-  // ratio was wrong -- 1.57 is inside the range the myconid elder already sits
+  // ratio was wrong -- 1.57 is inside the range the mycelid elder already sits
   // in -- but because at 822 it was the single heaviest creature at depth 23,
   // above the previous ceiling-setter, and `poolCeiling` reads the heaviest
   // thing a depth allows. Lifting the ceiling lifts `threatBudget` for every
@@ -957,7 +957,7 @@ const MONSTERS={
   wereratlord:{name:'Wererat guild lord',cr:12,hp:54,ac:22,atk:14,dmg:[2,6,6],xp:3600,speed:1.2,type:'humanoid',spr:'wereratlord',
              sewers:true, disease:{dc:19,name:'Lycanthropy'},
              caster:{dmg:[4,6,3],ranged:6,cd:5,fx:'#8fbf6a',elem:'acid'}},
-  // Boss-only, like the myconid rulers and the drow matron. The Dungeon's tier-1
+  // Boss-only, like the mycelid rulers and the drow matron. The Dungeon's tier-1
   // slot is depth 45, and it has to out-threat the drider three floors above it
   // at 4182 -- the stone giant tops out at 4158, so the legion needed a king.
   giantking:{name:'Fire giant king',cr:14,hp:80,ac:22,atk:15,dmg:[2,8,7], xp:4200,speed:1.4, type:'giant', spr:'giantking',
@@ -971,8 +971,8 @@ const SPAWN_DEPTH={
   hobgoblin:[2,5],orc:[2,5],gobshaman:[3,6],spider:[3,7],ghoul:[3,7],gnoll:[3,7],bugbear:[3,8],
   ogre:[6,12],wight:[6,11],wightnec:[8,13],minotaur:[8,13],troll:[10,28],ogremage:[13,99],dragon:[15,99],
   mummy:[10,20],wraith:[12,24],barrowwight:[13,26],bonecolossus:[16,32],deathknight:[20,99],lich:[22,99],bonedrake:[26,99],
-  stirge:[8,20],piercer:[8,18],cavebear:[8,18],troglodyte:[8,18],crawler:[9,20],cavefisher:[12,26],otyugh:[14,28],
-  umberhulk:[18,32],roper:[24,99],purpleworm:[30,99],
+  stirge:[8,20],ceilinglurker:[8,18],cavebear:[8,18],troglodyte:[8,18],carrionworm:[9,20],lurespinner:[12,26],otyugh:[14,28],
+  rubblehulk:[18,32],roper:[24,99],purpleworm:[30,99],
   shrieker:[15,24],mysprout:[15,24],violetfungus:[16,28],sporeservant:[17,30],
   myguard:[17,30],mycaster:[20,34],myelder:[24,99],
   drow:[17,28],drowbolt:[17,28],drowblade:[19,32],drowpriest:[20,34],drowmage:[20,34],drider:[23,99],
@@ -1071,7 +1071,7 @@ function affixChance(depth,rich){
 /* ---------- bosses ----------
    A boss belongs to the floor it caps. Boss floors are every third level from
    depth 6, and because themes cycle every three floors the theme of a boss
-   floor walks Sewers, Crypt, Caves, Duergar, Myconid, Drow, Dungeon and starts
+   floor walks Sewers, Crypt, Caves, Duergar, Mycelid, Drow, Dungeon and starts
    over 21 depths later. So a boss is chosen by (theme, tier), where the tier
    counts how many of that theme's boss floors have already been passed.
 
@@ -1099,11 +1099,11 @@ const BOSS_TABLE={
             {base:'wightnec',     name:'Ossuar, Who Counts the Dead'}],
            [{base:'lich',         name:'Vaunthil, Who Kept His Name'}]],
   Caves:  [[{base:'minotaur',     name:'Gorehorn, King Below'},
-            {base:'cavefisher',   name:'The Ceiling Widow'}],
+            {base:'lurespinner',   name:'The Ceiling Widow'}],
            [{base:'roper',        name:'The Patient Stone'}]],
   Duergar:[[{base:'duergarthane', name:'Thane Morgrun Ironvow'}],
            [{base:'duergarlord',  name:'Hammerlord Baruk Grimforge'}]],
-  Myconid:[[{base:'mylord',       name:'Ilhaeryn, the Standing Grove'}],
+  Mycelid:[[{base:'mylord',       name:'Ilhaeryn, the Standing Grove'}],
            [{base:'mysovereign',  name:'Thass-Mor, the Sporecrown'}]],
   Drow:   [[{base:'drowmatron',   name:'Matron Zaeryl of House Vhaeraun'}],
            [{base:'drider',       name:'Xull\'raen the Eight-Legged'}]],
@@ -1151,7 +1151,7 @@ const THEMES=[
   // Duergar halls are built, not dug: hence the high roomBias. `gold` is the
   // inlay colour, used by the wall trim, the frieze runes and the door fittings.
   {name:'Duergar', wall:'#565a5b', wall2:'#2e3132', floor:'#43474a', ceil:'#1e1d1a', fog:0x080807, moss:'#4a4438', roomBias:.72, gold:'#c9a227'},
-  // A myconid grove is grown, not cut: soft edges, low roomBias, and its own
+  // A mycelid grove is grown, not cut: soft edges, low roomBias, and its own
   // light. `light`/`fill` retint the party's torch so the whole grove reads
   // violet without repainting every texture, and `glow` is the spore colour.
   /* The stalks are DARKER than they look here, and that is a correction. At
@@ -1161,7 +1161,7 @@ const THEMES=[
      and the torch comes back toward white, so the grove keeps its colour at
      range and its detail up close — the violet now comes mostly from what is
      glowing rather than from washing everything in it. */
-  {name:'Myconid', wall:'#5d5368', wall2:'#332b3d', floor:'#413d4a', ceil:'#4a3960', fog:0x0d0814, moss:'#8a63b8', roomBias:.3,
+  {name:'Mycelid', wall:'#5d5368', wall2:'#332b3d', floor:'#413d4a', ceil:'#4a3960', fog:0x0d0814, moss:'#8a63b8', roomBias:.3,
    glow:'#c88ae8', light:0xa596bb, fill:0xbfb3d2},
   // A drow house: small black bricks laid true, a chiselled frieze, and the
   // only thing in the dungeon that gives off its own light. The walls carry an
@@ -1660,7 +1660,7 @@ const MONSTER_ART={
     `<path d="M30 26 L30 28 M32.5 26.5 L32.5 28.5" stroke="#b8b096" stroke-width="0.9"/>|/H|`+
     clawsAt(10,44,[150,170,190,130],4)+
     drip(33,34,4,'#3c0f0b')}),
-  /* ---------- myconids ----------
+  /* ---------- mycelids ----------
      Fungus, not flesh: a cap for a head, a pale stalk for a body, and gills
      where a face would be. The cap is the head layer so it tilts and the arm
      layer is a stubby limb, which is as close to telegraphing as a mushroom
@@ -2898,7 +2898,7 @@ const MONSTER_ART={
     fangsDown(49,19.5,8,4,1.8,'#e8dfc0')+fangsUp(50,24.5,7,3,1.7,'#e8dfc0')+`|/H|`+
     `<circle cx="58" cy="26" r="0.8" fill="#a8e05a" opacity="0.8"/><circle cx="61" cy="17" r="0.7" fill="#c8ff86" opacity="0.7"/>`}),
 /* ---------- the caves ---------- */
-  piercer:()=>({o:{hp:[32,18],ap:[40,30],lit:'#8a7a5e',mid:'#3a3226',eye:'#ffd27a',rough:[2.6,0.5],seed:61},
+  ceilinglurker:()=>({o:{hp:[32,18],ap:[40,30],lit:'#8a7a5e',mid:'#3a3226',eye:'#ffd27a',rough:[2.6,0.5],seed:61},
     body:`<path d="M32 4 Q22 26 24 44 Q28 54 32 58 Q36 54 40 44 Q42 26 32 4 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M32 6 Q28 26 29 46 M32 6 Q36 26 35 46" stroke="#241e14" stroke-width="1.2" fill="none" opacity="0.8"/>`+
     `<path d="M25 22 Q32 26 39 22 M24 30 Q32 34 40 30 M25 38 Q32 42 39 38" stroke="#5c5140" stroke-width="1.4" fill="none"/>`+
@@ -2906,7 +2906,7 @@ const MONSTER_ART={
     `|A|<path d="M40 40 Q46 44 47 50" stroke="#6e6046" stroke-width="2.2" fill="none" stroke-linecap="round"/>|/A|`,
     sharp:`|H|`+gEye(30,52,1.3)+gEye(34,52,1.3)+`|/H|`}),
 
-  cavefisher:()=>({o:{hp:[32,28],ap:[46,30],lit:'#9a7f5a',mid:'#3e3220',eye:'#ffe08a',rough:[2.4,0.45],seed:62},
+  lurespinner:()=>({o:{hp:[32,28],ap:[46,30],lit:'#9a7f5a',mid:'#3e3220',eye:'#ffe08a',rough:[2.4,0.45],seed:62},
     body:`<path d="M20 34 Q18 48 24 56 L40 56 Q46 48 44 34 Q38 28 32 28 Q26 28 20 34 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M22 40 Q32 44 42 40 M23 47 Q32 51 41 47" stroke="#2a2214" stroke-width="1.3" fill="none"/>`+
     `<path d="M22 54 L18 61 M28 56 L26 62 M36 56 L38 62 M42 54 L46 61" stroke="#7a6544" stroke-width="2"/>`+
@@ -2977,7 +2977,7 @@ const MONSTER_ART={
     sharp:`|H|`+gEye(29,19,1.5)+gEye(35,19,1.5)+fangsDown(29,24.5,6,3,1.6,'#cfd8b0')+`|/H|`+
     `|A|`+clawsAt(53,43,[35,60,85],4.4,'#c8d4a8')+`|/A|`+clawsAt(12,44,[95,120,145],4.4,'#c8d4a8')}),
 
-  crawler:()=>({o:{hp:[46,30],ap:[26,34],lit:'#7a6a3e',mid:'#2e2814',eye:'#c8ff6a',rough:[2.6,0.5],seed:66},
+  carrionworm:()=>({o:{hp:[46,30],ap:[26,34],lit:'#7a6a3e',mid:'#2e2814',eye:'#c8ff6a',rough:[2.6,0.5],seed:66},
     body:`<path d="M8 44 Q6 34 14 32 L44 30 Q54 32 54 42 Q54 52 44 54 L16 56 Q8 54 8 44 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M14 34 Q14 54 14 54 M22 32 Q22 55 22 55 M30 31 Q30 56 30 56 M38 31 Q38 55 38 55 M46 32 Q46 54 46 54" stroke="#1e1a0c" stroke-width="1.2" opacity="0.75"/>`+
     `<path d="M12 55 L10 61 M20 56 L19 62 M30 57 L30 62 M40 56 L41 62 M48 54 L50 60" stroke="#5c5030" stroke-width="1.8"/>`+
@@ -2999,7 +2999,7 @@ const MONSTER_ART={
     `<path d="M14 32 Q4 26 2 14" stroke="#6e6449" stroke-width="2.6" fill="none" stroke-linecap="round"/>`,
     sharp:`|H|`+gEye(33,6,2)+`|/H|`+gEye(2,14,1.6)+`|A|`+gEye(62,14,1.6)+`|/A|`}),
 
-  umberhulk:()=>({o:{hp:[32,20],ap:[50,32],ad:-0.6,lit:'#6e5230',mid:'#2a1e10',eye:'#ff8a3a',rough:[2.8,0.5],seed:68,
+  rubblehulk:()=>({o:{hp:[32,20],ap:[50,32],ad:-0.6,lit:'#6e5230',mid:'#2a1e10',eye:'#ff8a3a',rough:[2.8,0.5],seed:68,
       extra:glowGrad('uhg','#ff6a1e')},
     body:`<path d="M16 34 Q14 26 22 24 L42 24 Q50 26 48 34 L50 52 Q50 60 42 60 L22 60 Q14 60 14 52 Z" fill="url(#bg)" ${RIM}/>`+
     `<path d="M20 34 L44 34 M18 44 L46 44 M19 53 L45 53" stroke="#170f08" stroke-width="1.6"/>`+
@@ -3122,14 +3122,14 @@ const MONSTER_DETAIL={
   mummy:       {base:(o)=>hideDetail(o,{x0:20,x1:44,y0:32,y1:58,n:18,col:'#4a3c26',seed:41}), head:(o)=>faceDetail(o,{w:5.5,eye:10,col:'#4a3c26'})},
   // --- Caves ---
   ogre:        {base:(o)=>kitHumanoid(o,{w:11,belt:17,dark:'#3a2a16'}), head:(o)=>faceDetail(o,{w:8,eye:12,col:'#2e2414'})},
-  piercer:     {base:(o)=>hideDetail(o,{x0:26,x1:38,y0:14,y1:48,n:12,col:'#1a1610',seed:43})},
+  ceilinglurker:     {base:(o)=>hideDetail(o,{x0:26,x1:38,y0:14,y1:48,n:12,col:'#1a1610',seed:43})},
   cavebear:    {base:(o)=>hideDetail(o,{x0:16,x1:50,y0:26,y1:56,n:22,col:'#221709',seed:47})},
   troglodyte:  {base:(o)=>kitHumanoid(o,{w:8,belt:15,dark:'#26301a'})+hideDetail(o,{x0:22,x1:42,y0:34,y1:54,n:10,col:'#1c2612',seed:53}),
                 head:(o)=>faceDetail(o,{w:6,eye:11,col:'#1c2612'})},
   minotaur:    {base:(o)=>kitHumanoid(o,{w:11,belt:17,dark:'#3a2a16'})+hideDetail(o,{x0:20,x1:48,y0:34,y1:58,n:16,col:'#241708',seed:59}),
                 head:(o)=>faceDetail(o,{w:7.5,eye:12,col:'#241708'})},
-  crawler:     {base:(o)=>hideDetail(o,{x0:14,x1:50,y0:34,y1:56,n:16,col:'#20180a',seed:61})},
-  cavefisher:  {base:(o)=>hideDetail(o,{x0:22,x1:42,y0:32,y1:56,n:12,col:'#1a1a14',seed:67})},
+  carrionworm:     {base:(o)=>hideDetail(o,{x0:14,x1:50,y0:34,y1:56,n:16,col:'#20180a',seed:61})},
+  lurespinner:  {base:(o)=>hideDetail(o,{x0:22,x1:42,y0:32,y1:56,n:12,col:'#1a1a14',seed:67})},
   // --- Duergar: built things, so plate rather than straps ---
   // leather, not plate: the drudge takes kitHumanoid's straps and a scuffed
   // hide over the apron where the warriors get banded steel
@@ -3140,7 +3140,7 @@ const MONSTER_DETAIL={
   duergarxbow: {base:(o)=>plateBands(o,{w:10,y0:9,n:3,gap:4.4}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
   duergarscout:{base:(o)=>plateBands(o,{w:9,y0:9,n:2,gap:4.4,dark:'#242830',mid:'#2e333c'}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
   duergarpriest:{base:(o)=>plateBands(o,{w:10,y0:10,n:3,gap:4.2,dark:'#2e2a22',mid:'#3c372c',lit:'#7a6f52'}), head:(o)=>faceDetail(o,{w:6.5,eye:11,col:'#2a2018'})},
-  // --- Myconid ---
+  // --- Mycelid ---
   shrieker:    {base:(o)=>fungalDetail(o,{cx:32,cy:37,rx:14,n:11,col:'#3a2418',pore:'#4a2a18',seed:71})},
   mysprout:    {base:(o)=>fungalDetail(o,{cx:32,cy:33,rx:12,n:9,col:'#2a1c33',pore:'#3a2a20',seed:73})},
   violetfungus:{base:(o)=>fungalDetail(o,{cx:32,cy:31,rx:13,n:10,col:'#2a1433',pore:'#3a1c40',seed:79})},
@@ -3191,7 +3191,7 @@ const MONSTER_DETAIL={
   wraith:      {base:(o)=>hideDetail(o,{x0:20,x1:44,y0:34,y1:60,n:12,col:'#5a6a80',seed:211})},
   roper:       {base:(o)=>hideDetail(o,{x0:16,x1:44,y0:16,y1:54,n:20,col:'#1c1a14',seed:223})},
   otyugh:      {base:(o)=>hideDetail(o,{x0:12,x1:50,y0:26,y1:56,n:20,col:'#221c10',seed:227})},
-  umberhulk:   {base:(o)=>hideDetail(o,{x0:12,x1:48,y0:30,y1:58,n:20,col:'#241a0c',seed:229})},
+  rubblehulk:   {base:(o)=>hideDetail(o,{x0:12,x1:48,y0:30,y1:58,n:20,col:'#241a0c',seed:229})},
   purpleworm:  {base:(o)=>hideDetail(o,{x0:12,x1:50,y0:20,y1:56,n:22,col:'#2a1433',seed:233})},
 };
 
@@ -3833,7 +3833,7 @@ function tryGen(depth,targetWalk,theme){
        displaces some other trap instead of adding to the tally. Also no damage:
        the spores are the threat, and stunning a character in a place where
        every creature broadcasts distress is quite enough. */
-    if(theme.name==='Myconid')pool.push('puffball');
+    if(theme.name==='Mycelid')pool.push('puffball');
     const kind=pick(pool);
     const venom=kind==='pdart'||kind==='sleepdart';
     const bloodless=kind==='gas'||kind==='websnare'||kind==='puffball';
@@ -4135,7 +4135,7 @@ function tryGen(depth,targetWalk,theme){
       }
     }
   }
-  /* The chapel of Lolth: one chamber a floor given over to the goddess the whole
+  /* The chapel of the Weaver: one chamber a floor given over to the goddess the whole
      house answers to. The throne stands at the centre, the altar against a wall,
      and a priestess of the house keeps both.
 
@@ -4204,10 +4204,10 @@ function tryGen(depth,targetWalk,theme){
      A circle keeps a mound of rock and soil to cultivate on, to meld around and
      to sleep beside, and it is where the colony plants its dead. That is what
      makes the hoard here honest where the other three had to invent one:
-     myconids do not collect treasure, but metal does not rot, so what you dig
+     mycelids do not collect treasure, but metal does not rot, so what you dig
      out of a mound is the gear off everything it has ever composted. */
   let mound=null;
-  if(theme.name==='Myconid'){
+  if(theme.name==='Mycelid'){
     const cand=rooms.slice(1).filter(r=>r.w>=3&&r.h>=3&&!(lockedRoom&&r.x===lockedRoom.x&&r.y===lockedRoom.y));
     if(cand.length){
       const r=pick(cand);
@@ -4230,7 +4230,7 @@ function tryGen(depth,targetWalk,theme){
         const spots=DIRS.map(([dx,dy])=>[tx+dx,ty+dy]).filter(([x,y])=>g[idx(x,y)]===T_FLOOR);
         if(spots.length){
           const [gx,gy]=pick(spots);
-          const pool=spawnPool(depth).filter(([k])=>MONSTERS[k].myconid);
+          const pool=spawnPool(depth).filter(([k])=>MONSTERS[k].mycelid);
           // a mound is kept by whatever the depth allows that can broadcast —
           // a circle is held together by rapport, so its keeper carries spores
           const elders=pool.filter(([k])=>MONSTERS[k].spores);
@@ -4252,7 +4252,7 @@ function tryGen(depth,targetWalk,theme){
     const pool=Object.keys(SPAWN_DEPTH).filter(k=>MONSTERS[k].lurk&&depth>=SPAWN_DEPTH[k][0]-1&&depth<=SPAWN_DEPTH[k][1]);
     if(pool.length){
       // sized against the floor's per-monster share the same way a standing
-      // spawn is, so depth 30 does not ambush the party with a piercer
+      // spawn is, so depth 30 does not ambush the party with a ceiling lurker
       const lurkWeights=pool.map(k=>{
         const r=Math.log(threatOf(k,depth,null)/share);
         return [k,Math.exp(-(r*r)/sig)];
@@ -4318,7 +4318,7 @@ function tryGen(depth,targetWalk,theme){
      Pillars and torches are the fabric of the hall — structure and light — and
      have to stay the common sight or the place reads as a museum of one of
      everything. The other four are what the hall is FOR: a working forge, a rack
-     of picks, a niche to Laduguer, and the manacles that say out loud who does
+     of picks, a niche to Durn the Grey, and the manacles that say out loud who does
      the digging. Note the head count is unchanged, so this costs nothing: the
      floor already placed 10-17 features and they are simply more varied now. */
   let duergar=[];
@@ -4410,8 +4410,8 @@ function tryGen(depth,targetWalk,theme){
      ornament: what it eats, what it drinks, what it is raising, and what it
      has done with the dead. The fruiting cluster keeps the largest share
      because a grove is mostly food. */
-  let myconid=[];
-  if(theme.name==='Myconid'){
+  let mycelid=[];
+  if(theme.name==='Mycelid'){
     const KINDS=[['cluster',0.24],['nursery',0.19],['barrel',0.17],
                  ['pods',0.15],['compost',0.13],['rapport',0.12]];
     const pickKind=()=>{
@@ -4421,7 +4421,7 @@ function tryGen(depth,targetWalk,theme){
     };
     const nW=11+rnd(6);
     let wTries=400;
-    while(myconid.length<nW&&wTries-->0){
+    while(mycelid.length<nW&&wTries-->0){
       const x=1+rnd(W-2),y=1+rnd(H-2);
       if(g[idx(x,y)]!==T_FLOOR)continue;
       const wd=DIRS.filter(([dx,dy])=>g[idx(x+dx,y+dy)]===T_WALL);
@@ -4430,9 +4430,9 @@ function tryGen(depth,targetWalk,theme){
       // a rapport bloom is where a circle melds and wants room around it;
       // everything else only needs somewhere to stand
       const near=kind==='rapport'?4:2;
-      if(myconid.some(c=>Math.abs(c.x-x)+Math.abs(c.y-y)<(c.kind==='rapport'?4:near)))continue;
+      if(mycelid.some(c=>Math.abs(c.x-x)+Math.abs(c.y-y)<(c.kind==='rapport'?4:near)))continue;
       const [dx,dy]=pick(wd);
-      myconid.push({x,y,dx,dy,kind,hue:rnd(3)});
+      mycelid.push({x,y,dx,dy,kind,hue:rnd(3)});
     }
   }
   /* A boss swings at least as well as the best warrior standing on its own
@@ -4457,7 +4457,7 @@ function tryGen(depth,targetWalk,theme){
      generator's own BFS reaches, and nothing can lie beyond a furthest tile —
      but three things move after that BFS runs: the start room is sealed and its
      doors re-cut, locked doors appear, and the ossuary bier, the forge anvil
-     and Lolth's throne each block a tile. Any of those can leave the stairwell
+     and the Weaver's throne each block a tile. Any of those can leave the stairwell
      as the only way round. T31 caught it at about one crypt floor in a few
      hundred, which is exactly the rate at which it would have stranded the key
      and sealed a run instead. */
@@ -4477,7 +4477,7 @@ function tryGen(depth,targetWalk,theme){
     if(!DIRS.some(([dx,dy])=>seen[idx(stairs.x+dx,stairs.y+dy)]))return null;
   }
   return {w:W,h:H,grid:g,start,stairs,traps,items,monsters,secrets,theme,depth,
-    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,forge,chapel,mound,lurkers,duergar,pillars,drow,myconid};
+    explored:new Uint8Array(W*H),lockedRoom,decor:[],rivers,pipes,crypts,ossuary,forge,chapel,mound,lurkers,duergar,pillars,drow,mycelid};
 }
 /* ---------- difficulty curve ----------
    Depth, not party level, drives everything. One documented scalar grows every
@@ -4561,7 +4561,7 @@ function targetCount(depth){return Math.min(30,11+depth*0.7);}
    and `nMon` below is what reconciles the two. */
 const THEME_FLAG={
   Dungeon:m=>!!m.dungeon, Sewers:m=>!!m.sewers, Crypt:m=>m.type==='undead',
-  Caves:m=>!!m.cave, Duergar:m=>!!m.duergar, Myconid:m=>!!m.myconid, Drow:m=>!!m.drow,
+  Caves:m=>!!m.cave, Duergar:m=>!!m.duergar, Mycelid:m=>!!m.mycelid, Drow:m=>!!m.drow,
 };
 function themeAt(depth){return THEMES[Math.floor((depth-1)/3)%THEMES.length];}
 function themedPool(depth){
@@ -4660,7 +4660,7 @@ function mkMonster(key,x,y,depth){
     xp:Math.round(XP_AWARD(def.cr)*(1+0.12*Math.max(0,depth-1))),
     speed:def.speed,type:def.type,ranged:def.ranged||0,caster:def.caster||null,
     reach:!!def.reach,slot:0, // slot 0-1 front rank of its tile, 2-3 rear rank
-    skeletal:!!def.skeletal,incorporeal:!!def.incorporeal,cave:!!def.cave,lurk:!!def.lurk,duergar:!!def.duergar,myconid:!!def.myconid,drow:!!def.drow,sewers:!!def.sewers,dungeon:!!def.dungeon,
+    skeletal:!!def.skeletal,incorporeal:!!def.incorporeal,cave:!!def.cave,lurk:!!def.lurk,duergar:!!def.duergar,mycelid:!!def.mycelid,drow:!!def.drow,sewers:!!def.sewers,dungeon:!!def.dungeon,
     enlarge:!!def.enlarge,vanish:!!def.vanish,grown:false,vanished:0,
     distress:!!def.distress,shriek:!!def.shriek,shrieked:false,
     special:{disease:def.disease,poison:def.poison,paralysis:def.paralysis,energyDrain:def.energyDrain,regen:def.regen,
@@ -5701,14 +5701,14 @@ function caveWallCanvas(th,variant,baseCv){
    Blocks are three courses of two, which comes out roughly square in world
    space: a wall tile is one unit wide and WALLH tall, so 128 texels across map
    to 1.0 and 128 down map to 1.3. */
-/* ---------- myconid groves: grown, not built ----------
+/* ---------- mycelid groves: grown, not built ----------
 
    Walls are the stalks of mushrooms big enough to be architecture, pressed
    shoulder to shoulder. The shared base carries the stalk boundaries and the
    fibrous grain, so two tiles meet without a seam; variants change what has
    grown on them -- bracket shelves, spore freckles, a bloom of mould, veiling
    remnants, a split in the flesh -- rather than moving the stalks themselves. */
-function myconidBaseCanvas(th){
+function mycelidBaseCanvas(th){
   const {cv,ctx}=newCanvas(128);
   const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
   ctx.fillStyle=shade(th.wall2,-0.25);ctx.fillRect(0,0,128,128);
@@ -5808,7 +5808,7 @@ function myconidBaseCanvas(th){
    be painted deliberately: anything drawn over a freckle on the colour map does
    NOT hide that freckle's light, which is the trap the drow's first pilaster
    fell into. `both(fn)` draws to whichever sheets a device wants. */
-function myconidWallCanvas(th,variant,base){
+function mycelidWallCanvas(th,variant,base){
   const {cv,ctx}=newCanvas(128);
   const em=newCanvas(128);
   const wrapX=(fn)=>{for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,0);fn();ctx.restore();}};
@@ -5983,7 +5983,7 @@ function myconidWallCanvas(th,variant,base){
 
        And it has to be UNDER the flesh. Drawn at full strength it was a bright
        skull with round black eyes — a Halloween decal stuck on the wall, the
-       same failure Deep Duerra's mark had. The bones go down faint, and then a
+       same failure Morrath's mark had. The bones go down faint, and then a
        translucent wash of the stalk's own colour is laid back over the whole
        swelling, so what you see is a shape showing THROUGH rather than on. */
     const cx=mid(Math.floor(rr()*8)), hy=34+rr()*24;
@@ -6080,7 +6080,7 @@ function myconidWallCanvas(th,variant,base){
   return {cv,glow:em.cv};
 }
 // Gravel: the grove's floor is loose grit and shed spore-dust, not stone.
-function myconidFloorCanvas(th){
+function mycelidFloorCanvas(th){
   const {cv,ctx}=newCanvas(128);
   const wrap9f=(fn)=>{for(const oy of [-128,0,128])for(const ox of [-128,0,128]){ctx.save();ctx.translate(ox,oy);fn();ctx.restore();}};
   ctx.fillStyle=shade(th.floor,-0.4);ctx.fillRect(0,0,128,128);
@@ -6114,7 +6114,7 @@ function myconidFloorCanvas(th){
 }
 // The ceiling is the underside of caps big enough to roof a room: gills
 // radiating from a hub, with the hubs offset so the pattern does not grid.
-function myconidCeilCanvas(th){
+function mycelidCeilCanvas(th){
   const {cv,ctx}=newCanvas(128);
   const glow=th.glow||'#c88ae8';
   ctx.fillStyle=shade(th.ceil,-0.45);ctx.fillRect(0,0,128,128);
@@ -6248,7 +6248,7 @@ function espruarGlyph(ctx,x,y,h,seed){
 }
 /* The spider, which the theme had none of at all — `grep -c spider` over the
    whole engine returned a single comment. It is the city's main motif, cut into
-   everything the drow build in honour of Lolth, so it belongs on the walls before
+   everything the drow build in honour of the Weaver, so it belongs on the walls before
    anything else does.
 
    Drawn legs-first so the body sits over them, and shaped by the classic
@@ -6267,7 +6267,7 @@ function drowSpiderPath(ctx,cx,cy,r,lolth){
     ctx.quadraticCurveTo(kx,ky,tx,ty);
   }
   if(lolth){
-    /* Lolth's own mark: the spider with a drow woman for a body. At this size a
+    /* the Weaver's own mark: the spider with a drow woman for a body. At this size a
        face on the abdomen is four pixels of mush, so the WOMAN is the body —
        a head with hair sweeping back, and the eight legs radiating from behind
        it. The silhouette does the work. */
@@ -6340,7 +6340,7 @@ function drowWallCanvas(th,variant,base){
      Keyed on the variant itself rather than variant%4, which showed four
      treatments twice each over eight variants — the same duplication the duergar
      walls had, and worse here because none of the four said "drow". The eight now
-     run plain, pilaster, an obsidian spider, an older worn hand, Lolth's own mark,
+     run plain, pilaster, an obsidian spider, an older worn hand, the Weaver's own mark,
      a web fan in the spandrels, a house sigil in its cartouche, and a sigil that
      has been chiselled out. Variant 0 stays bare so the frieze has something to be
      read against. */
@@ -6422,7 +6422,7 @@ function drowWallCanvas(th,variant,base){
       drowSpider(ctx,cx,LOW,11.5,silver,false);
     });
   }else if(variant===4){
-    // Lolth herself, and this one is allowed to burn: her mark is the only
+    // the Weaver herself, and this one is allowed to burn: her mark is the only
     // device in the house that carries the same light as the script
     const cx=0.66*128;
     wrapX(()=>{
@@ -6771,10 +6771,10 @@ function dethekGlyph(ctx,x,y,h,seed){
    then a lit stroke offset up and left for the face of the cut — which is what
    makes an incision read as depth instead of as paint.
 
-   Laduguer's is a broken crossbow bolt on a grey shield: the Grey Protector's
-   mark, and the one thing in the theme that has earned its gold. Deep Duerra's
-   is a mind flayer skull split by a crack across the crown — the duergar were
-   enslaved by illithids and she stole psionics from them, so her symbol is a
+   Durn the Grey's is a broken crossbow bolt on a grey shield: the Grey Protector's
+   mark, and the one thing in the theme that has earned its gold. Morrath's
+   is a squithid skull split by a crack across the crown — the duergar were
+   enslaved by squithids and she stole psionics from them, so her symbol is a
    trophy taken off the thing that owned her people. */
 function laduguerMark(ctx,cx,cy,r,gold){
   const shield=()=>{
@@ -6830,7 +6830,7 @@ function laduguerMark(ctx,cx,cy,r,gold){
   ctx.translate(-0.6,-0.7);bolt(gold);
   ctx.restore();
 }
-/* An illithid skull is read from three things and none of them is the outline:
+/* An squithid skull is read from three things and none of them is the outline:
    a cranium taller than it is wide with no jaw under it, sockets set low and
    slanted, and four tentacles hanging clear of each other. Drawn as outlines of
    even weight it comes out as a cartoon face — the first attempt had round eyes,
@@ -6922,8 +6922,8 @@ function duergarWallCanvas(th,variant,base){
      on variant%4, because there are eight of them and the four spare slots were
      repeats: the theme was showing the same three treatments twice each and one
      of those three — a roundel with a meaningless star in it — said nothing about
-     whose hall this is. The eight now run plain, studs, chevrons, Laduguer, Deep
-     Duerra, a slave quota, an ore seam and the mason's roundel, so a long wall
+     whose hall this is. The eight now run plain, studs, chevrons, Durn the Grey, Deep
+     Morrath, a slave quota, an ore seam and the mason's roundel, so a long wall
      carries the faith, the work and the mine rather than ornament alone.
      `variant 0` is deliberately bare: with a device on every tile the frieze has
      nothing to be read against. */
@@ -6954,9 +6954,9 @@ function duergarWallCanvas(th,variant,base){
       ctx.strokeStyle='rgba(255,246,225,0.16)';
       ctx.beginPath();ctx.moveTo(x,y+3.2);ctx.lineTo(x+w/2,y-4.8);ctx.lineTo(x+w,y+3.2);ctx.stroke();
     }
-  }else if(variant===3){                          // Laduguer, the Grey Protector
+  }else if(variant===3){                          // Durn the Grey, the Grey Protector
     wrapX(()=>laduguerMark(ctx,0.30*128,BOT,12,gold));
-  }else if(variant===4){                          // Deep Duerra, and what she took it from
+  }else if(variant===4){                          // Morrath, and what she took it from
     wrapX(()=>duerraMark(ctx,0.70*128,BOT-3,11.5));
   }else if(variant===5){
     /* A slave quota, cut where the overseer could reach it: fours struck through
@@ -7408,7 +7408,7 @@ function addSpiderBody(B,mat,x,y,z,s){
    `flesh` is fibrous and runs VERTICALLY, because a mushroom stalk is a bundle
    of hyphae pulling upward; `gill` runs radially for the underside of a cap;
    `husk` is the dried, cracked stuff a colony builds with. */
-function myconidFleshCanvas(){
+function mycelidFleshCanvas(){
   const {cv,ctx}=newCanvas(128);
   ctx.fillStyle='#fff';ctx.fillRect(0,0,128,128);
   let sd=99173>>>0;const rr=()=>{sd=(sd*1664525+1013904223)>>>0;return sd/4294967296;};
@@ -7427,7 +7427,7 @@ function myconidFleshCanvas(){
   }
   return cv;
 }
-function myconidGillCanvas(){
+function mycelidGillCanvas(){
   const {cv,ctx}=newCanvas(128);
   ctx.fillStyle='#fff';ctx.fillRect(0,0,128,128);
   for(let i=0;i<128;i++){                       // straight blades: on a cap's
@@ -7438,7 +7438,7 @@ function myconidGillCanvas(){
   }
   return cv;
 }
-function myconidHuskCanvas(){
+function mycelidHuskCanvas(){
   const {cv,ctx}=newCanvas(128);
   ctx.fillStyle='#fff';ctx.fillRect(0,0,128,128);
   let sd=40507>>>0;const rr=()=>{sd=(sd*1664525+1013904223)>>>0;return sd/4294967296;};
@@ -7457,10 +7457,10 @@ function myconidHuskCanvas(){
   }
   return cv;
 }
-function myconidTex(kind){
+function mycelidTex(kind){
   const key='mycoTex_'+kind;
   if(R3.texCache[key])return R3.texCache[key];
-  const cv=kind==='gill'?myconidGillCanvas():kind==='husk'?myconidHuskCanvas():myconidFleshCanvas();
+  const cv=kind==='gill'?mycelidGillCanvas():kind==='husk'?mycelidHuskCanvas():mycelidFleshCanvas();
   const t=texFromCanvas(cv);
   t.wrapS=t.wrapT=THREE.RepeatWrapping;
   R3.texCache[key]=t;
@@ -8808,13 +8808,13 @@ function buildLevel(L){
   // one shared noise base, and deeper relief than a flat brick face wants
   const cave=th.name==='Caves';
   const duer=th.name==='Duergar';
-  const myco=th.name==='Myconid';
+  const myce=th.name==='Mycelid';
   const drow=th.name==='Drow';
-  const NVAR=cave?12:(duer?8:(myco?8:(drow?8:6)));
-  const grid=(cave||duer||myco||drow)?null:brickGrid(th); // brick skeleton, masonry themes only
+  const NVAR=cave?12:(duer?8:(myce?8:(drow?8:6)));
+  const grid=(cave||duer||myce||drow)?null:brickGrid(th); // brick skeleton, masonry themes only
   const baseWall=cave?caveBaseCanvas(th)      // shared earth, so tiles still join invisibly
                 :duer?duergarBaseCanvas(th)   // shared courses, trim and frieze channel
-                :myco?myconidBaseCanvas(th)   // shared stalk boundaries and grain
+                :myce?mycelidBaseCanvas(th)   // shared stalk boundaries and grain
                 :drow?drowBaseCanvas(th)      // shared courses and the frieze channel
                      :baseWallCanvas(th,grid);
   for(let v=0;v<NVAR;v++){
@@ -8825,7 +8825,7 @@ function buildLevel(L){
     // so the branch keys off `built.glow`.
     const built=cave?caveWallCanvas(th,v,baseWall)
                :duer?duergarWallCanvas(th,v,baseWall)
-               :myco?myconidWallCanvas(th,v,baseWall)
+               :myce?mycelidWallCanvas(th,v,baseWall)
                :drow?drowWallCanvas(th,v,baseWall)
                     :wallCanvas(th,v,grid,baseWall);
     const tex=texFromCanvas(built.glow?built.cv:built);
@@ -8840,10 +8840,10 @@ function buildLevel(L){
        about the surface rather than real geometry and so cannot collide with
        anything. */
     const mat=new THREE.MeshPhongMaterial({map:tex,bumpMap:tex,
-      bumpScale:cave?0.075:(duer?0.015:(myco?0.035:(drow?0.012:0.02))),
-      displacementMap:tex,displacementScale:cave?0.05:(duer?0.025:(myco?0.06:(drow?0.018:0.05))),
-      specular:duer?0x1c1a14:(myco?0x2a2233:(drow?0x13151b:0x191309)),
-      shininess:cave?3:(duer?14:(myco?8:(drow?9:5)))});
+      bumpScale:cave?0.075:(duer?0.015:(myce?0.035:(drow?0.012:0.02))),
+      displacementMap:tex,displacementScale:cave?0.05:(duer?0.025:(myce?0.06:(drow?0.018:0.05))),
+      specular:duer?0x1c1a14:(myce?0x2a2233:(drow?0x13151b:0x191309)),
+      shininess:cave?3:(duer?14:(myce?8:(drow?9:5)))});
     if(built.glow){
       const gt=texFromCanvas(built.glow);
       gt.wrapS=gt.wrapT=THREE.RepeatWrapping;
@@ -8855,10 +8855,10 @@ function buildLevel(L){
   R3.wallMats=wallMats;
   const floorTex=texFromCanvas(cave?caveFloorCanvas(th)
                               :duer?duergarFloorCanvas(th)
-                              :myco?myconidFloorCanvas(th)
+                              :myce?mycelidFloorCanvas(th)
                               :drow?drowFloorCanvas(th)
                                    :noiseCanvas(th.floor,th.wall2,false,th.moss));
-  /* The roof. Myconid grows its own — caps seen from below — and a cave is
+  /* The roof. Mycelid grows its own — caps seen from below — and a cave is
      roofed with the same rock it stands on, so it takes the floor's map. The
      other themes keep the plain dark wash.
 
@@ -8873,7 +8873,7 @@ function buildLevel(L){
      pale. Everything else here hands back a bare canvas, so the branch keys off
      `.glow` exactly as the wall loop does. */
   const WEB_SPAN=3;
-  const ceilBuilt=myco?myconidCeilCanvas(th)
+  const ceilBuilt=myce?mycelidCeilCanvas(th)
                  :cave?caveFloorCanvas(th)
                  :duer?duergarCeilCanvas(th)
                  :drow?drowCeilCanvas(th)
@@ -8884,7 +8884,7 @@ function buildLevel(L){
   ceilTex.repeat.set(cave?L.w/FLOOR_SPAN:(drow?L.w/WEB_SPAN:L.w),
                      cave?L.h/FLOOR_SPAN:(drow?L.h/WEB_SPAN:L.h));
   const floorMat=new THREE.MeshPhongMaterial({map:floorTex,bumpMap:floorTex,
-    bumpScale:cave?0.03:(duer?0.006:(myco?0.035:(drow?0.005:0.015))),   // gravel has real tooth
+    bumpScale:cave?0.03:(duer?0.006:(myce?0.035:(drow?0.005:0.015))),   // gravel has real tooth
     specular:duer?0x24211a:(drow?0x262a36:0x120e08),shininess:cave?3:(duer?18:(drow?26:4))});
   const ceilMat=new THREE.MeshPhongMaterial({map:ceilTex,bumpMap:ceilTex,
     // a vault has real relief; a plain dark wash has none to find
@@ -10015,7 +10015,7 @@ function buildLevel(L){
       }else if(f.kind==='forge'){
         /* A smith's station: the firebox in the wall with its flue running up
            into the roof, an anvil on its stump beside it, and the quench trough
-           at its foot. This is the thing the whole theme is about — Laduguer's
+           at its foot. This is the thing the whole theme is about — Durn the Grey's
            temples are built over the mine shafts and heated by their own forges —
            and it is the only furniture here that is still working. */
         /* An open hearth, not a firebox. The first pass built a closed mass with
@@ -10090,7 +10090,7 @@ function buildLevel(L){
         }
         B.addTo(g0);
       }else if(f.kind==='shrine'){
-        /* A niche to Laduguer. A wall tile is a solid box, so the recess is the
+        /* A niche to Durn the Grey. A wall tile is a solid box, so the recess is the
            trick the crypt and the sewer culverts use: a dead-black panel on the
            face with a surround standing proud of it, and everything inside sits
            slightly forward of the wall plane rather than behind it. */
@@ -10107,7 +10107,7 @@ function buildLevel(L){
            reads as two objects — a square with a separate triangle below it — and
            a four-sided one is far too deep for a plate 35mm thick. Three boxes of
            falling width give a heater shield's taper in silhouette, which is all
-           that survives at this size anyway. Grey, not pale: Laduguer's shield is
+           that survives at this size anyway. Grey, not pale: Durn the Grey's shield is
            described grey, and against a dead-black niche the mid tone reads while
            the bright one glares. */
         for(const [w,h,dy] of [[0.19,0.19,0.055],[0.13,0.05,-0.065],[0.065,0.035,-0.105]])
@@ -10296,7 +10296,7 @@ function buildLevel(L){
       for(let i=0;i<2;i++)
         B.at(ironMat,new THREE.CylinderGeometry(0.010,0.012,0.62,6),
              0.55+i*0.07,0.31,0.30+i*0.03,0.30,0,0.16-i*0.05);
-      // Laduguer's mark on the hood: this is a temple as much as a workshop
+      // Durn the Grey's mark on the hood: this is a temple as much as a workshop
       B.at(goldMat,new THREE.BoxGeometry(0.16,0.020,0.014),-0.01,H*0.62,0.305,0,0,0.7);
       B.at(goldMat,new THREE.BoxGeometry(0.08,0.020,0.014),0.07,H*0.62-0.06,0.305,0,0,0.34);
       B.addTo(g0);
@@ -10368,7 +10368,7 @@ function buildLevel(L){
       grp.add(g0);
     }
   }
-  /* The chapel of Lolth: the theme's set-piece, built the way the crypt's
+  /* The chapel of the Weaver: the theme's set-piece, built the way the crypt's
      ossuary and the duergar forge hall are. Her throne stands at the centre of
      the room and her altar against a wall, and one of the house's priestesses
      keeps both.
@@ -10860,18 +10860,18 @@ function buildLevel(L){
     mk(chit,rockU,chitMat); mk(bolts,cylU,boltMat);
     grp.add(litter);
   }
-  if(th.name==='Myconid')grp.add(sporeCloud(th));
+  if(th.name==='Mycelid')grp.add(sporeCloud(th));
   /* The circle mound: the grove's set-piece. Seeded from its own tile, because
      `openMound` calls `buildLevel` again to show the bed turned over and
      anything drawn with `Math.random()` would visibly reshuffle at that moment
      — the same reason the crypt's bone stacking and the duergar's floor litter
      are seeded. */
-  if(th.name==='Myconid'&&L.mound){
+  if(th.name==='Mycelid'&&L.mound){
     const c=L.mound, cx=c.tx+0.5, cz=c.ty+0.5;
     const g0=new THREE.Group(),B=Bins(3.4);
     let ms=((c.tx*2246822519)^(c.ty*3266489917))>>>0;
     const mr=()=>{ms=(ms*1664525+1013904223)>>>0;return ms/4294967296;};
-    const fleshT=myconidTex('flesh'),huskT=myconidTex('husk');
+    const fleshT=mycelidTex('flesh'),huskT=mycelidTex('husk');
     const soil=new THREE.MeshPhongMaterial({color:0x3a3040,map:huskT,bumpMap:huskT,
       bumpScale:0.022,specular:0x0c0a10,shininess:3});
     const stone=new THREE.MeshPhongMaterial({color:new THREE.Color(th.floor).multiplyScalar(1.1),
@@ -10946,9 +10946,9 @@ function buildLevel(L){
      reshuffles it, instanced down to a handful of draw calls, flat to the
      ground so it never blocks a path, and `decor` so a tap goes through it to
      whatever is lying on the same tile. */
-  if(th.name==='Myconid'){
+  if(th.name==='Mycelid'){
     const litter=new THREE.Group();
-    const fleshT=myconidTex('flesh'),huskT=myconidTex('husk');
+    const fleshT=mycelidTex('flesh'),huskT=mycelidTex('husk');
     const capMat=new THREE.MeshPhongMaterial({color:new THREE.Color(th.moss).multiplyScalar(0.80),
       map:fleshT,bumpMap:fleshT,bumpScale:0.008,specular:0x241e2c,shininess:6});
     const stubMat=new THREE.MeshPhongMaterial({color:0x6b5f4c,map:huskT,bumpMap:huskT,
@@ -10973,7 +10973,7 @@ function buildLevel(L){
     const loc=(px,py,pz,q,sx,sy,sz)=>new THREE.Matrix4().compose(
       new THREE.Vector3(px,py,pz),q,new THREE.Vector3(sx,sy,sz));
     const mounds=[],caps=[],stalks=[],stubs=[],blues=[],dust=[];
-    const busy=new Set((L.myconid||[]).map(f=>f.x+','+f.y));
+    const busy=new Set((L.mycelid||[]).map(f=>f.x+','+f.y));
     for(let y=1;y<L.h-1;y++)for(let x=1;x<L.w-1;x++){
       if(L.grid[y*L.w+x]!==T_FLOOR)continue;
       let hsh=((x*2654435761)^(y*1597334677))>>>0;
@@ -11128,8 +11128,8 @@ function buildLevel(L){
      A colony CULTIVATES, so all six are its work rather than its ornament:
      what it eats, what it drinks, what it is raising, what it melds around,
      and what it has done with the dead. */
-  if(th.name==='Myconid'&&L.myconid){
-    const fleshT=myconidTex('flesh'),gillT=myconidTex('gill'),huskT=myconidTex('husk');
+  if(th.name==='Mycelid'&&L.mycelid){
+    const fleshT=mycelidTex('flesh'),gillT=mycelidTex('gill'),huskT=mycelidTex('husk');
     const glowC=new THREE.Color(th.glow||'#c88ae8');
     /* Fungal flesh is soft and slightly waxy: a broad, weak highlight. The one
        thing it must not have is a tight one — a hard specular on a curved cap
@@ -11152,7 +11152,7 @@ function buildLevel(L){
     const liveMat=new THREE.MeshBasicMaterial({color:glowC});
     const boneMat=new THREE.MeshPhongMaterial({color:0x8a8272,specular:0x14120c,shininess:5});
     const pend=[],flames=R3.candleFlames||[];
-    for(const f of L.myconid){
+    for(const f of L.mycelid){
       const g0=new THREE.Group(),B=Bins(4.0);
       const Z=0.20;                              // how far out of the wall it stands
       if(f.kind==='cluster'){
@@ -11244,7 +11244,7 @@ function buildLevel(L){
           B.at(liveMat,new THREE.SphereGeometry(0.011,6,5),px+0.02,py+0.082,Z+0.055);
         }
       }else{
-        /* A RAPPORT BLOOM. Myconids spend a third of the day melding — sharing
+        /* A RAPPORT BLOOM. Mycelids spend a third of the day melding — sharing
            memory through spores — and a circle does it around one body. This is
            that body: a broad pale cap on the wall with its gills facing the
            room, and it is the brightest thing in the grove.
@@ -11350,7 +11350,7 @@ function buildLevel(L){
           addSpiderBody(S,jadeMat,0,0.41,0.17,1.22);           // it is built facing the room
           S.addTo(g0);
         }else if(f.kind==='shrine'){
-          /* A niche to Lolth. A wall tile is a solid box, so the recess is the
+          /* A niche to the Weaver. A wall tile is a solid box, so the recess is the
              trick the crypt and the sewer culverts use: a dead-black panel on the
              face with a surround standing proud, and everything inside sitting a
              hair forward of the wall plane rather than behind it. */
@@ -11735,7 +11735,7 @@ function buildLevel(L){
 }
 /* ---------- cave ambushers ---------- */
 // A lurker is scenery until it isn't. Each kind wears the formation it hides
-// among: the piercer a hanging spike, the cave fisher a wet knot of ceiling
+// among: the ceiling lurker a hanging spike, the lure-spinner a wet knot of ceiling
 // growth, the roper a floor column. Seeded from its own tile so a rebuild
 // (opening a bier, reloading a save) puts the same rock back.
 function addLurkerMesh(l,li,theme){
@@ -11811,7 +11811,7 @@ function addLurkerMesh(l,li,theme){
       const a=rr()*6.28,d=0.20+rr()*0.12;
       s.position.set(Math.cos(a)*d,sh/2,Math.sin(a)*d);g0.add(s);
     }
-  }else if(l.key==='cavefisher'){
+  }else if(l.key==='lurespinner'){
     // a knobbly mass rather than one solid: three overlapping lumps, each finely
     // enough faceted to read as rock instead of a cut gem
     const kr=0.15+rr()*0.04;
@@ -11830,7 +11830,7 @@ function addLurkerMesh(l,li,theme){
       const s=spike(dl,0.030+rr()*0.018,dark);
       s.position.set((rr()-0.5)*0.34,WALLH-0.18-dl/2,(rr()-0.5)*0.34);g0.add(s);
     }
-  }else{                                             // piercer, and anything new
+  }else{                                             // ceilinglurker, and anything new
     const len=0.44+rr()*0.26,rad=0.095+rr()*0.035;
     const s=spike(len,rad,rock);
     const px=(rr()-0.5)*0.16,pz=(rr()-0.5)*0.16;
@@ -11890,7 +11890,7 @@ function doorCanvas(th,locked){
     }
     return cv;
   }
-  if(th.name==='Myconid'){ // lengths of dried stalk, cut rough and bolted
+  if(th.name==='Mycelid'){ // lengths of dried stalk, cut rough and bolted
     ctx.fillStyle='#2a2230';ctx.fillRect(0,0,128,128);
     const cols=[0,21,44,63,87,107,128];
     for(let i=0;i<cols.length-1;i++){
@@ -12270,7 +12270,7 @@ function prewarmMonsterFrames(L){
    of this list would silently drift the moment a big creature is added. */
 const BIG_SPRITES=['ogre','troll','minotaur','ogremage','dragon',
   'bonecolossus','deathknight','bonedrake','lich',
-  'umberhulk','purpleworm','roper','otyugh','cavebear','duergarlord','myelder','mylord','mysovereign','shrieker','drider','drowmatron','blackpud','ochrejelly','scrag','ettin','hillgiant','stonegiant','giantking'];
+  'rubblehulk','purpleworm','roper','otyugh','cavebear','duergarlord','myelder','mylord','mysovereign','shrieker','drider','drowmatron','blackpud','ochrejelly','scrag','ettin','hillgiant','stonegiant','giantking'];
 function monsterSpriteScale(key,boss){return boss?1.05:(BIG_SPRITES.includes(key)?0.95:0.72);}
 function addMonsterSprite(m){
   const sprKey=MONSTERS[m.key].spr;
@@ -13393,7 +13393,7 @@ function damageMonster(m,dmg,byChar,crit){
   m.awake=true;m.sleep=false;
   m.hp-=dmg;
   combatNoise(m.x,m.y);   // the fight is heard five steps off, rounding corners but stopped by walls
-  myconidDistress(m);   // a hurt myconid tells the grove, before it worries about dying
+  mycelidDistress(m);   // a hurt mycelid tells the grove, before it worries about dying
   UI.floatAtMonster(m,(crit?'CRIT ':'-')+dmg,crit?'#e8c840':'#e05545');
   if(m.hp<=0){killMonster(m,byChar);return;}
 }
@@ -13872,7 +13872,7 @@ function updateMonsters(dt){
     if(m.stunned>0){m.stunned-=dt;continue;}
     if(m.shaken>0)m.shaken-=dt;
     duergarTricks(m);
-    myconidShriek(m);
+    mycelidShriek(m);
     const slowMult=m.slowed>0?2:1;
     if(m.slowed>0)m.slowed-=dt;
     const df=G.distField;
@@ -14105,37 +14105,37 @@ function pickPartyTarget(m){
   return pick(alive);
 }
 /* ---------- the grove answers for its own ----------
-   A myconid that is hurt broadcasts distress, and every other myconid within
+   A mycelid that is hurt broadcasts distress, and every other mycelid within
    earshot stands up. A shrieker does nothing else: it cannot fight and cannot
    move, and its whole purpose is to be the thing that notices you. Both run
    through the same call, because both are the grove noticing an intrusion. */
-function myconidAlarm(m,r){
-  if(!m||!m.myconid)return 0;
+function mycelidAlarm(m,r){
+  if(!m||!m.mycelid)return 0;
   let woke=0;
   for(const o of G.L.monsters){
     if(o===m||o.hp<=0||o.awake||o.guard)continue;
-    if(Math.abs(o.x-m.x)+Math.abs(o.y-m.y)<=r&&o.myconid){o.awake=true;woke++;}
+    if(Math.abs(o.x-m.x)+Math.abs(o.y-m.y)<=r&&o.mycelid){o.awake=true;woke++;}
   }
   return woke;
 }
-function myconidDistress(m){
+function mycelidDistress(m){
   if(!m.distress||m.hp<=0)return;
-  const woke=myconidAlarm(m,7);
+  const woke=mycelidAlarm(m,7);
   if(woke)UI.toast('Spores burst from '+m.name+' — the grove has been told.');
 }
 // a shrieker screams once, the moment it sees anyone, and wakes a wider circle
-function myconidShriek(m){
+function mycelidShriek(m){
   if(!m.shriek||m.shrieked||!m.awake||m.hp<=0)return;
   const d=Math.abs(m.x-G.px)+Math.abs(m.y-G.py);
   if(d>6)return;
   m.shrieked=true;
-  const woke=myconidAlarm(m,11);
+  const woke=mycelidAlarm(m,11);
   SFX.growl(0);
   UI.floatAtMonster(m,'SHRIEK','#c88ae8');
   UI.toast(woke?'The shrieker screams, and the grove wakes around you.'
                :'The shrieker screams. Nothing answers — this time.');
 }
-/* ---------- what the mind flayers left them ----------
+/* ---------- what the squithids left them ----------
    Duergar carry two innate powers in 3.5, once a day each, and both are worth
    more to a monster than a flat stat would be. Each fires once per creature and
    only when it is worth firing, so the party sees them as a turn in the fight
@@ -14231,7 +14231,7 @@ function monsterSpecials(m,ch){
       }
     }
   }
-  // an umber hulk's gaze: no new condition, just the stun that already exists.
+  // an rubble hulk's gaze: no new condition, just the stun that already exists.
   // Will save, because it is a mind effect rather than something physical.
   if(sp.gaze){
     const sv=charSaves(ch).will+saveBonusVs(ch,'spell'),nat=d20(),made=nat+sv>=sp.gaze.dc;
@@ -16108,7 +16108,7 @@ function openForge(){
   if(coffinNoise(f.ax,f.ay,8))setTimeout(()=>UI.toast('The whole hall has heard it…'),900);
   saveGame();
 }
-/* Lolth's altar carries what the house has laid on it, and it is robbed once.
+/* the Weaver's altar carries what the house has laid on it, and it is robbed once.
    Written on openBier's and openForge's terms — the same reach check, the same
    rebuild so the scenery changes, the same spill onto a walkable neighbour (the
    altar tile itself is against a wall but the throne block is not walkable), and
@@ -16135,9 +16135,9 @@ function openAltar(){
   saveGame();
 }
 /* Digging a circle mound out, written on `openBier`'s terms like the forge
-   anvil and Lolth's altar before it. Robbed once, and loud: a mound is where
+   anvil and the Weaver's altar before it. Robbed once, and loud: a mound is where
    the circle sleeps, so turning one over is heard right across the grove —
-   which on this theme means every myconid within earshot, not just the ones
+   which on this theme means every mycelid within earshot, not just the ones
    who can see you. */
 function openMound(){
   const L=G.L,c=L.mound;
@@ -16228,9 +16228,29 @@ function serializeGame(){
       traps:Object.values(L.traps),items:Object.keys(L.items).map(i=>[+i,L.items[i]]),
       monsters:L.monsters.map(m=>{const c=Object.assign({},m);delete c._sc;delete c._regenT;delete c.dot;return c;}),
       secrets:L.secrets,lockedRoom:L.lockedRoom,restCount:L.restCount||{},restsHere:L.restsHere||0,
-      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,forge:L.forge||null,chapel:L.chapel||null,mound:L.mound||null,lurkers:L.lurkers||[],duergar:L.duergar||[],pillars:L.pillars||[],drow:L.drow||[],myconid:L.myconid||[],
+      rivers:L.rivers||[],pipes:L.pipes||[],crypts:L.crypts||[],ossuary:L.ossuary||null,forge:L.forge||null,chapel:L.chapel||null,mound:L.mound||null,lurkers:L.lurkers||[],duergar:L.duergar||[],pillars:L.pillars||[],drow:L.drow||[],mycelid:L.mycelid||[],
     },
   };
+}
+/* Four creatures were renamed, and a save stores a creature by KEY — so without
+   this a run saved before the rename comes back with `MONSTERS[m.key]`
+   undefined and dies on the first floor it rebuilds. Lurkers carry a key too,
+   which is easy to forget: they are the ambushers, stored separately from
+   `monsters`.
+
+   The grove's own creatures did NOT need renaming: their keys were already
+   `mysprout`, `myguard` and so on, which read as well for a mycelid as for what
+   they were called before. Only the level's furniture array moved, and that is
+   handled in place by reading `lv.myconid` when `lv.mycelid` is absent.
+
+   Keep this table for ever. It costs nothing and it is the only thing standing
+   between an old save and a crash. */
+const MON_RENAMES={umberhulk:'rubblehulk',crawler:'carrionworm',
+                   cavefisher:'lurespinner',piercer:'ceilinglurker'};
+function renameKeys(list){
+  if(!list)return list;
+  for(const m of list)if(m&&MON_RENAMES[m.key])m.key=MON_RENAMES[m.key];
+  return list;
 }
 function deserializeGame(o){
   G.depth=o.depth;G.px=o.px;G.py=o.py;G.facing=o.facing;G.time=o.time||0;
@@ -16247,8 +16267,8 @@ function deserializeGame(o){
   const L={
     w:lv.w,h:lv.h,grid:b64ToU8(lv.grid),explored:b64ToU8(lv.explored),
     start:lv.start,stairs:lv.stairs,theme:THEMES[lv.themeIdx]||THEMES[0],depth:lv.depth,
-    traps,items,monsters:lv.monsters,secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
-    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,forge:lv.forge||null,chapel:lv.chapel||null,mound:lv.mound||null,lurkers:lv.lurkers||[],duergar:lv.duergar||[],pillars:lv.pillars||[],drow:lv.drow||[],myconid:lv.myconid||[],
+    traps,items,monsters:renameKeys(lv.monsters),secrets:lv.secrets,lockedRoom:lv.lockedRoom,decor:[],
+    restCount:lv.restCount||{},restsHere:lv.restsHere||0,rivers:lv.rivers||[],pipes:lv.pipes||[],crypts:lv.crypts||[],ossuary:lv.ossuary||null,forge:lv.forge||null,chapel:lv.chapel||null,mound:lv.mound||null,lurkers:renameKeys(lv.lurkers||[]),duergar:lv.duergar||[],pillars:lv.pillars||[],drow:lv.drow||[],mycelid:lv.mycelid||lv.myconid||[],
   };
   clearFx();
   G.L=L;G.over=false;
@@ -17405,7 +17425,7 @@ const UI=(()=>{
     if(d.incorporeal)out.push('Incorporeal — halves damage from unenchanted weapons');
     if(d.lurk)out.push('Ambusher — lies in wait as rock');
     if(d.shriek)out.push('Shrieks — wakes the grove');
-    if(d.distress)out.push('Distress — its pain calls other myconids');
+    if(d.distress)out.push('Distress — its pain calls other mycelids');
     return out;
   }
   function renderBestiary(){
