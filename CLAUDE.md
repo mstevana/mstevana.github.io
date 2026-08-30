@@ -633,7 +633,7 @@ Two mechanical notes:
 ## Adding a monster
 
 `MONSTERS` is a plain object keyed by id, so ordering does not matter
-here (unlike `scotland.html`). Touch all of these:
+here. Touch all of these:
 
 1. **`MONSTERS`** — the definition. `cr` drives XP via `XP_AWARD`; `hp`,
    `ac`, `atk`, `dmg`, `speed`, `type` are the combat numbers. Optional:
